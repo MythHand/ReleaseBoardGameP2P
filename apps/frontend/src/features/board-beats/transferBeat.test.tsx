@@ -2,23 +2,31 @@ import { act, render } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
 import type { BoardAnchors, BoardState } from '~/entities/game/board'
 import type { BeatPlan } from './planBeats'
+import { spot } from './testing'
 import { useTransferBeat } from './transferBeat'
 
 const played = vi.hoisted(() => ({
   names: [] as string[],
   shakes: [] as unknown[],
   takes: [] as unknown[],
+  // where each `takeFromSeat` element STOOD as it began — the start a travel
+  // reads off the card itself (`testing.tsx`'s `standing`)
+  takeStarts: [] as unknown[],
 }))
 const arrivals = vi.hoisted(() => ({ handLengths: [] as number[], calls: 0 }))
 
 vi.mock('@release/ui/animations', async (importOriginal) => {
   const real = await importOriginal<typeof import('@release/ui/animations')>()
+  const { standing } = await import('./testing')
   return {
     ...real,
-    play: (name: string, _el: unknown, params?: unknown) => {
+    play: (name: string, el: Element | null, params?: unknown) => {
       played.names.push(name)
       if (name === 'shake') played.shakes.push(params)
-      if (name === 'takeFromSeat') played.takes.push(params)
+      if (name === 'takeFromSeat') {
+        played.takes.push(params)
+        played.takeStarts.push(standing(el))
+      }
       return { finished: Promise.resolve() } as unknown as Animation
     },
     useHandArrival: (...args: Parameters<typeof real.useHandArrival>) => {
@@ -129,6 +137,7 @@ beforeEach(() => {
   played.names = []
   played.shakes = []
   played.takes = []
+  played.takeStarts = []
   arrivals.handLengths = []
   arrivals.calls = 0
 })
@@ -402,7 +411,7 @@ it('takes the chosen closed card from its parked position without replaying a fa
   const r = runTransfer(transferPlan({ named: false, index: 2 }), pending)
   await r.go()
   expect(played.names.filter((name) => name === 'takeFromSeat')).toHaveLength(1)
-  expect(played.takes[0]).toMatchObject({ from: { left: 620, top: 430, width: 150, height: 210 } })
+  expect(played.takeStarts[0]).toEqual({ left: 620, top: 430, width: 150 })
   root.removeChild(centreNode)
 })
 
@@ -529,5 +538,5 @@ it('takes the card out of the place the fan names, not one of its own choosing',
     vi.useRealTimers()
     root.remove()
   }
-  expect(played.takes[0]).toMatchObject({ from: pickedRect })
+  expect(played.takeStarts[0]).toEqual(spot(pickedRect))
 })

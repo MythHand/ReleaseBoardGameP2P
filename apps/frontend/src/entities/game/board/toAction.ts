@@ -12,6 +12,8 @@ export type TableIntent =
   | { kind: 'attack'; card: string; combo?: string }
   | { kind: 'pass' }
   | { kind: 'resolve'; choice: TableChoice }
+  | { kind: 'show'; card: string }
+  | { kind: 'takeBack' }
   | { kind: 'windowExpired' }
 
 // An intent becomes an action: the kit never knows the player's id or the
@@ -41,6 +43,10 @@ export function toAction(intent: TableIntent, player: string, at: number): Actio
       return { type: 'PASS', player, at }
     case 'resolve':
       return { type: 'RESOLVE', player, choice: intent.choice as Choice, at }
+    case 'show':
+      return { type: 'SHOW', player, card: intent.card, at }
+    case 'takeBack':
+      return { type: 'TAKE_BACK', player, at }
     // WINDOW_EXPIRED is the one action carrying no player — it belongs to no
     // one; the window itself expired.
     case 'windowExpired':

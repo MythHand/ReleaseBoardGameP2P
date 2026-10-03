@@ -4,18 +4,24 @@ import { nextFrames, play, useDiscardExit, useFlyer, wait } from '@release/ui/an
 import type { RefObject } from 'react'
 import { useCallback, useRef } from 'react'
 import type { BeatRun, BoardAnchors, StagedHandoff } from '~/entities/game/board'
-import { ATTACK_POSE, COVER_POSE, SHOW_HOLD } from '~/entities/game/board'
+import { ALARM_POSE, ATTACK_POSE, COVER_POSE, SHOW_HOLD } from '~/entities/game/board'
 import { aiCauseExit, withoutAiCause } from './aiCauseExit'
+import { liftOff, type Place, setDown } from './cardPlace'
 import { exchange } from './exchange'
 import type { BeatPlan } from './planBeats'
+import { adoptStaged } from './shownBeat'
 import { toEventsDeck } from './toEventsDeck'
 import { useToHand } from './toHand'
+import { settleInto } from './toHeap'
+import { readsAtGlance } from './zoneReading'
 
 // The answer to an attack (#101): a defence covers what is standing at the
 // centre, and the whole exchange leaves together. `_useDefenseStaging.ts` is
 // the OTHER half — the gesture that stands the local player's own answer there
 // before the engine has spoken; the two meet at `StagedHandoff`, exactly as
 // the combo pair's two halves do.
+
+type ZoneSlot = Extract<Place, { kind: 'zone' }>['slot']
 
 // same 5-line helper comboBeat.tsx keeps privately — copy it, don't import
 // across runners
@@ -132,11 +138,9 @@ export function useDefenseBeat(
         // where it came from": the card stands, in its own pose, and the
         // exchange leaves from something real.
         const handIndex = mine ? ctx.base.you.hand.findIndex((h) => h.card.id === plan.card) : -1
-        const from =
-          (handIndex >= 0 ? rectOf(a.handSlotAt(handIndex)) : null) ??
-          a.seatBox(plan.defender) ??
-          coverBox
-        const [el] = await flyer.raise([
+        const seat = a.seatBox(plan.defender)
+        const from = (handIndex >= 0 ? rectOf(a.handSlotAt(handIndex)) : null) ?? seat ?? coverBox
+        const raised = flyer.raise([
           {
             key: 'cover',
             at: from,
@@ -144,9 +148,20 @@ export function useDefenseBeat(
             card: ownSudo ? undefined : defence,
           },
         ])
+        // …and the place it left stops drawing it in the commit its carrier goes
+        // up: our fan, or the count of the hand it came out of (`cardPlace.ts`)
+        const held = handIndex >= 0 ? ctx.base.you.hand[handIndex] : undefined
+        liftOff(
+          ctx,
+          held
+            ? [{ kind: 'hand', uid: held.uid }]
+            : seat
+              ? [{ kind: 'seat', player: plan.defender }]
+              : [],
+        )
+        const [el] = await raised
         if (el) {
           await play('playToCenter', el, {
-            from,
             to: coverBox,
             rotate: COVER_POSE.rot,
             dx: COVER_POSE.dx,
@@ -247,7 +262,7 @@ export function useDefenseBeat(
               // as a blink rather than an arrival (owner, 22.09). The same
               // preset every other "card goes to a player" motion uses:
               // the deal, the hand limit, a card handed over.
-              if (el) await play('dealToSeat', el, { from: attackBox, to })?.finished
+              if (el) await play('dealToSeat', el, { to })?.finished
               flyer.drop('back')
             })()
           : undefined
@@ -268,17 +283,44 @@ export function useDefenseBeat(
       // the attack leaving for its hand are one moment, not two gestures.
       // What the centre was drawing off the pending goes down in the commit
       // the exit's carriers go up — the step's own `takeOff`.
-      const letGoOfThePending = () =>
-        ctx.publish({
-          ...ctx.base,
-          pending: null,
-          ...(reflected ? { centreAttack: { card: plan.attackCard, sudo: plan.attackSudo } } : {}),
-        })
+      //
+      // Through `cardPlace`, so the attack leaves every field the centre draws it
+      // from and the run's base moves with it — the Rollback's landing below
+      // builds on that base, and a base still holding the pending brought the
+      // attack back to the centre as it landed in the fan. A reflected attack
+      // stays, and so does the defence that turned it, if the exit does not take
+      // it: both stand on as the answered exchange's own fields. Our own cover
+      // carrier comes down in the same commit — the exit's copy, or the cover's
+      // standing render, is what draws it from here (#168).
+      const coverStays = reflected && !defenceSpent
+      const letGoOfThePending = () => {
+        liftOff(ctx, [{ kind: 'centre', card: plan.attackCard }])
+        if (reflected)
+          setDown(ctx, [
+            {
+              kind: 'centre',
+              attack: { card: plan.attackCard, sudo: plan.attackSudo },
+              ...(coverStays ? { cover: { card: plan.card, sudo: Boolean(ownSudo) } } : {}),
+            },
+          ])
+        flyer.drop('cover')
+      }
+      // …and what landed lies in the heap from the commit the carriers come down,
+      // as it lay on the table: the attack under the defence that covered it,
+      // and each pair's Sudo tucked under its own card. The layer says so, not
+      // the event order — the engine banks the Sudo a moment AFTER its card, and
+      // filed by event it lay on top, then swapped under once the projection's
+      // own heap (`toDiscardHeap`) took over (owner's recording, 02.10)
+      const filed = [attackAux, attackSpent, defenceAux, defenceSpent].flatMap((s, layer) =>
+        s ? [{ ...s, layer }] : [],
+      )
       // nothing flies, so the step never runs it — but the pending still has to
       // be let go of, or the answered attack keeps standing at the centre
       if (items.length === 0) letGoOfThePending()
       await Promise.all([
-        items.length > 0 ? latest.current.send(items, letGoOfThePending) : undefined,
+        items.length > 0
+          ? latest.current.send(items, letGoOfThePending).then(() => settleInto(ctx, filed))
+          : undefined,
         returning,
       ])
       flyer.drop('cover')
@@ -333,7 +375,7 @@ export function useDefenseBeat(
           (handIndex >= 0 ? rectOf(a.handSlotAt(handIndex)) : null) ??
           a.seatBox(plan.player) ??
           coverBox
-        const [el] = await flyer.raise([
+        const raised = flyer.raise([
           {
             key: 'cover',
             at: from,
@@ -341,9 +383,23 @@ export function useDefenseBeat(
             card: aux ? undefined : answer,
           },
         ])
+        // …and the place it left stops drawing it in the commit its carrier goes
+        // up, as `runCovered`'s does: the sacrificed release's zone (its Code
+        // Review with it), our fan, or the count of the hand it came out of
+        const held = handIndex >= 0 ? ctx.base.you.hand[handIndex] : undefined
+        liftOff(
+          ctx,
+          plan.method === 'sacrifice' && plan.slot
+            ? [{ kind: 'zone', player: plan.player, slot: plan.slot as ZoneSlot }]
+            : held
+              ? [{ kind: 'hand', uid: held.uid }]
+              : a.seatBox(plan.player)
+                ? [{ kind: 'seat', player: plan.player }]
+                : [],
+        )
+        const [el] = await raised
         if (el) {
           await play('playToCenter', el, {
-            from,
             to: coverBox,
             rotate: COVER_POSE.rot,
             dx: COVER_POSE.dx,
@@ -358,7 +414,17 @@ export function useDefenseBeat(
       // hold — `release()` clears the local answerer's own static cover render
       // at once, and the staging hook's `landed` gate has nothing else backing
       // that slot. Same ordering runCovered had to be fixed into.
-      if (mine && handoff) handoff.release()
+      //
+      // …AND TAKEN OVER, not only let go: off our fan — or, a sacrifice, out of
+      // our zone — in the commit the gesture lets go (`adoptStaged`). Released
+      // alone, the gesture stopped hiding the card the moment the alarm was
+      // answered, and the fan drew the Debugger again from the hand this run
+      // still held, for its whole flight to the discard (owner's recording, 03.10).
+      if (mine && handoff) {
+        if (plan.method === 'sacrifice' && plan.slot)
+          liftOff(ctx, [{ kind: 'zone', player: plan.player, slot: plan.slot as ZoneSlot }])
+        adoptStaged(ctx, handoff)
+      }
 
       // The Code Review's own true rest position, for the split below that
       // sends it alone — measured the same way `useDiscardExit`'s own
@@ -385,7 +451,7 @@ export function useDefenseBeat(
               card: alarmCard,
               el: a.centre.current,
               from: alarmBox,
-              pose: ATTACK_POSE,
+              pose: ALARM_POSE,
             }
           : null,
         // The release's own Code Review is never an events-deck card, so it
@@ -434,7 +500,8 @@ export function useDefenseBeat(
           deck: a.eventsBox.current,
           turnFaceDown: () => flyer.patch('sacrificed', { faceDown: true }),
         })
-        flyer.drop('sacrificed')
+        // the events deck counts it back in the commit its carrier comes down
+        setDown(ctx, [{ kind: 'events' }], () => flyer.drop('sacrificed'))
       })()
       // TAKEOFF: the answer has been given and both cards are in the air, so the
       // board lets go of the pending HERE — the same moment, and for the same
@@ -447,21 +514,42 @@ export function useDefenseBeat(
       // sequence puts in the same batch used to animate against a board that
       // still had the alarm standing on it (#103 testing, problem 1).
       const cause = aiCauseExit(plan.causeward, a)
-      const decks = ctx.base.decks
       // what the table was drawing goes in the commit the carriers go up — the
-      // step's own `takeOff`; with nothing to fly it has to happen anyway
+      // step's own `takeOff`; with nothing to fly it has to happen anyway. The
+      // remote answer's own carrier comes down in that commit too, as
+      // `runCovered`'s does: from here the exit's copy draws it, and left up it
+      // stood at the cover slot for the whole flight beside that copy.
       const letGoOfTheCause = () => {
         ctx.base = withoutAiCause(ctx.base, cause.length > 0 ? plan.causeward : undefined)
         ctx.publish(ctx.base)
+        flyer.drop('cover')
       }
-      if (items.length + cause.length === 0) letGoOfTheCause()
+      // …and what landed lies in the heap from the commit the carriers come
+      // down, as it lay on the table: the trigger beside the prompt, the alarm,
+      // and the answer over it with its Code Review tucked under (`toHeap`). Not
+      // the decks as they stood before the flight — that took back whatever
+      // else had landed meanwhile. A release going home is not the heap's.
+      const answered = toEvents ? [plan.spent[1]] : [plan.spent[1], plan.spent[0]]
+      const filed = [
+        cause.length > 0 ? plan.causeward : undefined,
+        plan.alarm,
+        ...(plan.method === 'monitoring' ? [] : answered),
+      ].flatMap((s, layer) => (s ? [{ eventId: s.eventId, card: s.card, layer }] : []))
+      // …and they FLY in that same order: the trigger on the bottom rung, the
+      // exchange above it. Sent at one layer with the answer, the trigger rode
+      // over the Debugger to the heap and lay under it the moment both landed
+      // (owner's recording, 03.10).
+      const flying =
+        cause.length > 0
+          ? [
+              ...cause.map((c) => ({ ...c, layer: 0 })),
+              ...items.map((it) => ({ ...it, layer: (it.layer ?? 0) + 1 })),
+            ]
+          : items
+      if (flying.length === 0) letGoOfTheCause()
       await Promise.all([
-        items.length + cause.length > 0
-          ? latest.current.send([...items, ...cause], letGoOfTheCause).then(() => {
-              if (cause.length === 0) return
-              ctx.base = { ...ctx.base, decks }
-              ctx.publish(ctx.base)
-            })
+        flying.length > 0
+          ? latest.current.send(flying, letGoOfTheCause).then(() => settleInto(ctx, filed))
           : undefined,
         sacrificedHome,
         plan.homeward ? sendHomeward(plan.homeward) : undefined,
@@ -480,7 +568,7 @@ export function useDefenseBeat(
   // ease to their LOD values over the CSS transitions already on them while
   // the flight carries the card across (`ComposedFace`'s own coupling).
   const runStolen = useCallback(
-    async (plan: Extract<BeatPlan, { kind: 'stolen' }>, ctx: BeatRun) => {
+    async (plan: Extract<BeatPlan, { kind: 'stolen' }>, _ctx: BeatRun) => {
       await nextFrames() // the shadow that renders `before` has committed (I2)
       const a = latest.current.anchors
       // `from` is the victim's slot as it stood BEFORE this batch (I1 — the
@@ -508,14 +596,15 @@ export function useDefenseBeat(
       }
       // A release stolen INTO OUR OWN zone (the reflected case, and any
       // future one) is read in full, not as LOD — only a crossing into an
-      // OPPONENT's zone gets the at-a-glance reading. The flip happens on
-      // the same frame the travel starts, so nothing is swapped on arrival.
-      if (plan.to !== ctx.base.selfId) {
+      // OPPONENT's zone gets the at-a-glance reading, and the thief's slot is
+      // what says which (`zoneReading.ts`). The flip happens on the same frame
+      // the travel starts, so nothing is swapped on arrival.
+      if (readsAtGlance(a.releaseSlot(plan.to, plan.slot))) {
         flyer.patch('steal', {
           content: <Card card={card} interactive={false} width="100%" lod />,
         })
       }
-      await play('playToCenter', el, { from, to })?.finished
+      await play('playToCenter', el, { to })?.finished
       flyer.drop('steal')
     },
     [flyer.raise, flyer.patch, flyer.drop],

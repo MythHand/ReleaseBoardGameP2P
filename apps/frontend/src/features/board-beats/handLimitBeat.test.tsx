@@ -6,6 +6,7 @@ import { expect, it, vi } from 'vitest'
 import type { BeatRun, BoardAnchors, BoardState, HandLimitHandoff } from '~/entities/game/board'
 import { useHandLimitBeat } from './handLimitBeat'
 import type { BeatPlan } from './planBeats'
+import { spot } from './testing'
 
 // Same stubbing idiom as `discardBeat.test.tsx`: `useFlyer` stays real with its
 // `raise` recorded (that is what says whether cards were flown INTO the grid),
@@ -13,17 +14,20 @@ import type { BeatPlan } from './planBeats'
 // through a sibling import the barrel mock never sees.
 const raises = vi.hoisted(() => ({ keys: [] as string[], at: [] as Rect[] }))
 const played = vi.hoisted(() => ({
-  moves: [] as { from: Rect; to: Rect }[],
+  // `from` is where the flown element STOOD as the flight began — the start a
+  // travel reads off the card itself (`testing.tsx`'s `standing`)
+  moves: [] as { from: unknown; to: Rect }[],
   // every preset name `play()` was called with, in order — the road home's
   // own test tells `returnToDeck` apart from the grid's `playToCenter` legs.
   names: [] as string[],
-  calls: [] as { name: string; params: Record<string, unknown>; at: number }[],
+  calls: [] as { name: string; params: Record<string, unknown>; at: number; start?: unknown }[],
 }))
 const exits = vi.hoisted(() => ({ items: [] as Leaving[], holdMs: 0, startedAt: 0 }))
 const order = vi.hoisted(() => ({ calls: [] as string[] }))
 const resets = vi.hoisted(() => ({ flyer: 0, exit: 0 }))
 vi.mock('@release/ui/animations', async (importOriginal) => {
   const real = await importOriginal<typeof import('@release/ui/animations')>()
+  const { standing } = await import('./testing')
   return {
     ...real,
     useFlyer: (...args: Parameters<typeof real.useFlyer>) => {
@@ -43,12 +47,12 @@ vi.mock('@release/ui/animations', async (importOriginal) => {
       }
     },
     play: (...args: Parameters<typeof real.play>) => {
-      const [name, , params = {}] = args
+      const [name, el, params = {}] = args
       played.names.push(name)
-      played.calls.push({ name, params, at: Date.now() })
+      played.calls.push({ name, params, at: Date.now(), start: standing(el) })
       if (name === 'playToCenter') {
         order.calls.push('move')
-        played.moves.push({ from: params.from as Rect, to: params.to as Rect })
+        played.moves.push({ from: standing(el), to: params.to as Rect })
       }
       return real.play(...args)
     },
@@ -359,8 +363,8 @@ it('builds the grid itself for a discard that is not ours', async () => {
   expect(raises.keys).toEqual(['hl4', 'hl5'])
   expect(raises.at).toEqual(sources)
   expect(played.moves).toEqual([
-    { from: sources[0], to: targets[0] },
-    { from: sources[1], to: targets[1] },
+    { from: spot(sources[0]), to: targets[0] },
+    { from: spot(sources[1]), to: targets[1] },
   ])
   expect(exits.items.map((item) => item.from)).toEqual(targets)
   expect(exits.items).toHaveLength(2)
@@ -410,8 +414,8 @@ it('sends the AI card standing behind the prompt home once this batch answers it
   const home = played.calls.find((c) => c.name === 'returnToDeck')
   const effectBox = anchors.effect.current?.getBoundingClientRect()
   const eventsBox = anchors.eventsBox.current?.getBoundingClientRect()
+  expect(home?.start).toMatchObject({ left: effectBox?.left, top: effectBox?.top })
   expect(home?.params).toMatchObject({
-    from: { left: effectBox?.left, top: effectBox?.top },
     to: { left: eventsBox?.left, top: eventsBox?.top },
   })
 })
@@ -596,7 +600,7 @@ it('stands Bad Vibe’s given-up card at the picked place, not in the grid', asy
   // it flew to the `picked` anchor's own box — the board positions that node
   // from `centrePlaceStyle('aiPick', 'picked')`, so this IS `centre.ts`'s
   // geometry and not a number this test invented
-  expect(played.moves).toEqual([{ from: seat, to: PICKED_BOX }])
+  expect(played.moves).toEqual([{ from: spot(seat), to: PICKED_BOX }])
   expect(exits.items.map((i) => i.from)).toEqual([PICKED_BOX])
 })
 

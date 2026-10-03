@@ -53,6 +53,8 @@ it('reads a git operation standing at the centre while its effect is open', () =
         picks: 1,
         options: [],
       },
+      // as the projection answers it while that pending stands
+      centreOperation: { card: 'operation-git-cherry-pick', sudo: false, spent: [] },
     },
   })
   render(<Board {...props} />)

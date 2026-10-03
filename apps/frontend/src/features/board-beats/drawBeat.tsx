@@ -184,7 +184,7 @@ export function useDrawBeat(
           // second, smaller trim — down to `SEAT_SHRINK` of a card width — not
           // a duplicate of the first.
           const to = seatCardBox(seat)
-          const anim = play('dealToSeat', el, { from: centre, to })
+          const anim = play('dealToSeat', el, { to })
           if (anim) await anim.finished
         }
         drop('draw')

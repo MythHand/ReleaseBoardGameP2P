@@ -2,7 +2,12 @@ import { createFakeEngine, FAKE_DECK, FAKE_EVENTS } from '@release/engine/fake'
 import { cardById } from '@release/ui'
 import { scatterAt } from '@release/ui/animations'
 import { describe, expect, it, vi } from 'vitest'
-import { type BoardState, type HistoryLabels, toBoardState } from '~/entities/game/board'
+import {
+  type BoardState,
+  type HistoryLabels,
+  standInScatter,
+  toBoardState,
+} from '~/entities/game/board'
 import { SHOW_HOLD, useAiBeat } from './aiBeat'
 import { planBeats } from './planBeats'
 import {
@@ -11,11 +16,12 @@ import {
   boxed,
   callOrder,
   nodeAt,
-  playedAll,
   playedNames,
   playedWith,
   renderBeat,
   runBeat,
+  spot,
+  startedAll,
   waitedMs,
 } from './testing'
 import { HALLUCINATION_HOLD, TABLE_HOLD } from './toCentre'
@@ -37,6 +43,7 @@ vi.mock('@release/ui/animations', async (importOriginal) => {
       // index-aligned with `played` — `playedWith(name)` is what reads it, and
       // it is what tells "a flight happened" from "a flight aimed HERE"
       animationsTrace.params.push(params)
+      animationsTrace.markStart(el)
       return real.play(name, el, params)
     },
     wait: (ms: number) => {
@@ -221,10 +228,10 @@ describe('aiBeat', () => {
     // proved neither — the AI card's own `goHome` supplies a `returnToDeck` on
     // every crush there is, so no-op'ing the release's flight left this test,
     // the one named for #71's guarantee, entirely green.
-    const homes = playedAll('returnToDeck').map((params) => params?.from)
+    const homes = startedAll('returnToDeck')
     expect(homes).toHaveLength(2)
-    expect(homes).toContainEqual(ZONE_SLOT) // the release, out of the zone
-    expect(homes).toContainEqual(EFFECT_BOX) // the AI card, off the centre
+    expect(homes).toContainEqual(spot(ZONE_SLOT)) // the release, out of the zone
+    expect(homes).toContainEqual(spot(EFFECT_BOX)) // the AI card, off the centre
     // the ONLY thing in the heap is the trigger
     const keys = (anchors.exitSpy.mock.calls.flat(2) as { key: string }[]).map((c) => c.key)
     expect(keys).toEqual(['d3'])
@@ -239,7 +246,7 @@ describe('aiBeat', () => {
     // …and it did NOT also go home. Exactly one card takes that road here — the
     // AI card, off the centre — so this test cannot pass on the evidence the
     // events-deck one above is about, nor that one on this.
-    expect(playedAll('returnToDeck').map((params) => params?.from)).toEqual([EFFECT_BOX])
+    expect(startedAll('returnToDeck')).toEqual([spot(EFFECT_BOX)])
   })
 
   // A zone slot wearing a Code Review renders as a `CardPair`; the aux half is
@@ -292,9 +299,9 @@ describe('aiBeat', () => {
     expect(items.map((i) => i.key).sort()).toEqual(['crushedAux', 'd3'])
     // two go home and no more — the AI card and the release. A third would be
     // the Code Review taking a road that is not its own.
-    const homes = playedAll('returnToDeck').map((params) => params?.from)
+    const homes = startedAll('returnToDeck')
     expect(homes).toHaveLength(2)
-    expect(homes).toContainEqual(ZONE_SLOT)
+    expect(homes).toContainEqual(spot(ZONE_SLOT))
   })
 
   // I7 FOR A CARD WITH NO EVENT OF ITS OWN. `destroySlot` called without a
@@ -339,6 +346,142 @@ describe('aiBeat', () => {
     expect(items.find((i) => i.key === 'crushedAux')?.scatter).toBeUndefined()
   })
 
+  // ONE CARD, ONE PLACE for the release a crush destroys (#168): the zone lets
+  // it go in the commit its carrier goes up, and where it lands has it in the
+  // commit the carrier comes down. The stand recorded it in its slot for the
+  // whole flight and after, and gone from everywhere once its carrier dropped.
+  describe('a crushed release, one place at a time', () => {
+    const crushedBase = {
+      you: { name: 'You', hand: [], release: { frontend: cardById('release-frontend') } },
+      opponents: [],
+      decks: { main: [10], events: 5, discardCount: 4, discardHeap: [] },
+      selfId: 'p1',
+      history: [],
+      setup: {},
+      playable: [],
+      frozen: [],
+    } as unknown as BoardState
+    // every publish, numbered in the same trace the drops and flights are in
+    const recording = () => {
+      const states: BoardState[] = []
+      const publish = (state: BoardState) => {
+        states.push(state)
+        animationsTrace.order.push(`publish:${states.length - 1}`)
+      }
+      return { states, publish }
+    }
+
+    it('lets the zone go of it in the commit its carrier goes up', async () => {
+      const anchors = anchorsFixture()
+      anchors.exitSpy.mockImplementation((items: unknown) => {
+        if ((items as { key: string }[]).some((i) => i.key === 'crushed'))
+          animationsTrace.order.push('exit:crushed')
+        return Promise.resolve()
+      })
+      const { result } = renderBeat(() => useAiBeat(anchors))
+      const { states, publish } = recording()
+      await runBeat(result.current.run, crushPlan('discard'), anchors, {
+        base: crushedBase,
+        publish,
+      })
+      const lifted = states.findIndex((s) => !s.you.release.frontend)
+      expect(lifted).toBeGreaterThanOrEqual(0)
+      expect(callOrder().indexOf(`publish:${lifted}`)).toBeLessThan(
+        callOrder().indexOf('exit:crushed'),
+      )
+    })
+
+    it('rests it in the heap as the stand-in for its top as it lands', async () => {
+      const anchors = anchorsFixture()
+      const { result } = renderBeat(() => useAiBeat(anchors))
+      const { states, publish } = recording()
+      const rest = standInScatter(6)
+      await runBeat(
+        result.current.run,
+        {
+          ...crushPlan('discard'),
+          tail: { ...crushPlan('discard').tail, rest, restCount: 6 },
+        },
+        anchors,
+        { base: crushedBase, publish },
+      )
+      // the very name and pose the projection then draws it with
+      const filed = states.findIndex((s) => s.decks.discardHeap?.some((c) => c.uid === 'top6'))
+      expect(filed).toBeGreaterThanOrEqual(0)
+      expect(states[filed].decks.discardHeap?.find((c) => c.uid === 'top6')).toMatchObject({
+        card: expect.objectContaining({ id: 'release-frontend' }),
+        ...rest,
+      })
+      expect(callOrder().indexOf(`publish:${filed}`)).toBeLessThan(
+        callOrder().indexOf('drop:crushed'),
+      )
+      // the trigger and the release, both counted
+      expect(states.at(-1)?.decks.discardCount).toBe(6)
+    })
+
+    // A REFUSED CRUSH: the release and the trigger beside it leave together and
+    // land in either order. The stand recorded the release filed and then gone
+    // again — the trigger's landing put back the decks from before (03.10).
+    it.each([
+      'the release',
+      'the trigger',
+    ])('keeps the release on top of the trigger after a refusal, %s landing first', async (first) => {
+      const anchors = anchorsFixture()
+      anchors.exitSpy.mockImplementation((items: unknown) => {
+        const crushed = (items as { key: string }[]).some((i) => i.key === 'crushed')
+        const late = first === 'the release' ? !crushed : crushed
+        return new Promise<void>((resolve) => setTimeout(resolve, late ? 200 : 0))
+      })
+      const { result } = renderBeat(() => useAiBeat(anchors))
+      const { states, publish } = recording()
+      const causeward = { card: 'trigger-ai', eventId: 3 }
+      const refused = {
+        kind: 'crushRefused' as const,
+        key: 'refused:9',
+        eventId: 9,
+        player: 'p1',
+        tail: {
+          kind: 'crush' as const,
+          slot: 'frontend',
+          card: 'release-frontend',
+          destination: 'discard' as const,
+          rest: standInScatter(6),
+          restCount: 6,
+        },
+        homeward: 'ai-crush-frontend',
+        causeward,
+      }
+      const base = {
+        ...crushedBase,
+        aiCause: causeward,
+        decks: {
+          ...crushedBase.decks,
+          discardCount: 5,
+          discardHeap: [{ uid: 'd3', card: cardById('trigger-ai'), ...scatterAt(3) }],
+        },
+      } as BoardState
+      await runBeat(result.current.runRefused, refused, anchors, { base, publish })
+      const last = states.at(-1)
+      expect(last?.decks.discardHeap?.map((card) => card.uid)).toEqual(['d3', 'top6'])
+      expect(last?.decks.discardCount).toBe(6)
+    })
+
+    it('counts an AI release back into the events deck as it lands', async () => {
+      const anchors = anchorsFixture()
+      const { result } = renderBeat(() => useAiBeat(anchors))
+      const { states, publish } = recording()
+      await runBeat(result.current.run, crushPlan('events'), anchors, {
+        base: crushedBase,
+        publish,
+      })
+      const homed = states.findIndex((s) => s.decks.events === 6)
+      expect(homed).toBeGreaterThanOrEqual(0)
+      expect(callOrder().indexOf(`publish:${homed}`)).toBeLessThan(
+        callOrder().indexOf('drop:crushed'),
+      )
+    })
+  })
+
   const standingPlan = {
     kind: 'aiEvent' as const,
     key: 'ai:1',
@@ -377,7 +520,11 @@ describe('aiBeat', () => {
     expect(playedNames()).toContain('returnToDeck')
   })
 
-  it('publishes the standing pair before either carrier lets go', async () => {
+  // …the moment the card has turned, not after a reading hold: the prompt is
+  // live from there, so the hand can answer it (owner, 03.10), and the table
+  // takes both cards over in the commit the carriers come down — the two frames
+  // that used to sit between drew both of them twice
+  it('publishes the standing pair and its prompt as the card turns, carriers down with it', async () => {
     const anchors = anchorsFixture()
     const { result } = renderBeat(() => useAiBeat(anchors))
     const pending = {
@@ -405,12 +552,13 @@ describe('aiBeat', () => {
       aiCause: { card: 'trigger-ai', eventId: 3 },
     })
     const order = callOrder()
-    const publishIndex = order.indexOf('publish')
-    const nextFramesIndex = order.indexOf('nextFrames')
+    const publishIndex = order.lastIndexOf('publish')
     expect(publishIndex).toBeGreaterThanOrEqual(0)
-    expect(nextFramesIndex).toBeGreaterThan(publishIndex)
-    expect(order.indexOf('drop:eff')).toBeGreaterThan(nextFramesIndex)
-    expect(order.indexOf('drop:trig')).toBeGreaterThan(nextFramesIndex)
+    expect(order.slice(publishIndex + 1, publishIndex + 3).sort()).toEqual([
+      'drop:eff',
+      'drop:trig',
+    ])
+    expect(waitedMs()).not.toContain(TABLE_HOLD)
   })
 
   // `runBeat`'s own opts carry no `onWait` hook (the brief's snippet assumed

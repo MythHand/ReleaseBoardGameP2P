@@ -1,5 +1,5 @@
 import type { RefObject } from 'react'
-import { useRef, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import type { Card as CardType } from '@/cards/types'
 import Card, { cardBoxIn } from '@/primitives/Card'
 import { CARD_W, insertPath, slotPlacement } from '@/table/Hand/fan'
@@ -100,6 +100,9 @@ export function useHandArrival(
   const size = useRef(1)
   const timer = useRef<number | null>(null)
   const nodes = useRef(new Map<string, HTMLDivElement>())
+  // scoped to this instance: a card uid is this step's name for its node, and
+  // another step in the same rendered list may carry the same card (see `useFlyer`)
+  const scope = useId()
 
   // What a queued arrival checks before it starts: a reset means the hand it was
   // queued for is gone (a new match, a scene torn down), so the card waiting its
@@ -267,7 +270,7 @@ export function useHandArrival(
 
   const overlay = flights.map((f) => (
     <div
-      key={f.key}
+      key={`${scope}${f.key}`}
       ref={(el) => {
         // the flight is played ON the node, so the step has to hold it
         if (el) nodes.current.set(f.key, el)

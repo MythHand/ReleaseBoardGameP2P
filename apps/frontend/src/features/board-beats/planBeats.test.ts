@@ -1213,6 +1213,46 @@ describe('planBeats — the sweep (#102)', () => {
     ])
   })
 
+  // THE ERROR 503 THE PLAYER PASSED leaves with their cards (owner, 03.10). It
+  // stands at the centre, where no source is ever found, and its `discarded`
+  // comes BEFORE the `eliminated` — so it was skipped, and the projection put
+  // it in the heap in one jump.
+  const passedAlarm = () =>
+    boardBefore({
+      pending: {
+        kind: 'neutralize503',
+        player: 'p1',
+        card: 'trigger-error-503',
+        methods: ['debugger'],
+      },
+    } as unknown as Partial<BoardState>)
+
+  it('sends the Error 503 a player passed with the sweep it opens', () => {
+    const plans = planBeats(
+      [
+        discarded(19, { card: 'trigger-error-503', reason: 'trigger' }),
+        eliminated({ id: 20 }),
+        discarded(21, { card: 'attack-bug', reason: 'effect' }),
+      ],
+      passedAlarm(),
+    )
+    expect(plans.map((p) => p.kind)).toEqual(['discard', 'eliminated'])
+    expect(plans[0]).toMatchObject({
+      gather: true,
+      alarm: { eventId: 19, card: 'trigger-error-503' },
+      cards: [{ eventId: 21, card: 'attack-bug' }],
+    })
+  })
+
+  it('sends it alone when the player had nothing left to sweep', () => {
+    const plans = planBeats(
+      [discarded(19, { card: 'trigger-error-503', reason: 'trigger' }), eliminated({ id: 20 })],
+      passedAlarm(),
+    )
+    expect(plans.map((p) => p.kind)).toEqual(['discard', 'eliminated'])
+    expect(plans[0]).toMatchObject({ alarm: { eventId: 19 }, cards: [] })
+  })
+
   it('leaves an ordinary discard ungathered', () => {
     const plans = planBeats([discarded(21, { reason: 'effect' })], boardBefore())
     expect((plans[0] as { gather?: true }).gather).toBeUndefined()
@@ -1812,6 +1852,24 @@ describe('planBeats — aiEvent (#106)', () => {
     expect(owed[0]).toMatchObject({ tail: { kind: 'standing' } })
   })
 
+  // A CRUSH OWED TO US lights the glow at the reveal too — the board's own rule
+  // (`glowsFor`), read at the moment the card turns up rather than once its
+  // prompt is published, and only on the board that will keep it lit (03.10)
+  it('lights the alarm at the reveal for a Crush owed to this board, and only for it', () => {
+    const crush = (player: string) => ({
+      kind: 'crush' as const,
+      player,
+      slot: 'frontend' as const,
+      methods: ['debugger' as const],
+      source: 'ai-crush-frontend',
+    })
+    const ours = planBeats(aiBatch(), boardBefore(), crush('p1'))
+    const theirs = planBeats(aiBatch(), boardBefore(), crush('p2'))
+    expect(ours[0]).toMatchObject({ tail: { kind: 'standing', alarm: true } })
+    expect(theirs[0]).toMatchObject({ tail: { kind: 'standing' } })
+    expect(theirs[0]).not.toMatchObject({ tail: { alarm: true } })
+  })
+
   it('lights the alarm for the 503 mimic, standing or not', () => {
     const revealed: Event = { id: 4, type: 'revealed', player: 'p1', card: 'ai-error-503' }
     const mimic = (...rest: Event[]): Event[] => [
@@ -2257,5 +2315,32 @@ describe('a refused Crush', () => {
   it('reads nothing as a refusal when no Crush was owed by that player', () => {
     const beats = planBeats([destroyed('p2')], boardBefore(crushOwed))
     expect(beats.some((beat) => beat.kind === 'crushRefused')).toBe(false)
+  })
+})
+
+// resolution.md §1: another player's card put out at the centre, or taken back,
+// is a beat; our own is where our gesture already put it.
+describe('a card shown at the centre', () => {
+  const shownBy = (player: string, id: number): Event =>
+    ({ id, type: 'shown', player, card: 'support-sudo' }) as Event
+  const takenBackBy = (player: string, id: number): Event =>
+    ({ id, type: 'takenBack', player, cards: ['support-sudo'] }) as Event
+
+  it('plans another player’s card coming out and going back, one beat each', () => {
+    const plans = planBeats([shownBy('p2', 1), takenBackBy('p2', 2)], boardBefore())
+    expect(plans).toEqual([
+      { kind: 'shown', key: 'shown:1', eventId: 1, player: 'p2', card: 'support-sudo' },
+      {
+        kind: 'takenBack',
+        key: 'takenBack:2',
+        eventId: 2,
+        player: 'p2',
+        cards: ['support-sudo'],
+      },
+    ])
+  })
+
+  it('plans nothing for our own — the gesture already put it there', () => {
+    expect(planBeats([shownBy('p1', 1), takenBackBy('p1', 2)], boardBefore())).toEqual([])
   })
 })

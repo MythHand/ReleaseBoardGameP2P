@@ -97,8 +97,7 @@ export function useUpgradeStaging(args: {
       const target = upgradeSlot(args.anchors, state.selfId)?.getBoundingClientRect()
       if (!reduced && target && drop.rect) {
         const [el] = await flyer.raise([{ key: 'upgrade-local', card: item.card, at: drop.rect }])
-        if (el && valid())
-          await play('playToCenter', el, { from: drop.rect, to: target, duration: 460 })?.finished
+        if (el && valid()) await play('playToCenter', el, { to: target, duration: 460 })?.finished
       }
       if (!valid()) {
         if (token === attempt.current) {

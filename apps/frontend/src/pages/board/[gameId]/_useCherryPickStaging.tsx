@@ -439,7 +439,7 @@ export function useCherryPickStaging(args: {
           }
           el.style.zIndex = '130'
           await nextFrames()
-          await play('playToCenter', el, { from, to, duration: REVEAL_DUR })?.finished
+          await play('playToCenter', el, { to, duration: REVEAL_DUR })?.finished
           await wait(REVEAL_HOLD)
           await arrival.land(ctx, { card: handData, el, fallbackKey: hand })
         })()
@@ -451,7 +451,7 @@ export function useCherryPickStaging(args: {
           el.style.zIndex = '120'
           setFlipped(new Set([deck]))
           await wait(FLIP_DUR)
-          await play('returnToDeck', el, { from, to: deckRect })?.finished
+          await play('returnToDeck', el, { to: deckRect })?.finished
           await wait(DECK_HOLD)
         })()
         const remaining = ours.options.filter((o) => o.uid !== hand && o.uid !== deck)
@@ -605,11 +605,9 @@ export function useCherryPickStaging(args: {
           }
           taken.style.zIndex = '130'
           await nextFrames()
-          await play('playToCenter', taken, { from: takenFrom, to, duration: REVEAL_DUR })?.finished
+          await play('playToCenter', taken, { to, duration: REVEAL_DUR })?.finished
           await wait(REVEAL_HOLD)
-          const at = taken.getBoundingClientRect()
-          if (seat)
-            await play('dealToSeat', taken, { from: at, to: seat, scale: SEAT_SHRINK })?.finished
+          if (seat) await play('dealToSeat', taken, { to: seat, scale: SEAT_SHRINK })?.finished
           taken.style.opacity = '0'
         })()
 
@@ -647,7 +645,7 @@ export function useCherryPickStaging(args: {
           const [el] = await deckFlyer.raise([
             { key: 'to-deck', card: COVER, at: heapBox, faceDown: true },
           ])
-          if (el) await play('returnToDeck', el, { from: heapBox, to: pile })?.finished
+          if (el) await play('returnToDeck', el, { to: pile })?.finished
           await wait(DECK_HOLD)
           deckFlyer.drop('to-deck')
         }

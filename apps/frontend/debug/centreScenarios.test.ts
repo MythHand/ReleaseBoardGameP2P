@@ -164,7 +164,7 @@ it('leaves the hand effect with nothing in any zone, so the only aim is a hand',
 })
 
 it('offers a release scenario whose card payment is an actual pending decision', () => {
-  const state = createScenario('releaseCost', 'release-cost')
+  const state = createScenario('release', 'release-cost')
   const release = state.players.you.hand.find((card) => card.id === 'release-frontend')
   const cost = state.players.you.hand.find((card) => card.id === 'defense-hotfix')
   expect(release).toBeDefined()

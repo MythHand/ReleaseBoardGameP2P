@@ -99,7 +99,6 @@ export function useCoverFlight(shared?: Flyer): CoverFlight {
           ])
           if (el) {
             await play('playToCenter', el, {
-              from,
               to: dest,
               rotate: pose.rot,
               dx: pose.dx,

@@ -115,6 +115,10 @@ export default function ReleaseZone({
             }`}
             style={{ width: slotSize, ...(accent ? { '--accent': accent } : {}) } as CSSProperties}
             ref={(el) => slotRef?.(key, el)}
+            // how a card reads here, said on the slot a flight measures: a card
+            // flying INTO it takes this reading at takeoff and rebuilds itself
+            // on the way, rather than swapping on landing
+            data-lod={lod ? 'true' : undefined}
             onMouseDown={card && onSlotDown ? (e) => onSlotDown(key, e) : undefined}
             onClick={targetable ? pick : undefined}
             onKeyDown={

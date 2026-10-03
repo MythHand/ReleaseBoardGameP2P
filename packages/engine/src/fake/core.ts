@@ -46,7 +46,8 @@ export function reject(state: GameState, action: Action, reason: string): Reduct
 }
 
 // Both locks name cards in a hand, so a card that leaves the hand takes its
-// lock with it (#80). Left behind, a stale uid is not merely untidy: `frozen`
+// lock with it (#80) — and so does `shown`: a card put out at the centre that
+// was then played is no longer waiting there. Left behind, a stale uid is not merely untidy: `frozen`
 // is projected, so it hands its former owner the identity of a card now sitting
 // in someone else's hand — a leak of exactly the kind the projection exists to
 // prevent. Pruning here rather than at each mover means no future path that
@@ -63,8 +64,25 @@ export const setHand = (state: GameState, id: PlayerId, hand: PlayerState['hand'
         hand,
         frozen: me.frozen.filter((uid) => held.has(uid)),
         replayLocked: me.replayLocked.filter((uid) => held.has(uid)),
+        shown: me.shown.filter((uid) => held.has(uid)),
       },
     },
+  }
+}
+
+/** Everything the player has put out at the centre goes back into the hand, in
+ *  everyone's view (resolution.md §1). Here rather than beside `show`, because
+ *  the time to attack a release takes cards back too, and that module sits above
+ *  the put-out one. */
+export function takeBack(state: GameState, log: Log, player: PlayerId): GameState {
+  const me = state.players[player]
+  if (me.shown.length === 0) return state
+  const cards = me.shown.flatMap((uid) => me.hand.find((c) => c.uid === uid)?.id ?? [])
+  if (cards.length > 0) log.add({ type: 'takenBack', player, cards })
+  return {
+    ...state,
+    players: { ...state.players, [player]: { ...me, shown: [] } },
+    eventSeq: log.seq,
   }
 }
 

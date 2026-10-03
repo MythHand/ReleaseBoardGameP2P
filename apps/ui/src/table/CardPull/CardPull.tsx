@@ -98,8 +98,7 @@ export default function CardPull(props: CardPullProps) {
               return
             }
             setDrag({ rect, returning: true })
-            const animation =
-              carrier.current && play('playToCenter', carrier.current, { from: rect, to: from })
+            const animation = carrier.current && play('playToCenter', carrier.current, { to: from })
             void Promise.resolve(animation?.finished)
               .catch(() => {})
               .then(() => {

@@ -1,7 +1,8 @@
+import { mkdir, writeFile } from 'node:fs/promises'
 import { fileURLToPath, URL } from 'node:url'
 import generouted from '@generouted/react-router/plugin'
 import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import svgr from 'vite-plugin-svgr'
 
 const uiSrc = fileURLToPath(new URL('../ui/src', import.meta.url))
@@ -10,10 +11,44 @@ const engineSrc = fileURLToPath(new URL('../../packages/engine/src', import.meta
 const translationSrc = fileURLToPath(
   new URL('../../packages/translation/src/index.ts', import.meta.url),
 )
+const debugLogs = fileURLToPath(new URL('./debug/logs', import.meta.url))
+
+// THE DEBUG STAND'S RECORDINGS land in the project, not in the browser's
+// downloads (#168): a recording is there to be read by whoever is working on the
+// board, and the downloads folder is one an agent on this machine cannot open.
+// Dev server only; the name is checked so nothing is written outside the folder.
+function debugLogSink(): Plugin {
+  return {
+    name: 'release:debug-log',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use('/__debug/log', (req, res) => {
+        const name = new URL(req.url ?? '/', 'http://stand').searchParams.get('name') ?? ''
+        if (req.method !== 'POST' || !/^[\w.-]+\.json$/.test(name)) {
+          res.statusCode = 400
+          res.end()
+          return
+        }
+        const chunks: Buffer[] = []
+        req.on('data', (chunk: Buffer) => chunks.push(chunk))
+        req.on('end', () => {
+          mkdir(debugLogs, { recursive: true })
+            .then(() => writeFile(`${debugLogs}/${name}`, Buffer.concat(chunks)))
+            .then(() => res.end(`apps/frontend/debug/logs/${name}`))
+            .catch(() => {
+              res.statusCode = 500
+              res.end()
+            })
+        })
+      })
+    },
+  }
+}
 
 export default defineConfig({
   base: process.env.VITE_BASE_URL ?? '/',
   plugins: [
+    debugLogSink(),
     react(),
     // `*.svg?react` imports resolve to React components (plain `*.svg` stay
     // asset URLs). @release/ui is consumed from source and its CardParallax

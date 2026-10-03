@@ -305,10 +305,7 @@ export function useRebaseStaging(args: {
           const delay = i * BACK_STEP
           last = Math.max(last, delay)
           if (!pileRect) return
-          later(
-            () => play('returnToDeck', el, { from: r, to: pileRect, duration: BACK_DUR }),
-            delay,
-          )
+          later(() => play('returnToDeck', el, { to: pileRect, duration: BACK_DUR }), delay)
         })
       }
       // The answer goes when the last card is home — see the divergence note

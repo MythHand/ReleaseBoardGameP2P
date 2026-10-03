@@ -901,15 +901,25 @@ it.each([
     { id: 1, type: 'operationPlayed', player: 'p2', card: 'operation-git-rebase', sudo: false },
     { id: 2, type: 'discarded', player: 'p2', card: 'operation-git-rebase', reason: 'effect' },
   ] as Event[]
+  // the boards as the projection answers them: while the pending stands the
+  // operation is at the centre and out of the heap, once it is answered it is in
+  // the heap and nowhere else
+  const filedHeap = {
+    ...preDiscard.decks,
+    discardCount: 1,
+    discardHeap: [{ uid: 'd2', card: card('operation-git-rebase'), ...scatterAt(2) }],
+  }
   const pending = {
     ...preDiscard,
-    decks: {
-      ...preDiscard.decks,
-      discardCount: 1,
-      discardHeap: [{ uid: 'd2', card: card('operation-git-rebase'), ...scatterAt(2) }],
-    },
+    decks: { ...preDiscard.decks, discardCount: 0, discardHeap: [] },
     pending: { kind: 'reorderTop', player: 'p2', source: 'operation-git-rebase' },
-  } as BoardState
+    centreOperation: {
+      card: 'operation-git-rebase',
+      sudo: false,
+      spent: [{ eventId: 2, card: 'operation-git-rebase' }],
+    },
+  } as unknown as BoardState
+  const answered = { ...preDiscard, decks: filedHeap, pending: null } as BoardState
   const restoredIntro: IntroBeat = {
     key: 'restored-match',
     shadow: pending,
@@ -927,7 +937,9 @@ it.each([
     })
     return (
       <>
-        <output data-testid="standing-operation">{String(beats.operationStanding)}</output>
+        <output data-testid="standing-operation">
+          {String(Boolean((beats.shadow ?? live).centreOperation))}
+        </output>
         <output data-testid="operation-heap">
           {(beats.shadow ?? live).decks.discardHeap?.map((c) => c.uid).join(',')}
         </output>
@@ -946,53 +958,11 @@ it.each([
     })
   expect(view.getByTestId('standing-operation').textContent).toBe('true')
   expect(view.getByTestId('operation-heap').textContent).toBe('')
-  view.rerender(<OperationProbe live={{ ...pending, pending: null }} feed={events} />)
+  view.rerender(<OperationProbe live={answered} feed={events} />)
   for (let i = 0; i < 50; i++)
     await act(async () => {
       await vi.advanceTimersByTimeAsync(20)
     })
   expect(view.getByTestId('standing-operation').textContent).toBe('false')
-})
-
-it.each([
-  'operation-git-rebase',
-  'operation-system-upgrade',
-])('keeps %s out of the heap under reduced motion until its pending resolves', (source) => {
-  motion.reduced = true
-  const events = [
-    { id: 1, type: 'operationPlayed', player: 'p2', card: source, sudo: true },
-    { id: 2, type: 'discarded', player: 'p2', card: source, reason: 'effect' },
-    { id: 3, type: 'discarded', player: 'p2', card: 'support-sudo', reason: 'effect' },
-  ] as Event[]
-  const pending = {
-    ...preDiscard,
-    pending:
-      source === 'operation-git-rebase'
-        ? { kind: 'reorderTop', player: 'p2', source }
-        : { kind: 'systemUpgrade', actor: 'p2', source, sudo: true },
-    decks: {
-      ...preDiscard.decks,
-      discardCount: 2,
-      discardHeap: [
-        { uid: 'd2', card: card(source), ...scatterAt(2) },
-        { uid: 'd3', card: card('support-sudo'), ...scatterAt(3) },
-      ],
-    },
-  } as BoardState
-  function ReducedProbe({ live }: { live: BoardState }) {
-    const beats = useBeats({ live, events, anchors: stub, enabled: true })
-    return (
-      <>
-        <output data-testid="reduced-heap">{(beats.shadow ?? live).decks.discardCount}</output>
-        <output data-testid="reduced-running">{String(beats.running)}</output>
-        {beats.overlays}
-      </>
-    )
-  }
-  const view = render(<ReducedProbe live={pending} />)
-  expect(view.getByTestId('reduced-heap').textContent).toBe('0')
-  expect(view.getByTestId('reduced-running').textContent).toBe('false')
-  expect(view.container.querySelector('[data-public-operation]')).toBeNull()
-  view.rerender(<ReducedProbe live={{ ...pending, pending: null }} />)
-  expect(view.getByTestId('reduced-heap').textContent).toBe('2')
+  expect(view.getByTestId('operation-heap').textContent).toBe('d2')
 })

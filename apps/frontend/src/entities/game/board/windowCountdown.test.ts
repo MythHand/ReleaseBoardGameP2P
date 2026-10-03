@@ -135,6 +135,7 @@ describe('a reaction window the engine actually opened', () => {
       pending: {
         kind: 'discardForRelease' as const,
         player: table.selfId,
+        release: 'rel',
         options: [table.you.hand[0]?.uid ?? 'x'],
       },
     }

@@ -24,6 +24,7 @@ import { pruneEmptyPiles } from './piles'
 import { playableFor } from './project'
 import { onReorderTop } from './rebase'
 import { onCancelRelease, onDiscardForRelease, onPlay } from './release'
+import { onShow, onTakeBack } from './shown'
 import { fireTrigger, onDecline503, onDeclineCrush, onNeutralize } from './triggers'
 import { onUpgradeDiscard, onUpgradeTake } from './upgrade'
 import { onPass, onWindowExpired } from './window'
@@ -339,7 +340,11 @@ export function reduce(state: GameState, action: Action): Reduction {
   // doing so — the clock only moves on a commit. It also emits nothing worth
   // counting, so the fold sits below this guard rather than above it.
   if (result.state === state) return result
-  const stamped = stampTurnClock(result.state, at)
+  // Putting a card out at the centre, or taking it back, is what the table
+  // sees, not a move — and a move is what restarts the clock. Letting it
+  // restart would hand a player unlimited time for the price of a gesture.
+  const shownOnly = action.type === 'SHOW' || action.type === 'TAKE_BACK'
+  const stamped = shownOnly ? result.state : stampTurnClock(result.state, at)
   return {
     state: { ...stamped, tally: foldTally(stamped.tally, result.events) },
     events: result.events,
@@ -375,6 +380,10 @@ function dispatch(state: GameState, action: Action): Reduction {
       return onClockStarted(state, action)
     case 'ATTACK':
       return onAttack(state, action)
+    case 'SHOW':
+      return onShow(state, action)
+    case 'TAKE_BACK':
+      return onTakeBack(state, action)
     default:
       return reject(
         state,

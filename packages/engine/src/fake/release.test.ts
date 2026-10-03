@@ -44,22 +44,17 @@ it('asks for the discard cost before the release lands', () => {
   expect(r.state.players.p1.hand).toHaveLength(2)
 })
 
-// The board needs to know WHICH card is standing at the centre while its cost
-// is unpaid, to render it there — but only the owner: the engine emits no
-// event until the cost lands, so nobody else has been told this play even
-// happened. `release` on the projected pending follows the same redaction
-// `options` already has (fake/attacks.ts's `pendingView`).
-it('projects the staged release only to its owner', () => {
+// A release waiting for its cost stands at the centre in everyone's view
+// (resolution.md §1): the play shows it, and every projection names it. Only
+// `options` stays the owner's — it is the rest of the hand.
+it('shows the release waiting for its cost to the whole table', () => {
   const asked = reduce(handed([FE, BUG]), { type: 'PLAY', player: 'p1', card: FE.uid, at: 1000 })
-  const mine = engine.project(asked.state, 'p1').pending
-  expect(mine).toMatchObject({ kind: 'discardForRelease', release: FE.uid })
+  expect(asked.events).toMatchObject([{ type: 'shown', player: 'p1', card: FE.id }])
+  expect(engine.project(asked.state, 'p1').pending).toMatchObject({ release: FE.uid })
 
-  const theirs = engine.project(asked.state, 'p2').pending
-  expect(theirs?.kind).toBe('discardForRelease')
-  // the key is absent entirely, not merely undefined — same redaction as
-  // `options`, which p2 sees as `[]` rather than missing (the two fields
-  // differ in HOW they redact; both refuse to name the release either way)
-  expect(theirs && 'release' in theirs).toBe(false)
+  const theirs = engine.project(asked.state, 'p2')
+  expect(theirs.pending).toMatchObject({ kind: 'discardForRelease', release: FE.uid, options: [] })
+  expect(theirs.shown).toEqual([{ player: 'p1', uid: FE.uid, card: FE.id }])
 })
 
 it('places the release once the cost is paid', () => {
@@ -190,7 +185,7 @@ it('never lets Debugger be played proactively', () => {
 // lifecycle, including the paths that never reach a window, lives in
 // ./win.test.ts, which replaced the assertion that used to sit here.
 
-it('takes a staged release back, leaving no trace in the feed', () => {
+it('takes a release back in everyone’s view', () => {
   const s = engine.createGame(config())
   const primed: GameState = {
     ...s,
@@ -209,9 +204,9 @@ it('takes a staged release back, leaving no trace in the feed', () => {
   expect(back.state.pending).toBeNull()
   // the hand is whole again and nothing was ever released
   expect(back.state.players.p1.hand.map((c) => c.uid)).toEqual([FE.uid, BUG.uid])
-  // the play emitted nothing, so taking it back emits nothing either — no peer
-  // ever saw it happen
-  expect(back.events).toEqual([])
+  // the table saw it put out, so it sees it taken back
+  expect(back.events).toMatchObject([{ type: 'takenBack', player: 'p1', cards: [FE.id] }])
+  expect(back.state.players.p1.shown).toEqual([])
 })
 
 it('refuses a cancel from anyone but the player who staged it', () => {

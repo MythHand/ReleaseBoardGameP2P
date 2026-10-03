@@ -264,3 +264,32 @@ it('never lets a rejection into the feed or the persisted log', () => {
   expect(seen.at(-1)?.events.map((e) => e.type)).toEqual(['dealt'])
   expect(readLog('g1', Date.now())?.map((e) => (e as Event).type)).toEqual(['dealt'])
 })
+
+// …and hands it to the board on its own list instead (#168): the board takes a
+// refused card home. On the same render the sync arrives, like the feed; per
+// game, like the feed.
+it('hands this seat’s own refusals over apart from the feed, per game', () => {
+  const seen: { events: Event[]; rejections: Event[] }[] = []
+  function Watch() {
+    const game = useGame()
+    useLayoutEffect(() => {
+      if (game.view) seen.push({ events: game.events, rejections: game.rejections })
+    }, [game.view, game.events, game.rejections])
+    return null
+  }
+  session = { gameLink: null, gameSync: null, gameId: 'g1' }
+  const { rerender } = render(<Watch />)
+
+  session = {
+    gameLink: null,
+    gameSync: { view: view(), events: [dealt('p1'), rejected()] },
+    gameId: 'g1',
+  }
+  rerender(<Watch />)
+  expect(seen[0].rejections.map((e) => e.type)).toEqual(['rejected'])
+  expect(seen[0].events.map((e) => e.type)).toEqual(['dealt'])
+
+  session = { gameLink: null, gameSync: { view: view(), events: [dealt('p1')] }, gameId: 'g2' }
+  rerender(<Watch />)
+  expect(seen.at(-1)?.rejections).toEqual([])
+})

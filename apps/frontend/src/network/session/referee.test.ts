@@ -1241,3 +1241,41 @@ it('automatically completes a legacy handover even while the donor is disconnect
   expect(done.session.state.players.b.hand).toEqual([second])
   expect(done.session.log.at(-1)).toMatchObject({ type: 'handTransfer', publicCard: true })
 })
+
+// A Sudo put out to attack a fresh release holds the time with its own deadline
+// (owner, 02.10). The keeper fires on it the way it fires on any window: the
+// Sudo goes home, in everyone's view, and the time to attack starts anew.
+it('sends a Sudo home on its own deadline and opens the time to attack anew', () => {
+  const { session } = twoPlayerSession()
+  const opened = openWindowFixture(session)
+  const w = opened.state.window
+  if (!w) throw new Error('no window')
+  const responder = opened.state.seating.find((id) => id !== w.target.player) ?? ''
+  const sudo = { uid: 'support-sudo#99', id: 'support-sudo' }
+  const holding: GameState = {
+    ...opened.state,
+    players: {
+      ...opened.state.players,
+      [responder]: {
+        ...opened.state.players[responder],
+        hand: [...opened.state.players[responder].hand, sudo],
+      },
+    },
+  }
+  const shown = createFakeEngine().reduce(holding, {
+    type: 'SHOW',
+    player: responder,
+    card: sudo.uid,
+    at: w.openedAt + 1,
+  }).state
+  expect(shown.window?.held).toBe(responder)
+  const before = opened.log.length
+
+  const result = tick({ ...opened, state: shown }, (shown.window?.deadline ?? 0) + 1)
+
+  expect(result.session.state.players[responder].shown).toEqual([])
+  expect(result.session.state.window).toMatchObject({ round: w.round + 1 })
+  expect(result.session.state.window?.held).toBeUndefined()
+  const grown = result.session.log.slice(before).map((e) => e.type)
+  expect(grown).toEqual(expect.arrayContaining(['takenBack', 'windowOpened']))
+})

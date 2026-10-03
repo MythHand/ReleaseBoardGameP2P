@@ -10,6 +10,7 @@ import type {
   StagedHandoff,
 } from '~/entities/game/board'
 import type { DiscardPickHandoff, RequestPickHandoff } from '~/entities/game/board/types'
+import { trace, tracing } from '~/shared/lib/debugTrace'
 import { useReducedMotion } from '~/shared/lib/useReducedMotion'
 import { useAiBeat } from './aiBeat'
 import { useComboBeat } from './comboBeat'
@@ -20,11 +21,21 @@ import { useDrawBeat } from './drawBeat'
 import { useEliminateBeat } from './eliminateBeat'
 import { useGameEndBeat } from './gameEndBeat'
 import { useHandLimitBeat } from './handLimitBeat'
-import { type OperationLanded, useOperationBeat, withoutPendingOperation } from './operationBeat'
+import { useOperationBeat } from './operationBeat'
 import type { BeatPlan } from './planBeats'
 import { planBeats } from './planBeats'
+import { useShownBeat } from './shownBeat'
 import { useTransferBeat } from './transferBeat'
 import { useUpgradeBeat } from './upgradeBeat'
+
+// A board a beat starts from or publishes, as the stand's recorder writes it
+// down (#168): the hand, what is out at the centre, what is pending.
+const glance = (b: BoardState) => ({
+  hand: b.you.hand.map((c) => `${c.card.name} ${c.uid}`),
+  shown: (b.shown ?? []).map((s) => `${s.player}:${s.card.name}`),
+  pending: b.pending?.kind ?? null,
+  centreAttack: b.centreAttack?.card ?? null,
+})
 
 // The board's beat queue. `useGame` accumulates engine events off the wire in
 // BATCHES — a peer can receive several moves in one sync — so a board that
@@ -109,9 +120,6 @@ export interface Beats {
    * collecting itself into one stack, or already held by a carrier and gone
    * from its own spot */
   discardOut: 'gathering' | 'taken' | null
-  operationStanding: boolean
-  /** the operation card resting at the centre — the table draws it, under any surface */
-  operationLanded: OperationLanded | null
   shadow: BoardState | null
   overlays: ReactNode[]
   exclusive: boolean
@@ -218,6 +226,7 @@ export function useBeats(args: {
   const handLimits = useHandLimitBeat(anchors, handLimit)
   const transfers = useTransferBeat(anchors, requestPick, onHandArrival)
   const ais = useAiBeat(anchors, onHandArrival)
+  const shownCards = useShownBeat(anchors)
   // The operation beat first: System Upgrade's centre holds both its answers and
   // the operation card itself, and they leave together in the answers' own send
   // rather than in a beat of their own behind them.
@@ -312,6 +321,18 @@ export function useBeats(args: {
           // this beat's to hold.
           alarm: false,
           run: (ctx) => upgrades.run(plan, ctx),
+        }
+      }
+      if (plan.kind === 'shown' || plan.kind === 'takenBack') {
+        return {
+          key: plan.key,
+          base,
+          exclusive: false,
+          alarm: false,
+          run: (ctx) =>
+            plan.kind === 'shown'
+              ? shownCards.runShown(plan, ctx)
+              : shownCards.runTakenBack(plan, ctx),
         }
       }
       if (plan.kind === 'draw') {
@@ -453,11 +474,12 @@ export function useBeats(args: {
           // Not exclusive: an AI card is read, not obeyed, and nothing about it
           // needs input dead.
           exclusive: false,
-          // The 503 mimic's glow is NOT the whole beat's: the beat opens with the
-          // trigger leaving its pile, and the mimic is only an alarm once its
-          // card has turned face up. The runner lights it at that moment
-          // (`raiseAlarm`, aiBeat.tsx); after the beat, the standing prompt
-          // keeps it lit (owner, 24.09 — it glowed before the card was seen).
+          // An AI card's glow is NOT the whole beat's: the beat opens with the
+          // trigger leaving its pile, and the card is only an alarm once it has
+          // turned face up — the 503 mimic, or a Crush owed to us (`glowsFor`).
+          // The runner lights it at that moment (`raiseAlarm`, aiBeat.tsx);
+          // after the beat, the standing prompt keeps it lit (owner, 24.09 — it
+          // glowed before the card was seen; 03.10 — a Crush lit late).
           alarm: false,
           run: (ctx) => ais.run(plan, ctx),
         }
@@ -522,6 +544,8 @@ export function useBeats(args: {
       ais.run,
       ais.runTaken,
       ais.runRefused,
+      shownCards.runShown,
+      shownCards.runTakenBack,
       discardPick,
     ],
   )
@@ -561,6 +585,8 @@ export function useBeats(args: {
         // behind on the planned one, which is the very flicker this closes.
         next.base = next.after?.ended ?? next.base
         runningRef.current = next
+        const key = next.key
+        if (tracing()) trace('beat', { key, exclusive: next.exclusive, base: glance(next.base) })
         setRunning(next)
         setAdvanced(null)
         setRaised(false)
@@ -570,6 +596,7 @@ export function useBeats(args: {
         let ended = next.base
         const publish = (state: BoardState) => {
           ended = state
+          if (tracing()) trace('beatPublish', { key, ...glance(state) })
           setAdvanced(state)
         }
         // A beat that throws must not hold the board: the shadow is dropped in
@@ -584,7 +611,9 @@ export function useBeats(args: {
           })
         } catch (err) {
           if (import.meta.env.DEV) console.error('[beats] %s failed', next.key, err)
+          trace('beatError', { key, error: String(err) })
         }
+        if (tracing()) trace('beatEnd', { key, ended: glance(ended) })
         // Even after a throw: whatever it managed to publish IS on screen, and
         // the beat behind it has to animate away from that and not from a board
         // two states back.
@@ -594,6 +623,7 @@ export function useBeats(args: {
     } finally {
       draining.current = false
       runningRef.current = null
+      trace('beatsDone')
       setRunning(null)
       setAdvanced(null)
       setRaised(false)
@@ -647,16 +677,18 @@ export function useBeats(args: {
     handLimits.reset()
     transfers.reset()
     ais.reset()
+    shownCards.reset()
   }, [intro?.key, live])
 
-  // Adopt only after the match-boundary reset, or its cleanup would erase
-  // the restored carrier on the same commit. A late intro key is another
-  // match-boundary reset, even when the restore watermark stays unchanged.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: live/events supply the snapshot at the restore boundary
+  // A restore, or reduced motion, cancels the operation's own flights. What
+  // stands at the centre is not restored here: the projection answers it
+  // (`centreOperation`), so a rebuilt board already has it. A late intro key is
+  // another match-boundary reset, even when the restore watermark stays
+  // unchanged.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the intro key is the match boundary this re-runs on
   useLayoutEffect(() => {
     if (reduced || (restoredThrough ?? 0) > 0) operations.reset()
-    if (!reduced && (restoredThrough ?? 0) > 0) operations.restore(live, events)
-  }, [intro?.key, reduced, restoredThrough, operations.reset, operations.restore])
+  }, [intro?.key, reduced, restoredThrough, operations.reset])
 
   // Beat zero, queued once. Keyed by the intro's own key so a re-render with a
   // fresh object cannot re-arm it, and React 19 StrictMode's double invoke plays
@@ -740,7 +772,9 @@ export function useBeats(args: {
     const before = settled.current
     settled.current = live
     const fresh = events.filter((e) => e.id > seen.current)
-    if (fresh.length === 0 && !operations.standing) return
+    // An operation standing at the centre can be answered with no event at all
+    // (a pending resolved in silence): the plan reads that off the two boards.
+    if (fresh.length === 0 && !before.centreOperation) return
     seen.current = fresh.at(-1)?.id ?? seen.current
     // Reduced motion collapses every beat to its end state, and the end state is
     // the projection the board already holds — so there is nothing to do but
@@ -785,13 +819,10 @@ export function useBeats(args: {
     unqueued.length > 0 &&
     planBeats(unqueued, settled.current, live.pending, live.decks.discardCount).length > 0
 
-  const reducedPending = reduced ? withoutPendingOperation(live, events) : live
   return {
     /** the pile a split has mounted but not yet flown in — it stays invisible */
     splittingPile: decks.splitting,
     discardOut: decks.discardOut,
-    operationStanding: operations.standing,
-    operationLanded: operations.landed,
     // The shadow is what the running beat has published, or its own base while
     // it has published nothing yet. The one exception is the opening, which
     // publishes a whole shape of its own rather than animating away from a
@@ -800,15 +831,8 @@ export function useBeats(args: {
     // beat reports done, so the handover to the live projection is the queue's
     // own last frame.
     shadow:
-      reducedPending === live
-        ? operations.standing
-          ? operations.withoutHeld(
-              (running?.exclusive ? (advanced ?? intro?.shadow) : (advanced ?? running?.base)) ??
-                (awaitingBatch ? settled.current : live),
-            )
-          : ((running?.exclusive ? (advanced ?? intro?.shadow) : (advanced ?? running?.base)) ??
-            (awaitingBatch ? settled.current : null))
-        : reducedPending,
+      (running?.exclusive ? (advanced ?? intro?.shadow) : (advanced ?? running?.base)) ??
+      (awaitingBatch ? settled.current : null),
     overlays: [
       ...discards.overlay,
       ...draws.overlay,
@@ -820,6 +844,7 @@ export function useBeats(args: {
       ...handLimits.overlay,
       ...transfers.overlay,
       ...ais.overlay,
+      ...shownCards.overlay,
       ...upgrades.overlay,
       ...operations.overlay,
     ],

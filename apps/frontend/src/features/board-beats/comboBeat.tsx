@@ -17,18 +17,22 @@ import {
   ATTACK_POSE,
   type BeatRun,
   type BoardAnchors,
+  type BoardState,
   COVER_POSE,
   MERGE_MS,
   SHOW_HOLD,
   type StagedHandoff,
 } from '~/entities/game/board'
+import { liftOff, type Place } from './cardPlace'
 import { exchange } from './exchange'
 import type { BeatPlan } from './planBeats'
+import { adoptStaged, shownSource } from './shownBeat'
 import { useToCentre } from './toCentre'
 import { toEventsDeck } from './toEventsDeck'
 import { useToHand } from './toHand'
 import { settleInto } from './toHeap'
 import { withoutFlown } from './withoutFlown'
+import { readsAtGlance } from './zoneReading'
 
 // The carrier a DDoS's own effect needs: the card it struck. One card is one
 // carrier, and a release wearing a Code Review is one card — it stands in the
@@ -107,16 +111,51 @@ export function useComboBeat(
       // FIRST slot (the same simplification `sourceOf` makes). Invisible on
       // screen; noted so it is not rediscovered as a bug.
       const handIndex = mine ? ctx.base.you.hand.findIndex((h) => h.card.id === cardId) : -1
+      // Put out at the centre first (resolution.md §1): the play starts where
+      // its cards stand, and their standing render goes down in the same commit
+      // the carrier taking them over goes up.
+      const shown = shownSource(ctx.base, actor, auxId ? [cardId, auxId] : [cardId], a)
+      const takeOver = () => {
+        if (!shown) return
+        ctx.base = shown.next
+        ctx.publish(shown.next)
+      }
       const fromRect =
-        (mine && handIndex >= 0 ? rectOf(a.handSlotAt(handIndex)) : null) ?? a.seatBox(actor)
+        shown?.rect ??
+        (mine && handIndex >= 0 ? rectOf(a.handSlotAt(handIndex)) : null) ??
+        a.seatBox(actor)
       if (!fromRect) return null
+      // ALREADY STANDING, ALREADY WHOLE. A play put out at the centre was
+      // watched arriving there — a release at the stage slot, a release with
+      // its Code Review folded in the row's first place, a Monitoring at the
+      // middle — so there is nothing left to bring in or to fold. Its carrier
+      // goes up exactly where and as it stands, in the commit its standing
+      // render comes down, and the caller flies it on from there. Folding it
+      // again at the middle was the road for a play nobody had seen, and read
+      // as the card sliding to the middle before it left for the zone (#168).
+      // An attack keeps its own landing below: it is not a release's road.
+      if (shown && main.category !== 'attack') {
+        const standing = flyer.raise([
+          aux
+            ? {
+                key: 'fold',
+                at: shown.rect,
+                content: <CardPair main={main} aux={aux} width="100%" />,
+              }
+            : { key: 'fold', at: shown.rect, card: main },
+        ])
+        takeOver()
+        const [el] = await standing
+        return el ?? null
+      }
       if (aux && main.category === 'attack') {
-        const [el] = await flyer.raise([
+        const raisedPair = flyer.raise([
           { key: 'fold', at: fromRect, content: <CardPair main={main} aux={aux} width="100%" /> },
         ])
+        takeOver()
+        const [el] = await raisedPair
         if (el) {
           await play('playToCenter', el, {
-            from: fromRect,
             to: cRect,
             rotate: ATTACK_POSE.rot,
             dx: ATTACK_POSE.dx,
@@ -125,11 +164,13 @@ export function useComboBeat(
         }
         return el ?? null
       }
-      const [el] = await flyer.raise([
+      const raised = flyer.raise([
         aux
           ? { key: 'fold', at: cRect, content: <CardPair main={main} aux={aux} width="100%" /> }
           : { key: 'fold', at: cRect, card: main },
       ])
+      takeOver()
+      const [el] = await raised
       if (!el) return null
       for (const anim of el.getAnimations?.({ subtree: true }) ?? []) anim.cancel() // I3
       const mainEl = aux ? el.querySelector<HTMLElement>('[data-main]') : el
@@ -277,7 +318,7 @@ export function useComboBeat(
           const spentHand = { ...ctx.base, you: { ...ctx.base.you, hand } }
           ctx.base = spentHand
           ctx.publish(spentHand)
-          handoff?.release()
+          adoptStaged(ctx, handoff)
         }
         // …AND EVERYTHING LEAVES AS ONE EXCHANGE — the same shape, and the same
         // helper, the defence's own resolution uses. LAYER COMES FROM POSITION,
@@ -384,7 +425,7 @@ export function useComboBeat(
             return
           }
           const seat = a.seatBox(hit.player)
-          if (node && seat) await play('dealToSeat', node, { from: overThrow, to: seat })?.finished
+          if (node && seat) await play('dealToSeat', node, { to: seat })?.finished
           pulled.drop(STRUCK)
         })()
 
@@ -498,7 +539,11 @@ export function useComboBeat(
         // reachable the moment a turn-played DDoS started logging `attacked`,
         // which is the fix this rides in behind.
         if (plan.resolved) return
-        ctx.publish({
+        // …and into the run's base, not only onto the screen: what the beat
+        // publishes next — the gesture letting go of the card — builds on the
+        // base, and a base without this put the centre back to empty for the
+        // frame the gesture let go in (#168, the owner's recordings, 02.10)
+        const next: BoardState = {
           ...ctx.base,
           pending: {
             kind: 'defend',
@@ -512,7 +557,9 @@ export function useComboBeat(
             deadline: 0,
             scope: 'hand',
           },
-        })
+        }
+        ctx.base = next
+        ctx.publish(next)
       }
 
       // Adopted without comparing cards, and structurally so: the event names
@@ -525,7 +572,7 @@ export function useComboBeat(
         // Published FIRST, so the render that takes over exists before the node
         // that is standing there now is let go of.
         standAttack()
-        handoff.release()
+        adoptStaged(ctx, handoff)
         return
       }
       await nextFrames() // the shadow that renders `before` has committed (I2)
@@ -580,7 +627,7 @@ export function useComboBeat(
             const from = a.seatBox(plan.player)
             if (from) {
               const [el] = await flyer.raise([{ key: 'cost', at: from, card: costCard }])
-              if (el) await play('playToCenter', el, { from, to: costBox })?.finished
+              if (el) await play('playToCenter', el, { to: costBox })?.finished
             }
           }
           await wait(SHOW_HOLD)
@@ -632,7 +679,7 @@ export function useComboBeat(
       // — unlike `seatBox`, which is null for the local player. Nothing
       // measurable here means the projection resolves it unaided.
       if (!toRect) {
-        handoff?.release()
+        adoptStaged(ctx, handoff)
         return
       }
       if (handoff && plan.player === ctx.base.selfId && handoff.el && cRect) {
@@ -640,8 +687,8 @@ export function useComboBeat(
         // Only a merged pair ever gets here — `_Board.tsx`'s `soloStaged`
         // excludes a release on purpose, so `handoff.el` is null for a plain
         // one (see below).
-        await play('playToReleaseZone', handoff.el, { from: cRect, to: toRect })?.finished
-        handoff.release()
+        await play('playToReleaseZone', handoff.el, { to: toRect })?.finished
+        adoptStaged(ctx, handoff)
         return
       }
       // THE ACTOR'S OWN PLAIN RELEASE — it is already standing at the STAGE
@@ -677,7 +724,7 @@ export function useComboBeat(
         // one the cost leg above already uses for `clearPaidCost`.
         latest.current.takeStagedRelease?.current?.()
         const [el] = await flyer.raise([{ key: 'release', at: stageRect, card: standing }])
-        if (el) await play('playToReleaseZone', el, { from: stageRect, to: toRect })?.finished
+        if (el) await play('playToReleaseZone', el, { to: toRect })?.finished
         // dropped as the beat ends, so the carrier and the projection's own
         // zone render swap in one commit (`useBeats`'s drain does the rest of
         // that batch synchronously)
@@ -691,19 +738,25 @@ export function useComboBeat(
         // permanently hidden fan card, and calling it costs nothing: the
         // handoff is non-null only while a dispatched play stands, and the
         // release that just landed IS that play.
-        handoff?.release()
+        adoptStaged(ctx, handoff)
         return
       }
       if (!cRect) {
-        handoff?.release()
+        adoptStaged(ctx, handoff)
         return
       }
       const el = await foldIn(plan.player, plan.card, plan.codeReview, ctx)
       if (plan.slot === 'monitoring') await wait(SHOW_HOLD)
-      if (el) await play('playToReleaseZone', el, { from: cRect, to: toRect })?.finished
+      // …reading the way the slot it lands in reads, from the frame the flight
+      // starts. A zone draws a pair whole whoever's it is, so only a lone card
+      // has a reading to take.
+      if (!plan.codeReview && readsAtGlance(a.releaseSlot(plan.player, plan.slot))) {
+        flyer.patch('fold', { lod: true })
+      }
+      if (el) await play('playToReleaseZone', el, { to: toRect })?.finished
       flyer.drop('fold')
     },
-    [foldIn, flyer.drop, flyer.raise],
+    [foldIn, flyer.drop, flyer.patch, flyer.raise],
   )
 
   // pairToDiscard: the pending pair at the centre splits into two singles.
@@ -769,12 +822,25 @@ export function useComboBeat(
       // The centre stops holding it in the same commit the carriers go up —
       // published through `takeOff` rather than after the flight, which is
       // what left the card standing there while its own copy flew away. Both
-      // halves of the centre go down together: the attack and what covered it.
+      // halves of the centre go down together: the attack and what covered it,
+      // off EVERY field the centre draws them from — the answered attack's own
+      // fields, and the pending that still owes the answer in the board from
+      // before the batch (#168: the attack stood under its own flight for the
+      // whole of it, owner's recordings 02.10).
+      const leaving: Place[] = [mainRef, auxRef, coverRef, coverAuxRef].flatMap((ref) =>
+        ref ? [{ kind: 'centre' as const, card: ref.card }] : [],
+      )
+      // …and the heap has them the moment the carriers come down, as they lay:
+      // the attack under what covered it, each pair's Sudo tucked under its own
+      // card — by layer, not by event, since the Sudo is banked after its card
+      // and the projection's own heap (`toDiscardHeap`) puts it under
+      const filed = [auxRef, mainRef, coverAuxRef, coverRef].flatMap((ref, layer) =>
+        ref ? [{ ...ref, layer }] : [],
+      )
       if (items.length > 0)
-        await latest.current.send(items, () => {
-          if (ctx.base.centreAttack || ctx.base.centreCover)
-            ctx.publish({ ...ctx.base, centreAttack: undefined, centreCover: undefined })
-        })
+        await latest.current
+          .send(items, () => liftOff(ctx, leaving))
+          .then(() => settleInto(ctx, filed))
     },
     [],
   )

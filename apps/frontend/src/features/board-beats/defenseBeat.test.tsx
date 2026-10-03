@@ -5,7 +5,7 @@ import { act, render } from '@testing-library/react'
 import type { RefObject } from 'react'
 import { expect, it, vi } from 'vitest'
 import type { BeatRun, BoardAnchors, BoardState, StagedHandoff } from '~/entities/game/board'
-import { ATTACK_POSE, COVER_POSE } from '~/entities/game/board'
+import { ALARM_POSE, COVER_POSE } from '~/entities/game/board'
 import { useDefenseBeat } from './defenseBeat'
 import type { BeatPlan } from './planBeats'
 
@@ -17,7 +17,9 @@ const played = vi.hoisted(() => ({
   // so the params reaching it — the cover's own tilt/offset (COVER_POSE) — are
   // observable here and worth pinning: a fly with no pose reads as a neat
   // stack, not a second play lying over the attack.
-  calls: [] as { name: string; params: Record<string, unknown> }[],
+  // `start` — where the flown element stood as the flight began: the start a
+  // travel reads off the card itself (`testing.tsx`'s `standing`)
+  calls: [] as { name: string; params: Record<string, unknown>; start?: unknown }[],
 }))
 // What `useDiscardExit`'s `send` actually received — not just that it was
 // called. `useDiscardExit`'s own `send` calls `play` through a SIBLING import
@@ -57,11 +59,12 @@ const patched = vi.hoisted(() => ({ lod: undefined as boolean | undefined }))
 vi.mock('@release/ui/animations', async (importOriginal) => {
   const real = await importOriginal<typeof import('@release/ui/animations')>()
   const { useState } = await import('react')
+  const { standing } = await import('./testing')
   return {
     ...real,
-    play: (name: string, _el: unknown, params: Record<string, unknown> = {}) => {
+    play: (name: string, el: Element | null, params: Record<string, unknown> = {}) => {
       played.names.push(name)
-      played.calls.push({ name, params })
+      played.calls.push({ name, params, start: standing(el) })
       return { finished: Promise.resolve() } as unknown as Animation
     },
     useFlyer: (...args: Parameters<typeof real.useFlyer>) => {
@@ -179,7 +182,13 @@ function harness(handSlot: HTMLElement | null = null) {
       player === 'p1' ? null : { left: 0, top: 0, width: 150, height: 210 },
     seatOf: () => node(),
     handSlotAt: () => handSlot,
-    releaseSlot: () => node(),
+    // …and an opponent's zone reads at a glance, ours in full: `Seat` hands
+    // its zone `lod` and the zone says so on every slot (`zoneReading.ts`)
+    releaseSlot: (player: string) => {
+      const slot = node()
+      if (player !== 'p1') slot.dataset.lod = 'true'
+      return slot
+    },
     bindPile: () => {},
     bindSeat: () => {},
     bindReleaseSlot: () => {},
@@ -423,8 +432,8 @@ it('stands our own cover even with no handoff and no seat to fly from', async ()
   // it lands at the cover slot, in the cover's own pose — the same end state
   // the flight from a seat reaches
   const box = cover.getBoundingClientRect()
+  expect(flights[0].start).toEqual({ left: box.left, top: box.top, width: box.width })
   expect(flights[0].params).toMatchObject({
-    from: { left: box.left, top: box.top, width: box.width, height: box.height },
     to: { left: box.left, top: box.top, width: box.width, height: box.height },
     rotate: COVER_POSE.rot,
   })
@@ -480,9 +489,9 @@ it('flies our own defence out of the fan slot it left', async () => {
   const flights = played.calls.filter((c) => c.name === 'playToCenter')
   expect(flights).toHaveLength(1)
   const box = cover.getBoundingClientRect()
+  // the fan slot, not the cover slot it lands on — a real journey
+  expect(flights[0].start).toEqual({ left: 40, top: 60, width: 150 })
   expect(flights[0].params).toMatchObject({
-    // the fan slot, not the cover slot it lands on — a real journey
-    from: { left: 40, top: 60, width: 150, height: 210 },
     to: { left: box.left, top: box.top, width: box.width, height: box.height },
     rotate: COVER_POSE.rot,
   })
@@ -541,7 +550,7 @@ it('does not fly our own staged defence in from the fan a second time', async ()
   // and emphatically nothing from the fan slot the card left — the replay the
   // user watched. Asserted against the stub above, which is the only reason
   // this file can tell that box apart from the cover's.
-  expect(played.calls.map((c) => c.params.from)).not.toContainEqual(
+  expect(played.calls.map((c) => c.start)).not.toContainEqual(
     expect.objectContaining({ left: 40, top: 60 }),
   )
   // the cover slot is still what the exchange leaves from, untouched by any of
@@ -842,7 +851,7 @@ it('covers the alarm and takes both away as one exchange', async () => {
   expect(exits.items[0].scatter).toEqual(scatterAt(11))
   expect(exits.items[1].scatter).toEqual(scatterAt(12))
   // and each starts from the tilt it was resting at (I6/I9)
-  expect(exits.items[0].pose).toEqual(ATTACK_POSE)
+  expect(exits.items[0].pose).toEqual(ALARM_POSE)
   expect(exits.items[1].pose).toEqual(COVER_POSE)
 })
 
@@ -1072,8 +1081,8 @@ it('sends the AI card standing behind the prompt home once this batch answers it
   expect(home).toHaveLength(1)
   const effectBox = anchors.effect.current?.getBoundingClientRect()
   const eventsBox = anchors.eventsBox.current?.getBoundingClientRect()
+  expect(home[0].start).toMatchObject({ left: effectBox?.left, top: effectBox?.top })
   expect(home[0].params).toMatchObject({
-    from: { left: effectBox?.left, top: effectBox?.top },
     to: { left: eventsBox?.left, top: eventsBox?.top },
   })
 })
@@ -1121,8 +1130,16 @@ it('keeps the AI trigger out of the heap while the neutralized exchange is still
       await vi.advanceTimersByTimeAsync(1000)
     })
     await flight
-    expect(published.at(-1)?.decks.discardHeap?.map((card) => card.uid)).toEqual(['d3'])
-    expect(published.at(-1)?.decks.discardCount).toBe(1)
+    // landed, it is back — and so is everything that landed with it, filed as it
+    // lay: the trigger, the alarm, the Debugger over it. Putting back the decks
+    // from before the flight left the alarm and the Debugger nowhere until the
+    // live board caught up (owner's recording, 03.10)
+    expect(published.at(-1)?.decks.discardHeap?.map((card) => card.uid)).toEqual([
+      'd3',
+      'd11',
+      'd12',
+    ])
+    expect(published.at(-1)?.decks.discardCount).toBe(3)
   } finally {
     hang.on = false
     act(() => {
@@ -1211,7 +1228,171 @@ it('keeps a reflected hand attack visible while only the defence leaves', async 
     effect: 'reflect' as const,
     spent: [{ eventId: 14, card: 'defense-hotfix', reason: 'defenceSpent' as const }],
   }
-  await drive(() => api.beat?.runCovered(plan, { base, publish: (s) => published.push(s) }))
+  // the board from before the batch, with the attack still owed its answer —
+  // the only board a reflection is ever played against
+  const withAttack = {
+    ...base,
+    pending: {
+      kind: 'defend',
+      player: 'p1',
+      attacker: 'p2',
+      attackCard: 'attack-bug',
+      sudo: false,
+    },
+  } as unknown as BoardState
+  await drive(() =>
+    api.beat?.runCovered(plan, { base: withAttack, publish: (s) => published.push(s) }),
+  )
   expect(published.at(-1)?.pending).toBeNull()
   expect(published.at(-1)?.centreAttack).toEqual({ card: 'attack-bug', sudo: false })
+})
+
+// The exchange lands in the heap as it lay on the table (#168): the attack
+// under the defence, and the defence's Sudo tucked under its own card — the
+// order the projection's own heap keeps (`toDiscardHeap`), though the engine
+// banks the Sudo after its card. Filed by event, the two swapped places the
+// moment the projection took over, and the pile blinked (owner's recording).
+it('lands a defence played with Sudo in the heap with the Sudo under it', async () => {
+  const { api, Probe } = harness()
+  render(<Probe />)
+  const published: BoardState[] = []
+  const plan = {
+    ...cancelPlan(),
+    sudo: 'support-sudo',
+    spent: [
+      { eventId: 13, card: 'attack-bug', reason: 'attackSpent' as const },
+      { eventId: 14, card: 'defense-hotfix', reason: 'defenceSpent' as const },
+      { eventId: 15, card: 'support-sudo', reason: 'defenceSpent' as const },
+    ],
+  }
+  const withAttack = {
+    ...base,
+    pending: {
+      kind: 'defend',
+      player: 'p1',
+      attacker: 'p2',
+      attackCard: 'attack-bug',
+      sudo: false,
+    },
+  } as unknown as BoardState
+  await drive(() =>
+    api.beat?.runCovered(plan, { base: withAttack, publish: (s) => published.push(s) }),
+  )
+  expect(published.at(-1)?.decks.discardHeap?.map((h) => h.uid)).toEqual(['d13', 'd15', 'd14'])
+})
+
+// ===== neutralized — one card, one place (#168) =====
+// The answer leaves where it stood in the commit its carrier goes up, the way
+// `runCovered`'s does. The stand recorded our Debugger back in the fan for its
+// whole flight to the discard, and the 503's answer gone once it had landed.
+
+it('takes our own Debugger off the fan in the commit the gesture lets go of it', async () => {
+  exits.items.length = 0
+  const { api, Probe } = harness()
+  const published: BoardState[] = []
+  const withDebugger = {
+    ...base,
+    you: { ...base.you, hand: [{ uid: 'dbg', card: cardById('protection-debugger') }] },
+  } as unknown as BoardState
+  let handAtRelease: string[] | undefined
+  const release = vi.fn(() => {
+    handAtRelease = published.at(-1)?.you.hand.map((h) => h.uid)
+  })
+  const staging = {
+    current: { mainUid: 'dbg', el: node(), release },
+  } as unknown as RefObject<StagedHandoff | null>
+  render(<Probe staging={staging} />)
+  await drive(() =>
+    api.beat?.runNeutralized(
+      { ...debuggerPlan(), player: 'p1' },
+      { base: withDebugger, publish: (s) => published.push(s) },
+    ),
+  )
+  expect(release).toHaveBeenCalledOnce()
+  expect(handAtRelease).toEqual([])
+})
+
+it('lowers the answering seat’s hand as its Debugger takes off', async () => {
+  played.names = []
+  const { api, Probe } = harness()
+  render(<Probe />)
+  let liftedAfter: string[] | null = null
+  await drive(() =>
+    api.beat?.runNeutralized(debuggerPlan(), {
+      base,
+      publish: (s) => {
+        if (liftedAfter === null && s.opponents[0].handCount === 2) liftedAfter = [...played.names]
+      },
+    }),
+  )
+  expect(liftedAfter).toEqual([])
+  expect(played.names).toContain('playToCenter')
+})
+
+it('takes a sacrificed release out of its zone as it takes off', async () => {
+  played.names = []
+  const { api, Probe } = harness()
+  render(<Probe />)
+  const zoned = {
+    ...base,
+    opponents: [{ ...base.opponents[0], release: { frontend: cardById('release-frontend') } }],
+  } as unknown as BoardState
+  let liftedAfter: string[] | null = null
+  await drive(() =>
+    api.beat?.runNeutralized(
+      {
+        ...debuggerPlan(),
+        method: 'sacrifice',
+        slot: 'frontend',
+        destination: 'discard',
+        spent: [{ eventId: 12, card: 'release-frontend' }],
+      },
+      {
+        base: zoned,
+        publish: (s) => {
+          if (liftedAfter === null && !s.opponents[0].release.frontend)
+            liftedAfter = [...played.names]
+        },
+      },
+    ),
+  )
+  expect(liftedAfter).toEqual([])
+  expect(played.names).toContain('playToCenter')
+})
+
+it('counts a sacrificed AI release back into the events deck as it lands', async () => {
+  const { api, Probe } = harness()
+  render(<Probe />)
+  const published: BoardState[] = []
+  await drive(() =>
+    api.beat?.runNeutralized(
+      {
+        ...debuggerPlan(),
+        method: 'sacrifice',
+        slot: 'frontend',
+        destination: 'events',
+        spent: [{ eventId: 12, card: 'release-frontend' }],
+      },
+      { base, publish: (s) => published.push(s) },
+    ),
+  )
+  expect(published.at(-1)?.decks.events).toBe(6)
+})
+
+// The AI trigger beside the prompt leaves with the answer, and flies UNDER it —
+// the order the heap files them in. At one layer with the answer it rode over
+// the Debugger and lay under it the moment both landed (owner's recording, 03.10).
+it('flies the AI trigger under the exchange it leaves with, as the heap files them', async () => {
+  exits.items.length = 0
+  const { api, Probe } = harness()
+  render(<Probe />)
+  await drive(() =>
+    api.beat?.runNeutralized(
+      { ...debuggerPlan(), alarm: undefined, causeward: { card: 'trigger-ai', eventId: 3 } },
+      ctx,
+    ),
+  )
+  const layerOf = (id: string) => exits.items.find((i) => i.card.id === id)?.layer
+  expect(layerOf('trigger-ai')).toBe(0)
+  expect(layerOf('protection-debugger')).toBe(1)
 })

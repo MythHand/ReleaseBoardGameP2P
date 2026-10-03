@@ -4,10 +4,11 @@ import type { Leaving } from '@release/ui/animations'
 import { scatterAt } from '@release/ui/animations'
 import { act, render } from '@testing-library/react'
 import type { RefObject } from 'react'
-import { expect, it, vi } from 'vitest'
+import { beforeEach, expect, it, vi } from 'vitest'
 import type { BeatRun, BoardAnchors, BoardState, StagedHandoff } from '~/entities/game/board'
 import { useComboBeat } from './comboBeat'
 import type { BeatPlan } from './planBeats'
+import { spot } from './testing'
 
 // Two arrays, and they are deliberately NOT index-aligned — read the second
 // sentence before using them.
@@ -26,6 +27,13 @@ import type { BeatPlan } from './planBeats'
 const played = vi.hoisted(() => ({
   names: [] as string[],
   params: [] as (Record<string, unknown> | undefined)[],
+  // where each FLIGHT's element stood as it began, aligned with `params` —
+  // the start a travel reads off the card itself (`testing.tsx`'s `standing`)
+  starts: [] as unknown[],
+  // what the carrier was handed on the way (`useFlyer`'s `patch`), and how many
+  // flights had started by then — a reading handed at takeoff sits BEFORE the
+  // flight it belongs to
+  patches: [] as { flights: number; next: unknown }[],
   wholePairs: [] as boolean[],
 }))
 
@@ -35,6 +43,8 @@ const played = vi.hoisted(() => ({
 const resetPlayed = () => {
   played.names = []
   played.params = []
+  played.starts = []
+  played.patches = []
   played.wholePairs = []
 }
 
@@ -53,15 +63,27 @@ const hang = vi.hoisted(() => ({ on: false, release: null as (() => void) | null
 vi.mock('@release/ui/animations', async (importOriginal) => {
   const real = await importOriginal<typeof import('@release/ui/animations')>()
   const { useState } = await import('react')
+  const { standing } = await import('./testing')
   return {
     ...real,
     play: (name: string, el: Element, params?: Record<string, unknown>) => {
       played.names.push(name)
       played.params.push(params)
+      played.starts.push(standing(el))
       played.wholePairs.push(
         Boolean(el.querySelector('[data-main]') && el.querySelector('[data-aux]')),
       )
       return { finished: Promise.resolve() } as unknown as Animation
+    },
+    useFlyer: (...args: Parameters<typeof real.useFlyer>) => {
+      const flyer = real.useFlyer(...args)
+      return {
+        ...flyer,
+        patch: (...patch: Parameters<typeof flyer.patch>) => {
+          played.patches.push({ flights: played.params.length, next: patch[1] })
+          flyer.patch(...patch)
+        },
+      }
     },
     // A stateful stand-in, not a fixed `overlay: []`: the reset() test needs
     // to tell "a flyer is mounted" from "reset() cleared it," and a hardcoded
@@ -124,6 +146,10 @@ function harness() {
   const stage = boxed(STAGE_BOX.left, STAGE_BOX.top)
   const handSlot = node()
   const releaseSlot = node()
+  // an opponent's zone reads at a glance, ours in full — `Seat` hands its zone
+  // `lod` and the zone says so on every slot (`zoneReading.ts`)
+  const theirSlot = node()
+  theirSlot.dataset.lod = 'true'
   const anchors = {
     hand: { current: node() },
     centre: { current: centre },
@@ -142,7 +168,7 @@ function harness() {
       player === 'p1' ? null : { left: 0, top: 0, width: 150, height: 210 },
     seatOf: () => node(),
     handSlotAt: (i: number) => (i === 0 ? handSlot : null),
-    releaseSlot: () => releaseSlot,
+    releaseSlot: (player: string) => (player === 'p1' ? releaseSlot : theirSlot),
     bindPile: () => {},
     bindSeat: () => {},
     bindReleaseSlot: () => {},
@@ -183,7 +209,13 @@ async function drive(run: () => Promise<void> | undefined) {
   }
 }
 
-const ctx: BeatRun = { base, publish: () => {} }
+// A run of its own for every test, as the queue gives every beat one: a beat
+// moves its run's base as it publishes, and a run shared across tests handed
+// each test the board the one before it had left.
+let ctx: BeatRun = { base, publish: () => {} }
+beforeEach(() => {
+  ctx = { base, publish: () => {} }
+})
 
 // ===== attackPlaced =====
 
@@ -314,6 +346,64 @@ it.each([
   }
 })
 
+// OUR OWN play, put out at the centre before it went: the shadow the beat runs
+// on still has it out. The gesture letting go of it is the frame the centre
+// would draw our shown card again from that shadow — so by then the shadow must
+// already say it is not out any more, or a second DDoS stands at the middle
+// while the real one flies to the discard (#168).
+it('takes our own shown DDoS off the table in the frame the gesture lets go of it', async () => {
+  resetPlayed()
+  exits.items = []
+  const { api, Probe } = harness()
+  const published: BoardState[] = []
+  let atRelease: BoardState | undefined
+  const release = vi.fn(() => {
+    atRelease = published.at(-1)
+  })
+  const staging = {
+    current: { mainUid: 'ddos#0', supportUid: 'sudo#0', el: boxed(400, 300), release },
+  }
+  render(<Probe staging={staging} />)
+  const shownBase: BoardState = {
+    ...base,
+    you: {
+      ...base.you,
+      hand: [
+        { uid: 'ddos#0', card: card('attack-ddos') },
+        { uid: 'sudo#0', card: card('support-sudo') },
+      ],
+    },
+    shown: [
+      { player: 'p1', uid: 'ddos#0', card: card('attack-ddos') },
+      { player: 'p1', uid: 'sudo#0', card: card('support-sudo') },
+    ],
+  }
+  await drive(() =>
+    api.beat?.runAttack(
+      {
+        kind: 'attackPlaced',
+        key: 'attack:5',
+        eventId: 5,
+        attacker: 'p1',
+        target: 'p3',
+        card: 'attack-ddos',
+        sudo: true,
+        resolved: true,
+        spent: [
+          { eventId: 6, card: 'attack-ddos' },
+          { eventId: 7, card: 'support-sudo' },
+        ],
+      },
+      { base: shownBase, publish: (state) => published.push(state) },
+    ),
+  )
+  expect(release).toHaveBeenCalledTimes(1)
+  expect(atRelease?.shown ?? []).toEqual([])
+  // and nothing published after it puts it back
+  const letGo = published.indexOf(atRelease as BoardState)
+  expect(published.slice(letGo).every((s) => (s.shown ?? []).length === 0)).toBe(true)
+})
+
 it('never says an answer is owed for an attack that cannot be answered', async () => {
   resetPlayed()
   const { api, Probe } = harness()
@@ -427,14 +517,16 @@ it('publishes our own attack too when the answer arrives in the same batch', asy
   expect(release).toHaveBeenCalledTimes(1)
   expect(played.names).not.toContain('foldIntoPair')
   // …and the attack it left standing is published, so the cover has something
-  // to cover
-  expect(published).toHaveLength(1)
-  expect(published[0].pending).toMatchObject({
+  // to cover — and it is still standing on the board the beat ends on, where the
+  // card that left the hand for it is no longer in the fan (#168)
+  const last = published.at(-1)
+  expect(last?.pending).toMatchObject({
     kind: 'defend',
     player: 'p2',
     attacker: 'p1',
     attackCard: 'attack-bug',
   })
+  expect(last?.you.hand.map((h) => h.uid)).not.toContain('u1')
 })
 
 // It DECLINES over a standing pending rather than replacing it (#101, Fix D,
@@ -532,9 +624,9 @@ it('lands a sudo attack as one pair in the pose its pending render uses', async 
   await drive(() => api.beat?.runAttack(plan, ctx))
   expect(played.names).toEqual(['playToCenter'])
   expect(played.wholePairs).toEqual([true])
+  expect(played.starts).toEqual([{ left: 0, top: 0, width: 150 }])
   expect(played.params).toEqual([
     {
-      from: { left: 0, top: 0, width: 150, height: 210 },
       to: CENTRE_BOX,
       rotate: -4,
       dx: 0,
@@ -635,7 +727,7 @@ it('flies the actor’s own plain release from the stage slot, once, and lets it
   expect(take).toHaveBeenCalledTimes(1)
   // and it starts at the STAGE slot — not the attack centre, which is where
   // the beat used to measure from
-  expect(played.params[0]).toMatchObject({ from: STAGE_BOX })
+  expect(played.starts[0]).toEqual(spot(STAGE_BOX))
 })
 
 it('folds an opponent’s Code Review combo in and flies it to their slot', async () => {
@@ -654,6 +746,61 @@ it('folds an opponent’s Code Review combo in and flies it to their slot', asyn
   await drive(() => api.beat?.runRelease(plan, ctx))
   expect(played.names.filter((n) => n === 'foldIntoPair')).toHaveLength(2)
   expect(played.names).toContain('playToReleaseZone')
+})
+
+// PUT OUT AT THE CENTRE (resolution.md §1), an opponent's release was watched
+// arriving and assembling where it stands, so it leaves for its zone from THERE
+// — not folded again at the middle first, which read as the card sliding to the
+// middle before it went (#168).
+const theirRelease = (codeReview: boolean): Extract<BeatPlan, { kind: 'releasePlaced' }> => ({
+  kind: 'releasePlaced',
+  key: 'release:7',
+  eventId: 7,
+  player: 'p2',
+  slot: 'backend',
+  card: 'release-backend',
+  ...(codeReview ? { codeReview: 'support-code-review' } : {}),
+})
+const shownBy = (ids: string[]) => ({
+  ...base,
+  shown: ids.map((id, i) => ({ player: 'p2', uid: `s${i}`, card: card(id) })),
+})
+
+it('takes an opponent’s shown Code Review combo off its place in the row, straight to their slot', async () => {
+  resetPlayed()
+  const { api, Probe } = harness()
+  render(<Probe />)
+  const published: BoardState[] = []
+  const on = shownBy(['release-backend', 'support-code-review'])
+  await drive(() =>
+    api.beat?.runRelease(theirRelease(true), { base: on, publish: (s) => published.push(s) }),
+  )
+  // nothing folds: the one flight is the whole pair, to the zone
+  expect(played.names).toEqual(['playToReleaseZone'])
+  expect(played.wholePairs).toEqual([true])
+  // from the row's first place, where the pair stands — not the middle (400)
+  expect(played.starts).toEqual([{ left: 316, top: 300, width: 150 }])
+  // its standing render went down as the carrier took it
+  expect(published.at(-1)?.shown ?? []).toEqual([])
+  // a zone draws a pair whole whoever's it is: no reading to take
+  expect(played.patches).toEqual([])
+})
+
+it('takes an opponent’s shown lone release off the stage slot, reading at a glance from takeoff', async () => {
+  resetPlayed()
+  const { api, Probe } = harness()
+  render(<Probe />)
+  await drive(() =>
+    api.beat?.runRelease(theirRelease(false), {
+      base: shownBy(['release-backend']),
+      publish: () => {},
+    }),
+  )
+  expect(played.names).toEqual(['playToReleaseZone'])
+  expect(played.starts).toEqual([spot(STAGE_BOX)])
+  // their zone reads at a glance, and the card is handed that reading BEFORE
+  // its flight starts — so it rebuilds on the way, not on landing
+  expect(played.patches).toEqual([{ flights: 0, next: { lod: true } }])
 })
 
 // The cost leg (#101, Task 11): by the rules a release costs one card, and

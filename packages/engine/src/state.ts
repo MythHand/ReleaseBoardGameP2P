@@ -52,6 +52,14 @@ export interface PlayerState {
   // begins. A separate list precisely because the two thaw at different moments;
   // one list could only ever be right for one of them.
   replayLocked: CardUid[]
+  // The cards this player has put out at the centre while the play they belong
+  // to is still being made — a Sudo waiting for its partner, a Code Review for
+  // its release, a release for its cost, an attack for its target. Seen by the
+  // whole table (resolution.md §1, «Выложенное на стол видно всем»). They stay
+  // in the hand: showing a card is what the table sees, not a move, so
+  // legality and spending never look here. A card that leaves the hand leaves
+  // this list with it (`setHand`), the same as the two locks above.
+  shown: CardUid[]
   // What this player was dealt FACE UP at setup — by the rules, the reserved
   // Debugger. Recorded rather than re-derived, because provenance and identity
   // are not the same question: with a deck holding fewer Debuggers than players
@@ -71,6 +79,11 @@ export interface ReactionWindow {
   deadline: number
   // Revocable: passing only means "fine, close early". A passer may still attack.
   passed: PlayerId[]
+  // A Sudo put out at the centre to attack with holds the time: its own span
+  // for the attack to join it (`SUDO_PARTNER_MS`), carried as this window's
+  // deadline. Gone with the Sudo — it runs out or is taken back, and the time
+  // to attack the release starts anew (owner, 02.10).
+  held?: PlayerId
 }
 
 // Cards remain at the centre until the whole hand-attack decision resolves.
