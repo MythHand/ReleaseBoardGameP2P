@@ -562,24 +562,6 @@ it('keeps the rematch’s opening when it lands while a beat is in flight', asyn
   expect(log).toEqual(['intro', 'intro2'])
 })
 
-// The heap's own stand-in pose is keyed by the discard count AFTER the batch
-// (`toBoardState`'s `standInScatter`), and a plan reads it to land a silently
-// banked card exactly where the heap will rest it (#106, the crush ending).
-// That count exists nowhere in the events — the engine banks some cards with no
-// event at all — so it reaches the planner only through this argument.
-it('hands the planner the discard count the batch left behind', async () => {
-  motion.reduced = false
-  planned.calls = []
-  sent.hang = false
-  const { rerender } = render(<Probe live={preDiscard} events={[]} anchors={stub} />)
-  rerender(<Probe live={afterDiscard} events={[discardEvent]} anchors={stub} />)
-  await flush()
-  const args = planned.calls.at(-1)
-  // …the POST-batch count, not the projection the beat animates away from
-  expect(args?.[3]).toBe(afterDiscard.decks.discardCount)
-  expect(args?.[3]).not.toBe(preDiscard.decks.discardCount)
-})
-
 // ===== the watermark a restore or a resend seeds the queue with (#136, Task
 // 16). `isOpening` reads the PROJECTION, so mid-match `intro` is null and
 // beats are ENABLED from the first frame — without the mark, the whole

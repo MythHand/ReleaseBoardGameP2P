@@ -1,6 +1,6 @@
 import { type CardData, cardById } from '@release/ui'
 import type { BoardState, CentreOperation } from '~/entities/game/board'
-import { type Filed, withLanded, withoutLanded, withoutTopCopy, withStandIn } from './toHeap'
+import { type Filed, withLanded, withoutLanded, withoutTopCopy } from './toHeap'
 
 // ONE CARD, ONE PLACE (#168; docs/animations/beat-copies.md §5).
 //
@@ -217,8 +217,6 @@ export type Landing =
       ai?: { id: string; event: string }
     }
   | { kind: 'heap'; filed: Filed[] }
-  // a card banked with no `discarded` event of its own: the heap's top stand-in
-  | { kind: 'heapTop'; card: string; count: number; banked?: number }
   | { kind: 'pile'; pile: number; count?: number }
   | { kind: 'events'; count?: number }
   | {
@@ -293,8 +291,6 @@ export function withCard(board: BoardState, to: Landing): BoardState {
     }
     case 'heap':
       return withLanded(board, to.filed)
-    case 'heapTop':
-      return withStandIn(board, to)
     case 'pile':
       return {
         ...board,

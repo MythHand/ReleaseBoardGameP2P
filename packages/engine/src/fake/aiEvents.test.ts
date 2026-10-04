@@ -118,7 +118,7 @@ describe('answering a Crush', () => {
   const dbg: CardInstance = { uid: 'protection-debugger#0', id: 'protection-debugger' }
   const fe: CardInstance = { uid: 'release-frontend#0', id: 'release-frontend' }
   const be: CardInstance = { uid: 'release-backend#0', id: 'release-backend' }
-  const crushed = () => {
+  const crushed = (frontend: { card: CardInstance; codeReview?: CardInstance } = { card: fe }) => {
     const base = engine.createGame(config())
     const state = game({
       players: {
@@ -126,12 +126,49 @@ describe('answering a Crush', () => {
         p1: {
           ...base.players.p1,
           hand: [dbg],
-          release: { frontend: { card: fe }, backend: { card: be } },
+          release: { frontend, backend: { card: be } },
         },
       },
     })
     return fireEvent(state, 'ai-crush-frontend').state
   }
+
+  // A CRUSH SAYS WHERE ITS SPOILS WENT. It banked them in silence, and the board
+  // had no place in the heap for either card — a stand-in for the top, and the
+  // release under it nowhere (owner's recording, 04.10).
+  it('files the release and the Code Review it destroys as discarded, caused by the destruction', () => {
+    const cr: CardInstance = { uid: 'support-code-review#0', id: 'support-code-review' }
+    const r = reduce(crushed({ card: fe, codeReview: cr }), {
+      type: 'PASS',
+      player: 'p1',
+      at: 2000,
+    })
+    const destroyed = r.events.find((e) => e.type === 'releaseDestroyed')
+    expect(r.events.filter((e) => e.type === 'discarded')).toEqual([
+      expect.objectContaining({
+        card: 'release-frontend',
+        reason: 'destroyed',
+        parent: destroyed?.id,
+      }),
+      expect.objectContaining({
+        card: 'support-code-review',
+        reason: 'destroyed',
+        parent: destroyed?.id,
+      }),
+    ])
+  })
+
+  // …but an AI release goes home to the events deck, not to the discard
+  it('files nothing for an AI release it destroys', () => {
+    const ai: CardInstance = {
+      uid: 'release-frontend#ai',
+      id: 'release-frontend',
+      event: 'ai-release-frontend',
+    }
+    const r = reduce(crushed({ card: ai }), { type: 'PASS', player: 'p1', at: 2000 })
+    expect(r.events.some((e) => e.type === 'discarded')).toBe(false)
+    expect(r.state.decks.events.map((c) => c.id)).toContain('ai-release-frontend')
+  })
 
   it('offers no sacrifice, even with another release standing', () => {
     expect(crushed().pending).toMatchObject({ kind: 'crush', methods: ['debugger'] })

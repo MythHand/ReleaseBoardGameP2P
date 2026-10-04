@@ -992,6 +992,54 @@ describe('the discard heap', () => {
     expect(heap?.[0]).toMatchObject(scatterAt(1))
   })
 
+  // A DESTROYED RELEASE GOES INTO THE HEAP AS IT LAY: its Code Review under it.
+  // Crush Backend refused — the trigger first, then the pair, the release on
+  // top (owner's recording, 04.10).
+  it('lays a destroyed release over the Code Review it stood on', () => {
+    const log: Event[] = [
+      discardedEvent(1, 'trigger-ai', 'trigger'),
+      {
+        id: 2,
+        type: 'releaseDestroyed',
+        player: 'you',
+        slot: 'backend',
+        card: 'release-backend',
+      } as Event,
+      discardedEvent(3, 'release-backend', 'destroyed'),
+      discardedEvent(4, 'support-code-review', 'destroyed'),
+    ]
+    const heap = toBoardState(
+      withDecks({ discardCount: 3, discardTop: 'support-code-review' }),
+      log,
+      labels,
+    ).decks.discardHeap
+    expect(heap?.map((c) => c.uid)).toEqual(['d1', 'd4', 'd3'])
+  })
+
+  // …and only straight after the destruction: nothing is left armed for two
+  // cards of the same names thrown out later
+  it('leaves nothing armed after a release destroyed alone', () => {
+    const log: Event[] = [
+      {
+        id: 1,
+        type: 'releaseDestroyed',
+        player: 'you',
+        slot: 'backend',
+        card: 'release-backend',
+      } as Event,
+      discardedEvent(2, 'release-backend', 'destroyed'),
+      { id: 3, type: 'passed', player: 'you' } as Event,
+      discardedEvent(4, 'release-backend', 'handLimit'),
+      discardedEvent(5, 'support-code-review', 'handLimit'),
+    ]
+    const heap = toBoardState(
+      withDecks({ discardCount: 3, discardTop: 'support-code-review' }),
+      log,
+      labels,
+    ).decks.discardHeap
+    expect(heap?.map((c) => c.uid)).toEqual(['d2', 'd4', 'd5'])
+  })
+
   // A PICK NEVER TAKES THE CARDS ITS OWN PLAY SPENT. Cherry-pick and its sudo
   // join the pile the moment they are played, but the pick offers what lay there
   // before (`openPickFromDiscard`). Taking a card of the same name out of it took

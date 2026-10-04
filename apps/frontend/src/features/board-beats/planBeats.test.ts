@@ -1,9 +1,7 @@
 import type { Event } from '@release/engine'
 import { cardById } from '@release/ui'
-import { scatterAt } from '@release/ui/animations'
 import { describe, expect, it } from 'vitest'
 import type { BoardState } from '~/entities/game/board'
-import { standInScatter } from '~/entities/game/board'
 import type { BeatPlan } from './planBeats'
 import { classifyPiles, planBeats } from './planBeats'
 
@@ -1767,45 +1765,30 @@ describe('planBeats — aiEvent (#106)', () => {
     })
   })
 
-  // WHERE THE HEAP WILL ACTUALLY REST IT. An automatic `destroySlot` emits no
-  // `discarded`, so there is no event id to key a scatter off — but the heap
-  // still shows the card, as its stand-in for the discard's top, and that
-  // stand-in has a pose. The plan reads it through the very function
-  // `toDiscardHeap` rests it with (I7), off the post-batch count `useBeats`
-  // hands in — never recomputed from `before` plus what the batch looks like
-  // it banked.
-  it('rests a crushed release on the pose the heap will actually give it', () => {
-    const batch = aiBatch({
-      id: 4,
-      type: 'releaseDestroyed',
-      player: 'p1',
-      slot: 'frontend',
-      card: 'release-frontend',
-    })
-    const before = boardBefore({
-      you: {
-        name: 'You',
-        hand: [],
-        release: { frontend: card('release-frontend') },
-        support: {},
-        releaseEvent: {},
-      },
-    } as Partial<BoardState>)
-    const plan = planBeats(batch, before, null, 7)[0] as Extract<BeatPlan, { kind: 'aiEvent' }>
-    expect(plan.tail).toMatchObject({ kind: 'crush', rest: standInScatter(7) })
-    // and it is the STAND-IN's pose, never a real discard event's — those are
-    // keyed positive and this one is deliberately out of their range
-    expect(plan.tail).not.toMatchObject({ rest: scatterAt(4) })
-  })
-
-  it('rests nothing when the heap has nothing to rest it as', () => {
-    const batch = aiBatch({
-      id: 4,
-      type: 'releaseDestroyed',
-      player: 'p1',
-      slot: 'frontend',
-      card: 'release-frontend',
-    })
+  // WHERE THE HEAP WILL REST WHAT IT DESTROYED: on the `discarded` events the
+  // destruction filed the cards by (`destroySlot`), the release's and the Code
+  // Review's under it — and those two events are the crush's own, so no
+  // discard beat flies the same cards a second time (owner's recording, 04.10).
+  it('carries the discard events a crush filed its cards by, and claims them', () => {
+    const batch = aiBatch(
+      { id: 4, type: 'releaseDestroyed', player: 'p1', slot: 'frontend', card: 'release-frontend' },
+      {
+        id: 5,
+        type: 'discarded',
+        player: 'p1',
+        card: 'release-frontend',
+        reason: 'destroyed',
+        parent: 4,
+      } as Event,
+      {
+        id: 6,
+        type: 'discarded',
+        player: 'p1',
+        card: 'support-code-review',
+        reason: 'destroyed',
+        parent: 4,
+      } as Event,
+    )
     const withReview = boardBefore({
       you: {
         name: 'You',
@@ -1815,6 +1798,22 @@ describe('planBeats — aiEvent (#106)', () => {
         releaseEvent: {},
       },
     } as Partial<BoardState>)
+    const plans = planBeats(batch, withReview)
+    expect(plans.map((p) => p.kind)).toEqual(['aiEvent'])
+    expect(plans[0]).toMatchObject({
+      tail: { kind: 'crush', releaseDiscardId: 5, codeReviewDiscardId: 6 },
+    })
+  })
+
+  // …and a release from the events deck goes home: nothing of it is filed
+  it('files nothing for a crushed release that goes home to the events deck', () => {
+    const batch = aiBatch({
+      id: 4,
+      type: 'releaseDestroyed',
+      player: 'p1',
+      slot: 'frontend',
+      card: 'release-frontend',
+    })
     const goesHome = boardBefore({
       you: {
         name: 'You',
@@ -1824,44 +1823,9 @@ describe('planBeats — aiEvent (#106)', () => {
         releaseEvent: { frontend: 'ai-release-frontend' },
       },
     } as Partial<BoardState>)
-    // buried under its own Code Review — `bankToDiscard` banks the spoils as
-    // [release, codeReview], so the Code Review is the top and this one is
-    // under it, with no entry of its own (docs/animations/backlog.md)
-    expect(planBeats(batch, withReview, null, 7)[0]).not.toMatchObject({ tail: { rest: {} } })
-    // never reaches the heap at all — it is claimed back by the events deck
-    expect(planBeats(batch, goesHome, null, 7)[0]).not.toMatchObject({ tail: { rest: {} } })
-    // and with no count handed in there is nothing to read
-    expect(planBeats(batch, boardBefore(), null)[0]).not.toMatchObject({ tail: { rest: {} } })
-  })
-
-  // THE PAIR THAT MATTERS #2 — two batches identical AND empty
-  // …and with a Code Review the Code Review IS the top, so it carries the pose
-  // (owner, 17.09: they go as they lay, Code Review on top; #168)
-  it('gives a crushed release’s Code Review the heap’s top pose', () => {
-    const batch: Event[] = [
-      { id: 1, type: 'drawn', player: 'p1', pile: 0, deckSize: 30 },
-      {
-        id: 2,
-        type: 'aiRevealed',
-        player: 'p1',
-        aiCard: 'trigger-ai',
-        eventCard: 'ai-crush-frontend',
-      },
-      { id: 3, type: 'discarded', player: 'p1', card: 'trigger-ai', reason: 'trigger' },
-      { id: 4, type: 'releaseDestroyed', player: 'p1', slot: 'frontend', card: 'release-frontend' },
-    ] as Event[]
-    const withReview = boardBefore({
-      you: {
-        name: 'You',
-        hand: [],
-        release: { frontend: card('release-frontend') },
-        support: { frontend: card('support-code-review') },
-        releaseEvent: {},
-      },
-    } as Partial<BoardState>)
-    expect(planBeats(batch, withReview, null, 7)[0]).toMatchObject({
-      tail: { codeReviewRest: standInScatter(7), restCount: 7 },
-    })
+    const tail = (planBeats(batch, goesHome)[0] as Extract<BeatPlan, { kind: 'aiEvent' }>).tail
+    expect(tail).toMatchObject({ kind: 'crush', destination: 'events' })
+    expect(tail).not.toHaveProperty('releaseDiscardId')
   })
 
   it('separates a prompt that is owed from nothing having happened, using `owed`', () => {
@@ -2344,6 +2308,48 @@ describe('a refused Crush', () => {
   it('reads nothing as a refusal when no Crush was owed by that player', () => {
     const beats = planBeats([destroyed('p2')], boardBefore(crushOwed))
     expect(beats.some((beat) => beat.kind === 'crushRefused')).toBe(false)
+  })
+
+  // …and what it destroyed is its own to fly: the release and the Code Review
+  // under it are filed under the destruction, and no discard beat takes the
+  // same two cards a second time (owner's recording, 04.10)
+  it('flies the cards it destroyed on their own discard events, and only once', () => {
+    const reviewed = boardBefore({
+      ...crushOwed,
+      you: {
+        name: 'You',
+        hand: [],
+        release: { frontend: card('release-frontend') },
+        support: { frontend: card('support-code-review') },
+        releaseEvent: {},
+      },
+    } as Partial<BoardState>)
+    const beats = planBeats(
+      [
+        destroyed(),
+        {
+          id: 21,
+          type: 'discarded',
+          player: 'p1',
+          card: 'release-frontend',
+          reason: 'destroyed',
+          parent: 20,
+        },
+        {
+          id: 22,
+          type: 'discarded',
+          player: 'p1',
+          card: 'support-code-review',
+          reason: 'destroyed',
+          parent: 20,
+        },
+      ] as Event[],
+      reviewed,
+    )
+    expect(beats.map((b) => b.kind)).toEqual(['crushRefused'])
+    expect(beats[0]).toMatchObject({
+      tail: { releaseDiscardId: 21, codeReviewDiscardId: 22, codeReview: 'support-code-review' },
+    })
   })
 })
 

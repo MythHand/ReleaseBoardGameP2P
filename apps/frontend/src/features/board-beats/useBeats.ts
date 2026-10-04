@@ -792,7 +792,7 @@ export function useBeats(args: {
     // chaining itself: a plan is a fold of events, and where a beat ends is only
     // known once it has run.
     let previous: Beat | undefined
-    for (const plan of planBeats(fresh, before, live.pending ?? null, live.decks.discardCount)) {
+    for (const plan of planBeats(fresh, before, live.pending ?? null)) {
       const beat = beatOf(plan, before)
       if (!beat) continue
       beat.after = previous
@@ -819,8 +819,7 @@ export function useBeats(args: {
   // A non-animated batch never starts a runner, so it must show live now;
   // there would be no later queue render to release a preview shadow.
   const awaitingBatch =
-    unqueued.length > 0 &&
-    planBeats(unqueued, settled.current, live.pending, live.decks.discardCount).length > 0
+    unqueued.length > 0 && planBeats(unqueued, settled.current, live.pending).length > 0
 
   return {
     /** the pile a split has mounted but not yet flown in — it stays invisible */

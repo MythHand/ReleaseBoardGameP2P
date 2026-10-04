@@ -375,7 +375,13 @@ function toDiscardHeap(log: Event[], top: CardData | undefined, count: number): 
   // one, so any later pair of discards that happened to end on that support —
   // two cards going out to a hand limit, say — was read as this play's own and
   // tucked. The pile then re-sorted itself behind the player's back (#168).
-  let pairing: { player: string; main: string; support: string } | null = null
+  //
+  // A DESTROYED RELEASE names its pair too: what lay in its slot was the release
+  // with its Code Review tucked under it, and the two leave together, the
+  // release first (`destroySlot`). That one is FLEETING — it holds only over the
+  // discards that come straight after the destruction, so a release destroyed
+  // with nothing under it leaves nothing armed behind it.
+  let pairing: { player: string; main: string; support: string; fleeting?: true } | null = null
   // the support just tucked under its main, if the last step did that: the
   // projection's own top is THAT card (the engine banked it last), so the fold
   // still ends on the top even though the top is not the last entry
@@ -394,6 +400,11 @@ function toDiscardHeap(log: Event[], top: CardData | undefined, count: number): 
   let filing: string | null = null
   for (const e of log) {
     if (e.type !== 'discarded' && e.type !== 'operationPlayed') filing = null
+    if (pairing?.fleeting && e.type !== 'discarded') pairing = null
+    if (e.type === 'releaseDestroyed') {
+      pairing = { player: e.player, main: e.card, support: 'support-code-review', fleeting: true }
+      continue
+    }
     if (e.type === 'takenFromDiscard') {
       // Events identify the public card type, not a physical uid. Removing one
       // matching copy preserves the visible inventory even with duplicates —

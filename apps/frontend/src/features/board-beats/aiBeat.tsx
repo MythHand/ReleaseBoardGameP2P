@@ -1,6 +1,6 @@
-import { cardAreaOf, cardBoxIn, cardById } from '@release/ui'
+import { cardAreaOf, cardBoxIn, cardById, PAIR_AUX } from '@release/ui'
 import type { Rect } from '@release/ui/animations'
-import { play, scatterAt, useDiscardExit, wait } from '@release/ui/animations'
+import { exitLayer, play, scatterAt, useDiscardExit, wait } from '@release/ui/animations'
 import { useCallback, useRef } from 'react'
 import type { BeatRun, BoardAnchors } from '~/entities/game/board'
 import { aiCauseExit, withoutAiCause } from './aiCauseExit'
@@ -106,10 +106,31 @@ export function useAiBeat(
       const auxEl = aux ? (slotEl?.querySelector<HTMLElement>('[data-aux]') ?? null) : null
       const auxFrom =
         auxEl && crushedFrom ? cardBoxIn(auxEl.getBoundingClientRect(), crushedFrom.width) : null
+      // THE ORDER THEY GO INTO THE HEAP, from the start: the trigger lowest (it
+      // rides the exit step's bottom rung), the Code Review over it, the release
+      // on top — the way the two lay in the slot and the way the heap then rests
+      // them (`toDiscardHeap`'s pairing). Asked of the exit step's own ladder, so
+      // the three cannot fall out of order with one another. They used to go up
+      // in the order they were raised, the release under its own Code Review,
+      // and swap as the heap took over (owner's recording, 04.10).
+      //
+      // …and the Code Review leaves at the tilt it lay at in the pair, which the
+      // flight then unwinds — raised square, it clicked straight on its first
+      // frame.
       const going = [
-        ...(card && crushedFrom ? [{ key: CRUSHED, card, at: crushedFrom }] : []),
+        ...(card && crushedFrom
+          ? [{ key: CRUSHED, card, at: crushedFrom, layer: exitLayer(2) }]
+          : []),
         ...(aux && (auxFrom ?? crushedFrom)
-          ? [{ key: CRUSHED_AUX, card: aux, at: (auxFrom ?? crushedFrom) as Rect }]
+          ? [
+              {
+                key: CRUSHED_AUX,
+                card: aux,
+                at: (auxFrom ?? crushedFrom) as Rect,
+                layer: exitLayer(1),
+                ...(auxFrom ? { pose: `rotate(${PAIR_AUX.rot}deg)` } : {}),
+              },
+            ]
           : []),
       ]
       // the carriers go up and the zone lets go before anything is awaited —
@@ -125,101 +146,61 @@ export function useAiBeat(
   // …and the destroyed release takes the road the plan already worked out,
   // with the Code Review that was tucked under it going its own way.
   //
-  // NEITHER CARD HAS A `discarded` EVENT TO FLY ON. `destroySlot` called
-  // without a reason (fake/triggers.ts — the automatic destruction, and the
-  // refusal) emits `releaseDestroyed` and nothing else, so `toDiscardHeap`,
-  // which folds one heap card per `discarded`, holds no entry keyed to either.
-  //
-  // The heap does still rest ONE of them: its `top<count>` stand-in for
-  // the discard's top. `tail.rest` is that pose, read at plan time
-  // through the shared `standInScatter` off the projection that will
-  // render the heap — so the flight and the rest are one value (I7) and
-  // the card does not jump on its last frame. It is present only when this
-  // release really is what the top will be; a release buried under its own
-  // Code Review has nothing, and neither has the Code Review itself. Those
-  // two are recorded in `docs/animations/backlog.md` rather than papered
-  // over with an invented pose — an omitted scatter takes a fresh
-  // `jitter()`, which is at least honestly arbitrary.
+  // EACH FLIES ON ITS OWN `discarded` EVENT (`destroySlot`): the pose that
+  // event keys is the one the heap then rests the card on (I7), so nothing
+  // jumps on the last frame. The two that go to the heap land in ONE commit,
+  // the Code Review under the release — the way they lay in the slot and the
+  // way the projection folds them — whichever of the two arrives first.
   //
   // WHERE IT LANDS HAS IT IN THE COMMIT ITS CARRIER COMES DOWN (`setDown`): the
-  // events deck counts it back, or the heap rests it as the stand-in for its
-  // top. Dropped with nothing filed, it was nowhere until the live board caught
+  // events deck counts a release from it back, the heap rests the rest.
+  // Dropped with nothing filed, a card was nowhere until the live board caught
   // up — or, while the zone still drew it, back in its slot.
   const sendCrushed = useCallback(
     async (beat: BeatRun, tail: CrushTail, crushedFrom: Rect) => {
       const card = cardById(tail.card)
       const aux = tail.codeReview ? cardById(tail.codeReview) : null
-      // The Code Review is never an events-deck card, so it always takes the
-      // ordinary road even when the release it protected does not — the same
-      // split, for the same reason, `defenseBeat`'s sacrifice leg makes.
-      // It is the discard's top — banked after the release — so it flies onto
-      // the heap's stand-in pose and rests there as it lands, the release under
-      // it counted with it when that went to the discard too (`codeReviewRest`).
-      const auxOut = aux
-        ? latest.current.exit
-            .send(
-              [
-                {
-                  key: CRUSHED_AUX,
-                  card: aux,
-                  node: elOf(CRUSHED_AUX),
-                  ...(tail.codeReviewRest ? { scatter: tail.codeReviewRest } : {}),
-                },
-              ],
-              // nothing stands: handed over as its own `node`
-              null,
-            )
-            .then(() =>
-              setDown(
-                beat,
-                tail.codeReviewRest && tail.restCount !== undefined
-                  ? [
-                      {
-                        kind: 'heapTop',
-                        card: aux.id,
-                        count: tail.restCount,
-                        banked: tail.destination === 'discard' ? 2 : 1,
-                      },
-                    ]
-                  : [],
-                () => drop(CRUSHED_AUX),
-              ),
-            )
-        : Promise.resolve()
-      const mainOut = (async () => {
-        if (!card) return
-        // Its road is the plan's answer, not one worked out here: the fact
-        // lives on the pre-batch projection (`releaseEvent`), which the
-        // runner cannot see and the plan already read (#71 — the class of
-        // bug this closes).
-        if (tail.destination === 'events') {
-          await goHome(CRUSHED, crushedFrom)
-          setDown(beat, [{ kind: 'events' }], () => drop(CRUSHED))
-          return
-        }
-        await latest.current.exit.send(
+      const toHeap = (key: string, data: NonNullable<typeof card>, eventId?: number) =>
+        latest.current.exit.send(
           [
             {
-              key: CRUSHED,
-              card,
-              node: elOf(CRUSHED),
-              ...(tail.rest ? { scatter: tail.rest } : {}),
+              key,
+              card: data,
+              node: elOf(key),
+              ...(eventId === undefined ? {} : { scatter: scatterAt(eventId) }),
             },
           ],
           // nothing stands: handed over as its own `node`
           null,
         )
-        // only the heap's top has a place there; a release buried under its
-        // own Code Review has none (docs/animations/backlog.md)
-        setDown(
-          beat,
-          tail.rest && tail.restCount !== undefined
-            ? [{ kind: 'heapTop', card: tail.card, count: tail.restCount }]
-            : [],
-          () => drop(CRUSHED),
-        )
-      })()
+      // The Code Review is never an events-deck card, so it always takes the
+      // ordinary road even when the release it protected does not — the same
+      // split, for the same reason, `defenseBeat`'s sacrifice leg makes.
+      const auxOut = aux ? toHeap(CRUSHED_AUX, aux, tail.codeReviewDiscardId) : null
+      // Its road is the plan's answer, not one worked out here: the fact lives
+      // on the pre-batch projection (`releaseEvent`), which the runner cannot
+      // see and the plan already read (#71 — the class of bug this closes).
+      const home = tail.destination === 'events'
+      const mainOut = card
+        ? home
+          ? goHome(CRUSHED, crushedFrom).then(() =>
+              setDown(beat, [{ kind: 'events' }], () => drop(CRUSHED)),
+            )
+          : toHeap(CRUSHED, card, tail.releaseDiscardId)
+        : null
       await Promise.all([mainOut, auxOut])
+      const filed = [
+        ...(aux && tail.codeReviewDiscardId !== undefined
+          ? [{ eventId: tail.codeReviewDiscardId, card: aux.id, layer: 0 }]
+          : []),
+        ...(card && !home && tail.releaseDiscardId !== undefined
+          ? [{ eventId: tail.releaseDiscardId, card: tail.card, layer: 1 }]
+          : []),
+      ]
+      setDown(beat, filed.length > 0 ? [{ kind: 'heap', filed }] : [], () => {
+        if (aux) drop(CRUSHED_AUX)
+        if (card && !home) drop(CRUSHED)
+      })
     },
     [elOf, drop, goHome],
   )
@@ -444,25 +425,8 @@ export function useAiBeat(
       })()
 
       // …and the destroyed release takes the road the plan already worked out,
-      // with the Code Review that was tucked under it going its own way.
-      //
-      // NEITHER CARD HAS A `discarded` EVENT TO FLY ON. `destroySlot` called
-      // without a reason (fake/triggers.ts:88-92 — the automatic destruction)
-      // emits `releaseDestroyed` and nothing else, so `toDiscardHeap`, which
-      // folds one heap card per `discarded`, holds no entry keyed to either.
-      //
-      // The heap does still rest ONE of them: its `top<count>` stand-in for
-      // the discard's top. `plan.tail.rest` is that pose, read at plan time
-      // through the shared `standInScatter` off the projection that will
-      // render the heap — so the flight and the rest are one value (I7) and
-      // the card does not jump on its last frame. It is present only when this
-      // release really is what the top will be; a release buried under its own
-      // Code Review has nothing, and neither has the Code Review itself. Those
-      // two are recorded in `docs/animations/backlog.md` rather than papered
-      // over with an invented pose — an omitted scatter takes a fresh
-      // `jitter()`, which is at least honestly arbitrary. What is gone for
-      // good is the previous `scatterAt(plan.eventId)`: a place keyed to the
-      // DRAW's own event id, under which nothing rests at all.
+      // with the Code Review that was tucked under it going its own way, each
+      // on its own `discarded` event (`sendCrushed`).
       const crushedOut =
         plan.tail.kind === 'crush' && crushedFrom
           ? sendCrushed(beat, plan.tail, crushedFrom)

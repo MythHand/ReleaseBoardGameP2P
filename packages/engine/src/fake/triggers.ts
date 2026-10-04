@@ -88,9 +88,21 @@ function destroySlot(
   const released = me.release[slot]
   if (!released) return { ...state, eventSeq: log.seq }
   const spoils = [released.card, ...(released.codeReview ? [released.codeReview] : [])]
-  log.add({ type: 'releaseDestroyed', player, slot, card: released.card.id })
+  const destroyedId = log.add({ type: 'releaseDestroyed', player, slot, card: released.card.id })
   if (reason) {
     for (const c of spoils) log.add({ type: 'discarded', player, card: c.id, reason }, parent)
+  } else {
+    // A CRUSH NAMES NO REASON, and its spoils used to be banked in silence: the
+    // feed said a release was destroyed and nothing about where its cards went,
+    // so the board had no place in the heap for either of them and drew a
+    // stand-in for the top instead (owner's recording, 04.10). They are
+    // destroyed, the way an attack's are, and caused by this destruction. A
+    // card from the events deck is the exception: it goes home, not to the
+    // discard (`bankToDiscard`), so nothing says it was discarded.
+    for (const c of spoils) {
+      if (c.event !== undefined) continue
+      log.add({ type: 'discarded', player, card: c.id, reason: 'destroyed' }, destroyedId)
+    }
   }
   const zone = { ...me.release }
   delete zone[slot]

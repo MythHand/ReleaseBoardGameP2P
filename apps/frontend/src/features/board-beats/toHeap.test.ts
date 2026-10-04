@@ -1,8 +1,8 @@
 import { cardById } from '@release/ui'
 import { scatterAt } from '@release/ui/animations'
 import { describe, expect, it } from 'vitest'
-import { type BoardState, standInScatter } from '~/entities/game/board'
-import { withLanded, withoutTopCopy, withStandIn } from './toHeap'
+import type { BoardState } from '~/entities/game/board'
+import { withLanded, withoutTopCopy } from './toHeap'
 
 const c = (id: string) => cardById(id) as NonNullable<ReturnType<typeof cardById>>
 
@@ -39,19 +39,29 @@ describe('withLanded', () => {
   })
 })
 
-describe('withStandIn', () => {
-  it('rests the card on the projection’s own stand-in, in place of an earlier one', () => {
-    const next = withStandIn(
-      heapOf(4, [
-        ['d3', 'trigger-ai'],
-        ['top2', 'attack-bug'],
-      ]),
-      { card: 'release-frontend', count: 5 },
-    )
-    expect(uids(next)).toEqual(['d3', 'top5'])
-    expect(next.decks.discardHeap?.at(-1)).toMatchObject(standInScatter(5))
-    expect(next.decks.discardCount).toBe(5)
-    expect(next.decks.discard?.id).toBe('release-frontend')
+describe('withLanded — a card that lands late', () => {
+  // A refused Crush: the destroyed release and the Code Review under it can come
+  // down before the trigger beside them. The trigger was filed first, so it lies
+  // under them — where the projection folds it — and not on top for a moment
+  // before dropping under them (owner's recording, 04.10).
+  it('lies under the cards already there that were filed after it', () => {
+    const pair = heapOf(2, [
+      ['d4', 'support-code-review'],
+      ['d3', 'release-backend'],
+    ])
+    const next = withLanded(pair, [{ eventId: 1, card: 'trigger-ai' }])
+    expect(uids(next)).toEqual(['d1', 'd4', 'd3'])
+    expect(next.decks.discard?.id).toBe('release-backend')
+  })
+
+  // …while the cards of ONE landing keep the order the table gave them: the
+  // Code Review under its release, though its event is the later one
+  it('keeps the table order of the cards landing together', () => {
+    const next = withLanded(heapOf(1, [['d1', 'trigger-ai']]), [
+      { eventId: 4, card: 'support-code-review', layer: 0 },
+      { eventId: 3, card: 'release-backend', layer: 1 },
+    ])
+    expect(uids(next)).toEqual(['d1', 'd4', 'd3'])
   })
 })
 

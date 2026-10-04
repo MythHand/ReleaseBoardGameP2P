@@ -2,12 +2,7 @@ import { createFakeEngine, FAKE_DECK, FAKE_EVENTS } from '@release/engine/fake'
 import { cardById } from '@release/ui'
 import { scatterAt } from '@release/ui/animations'
 import { describe, expect, it, vi } from 'vitest'
-import {
-  type BoardState,
-  type HistoryLabels,
-  standInScatter,
-  toBoardState,
-} from '~/entities/game/board'
+import { type BoardState, type HistoryLabels, toBoardState } from '~/entities/game/board'
 import { SHOW_HOLD, useAiBeat } from './aiBeat'
 import { planBeats } from './planBeats'
 import {
@@ -310,32 +305,13 @@ describe('aiBeat', () => {
     expect(homes).toContainEqual(spot(ZONE_SLOT))
   })
 
-  // I7 FOR A CARD WITH NO EVENT OF ITS OWN. `destroySlot` called without a
-  // reason emits `releaseDestroyed` and no `discarded`, so there is no event
-  // id to key a scatter off — but the heap still shows the card as its
-  // stand-in for the discard's top, and the plan carries that pose. The
-  // flight has to land ON it: anything else (the draw's own `plan.eventId`,
-  // as this used to send, or a fresh `jitter()`) jumps on the last frame,
-  // which is the whole reason one scatter drives both.
-  it('lands a crushed release on the very pose the heap will rest it on', async () => {
-    const anchors = anchorsFixture()
-    const { result } = renderBeat(() => useAiBeat(anchors))
-    const rest = { rot: 3, dx: 4, dy: 5 }
-    await runBeat(
-      result.current.run,
-      { ...crushPlan('discard'), tail: { ...crushPlan('discard').tail, rest } },
-      anchors,
-    )
-    const items = anchors.exitSpy.mock.calls.flat(2) as { key: string; scatter?: unknown }[]
-    expect(items.find((i) => i.key === 'crushed')?.scatter).toEqual(rest)
-  })
-
-  // The contrast, and the recorded gap: a release buried under its own Code
-  // Review is not the heap's top, so the plan carries no pose for it. The Code
-  // Review's own pose arrives only from the plan (`codeReviewRest`, pinned in
-  // the crushed-release tests below) — a tail without one claims nothing. The
-  // trigger beside them is what a card WITH a real `discarded` id looks like.
-  it('claims a heap pose only for the card the heap actually rests', async () => {
+  // I7: EACH CARD FLIES ON ITS OWN `discarded` EVENT. `destroySlot` files the
+  // release and the Code Review under it by events of their own, and the heap
+  // rests each on the pose its event keys — so the flight lands on exactly
+  // that, and nothing jumps on the last frame. They used to fly onto a
+  // stand-in for the discard's top, the release under its own Code Review
+  // onto nothing at all (owner's recording, 04.10).
+  it('lands what a crush destroyed on the poses of its own discard events', async () => {
     const slot = protectedSlot()
     const anchors = anchorsFixture({ releaseSlot: () => slot })
     const { result } = renderBeat(() => useAiBeat(anchors))
@@ -343,14 +319,19 @@ describe('aiBeat', () => {
       result.current.run,
       {
         ...crushPlan('discard'),
-        tail: { ...crushPlan('discard').tail, codeReview: 'support-code-review' },
+        tail: {
+          ...crushPlan('discard').tail,
+          codeReview: 'support-code-review',
+          releaseDiscardId: 21,
+          codeReviewDiscardId: 22,
+        },
       },
       anchors,
     )
     const items = anchors.exitSpy.mock.calls.flat(2) as { key: string; scatter?: unknown }[]
     expect(items.find((i) => i.key === 'd3')?.scatter).toEqual(scatterAt(3))
-    expect(items.find((i) => i.key === 'crushed')?.scatter).toBeUndefined()
-    expect(items.find((i) => i.key === 'crushedAux')?.scatter).toBeUndefined()
+    expect(items.find((i) => i.key === 'crushed')?.scatter).toEqual(scatterAt(21))
+    expect(items.find((i) => i.key === 'crushedAux')?.scatter).toEqual(scatterAt(22))
   })
 
   // ONE CARD, ONE PLACE for the release a crush destroys (#168): the zone lets
@@ -358,10 +339,11 @@ describe('aiBeat', () => {
   // commit the carrier comes down. The stand recorded it in its slot for the
   // whole flight and after, and gone from everywhere once its carrier dropped.
   describe('a crushed release, one place at a time', () => {
-    // THE CODE REVIEW is the discard's top when the release under it is
-    // crushed — banked after it — so it rests as the heap's stand-in, both
-    // cards counted (#168; owner, 17.09: they go as they lay, Code Review on top)
-    it('rests the Code Review as the heap’s top, both cards counted', async () => {
+    // THE TWO GO IN AS THEY LAY: the Code Review under the release it stood
+    // under, both counted, in the one commit their carriers come down — the
+    // order the projection folds them in (owner, 04.10: trigger, Code Review,
+    // release, bottom-up)
+    it('files the Code Review under its release as they land, both counted', async () => {
       const slot = protectedSlot()
       const anchors = anchorsFixture({ releaseSlot: () => slot })
       const { result } = renderBeat(() => useAiBeat(anchors))
@@ -381,7 +363,6 @@ describe('aiBeat', () => {
         playable: [],
         frozen: [],
       } as unknown as BoardState
-      const rest = standInScatter(7)
       await runBeat(
         result.current.run,
         {
@@ -389,22 +370,16 @@ describe('aiBeat', () => {
           tail: {
             ...crushPlan('discard').tail,
             codeReview: 'support-code-review',
-            codeReviewRest: rest,
-            restCount: 7,
+            releaseDiscardId: 21,
+            codeReviewDiscardId: 22,
           },
         },
         anchors,
         { base, publish: (s) => published.push(s) },
       )
-      const items = anchors.exitSpy.mock.calls.flat(2) as { key: string; scatter?: unknown }[]
-      expect(items.find((i) => i.key === 'crushedAux')?.scatter).toEqual(rest)
       const last = published.at(-1)
-      expect(last?.decks.discardHeap?.at(-1)).toMatchObject({
-        uid: 'top7',
-        card: expect.objectContaining({ id: 'support-code-review' }),
-        ...rest,
-      })
-      // the trigger, the release under its Code Review, and the Code Review
+      expect(last?.decks.discardHeap?.map((c) => c.uid)).toEqual(['d3', 'd22', 'd21'])
+      // the trigger, the Code Review and the release
       expect(last?.decks.discardCount).toBe(7)
     })
 
@@ -448,26 +423,22 @@ describe('aiBeat', () => {
       )
     })
 
-    it('rests it in the heap as the stand-in for its top as it lands', async () => {
+    it('files it in the heap on its own discard event as it lands', async () => {
       const anchors = anchorsFixture()
       const { result } = renderBeat(() => useAiBeat(anchors))
       const { states, publish } = recording()
-      const rest = standInScatter(6)
       await runBeat(
         result.current.run,
-        {
-          ...crushPlan('discard'),
-          tail: { ...crushPlan('discard').tail, rest, restCount: 6 },
-        },
+        { ...crushPlan('discard'), tail: { ...crushPlan('discard').tail, releaseDiscardId: 21 } },
         anchors,
         { base: crushedBase, publish },
       )
       // the very name and pose the projection then draws it with
-      const filed = states.findIndex((s) => s.decks.discardHeap?.some((c) => c.uid === 'top6'))
+      const filed = states.findIndex((s) => s.decks.discardHeap?.some((c) => c.uid === 'd21'))
       expect(filed).toBeGreaterThanOrEqual(0)
-      expect(states[filed].decks.discardHeap?.find((c) => c.uid === 'top6')).toMatchObject({
+      expect(states[filed].decks.discardHeap?.find((c) => c.uid === 'd21')).toMatchObject({
         card: expect.objectContaining({ id: 'release-frontend' }),
-        ...rest,
+        ...scatterAt(21),
       })
       expect(callOrder().indexOf(`publish:${filed}`)).toBeLessThan(
         callOrder().indexOf('drop:crushed'),
@@ -476,17 +447,20 @@ describe('aiBeat', () => {
       expect(states.at(-1)?.decks.discardCount).toBe(6)
     })
 
-    // A REFUSED CRUSH: the release and the trigger beside it leave together and
-    // land in either order. The stand recorded the release filed and then gone
-    // again — the trigger's landing put back the decks from before (03.10).
+    // A REFUSED CRUSH: the release with its Code Review and the trigger beside
+    // them leave together and land in either order — and the heap is the same
+    // either way, bottom-up the trigger, the Code Review, the release. The
+    // trigger landing last used to lie on top and drop under them a moment
+    // later (owner's recording, 04.10).
     it.each([
-      'the release',
+      'the pair',
       'the trigger',
-    ])('keeps the release on top of the trigger after a refusal, %s landing first', async (first) => {
-      const anchors = anchorsFixture()
+    ])('lays the heap the same after a refusal, %s landing first', async (first) => {
+      const slot = protectedSlot()
+      const anchors = anchorsFixture({ releaseSlot: () => slot })
       anchors.exitSpy.mockImplementation((items: unknown) => {
-        const crushed = (items as { key: string }[]).some((i) => i.key === 'crushed')
-        const late = first === 'the release' ? !crushed : crushed
+        const crushed = (items as { key: string }[]).some((i) => i.key.startsWith('crushed'))
+        const late = first === 'the pair' ? !crushed : crushed
         return new Promise<void>((resolve) => setTimeout(resolve, late ? 200 : 0))
       })
       const { result } = renderBeat(() => useAiBeat(anchors))
@@ -494,23 +468,26 @@ describe('aiBeat', () => {
       const causeward = { card: 'trigger-ai', eventId: 3 }
       const refused = {
         kind: 'crushRefused' as const,
-        key: 'refused:9',
-        eventId: 9,
+        key: 'refused:20',
+        eventId: 20,
         player: 'p1',
         tail: {
           kind: 'crush' as const,
           slot: 'frontend',
           card: 'release-frontend',
           destination: 'discard' as const,
-          rest: standInScatter(6),
-          restCount: 6,
+          codeReview: 'support-code-review',
+          releaseDiscardId: 21,
+          codeReviewDiscardId: 22,
         },
         homeward: 'ai-crush-frontend',
         causeward,
       }
       const base = {
         ...crushedBase,
+        you: { ...crushedBase.you, support: { frontend: cardById('support-code-review') } },
         aiCause: causeward,
+        // the trigger standing as the cause is already the heap's and counted
         decks: {
           ...crushedBase.decks,
           discardCount: 5,
@@ -519,8 +496,8 @@ describe('aiBeat', () => {
       } as BoardState
       await runBeat(result.current.runRefused, refused, anchors, { base, publish })
       const last = states.at(-1)
-      expect(last?.decks.discardHeap?.map((card) => card.uid)).toEqual(['d3', 'top6'])
-      expect(last?.decks.discardCount).toBe(6)
+      expect(last?.decks.discardHeap?.map((card) => card.uid)).toEqual(['d3', 'd22', 'd21'])
+      expect(last?.decks.discardCount).toBe(7)
     })
 
     it('counts an AI release back into the events deck as it lands', async () => {

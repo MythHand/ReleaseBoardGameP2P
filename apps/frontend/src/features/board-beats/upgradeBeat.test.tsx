@@ -390,9 +390,10 @@ it('files the answers into the heap as they land, above the System Upgrade card'
   if (!upgradeCard) throw new Error('no System Upgrade card')
   const { api, ctx } = harness({
     handOver: (run) => ({
-      items: [{ key: 'operation-exit:9', card: upgradeCard, layer: 1 }],
+      // filed when it was played — before any answer was thrown (`openSystemUpgrade`)
+      items: [{ key: 'operation-exit:0', card: upgradeCard, layer: 1 }],
       takeOff: () => {},
-      settle: () => settleInto(run, [{ eventId: 9, card: 'operation-system-upgrade', layer: 1 }]),
+      settle: () => settleInto(run, [{ eventId: 0, card: 'operation-system-upgrade', layer: 1 }]),
     }),
   })
   const final = {
@@ -407,7 +408,7 @@ it('files the answers into the heap as they land, above the System Upgrade card'
       (s) =>
         s.pending?.kind === 'systemUpgrade' && s.decks.discardHeap?.some((c) => c.uid === 'd3'),
     )
-  expect(landed?.decks.discardHeap?.map((c) => c.uid)).toEqual(['d9', 'd3'])
+  expect(landed?.decks.discardHeap?.map((c) => c.uid)).toEqual(['d0', 'd3'])
   expect(landed?.decks.discardCount).toBe(2)
 })
 
