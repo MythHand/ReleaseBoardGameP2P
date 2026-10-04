@@ -116,10 +116,14 @@ const flipTo = (
   pose: string,
   dur: number,
   snap: boolean,
+  rotateFrom = 0,
 ): Animation | null => {
   if (!from || !box) return null
+  // a start that is turned ends on a turn of nought, so the two keyframes are
+  // the same list of functions and the turn unwinds over the flight
+  const rest = rotateFrom ? 'translate(0, 0) scale(1) rotate(0deg)' : 'translate(0, 0) scale(1)'
   return el.animate(
-    [{ transform: enterPose(from, box) }, { transform: pose || 'translate(0, 0) scale(1)' }],
+    [{ transform: enterPose(from, box, rotateFrom) }, { transform: pose || rest }],
     { duration: dur, easing: snap ? LAND : EASE, fill: 'forwards' },
   )
 }
@@ -128,11 +132,17 @@ const flipTo = (
  * Поза, в которой элемент, стоящий на своём месте, ВЫГЛЯДИТ стоящим в `from`:
  * смещение центр-в-центр плюс масштаб по ширине. Вход FLIP-полёта — им красят
  * первый кадр, чтобы карта не мигнула в конечной позе до старта анимации.
+ *
+ * `rotateFrom` — наклон, с которым карта лежит в `from` (карта в куче сброса
+ * лежит повёрнутой). Без него карта, вылетающая из кучи, стартовала бы ровной и
+ * щёлкала на несколько градусов в первый же кадр. Не задан — поза та же, что и
+ * была, до символа.
  */
-export const enterPose = (from: Rect, box: Rect): string => {
+export const enterPose = (from: Rect, box: Rect, rotateFrom = 0): string => {
   const dx = from.left + from.width / 2 - (box.left + box.width / 2)
   const dy = from.top + from.height / 2 - (box.top + box.height / 2)
-  return `translate(${dx}px, ${dy}px) scale(${from.width / box.width})`
+  const turn = rotateFrom ? ` rotate(${rotateFrom}deg)` : ''
+  return `translate(${dx}px, ${dy}px) scale(${from.width / box.width})${turn}`
 }
 
 // ХАРАКТЕР тряски — доли от размаха по кадрам (см. пресет shake). Не сила и не
@@ -268,7 +278,8 @@ export const PRESETS: Record<string, Preset> = {
   // элемент уже стоит на своём месте, а летит «из» прямоугольника from.
   //   from — откуда карта пришла (её rect на момент старта),
   //   box  — рамка места, где она уже стоит,
-  //   pose — поза покоя на столе (наклон и смещение), в которую она садится.
+  //   pose — поза покоя на столе (наклон и смещение), в которую она садится,
+  //   rotateFrom — наклон, с которым она лежала в from (карта из кучи сброса).
   //
   // Наклон едет ВМЕСТЕ с картой и в неё же приземляется. Ровная посадка с
   // наклоном, догоняющим её следующим кадром, читается как щелчок — это
@@ -285,8 +296,16 @@ export const PRESETS: Record<string, Preset> = {
       pose = '',
       dur = 480,
       snap = false,
-    } = (p ?? {}) as { from?: Rect; box?: Rect; pose?: string; dur?: number; snap?: boolean }
-    return flipTo(el, from, box, pose, dur, snap)
+      rotateFrom = 0,
+    } = (p ?? {}) as {
+      from?: Rect
+      box?: Rect
+      pose?: string
+      dur?: number
+      snap?: boolean
+      rotateFrom?: number
+    }
+    return flipTo(el, from, box, pose, dur, snap, rotateFrom)
   },
 
   // ===== Смена содержимого слота (HUD, turn dock) =====

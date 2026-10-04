@@ -34,11 +34,17 @@ const exits = vi.hoisted(() => ({
   // …and what each card was sent to: the pose it lands on, the layer it rides
   sent: [] as { key: string; scatter?: { rot: number }; layer?: number }[],
   pending: null as Promise<void> | null,
+  // every preset played, and what it was told — the deal out of the pile is one
+  played: [] as [string, Record<string, unknown> | undefined][],
 }))
 vi.mock('@release/ui/animations', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@release/ui/animations')>()
   return {
     ...actual,
+    play: (...args: Parameters<typeof actual.play>) => {
+      exits.played.push([args[0], args[2]])
+      return actual.play(...args)
+    },
     useDiscardExit: () => ({
       overlay: [],
       send: (items: { key: string; scatter?: { rot: number }; layer?: number }[]) => {
@@ -510,6 +516,41 @@ it('sends a card home to the spot it was lifted from, not to another copy of it'
   // its own pose, and the bottom of what is left — not the new one's, on top
   expect(home?.scatter?.rot).toBe(scatterAt(103).rot)
   expect(home?.layer).toBe(0)
+})
+
+// THE DEAL COMES OUT OF THE PILE. Every cell flies out of the spot its card lay
+// at — that card's own tilt, copies each from their own — and all of them at
+// once. It used to start every cell at the middle of the pile's box, square and
+// transparent, staggered: the cards appeared rather than left (owner, 04.10).
+it('deals each card out of its own spot in the pile, all at once', () => {
+  mockReducedMotion(false)
+  exits.played = []
+  const base = makeBoardProps()
+  const entry = (eventId: number, id: string) => ({
+    uid: `d${eventId}`,
+    card: handItem('x', id).card,
+    ...scatterAt(eventId),
+  })
+  const lying = [
+    entry(1, 'trigger-error-503'),
+    entry(2, 'attack-bug'),
+    entry(3, 'trigger-error-503'),
+  ]
+  const decks = { ...base.state.decks, discardCount: 3, discardHeap: lying }
+  const pending = cherryPending([
+    { uid: 'c1', id: 'trigger-error-503' },
+    { uid: 'c2', id: 'attack-bug' },
+    { uid: 'c3', id: 'trigger-error-503' },
+  ])
+  render(<Board {...base} state={{ ...base.state, decks, pending }} />)
+  const deal = exits.played.filter(([name]) => name === 'landInPose').map(([, p]) => p)
+  expect(deal.map((p) => p?.rotateFrom)).toEqual([
+    scatterAt(1).rot,
+    scatterAt(2).rot,
+    scatterAt(3).rot,
+  ])
+  // nothing waits its turn
+  expect(deal.every((p) => p?.delay === undefined)).toBe(true)
 })
 
 // …AND THEY LIE IN THE PILE'S ORDER THE MOMENT THEY LAND. The cells going home

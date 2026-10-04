@@ -1,6 +1,6 @@
 import type { Event } from '@release/engine'
 import type { CardData, HeapCard, TableActions } from '@release/ui'
-import { Card, ConfirmAction, cardById, TableSurface, Typography } from '@release/ui'
+import { Card, ConfirmAction, cardAreaOf, cardById, TableSurface, Typography } from '@release/ui'
 import {
   exitLayer,
   nextFrames,
@@ -51,10 +51,8 @@ const COVER: CardData = {
   qty: 0,
 }
 
-// timings — the approved scene, the three legs that actually travel (deal,
-// hand-reveal, deck)
-const DEAL_DUR = 360 // dealing out of the pile into the grid
-const DEAL_STEP = 16 // per-card stagger, dealing out
+// timings — the legs this surface times itself (hand-reveal, deck, the return);
+// the deal out of the pile is `landInPose`'s own
 const STAGGER_CAP = 40 // don't stagger past this many cards
 const REVEAL_W = 220 // width the chosen card reaches in the centre
 const REVEAL_DUR = 460 // fly-to-centre duration
@@ -73,14 +71,6 @@ const RETURN_STEP = 14 // per-card stagger, returning to the pile
 // the card that is taken.
 const PIN_Z = 100
 const homeZ = (depth: number) => PIN_Z + exitLayer(depth)
-
-// centre-to-centre translate + scale to move an element from one rect to
-// another — the story's own `between()`, ported verbatim.
-function between(from: DOMRect, to: DOMRect): string {
-  const dx = to.left + to.width / 2 - (from.left + from.width / 2)
-  const dy = to.top + to.height / 2 - (from.top + from.height / 2)
-  return `translate(${dx}px, ${dy}px) scale(${to.width / from.width})`
-}
 
 export function useCherryPickStaging(args: {
   handoff: RefObject<DiscardPickHandoff | null>
@@ -199,6 +189,9 @@ export function useCherryPickStaging(args: {
   // change across re-renders (a projection tick) without the offer itself
   // changing, and re-running the deal would fly the same cards a second time.
   const dealtKey = useRef<string | null>(null)
+  // which deal is the live one — a deal that a newer one has replaced does not
+  // get to end it
+  const dealRun = useRef(0)
   // The offer this hook has already answered and flown. The queue keeps
   // drawing the projection its NEXT beat moves away from — the one where this
   // pending is still open — for as long as the operation card's own exit runs,
@@ -207,18 +200,6 @@ export function useCherryPickStaging(args: {
   // before it leaves. Cleared when the offer itself goes (below) and when a
   // RESOLVE is refused, because then the choice really is open again.
   const answeredKey = useRef<string | null>(null)
-  const timers = useRef<number[]>([])
-  const later = (fn: () => void, ms: number) => {
-    timers.current.push(window.setTimeout(fn, ms))
-  }
-  const clearTimers = () => {
-    for (const t of timers.current) window.clearTimeout(t)
-    timers.current = []
-  }
-  // No timer survives the hook. useLayoutEffect with no deps: mount-once,
-  // cleanup-on-unmount only — the same idiom the story's own version uses.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: mount-once by design — `clearTimers` is a plain function recreated every render, so listing it would clear timers on every render instead of only on unmount
-  useLayoutEffect(() => clearTimers, [])
 
   const [manualRetry, setManualRetry] = useState(false)
   const exit = useDiscardExit(anchors.discardBox)
@@ -239,7 +220,6 @@ export function useCherryPickStaging(args: {
     setConfirmed(false)
     setFlying(false)
     setFlipped(new Set())
-    clearTimers()
     for (const el of cellRefs.current.values()) {
       for (const animation of el.getAnimations?.() ?? []) animation.cancel()
       el.style.cssText = ''
@@ -274,9 +254,17 @@ export function useCherryPickStaging(args: {
     }
   }, [ours, confirmed, flying])
 
-  // deal the offer OUT of the discard pile into the grid: every cell starts
-  // at the pile's own rect and flies to its slot, staggered — purely cosmetic,
-  // so it never gates a click (the discard is face-up and known throughout).
+  // DEAL THE OFFER OUT OF THE DISCARD PILE into the grid. Each cell flies out
+  // of the very spot its card lay at in the pile — its place, its tilt, its
+  // depth — all of them at once, and the pile lets those cards go in the same
+  // commit (`lifted`), so the first frame is the pile as it was. The cell is
+  // already standing in its slot; `landInPose` flies its ENTRY, the module every
+  // card landing on the table goes through. It used to start every cell at the
+  // middle of the pile's box, square and transparent, on a curve that covers
+  // most of the way in its first fifth: by the time a card could be seen it
+  // was nearly in its slot, and the deal read as cards appearing (owner, 04.10).
+  // Purely cosmetic, so it never gates a click (the discard is face-up and
+  // known throughout); the confirm bar waits for it.
   // biome-ignore lint/correctness/useExhaustiveDependencies: fires once per episode (guarded by `dealtKey`), not on every render `ours`/`options` produce a new identity for
   useLayoutEffect(() => {
     if (!offer) {
@@ -290,31 +278,35 @@ export function useCherryPickStaging(args: {
     if (reduced) return
     const pileRect = anchors.discardBox.current?.getBoundingClientRect()
     if (!pileRect) return
-    const els = offer.options.map((o) => cellRefs.current.get(o.uid))
-    if (els.every((el) => !el)) return
-    for (const el of els) {
-      if (!el) continue
-      el.style.transition = 'none'
-      el.style.transform = between(el.getBoundingClientRect(), pileRect)
-      el.style.opacity = '0'
-    }
+    // where the pile draws a card, and where in it each of these cards lies —
+    // the same pairing the pile reads to let them go
+    const area = cardAreaOf(pileRect)
+    const lying = claimInHeap(offer.options, state.decks.discardHeap ?? [])
+    const flights = offer.options.flatMap((o, i) => {
+      const el = cellRefs.current.get(o.uid)
+      if (!el) return []
+      const claim = lying.get(o.uid)
+      const at = claim?.rest ?? { dx: 0, dy: 0, rot: 0 }
+      const from = { ...area, left: area.left + at.dx, top: area.top + at.dy }
+      const box = el.getBoundingClientRect()
+      // on its way out it keeps the depth it lay at, so the cards leave the
+      // pile stacked the way they lay in it
+      el.style.zIndex = String(homeZ(claim?.depth ?? i))
+      return [{ el, anim: play('landInPose', el, { from, box, rotateFrom: at.rot }) }]
+    })
+    if (flights.length === 0) return
+    const run = ++dealRun.current
     setDealing(true)
-    requestAnimationFrame(() =>
-      requestAnimationFrame(() => {
-        els.forEach((el, i) => {
-          if (!el) return
-          const delay = Math.min(i, STAGGER_CAP) * DEAL_STEP
-          el.style.transition = `transform ${DEAL_DUR}ms var(--ease-out) ${delay}ms, opacity ${DEAL_DUR}ms ${delay}ms`
-          el.style.transform = ''
-          el.style.opacity = ''
-        })
-        const total = DEAL_DUR + Math.min(els.length, STAGGER_CAP) * DEAL_STEP + 60
-        later(() => {
-          for (const el of els) if (el) el.style.transition = ''
-          setDealing(false)
-        }, total)
-      }),
-    )
+    void Promise.allSettled(flights.map((f) => f.anim?.finished)).then(() => {
+      if (run !== dealRun.current) return
+      // the last frame is the cell's own place, so letting go of it moves
+      // nothing — and it frees the cell's hover lift, which a held frame blocks
+      for (const { el, anim } of flights) {
+        anim?.cancel()
+        el.style.zIndex = ''
+      }
+      setDealing(false)
+    })
   }, [offer, reduced])
 
   // roles by the rules: a trigger (if chosen) is always the deck card; a

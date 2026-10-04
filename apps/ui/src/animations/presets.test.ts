@@ -130,3 +130,30 @@ describe('playToReleaseZone', () => {
     expect(declared('playToReleaseZone', { to }).frames).toHaveLength(2)
   })
 })
+
+// A CARD LEAVING THE DISCARD LEAVES IT TURNED. The heap lays every card at a
+// tilt, and a card that flies out of it (into Cherry-pick's grid) starts AT that
+// tilt: started straight, it clicked a few degrees on its first frame. Without
+// `rotateFrom` the landing is what it always was, to the character.
+describe('landInPose', () => {
+  const from = { left: 100, top: 100, width: 100, height: 140 }
+  const box = { left: 400, top: 300, width: 150, height: 210 }
+
+  it('starts at the tilt it lay at and ends square', () => {
+    const { frames } = declared('landInPose', { from, box, rotateFrom: -11.5 })
+    expect((frames[0] as { transform?: string }).transform).toBe(
+      'translate(-325px, -235px) scale(0.6666666666666666) rotate(-11.5deg)',
+    )
+    expect((frames[1] as { transform?: string }).transform).toBe(
+      'translate(0, 0) scale(1) rotate(0deg)',
+    )
+  })
+
+  it('is unchanged without a starting tilt', () => {
+    const { frames } = declared('landInPose', { from, box })
+    expect(frames.map((f) => (f as { transform?: string }).transform)).toEqual([
+      'translate(-325px, -235px) scale(0.6666666666666666)',
+      'translate(0, 0) scale(1)',
+    ])
+  })
+})
