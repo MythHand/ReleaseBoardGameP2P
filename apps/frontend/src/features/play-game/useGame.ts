@@ -26,6 +26,8 @@ export interface Game {
   push(): void
   attack(card: string, combo?: string): void
   pass(): void
+  // a pass taken back while the time to attack still runs
+  unpass(): void
   resolve(choice: Choice): void
   // a card put out at the centre while a play is made, and taken back
   show(card: string): void
@@ -175,6 +177,7 @@ export function useGame(): Game {
     push: () => submit({ type: 'PUSH' }),
     attack: (card, combo) => submit({ type: 'ATTACK', card, combo }),
     pass: () => submit({ type: 'PASS' }),
+    unpass: () => submit({ type: 'UNPASS' }),
     resolve: (choice) => submit({ type: 'RESOLVE', choice }),
     show: (card) => submit({ type: 'SHOW', card }),
     takeBack: () => submit({ type: 'TAKE_BACK' }),

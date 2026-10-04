@@ -390,6 +390,7 @@ const PEER_INTENT_TYPES: ReadonlySet<string> = new Set<Action['type']>([
   'PUSH',
   'ATTACK',
   'PASS',
+  'UNPASS',
   'RESOLVE',
   'SHOW',
   'TAKE_BACK',

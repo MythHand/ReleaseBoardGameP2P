@@ -11,6 +11,7 @@ export type TableIntent =
   | { kind: 'push' }
   | { kind: 'attack'; card: string; combo?: string }
   | { kind: 'pass' }
+  | { kind: 'unpass' }
   | { kind: 'resolve'; choice: TableChoice }
   | { kind: 'show'; card: string }
   | { kind: 'takeBack' }
@@ -41,6 +42,8 @@ export function toAction(intent: TableIntent, player: string, at: number): Actio
       return { type: 'ATTACK', player, card: intent.card, combo: intent.combo, at }
     case 'pass':
       return { type: 'PASS', player, at }
+    case 'unpass':
+      return { type: 'UNPASS', player, at }
     case 'resolve':
       return { type: 'RESOLVE', player, choice: intent.choice as Choice, at }
     case 'show':

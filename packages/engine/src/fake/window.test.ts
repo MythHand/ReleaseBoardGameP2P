@@ -407,6 +407,62 @@ describe('one attack at a time', () => {
     expect(hit.state.players.p2.release.frontend?.card.uid).toBe(own.uid)
   })
 
+  // A PASS IS A MARK, nothing more (owner, 04.10): it costs the one who passed
+  // nothing, and the time to attack ends early only when every opponent has
+  // passed. Putting an attack or its Sudo out uses this chance to hit — the marks
+  // start over, and nobody passes while it is out (ditayler, #211).
+  it('starts the passes over when an attack is put out, and takes no pass while it is out', () => {
+    const s = released({ p2: [SUDO, BUG], p3: [BUG3] })
+    const passed = reduce(s, { type: 'PASS', player: 'p2', at: 1100 })
+    expect(passed.state.window?.passed).toEqual(['p2'])
+    const sudo = reduce(passed.state, { type: 'SHOW', player: 'p2', card: SUDO.uid, at: 1200 })
+    expect(sudo.state.window).toMatchObject({ held: 'p2', passed: [] })
+    const late = reduce(sudo.state, { type: 'PASS', player: 'p3', at: 1300 })
+    expect(late.events).toMatchObject([{ type: 'rejected', reason: 'an attack is out' }])
+    expect(late.state.window).not.toBeNull()
+    expect(late.state.players.p2.shown).toEqual([SUDO.uid])
+  })
+
+  it('declares no win on a third release while a Sudo still has its time', () => {
+    const s = released({ p2: [SUDO, BUG], p3: [BUG3] })
+    const third: GameState = {
+      ...s,
+      players: {
+        ...s.players,
+        p1: {
+          ...s.players.p1,
+          release: { ...s.players.p1.release, backend: { card: BE }, database: { card: DB } },
+        },
+      },
+    }
+    const passed = reduce(third, { type: 'PASS', player: 'p2', at: 1100 })
+    const sudo = reduce(passed.state, { type: 'SHOW', player: 'p2', card: SUDO.uid, at: 1200 })
+    const late = reduce(sudo.state, { type: 'PASS', player: 'p3', at: 1300 })
+    expect(late.events.map((e) => e.type)).not.toContain('gameOver')
+    expect(late.state.over).toBeFalsy()
+  })
+
+  it('leaves the passes empty after an attack put out is taken back', () => {
+    const s = released({ p2: [BUG], p3: [BUG3] })
+    const passed = reduce(s, { type: 'PASS', player: 'p3', at: 1100 })
+    const out = reduce(passed.state, { type: 'SHOW', player: 'p2', card: BUG.uid, at: 1200 })
+    const back = reduce(out.state, { type: 'TAKE_BACK', player: 'p2', at: 1300 })
+    expect(back.state.window?.passed).toEqual([])
+  })
+
+  it('takes a pass back, and only a pass that was made', () => {
+    const s = released({ p2: [BUG], p3: [BUG3] })
+    const never = reduce(s, { type: 'UNPASS', player: 'p2', at: 1050 })
+    expect(never.events).toMatchObject([{ type: 'rejected', reason: 'you have not passed' }])
+    const passed = reduce(s, { type: 'PASS', player: 'p2', at: 1100 })
+    const back = reduce(passed.state, { type: 'UNPASS', player: 'p2', at: 1200 })
+    expect(back.events).toMatchObject([{ type: 'unpassed', player: 'p2' }])
+    expect(back.state.window?.passed).toEqual([])
+    // the mark is gone, so the last pass no longer ends the time to attack
+    const p3 = reduce(back.state, { type: 'PASS', player: 'p3', at: 1300 })
+    expect(p3.state.window).not.toBeNull()
+  })
+
   it('lets the player under attack put a Sudo out for their defence', () => {
     const sudo: CardInstance = { uid: 'support-sudo#1', id: 'support-sudo' }
     const rollback: CardInstance = { uid: 'defense-rollback#0', id: 'defense-rollback' }

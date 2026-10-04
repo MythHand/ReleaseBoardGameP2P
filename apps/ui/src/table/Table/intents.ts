@@ -199,6 +199,8 @@ export interface TableActions {
   onPush?: () => void
   onAttack?: (card: string, combo?: string) => void
   onPass?: () => void
+  // a pass is only a mark while the time to attack runs: it can be taken back
+  onUnpass?: () => void
   onResolve?: (choice: TableChoice) => void
   // What the table sees while a play is being made: a card of the hand put out
   // at the centre, and everything put out taken back. Not moves — the play is

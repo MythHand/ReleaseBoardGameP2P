@@ -13,7 +13,8 @@ export type HistoryLabels = Record<HistoryEvent['type'], string>
 
 // A card put out at the centre and taken back is what the table sees while a
 // play is being made, not a move: it has no row in the history.
-type HistoryEvent = Exclude<Event, { type: 'shown' | 'takenBack' }>
+// a pass taken back is a mark withdrawn, not a move (owner, 04.10)
+type HistoryEvent = Exclude<Event, { type: 'shown' | 'takenBack' | 'unpassed' }>
 
 // `assetUrl` throws on a key the catalogue does not recognise, so a card id
 // the catalogue does not know cannot resolve through it — `toTableState` must
@@ -643,7 +644,10 @@ function historyEvents(events: Event[]): HistoryEvent[] {
 
   return events.filter(
     (event): event is HistoryEvent =>
-      !hidden.has(event.id) && event.type !== 'shown' && event.type !== 'takenBack',
+      !hidden.has(event.id) &&
+      event.type !== 'shown' &&
+      event.type !== 'takenBack' &&
+      event.type !== 'unpassed',
   )
 }
 

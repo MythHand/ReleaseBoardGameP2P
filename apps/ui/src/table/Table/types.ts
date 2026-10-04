@@ -68,6 +68,10 @@ export interface TableState {
   frozen: string[]
   pending?: TablePending | null
   window?: TableWindow | null
+  // Every card put out at the centre while its play is being made, whoever put
+  // it there — the dock reads it to tell an attack being made from a chance to
+  // make one
+  shown?: { player: string; uid: string; card: Card }[]
   // Keyed by card uid — the projection's answer to "what may pair with this",
   // so the kit looks the pairing up rather than deciding it.
   comboOptions?: Record<string, string[]>

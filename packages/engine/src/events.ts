@@ -39,6 +39,7 @@ export type Event = EventBase &
     | { type: 'windowOpened'; player: PlayerId; slot: ReleaseSlot; round: number; deadline: number }
     | { type: 'windowClosed'; player: PlayerId; slot: ReleaseSlot }
     | { type: 'passed'; player: PlayerId }
+    | { type: 'unpassed'; player: PlayerId }
     | { type: 'attacked'; attacker: PlayerId; card: CardId; sudo: boolean; target: PlayerId }
     | { type: 'defended'; player: PlayerId; card: CardId; effect: DefenceEffect }
     | { type: 'tookHit'; player: PlayerId }
@@ -144,6 +145,7 @@ const EVENT_PAYLOAD_KEYS: Record<EventType, readonly string[]> = {
   windowOpened: ['player', 'slot', 'round', 'deadline'],
   windowClosed: ['player', 'slot'],
   passed: ['player'],
+  unpassed: ['player'],
   attacked: ['attacker', 'card', 'sudo', 'target'],
   defended: ['player', 'card', 'effect'],
   tookHit: ['player'],
@@ -269,6 +271,7 @@ function hasEventShape(event: UnknownRecord): boolean {
     case 'windowClosed':
       return hasString(event, 'player') && isOneOf(event.slot, ['frontend', 'backend', 'database'])
     case 'passed':
+    case 'unpassed':
     case 'tookHit':
     case 'eliminated':
     case 'turnEnded':
@@ -337,6 +340,7 @@ function hasEventShape(event: UnknownRecord): boolean {
           'PUSH',
           'ATTACK',
           'PASS',
+          'UNPASS',
           'WINDOW_EXPIRED',
           'CLOCK_STARTED',
           'RESOLVE',

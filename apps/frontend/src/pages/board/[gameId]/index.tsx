@@ -237,6 +237,7 @@ export default function BoardPage() {
           onPush: game.push,
           onAttack: game.attack,
           onPass: game.pass,
+          onUnpass: game.unpass,
           onResolve: game.resolve,
           onShow: game.show,
           onTakeBack: game.takeBack,

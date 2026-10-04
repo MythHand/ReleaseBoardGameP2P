@@ -66,16 +66,23 @@ export function onShow(state: GameState, action: Action & { type: 'SHOW' }): Red
     return reject(state, action, 'that card cannot be played now')
   const log = createLog(state.eventSeq)
   const shown = show(state, log, action.player, [action.card])
-  // A Sudo put out to attack with holds the time: its attack has its own span
-  // to join it, and that is the time running now (owner, 02.10).
-  if (responder && w && !w.held && card.id === 'support-sudo') {
-    const held = {
-      ...w,
-      held: action.player,
-      openedAt: action.at,
-      deadline: action.at + SUDO_PARTNER_MS,
-    }
-    return { state: { ...shown, window: held }, events: log.events }
+  if (responder && w) {
+    // An attack (or its Sudo) put out uses this chance to hit: the passes made on
+    // it start over — a pass is only a mark (owner, 04.10), and a mark copied
+    // into the new time would let the last pass close it over the card out.
+    const using = { ...w, passed: [] }
+    // A Sudo put out to attack with holds the time: its attack has its own span
+    // to join it, and that is the time running now (owner, 02.10).
+    const window =
+      !w.held && card.id === 'support-sudo'
+        ? {
+            ...using,
+            held: action.player,
+            openedAt: action.at,
+            deadline: action.at + SUDO_PARTNER_MS,
+          }
+        : using
+    return { state: { ...shown, window }, events: log.events }
   }
   return { state: shown, events: log.events }
 }

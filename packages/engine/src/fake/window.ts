@@ -127,6 +127,10 @@ export function onPass(state: GameState, action: Action & { type: 'PASS' }): Red
     return reject(state, action, 'you cannot respond to this window')
   }
   if (w.passed.includes(action.player)) return reject(state, action, 'you already passed')
+  // An attack (or the Sudo it goes with) out at the centre is this chance to hit
+  // being used: nobody passes on it, and its owner backs out by taking the card
+  // back — so the last pass can never close the time over a card still out.
+  if (attackOut(state)) return reject(state, action, 'an attack is out')
 
   const log = createLog(state.eventSeq)
   log.add({ type: 'passed', player: action.player })
@@ -138,6 +142,21 @@ export function onPass(state: GameState, action: Action & { type: 'PASS' }): Red
     return { state: closeWindow(next, log), events: log.events }
   }
   return { state: next, events: log.events }
+}
+
+// A PASS IS A MARK (owner, 04.10): it costs the one who passed nothing, and it
+// can be taken back for as long as the time to attack runs.
+export function onUnpass(state: GameState, action: Action & { type: 'UNPASS' }): Reduction {
+  const w = state.window
+  if (!w) return reject(state, action, 'no reaction window is open')
+  if (state.pending) return reject(state, action, 'a decision is pending')
+  if (!w.passed.includes(action.player)) return reject(state, action, 'you have not passed')
+  if (attackOut(state)) return reject(state, action, 'an attack is out')
+
+  const log = createLog(state.eventSeq)
+  log.add({ type: 'unpassed', player: action.player })
+  const passed = w.passed.filter((id) => id !== action.player)
+  return { state: { ...state, window: { ...w, passed }, eventSeq: log.seq }, events: log.events }
 }
 
 export function onWindowExpired(

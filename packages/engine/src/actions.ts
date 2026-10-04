@@ -53,6 +53,9 @@ export type Action =
   | { type: 'PUSH'; player: PlayerId; at: number }
   | { type: 'ATTACK'; player: PlayerId; card: CardUid; combo?: CardUid; at: number }
   | { type: 'PASS'; player: PlayerId; at: number }
+  // A pass taken back while the time to attack a fresh release still runs: a
+  // pass is only a mark (owner, 04.10), so it can be withdrawn
+  | { type: 'UNPASS'; player: PlayerId; at: number }
   | { type: 'WINDOW_EXPIRED'; at: number }
   // Keeper-only, like WINDOW_EXPIRED: starts the turn's inactivity clock when
   // no committed action has stamped one — in practice exactly once, for the

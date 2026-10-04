@@ -326,12 +326,6 @@ export default function Board({
   const actions = deal.active || beats.exclusive ? INERT_ACTIONS : liveActions
 
   const { you, opponents, decks, turn, history, setup } = state
-  const derived = deriveDock(state, state.selfId, now)
-  // Nobody is on turn during the opening: the dock stands in its waiting state
-  // and names the moment where it would name a player.
-  const dockView: DockView = deal.active
-    ? { state: 'waiting', danger: false, seconds: 0, progress: 0, activePlayer: undefined }
-    : { ...derived, ...dock }
   const dockCopy = deal.active
     ? { ...copy.turnDock, turnOf: copy.turnDock.gameStart }
     : copy.turnDock
@@ -391,6 +385,23 @@ export default function Board({
     // `docs/animations/backlog.md` and the audit register.
     matchKey: intro?.gameId ?? null,
   })
+
+  // WHO HAS AN ATTACK OUT AT THE CENTRE, for the dock (owner, 04.10). Our own
+  // counts the moment we put it out, not once the host confirms it — the board
+  // never waits for the host — and one we have asked back is home already.
+  const stagedOut = staging.staged?.main ?? staging.staged?.support
+  const shownForDock =
+    state.window && stagedOut
+      ? [...(state.shown ?? []), { player: state.selfId, uid: stagedOut.uid, card: stagedOut.card }]
+      : (state.shown ?? []).filter(
+          (s) => s.player !== state.selfId || !staging.returning.has(s.uid),
+        )
+  const derived = deriveDock({ ...state, shown: shownForDock }, state.selfId, now)
+  // Nobody is on turn during the opening: the dock stands in its waiting state
+  // and names the moment where it would name a player.
+  const dockView: DockView = deal.active
+    ? { state: 'waiting', danger: false, seconds: 0, progress: 0, activePlayer: undefined }
+    : { ...derived, ...dock }
 
   // a `defend` pending owed to us means the defence hook owns the fan instead
   // of the turn hook — the two never run at once (the engine suspends normal
@@ -2151,6 +2162,8 @@ export default function Board({
             seconds={dockView.seconds}
             progress={dockView.progress}
             activePlayer={dockView.activePlayer}
+            passed={dockView.passed}
+            passes={dockView.passes}
             copy={dockCopy}
             paused={paused}
             onDraw={actions?.onDraw ? () => dockKey(actions.onDraw) : undefined}
@@ -2158,6 +2171,7 @@ export default function Board({
             onPass={
               answering ? (unanswered ? defenseStaging.onDecline : undefined) : actions?.onPass
             }
+            onUnpass={actions?.onUnpass}
           />
         </div>
       </div>
