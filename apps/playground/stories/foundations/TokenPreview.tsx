@@ -114,6 +114,7 @@ const DISCRETE_SECTIONS: { title: string; pick: (n: string) => boolean }[] = [
   { title: 'Brand & categories', pick: (n) => n === '--brand-green' || n.startsWith('--cat-') },
   { title: 'Named hues', pick: (n) => NAMED_HUES.includes(n) },
   { title: 'State accents', pick: (n) => n.endsWith('-accent') },
+  { title: 'Room roles', pick: (n) => n.startsWith('--role-') },
   { title: 'Highlight fills', pick: (n) => /^--(yellow|amber|orange)-/.test(n) },
   { title: 'Card graphics', pick: (n) => n.startsWith('--card-') },
 ]

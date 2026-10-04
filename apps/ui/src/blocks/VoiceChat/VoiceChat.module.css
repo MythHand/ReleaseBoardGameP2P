@@ -1,0 +1,275 @@
+/* ---- the lobby's line ---- */
+
+/* the rest of the heading's line: the count, and the headphones at its end; the
+   list of participants opens against this line */
+.line {
+  position: relative;
+  display: flex;
+  flex: 1;
+  gap: 16px;
+  align-items: center;
+  min-inline-size: 0;
+}
+
+/* the popover's content sets its width, so nothing in a row can push past it;
+   a column that shrinks into the popover's height limit, so the people inside
+   can scroll under the overall volume. It reaches over the popover's padding
+   at both ends and carries that padding inside instead: the people scroll to
+   the panel's very edges, not to a band short of them */
+.popoverBody {
+  display: flex;
+  flex-direction: column;
+  inline-size: 380px;
+  min-block-size: 0;
+  margin-block: calc(-1 * var(--pad-block));
+}
+
+/* ---- the table's panel ---- */
+
+.panel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 16px;
+  min-block-size: 0;
+}
+
+/* dressed like the participants panel's head, the one beside it on the rail */
+.panelHead {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 0 4px;
+}
+
+.panelTitle {
+  opacity: 0.6;
+}
+
+/* ---- shared ---- */
+
+.people {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  color: var(--white-45);
+}
+
+/* the microphone and the headphones at the line's end; the notices hang from it */
+.controls {
+  position: relative;
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  margin-inline-start: auto;
+}
+
+/* ---- notices about my voice ---- */
+
+/* under the microphone and the headphones, over whatever lies below: as far
+   below as the popover opens (6px), as wide as its list (380px), and out past
+   the pair's right edge exactly as far as the list's popover (its 18px padding
+   and 1px border), so the two share one right edge; several stand one under
+   another, as far apart as chat toasts (10px) */
+.notices {
+  position: absolute;
+  inset-block-start: calc(100% + 6px);
+  inset-inline-end: -19px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  inline-size: 380px;
+}
+
+/* a chat toast's dress: its black plate, and the same room on every side — the
+   message's side padding (owner, 30.09) */
+.notice {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 8px;
+  background: var(--surface-0);
+}
+
+.noticeBody {
+  flex: 1;
+  min-inline-size: 0;
+}
+
+/* the message's head and text: the same gap under the head, the same tight
+   leading */
+.noticeTitle {
+  margin-block-end: 5px;
+}
+
+/* the title takes the colour of what it explains: the red microphone, the
+   orange headphones */
+.microphone {
+  color: var(--coral);
+}
+
+.connection {
+  color: var(--cat-operation);
+}
+
+.noticeText {
+  margin: 0;
+  line-height: 1.25;
+  color: var(--white-80);
+  overflow-wrap: anywhere;
+}
+
+/* the cross, dressed like the rules' search clear button, without its frame */
+.noticeClose {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  inline-size: 22px;
+  block-size: 22px;
+  padding: 0;
+  font-size: 13px;
+  color: var(--white-70);
+  cursor: pointer;
+  background: transparent;
+  border: none;
+}
+
+.noticeClose:hover {
+  color: var(--fg);
+}
+
+.off {
+  display: flex;
+  color: var(--white-45);
+}
+
+/* a mute that is on — mine on a participant, or on my own microphone: the
+   danger button's red */
+.muted {
+  display: flex;
+  color: var(--coral);
+}
+
+/* a muted participant's volume: faded, and still free to move */
+.faded {
+  opacity: 0.5;
+}
+
+/* right after the name of a participant who turned their microphone off; sits
+   on the name's line and follows it when the name wraps */
+.micOff {
+  display: inline-flex;
+  margin-inline-start: 6px;
+  vertical-align: middle;
+  color: var(--white-45);
+}
+
+/* on the rail the tab's own colour, like every other tab */
+.tabOff {
+  display: flex;
+}
+
+/* the headphones by where I stand: blue while connecting, the "on the line"
+   green once in (Badge success), orange when the connection broke off */
+.connecting {
+  display: flex;
+  color: var(--periwinkle);
+}
+
+.connected {
+  display: flex;
+  color: var(--mint);
+}
+
+.interrupted {
+  display: flex;
+  color: var(--cat-operation);
+}
+
+/* the overall volume and the people: a column that may shrink, so only the
+   people scroll when the room runs out */
+.voiceList {
+  display: flex;
+  flex-direction: column;
+  min-block-size: 0;
+}
+
+.peopleScroll {
+  min-block-size: 0;
+}
+
+/* the room under the overall volume's rule lives inside the scroll, not
+   between the two: the people scroll right up to the rule */
+.underOverall {
+  padding-block-start: 12px;
+}
+
+/* the chat's own volume, set off from the people below it */
+.overall {
+  padding-block-end: 12px;
+  border-block-end: 1px solid var(--white-10);
+}
+
+/* in the popover it leads, and takes back the top padding reached over */
+.popoverBody .overall {
+  padding-block-start: var(--pad-block);
+}
+
+/* in the popover with no overall volume above, the people lead: the top padding
+   reached over rides inside the scroll */
+.popoverBody .alone {
+  padding-block-start: var(--pad-block);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+/* in the popover, the bottom padding it reached over, carried inside the scroll */
+.popoverBody .list {
+  padding-block-end: var(--pad-block);
+}
+
+.person {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-inline-size: 0;
+}
+
+/* a long name wraps rather than widening the list */
+.name {
+  flex: 1;
+  min-inline-size: 0;
+  color: var(--white-45);
+  overflow-wrap: anywhere;
+}
+
+/* the room's role colours — the same tokens the text chat reads */
+.host {
+  color: var(--role-host);
+}
+
+.player {
+  color: var(--role-player);
+}
+
+.spectator {
+  color: var(--role-spectator);
+}
+
+.you {
+  color: var(--white-45);
+}
+
+.personVolume {
+  flex: none;
+  inline-size: 150px;
+}

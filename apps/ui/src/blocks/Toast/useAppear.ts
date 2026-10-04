@@ -7,11 +7,14 @@ import { play } from '@/animations/play'
 // компоненте, который вместе с этим элементом монтируется.
 // Уход элемент доигрывает САМ: снаружи ему говорят `leaving`, и только после
 // конца анимации он отдаёт право снять себя со сцены (`onLeft`).
-export function useAppear<T extends HTMLElement>(leaving: boolean, onLeft?: () => void) {
+// `dy` is where it comes from: below by default, the way a toast rises; a
+// negative one brings it down from above.
+export function useAppear<T extends HTMLElement>(leaving: boolean, onLeft?: () => void, dy = 18) {
   const ref = useRef<T>(null)
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the arrival plays once, on mount
   useEffect(() => {
-    play('hudIn', ref.current, { dy: 18, dur: 260 })
+    play('hudIn', ref.current, { dy, dur: 260 })
   }, [])
 
   useEffect(() => {

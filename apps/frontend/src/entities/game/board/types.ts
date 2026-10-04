@@ -38,7 +38,7 @@ import type {
 } from '@release/ui'
 import type { ReactNode } from 'react'
 
-export type Panel = 'settings' | 'history' | 'participants' | 'rules' | 'modes' | 'chat'
+export type Panel = 'settings' | 'history' | 'participants' | 'rules' | 'modes' | 'voice' | 'chat'
 
 export interface BoardOpponent {
   id: string
@@ -141,6 +141,7 @@ export function isPlayerBoard(state: BoardState): state is PlayerBoardState {
 // Everything the session/P2P layer answers. The engine has no concept of a
 // spectator, a room code, or a pause.
 export interface BoardRoom {
+  onCopy?: (text: string) => Promise<boolean>
   role?: 'host' | 'guest'
   code?: string
   participants: Participant[]
@@ -237,6 +238,7 @@ export interface BoardChromeCopy {
   tabParticipants: string
   tabRules: string
   tabModes: string
+  tabVoice?: string
   tabChat?: string
 }
 
@@ -364,6 +366,9 @@ export interface BoardSlots {
   // match, and the consumer's non-fatal error notice.
   corner?: ReactNode
   banner?: ReactNode
+  voice?: ReactNode
+  voiceTab?: ReactNode
+  voiceNotices?: ReactNode
   chat?: ReactNode
   toasts?: ReactNode
 }

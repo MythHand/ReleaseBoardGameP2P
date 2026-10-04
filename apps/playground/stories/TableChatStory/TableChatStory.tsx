@@ -2,6 +2,7 @@ import { en as enCommon, ru as ruCommon } from '@release/translation/catalog'
 import { useEffect, useMemo, useState } from 'react'
 import Chat, { type ChatMessage, type ChatRole } from '@/blocks/Chat'
 import { ToastStack } from '@/blocks/Toast'
+import { VoiceNotices, VoicePanel, VoiceTabIcon } from '@/blocks/VoiceChat'
 import { CHAT_SELF, makeChat } from '@/mocks/chat'
 import { makeSpectatorTable, makeTable } from '@/mocks/table'
 import Message from '@/primitives/Message'
@@ -11,6 +12,8 @@ import { type Lang, pick, useLang } from '../../Playground/lang'
 import HoverSelect from '../controls/HoverSelect'
 import TechBar from '../controls/TechBar'
 import { TechButton, TechField, TechLabel, TechSwitch } from '../controls/TechControls'
+import { copyText } from '../copyText'
+import { useVoiceDemo, VoiceDemoControls, voiceIssueView } from '../voiceDemo'
 import styles from './TableChatStory.module.css'
 
 type GameOverCondition = 'release' | 'lastStanding'
@@ -136,6 +139,7 @@ export default function TableChatStory() {
   // host switch: the action clocks for the whole table
   const [timers, setTimers] = useState(true)
   const [chatToasts, setChatToasts] = useState(true)
+  const voice = useVoiceDemo()
   const [ready, setReady] = useState<Set<string>>(() => new Set())
   // Anchor for the reaction demo states' sweep, reset each time either is
   // (re-)selected so switching back into it restarts the countdown. Keyed on
@@ -339,6 +343,8 @@ export default function TableChatStory() {
           options={DOCK_STATES.map((d) => ({ value: d.id, label: d.label[lang] }))}
           onChange={(v) => setDock(v as DockDemo)}
         />
+
+        <VoiceDemoControls demo={voice} />
       </TechBar>
       <div className={styles.stage}>
         <Table
@@ -348,6 +354,7 @@ export default function TableChatStory() {
               : storyState
           }
           room={{
+            onCopy: copyText,
             role,
             code: '4F2A-9K',
             participants: base.participants,
@@ -429,6 +436,21 @@ export default function TableChatStory() {
                 }
               />
             ),
+            voice: (
+              <VoicePanel
+                {...voice.props}
+                title={tableCopy.tabVoice}
+                issue={voiceIssueView(voice.issue, lang)}
+                copy={pick(lang, { ru: ruCommon.voiceChat, en: enCommon.voiceChat })}
+              />
+            ),
+            voiceNotices: (
+              <VoiceNotices
+                issue={voiceIssueView(voice.issue, lang)}
+                copy={pick(lang, { ru: ruCommon.voiceChat, en: enCommon.voiceChat })}
+              />
+            ),
+            voiceTab: <VoiceTabIcon status={voice.status} micOff={voice.props.micOff} />,
             toasts: (
               <ToastStack
                 items={toasts}

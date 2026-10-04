@@ -31,6 +31,19 @@ export { default as Rules } from './blocks/Rules'
 export { type ToastItem, ToastStack, type ToastStackCopy } from './blocks/Toast'
 export type { VideoPlayerCopy, VideoPlayerProps } from './blocks/VideoPlayer'
 export { default as VideoPlayer } from './blocks/VideoPlayer'
+export type {
+  VoiceChatCopy,
+  VoiceIssue,
+  VoiceParticipant,
+  VoiceRole,
+  VoiceStatus,
+} from './blocks/VoiceChat'
+export {
+  default as VoiceChat,
+  VoiceNotices,
+  VoicePanel,
+  VoiceTabIcon,
+} from './blocks/VoiceChat'
 export { default as Loader } from './boot'
 export { buildSequence } from './boot/lines'
 export {
@@ -76,6 +89,7 @@ export { default as ModeSelect } from './primitives/ModeSelect'
 export { default as Overlay } from './primitives/Overlay'
 export { default as Pile } from './primitives/Pile'
 export type { HeapCard } from './primitives/Pile/Pile'
+export { default as Popover } from './primitives/Popover'
 export { default as RingTimer } from './primitives/RingTimer'
 export type { ScrollAreaHandle } from './primitives/ScrollArea'
 export { default as ScrollArea } from './primitives/ScrollArea'

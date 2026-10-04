@@ -18,7 +18,7 @@ import type { DockView } from './dock'
 import type { TableActions, TablePending, TableWindow } from './intents'
 import type { PendingPromptCopy } from './PendingPrompt'
 
-export type Panel = 'settings' | 'history' | 'participants' | 'rules' | 'modes' | 'chat'
+export type Panel = 'settings' | 'history' | 'participants' | 'rules' | 'modes' | 'chat' | 'voice'
 
 export interface TableOpponent {
   id: string
@@ -83,6 +83,7 @@ export function isPlayerTable(state: TableState): state is PlayerTableState {
 // Everything the session/P2P layer answers. The engine has no concept of a
 // spectator, a room code, or a pause.
 export interface TableRoom {
+  onCopy?: (text: string) => Promise<boolean>
   role?: 'host' | 'guest'
   code?: string
   participants: Participant[]
@@ -179,6 +180,9 @@ export interface TableChromeCopy {
   // подпись вкладки чата — необязательна, как и сам чат: вкладка появляется
   // только вместе со слотом `slots.chat`, а без него подписывать нечего
   tabChat?: string
+  // the voice chat's tab — a square icon, so this names it for a screen reader
+  // and titles its panel; optional for the same reason as `tabChat`
+  tabVoice?: string
 }
 
 export interface TableCopyBundle {
@@ -205,6 +209,16 @@ export interface TableSlots {
   // выезжающую панель, а кто ведёт ленту (P2P, мок) он не знает. Нет слота —
   // нет ни вкладки, ни панели.
   chat?: ReactNode
+  // The voice chat, the same way: the table gives it a square tab on the rail and
+  // a panel, and knows nothing of where the voices come from. `voice` is the
+  // panel's content; `voiceTab` is the tab's face, since only the consumer knows
+  // whether I am in the voice chat. No `voice` — no tab and no panel.
+  voice?: ReactNode
+  voiceTab?: ReactNode
+  // The voice chat's notices (VoiceNotices). The table hangs them where the
+  // microphone and the headphones stand in the open voice panel, and keeps them
+  // there whether the panel is open or not (owner, 30.09).
+  voiceNotices?: ReactNode
   // Всплывающие плашки в правом нижнем углу. Стол даёт им угол, ширину и слой;
   // что всплывает — дело потребителя. Одно правило стол берёт на себя: при
   // открытой панели чата плашек нет вовсе — лента и так на экране.

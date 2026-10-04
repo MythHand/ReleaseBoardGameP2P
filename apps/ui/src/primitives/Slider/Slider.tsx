@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react'
+import Typography, { type TypographyBase, type TypographyTk } from '../Typography'
 import styles from './Slider.module.css'
 
 interface SliderProps {
@@ -12,6 +13,13 @@ interface SliderProps {
   color?: string
   // заливка дорожки до текущего значения цветом color (как у светофорного лимита)
   fill?: boolean
+  // the thumb's own colour, leaving the value's alone; unset — color's
+  thumbColor?: string
+  // what follows the number, e.g. '%'
+  unit?: string
+  // the value's face on the scale; unset — numeric, the slider's own
+  valueBase?: TypographyBase
+  valueTk?: TypographyTk
   className?: string
 }
 
@@ -25,10 +33,16 @@ export default function Slider({
   label,
   color,
   fill = false,
+  thumbColor,
+  unit = '',
+  valueBase = 'numeric',
+  valueTk,
   className = '',
 }: SliderProps) {
-  const thumb = color ?? '#8fd9b0'
+  const thumb = thumbColor ?? color ?? '#8fd9b0'
   const percent = max > min ? ((value - min) / (max - min)) * 100 : 0
+  // the widest value the range can show, its unit included, in characters
+  const valueChars = Math.max(String(min).length, String(max).length) + unit.length
   const inputStyle = {
     '--thumb': thumb,
     ...(fill
@@ -51,9 +65,16 @@ export default function Slider({
         onChange={(e) => onChange?.(Number(e.target.value))}
         style={inputStyle}
       />
-      <span className={styles.value} style={color ? { color } : undefined}>
+      <Typography
+        base={valueBase}
+        tk={valueTk}
+        as="span"
+        className={styles.value}
+        style={{ minInlineSize: `${valueChars}ch`, ...(color ? { color } : {}) }}
+      >
         {value}
-      </span>
+        {unit}
+      </Typography>
     </div>
   )
 }

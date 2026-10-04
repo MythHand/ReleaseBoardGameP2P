@@ -4,6 +4,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router'
 import { vi } from 'vitest'
 import type { UseLobby } from '~/entities/lobby'
 import type { RoomChatView } from '~/features/chat/RoomChat'
+import { createFakeVoiceFacade } from '~/network/voice/testing/fakeVoiceFacade'
 // The board's own style module — the `.enter` class the opening hides blocks
 // with is reached the same way the ported suite reaches Arrow's classnames.
 import boardStyles from '../_Board.module.css'
@@ -69,6 +70,7 @@ function session(peers: Record<string, unknown> = {}): UseLobby {
   return {
     gameId: 'g1',
     gameSync: { view: engine.spectate(state), events: [], resync: true },
+    voice: createFakeVoiceFacade(),
     state: { selfId: 'me', hostId: 'me', maxPlayers: 6, setup: {}, peers },
     status: 'in-lobby',
     roomCode: 'YTG-N2Q',
@@ -510,4 +512,13 @@ it('sends the game-over continue action to this game’s own stats route', async
 
   expect(await screen.findByTestId('stats-page')).toBeTruthy()
   expect(router.state.location.pathname).toBe('/board/g1/stats')
+})
+
+it('connects board voice using the session facade and keeps it on route unmount', () => {
+  const page = renderBoard()
+  fireEvent.click(screen.getByRole('button', { name: 'voice chat' }))
+  fireEvent.click(screen.getByRole('button', { name: 'join' }))
+  expect(sessionValue.voice.connect).toHaveBeenCalledOnce()
+  page.unmount()
+  expect(sessionValue.voice.disconnect).not.toHaveBeenCalled()
 })
