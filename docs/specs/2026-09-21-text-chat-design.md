@@ -249,9 +249,10 @@ The UI kit's current self detection compares display names. It changes to accept
 a stable self/member identity on messages, because display names are presentation
 and may collide. Grouping consecutive messages uses the same stable author id.
 
-Draft text remains local to the mounted `Chat` component and is not part of the
-room journal. Navigating to another screen may discard an unsent draft; sent
-messages and history never disappear.
+Draft text remains local to the screen's `useRoomChatView` and is not part of the
+room journal. It survives a `Chat` remount when Board resets hidden-tab animations.
+Navigating to another screen may discard an unsent draft; sent messages and
+history never disappear. The UI kit also supports an uncontrolled local draft.
 
 ## Screen integration
 

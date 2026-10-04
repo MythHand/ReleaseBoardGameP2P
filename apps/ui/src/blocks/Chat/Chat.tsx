@@ -46,14 +46,18 @@ interface ChatProps {
   // старый контракт для моков playground без memberId
   selfName?: string
   onSend?: ((text: string) => boolean) | ((text: string) => void)
+  // A screen that remounts its Chat slot can keep an unsent draft above it.
+  // Omit `draft` for the kit's existing local-draft behavior.
+  draft?: string
+  onDraftChange?: (draft: string) => void
   className?: string
 }
 
 // Лента переписки: прокручиваемый лог и строка ввода — и больше ничего. Сами
 // реплики рисует примитив Message; лента отвечает только за порядок — что с чем
 // склеено, что своё, что подтянуть к низу.
-// Блок держит лишь черновик в поле; сообщения приходят и уходят через пропсы,
-// потому что откуда они берутся (P2P, мок, история) кит знать не должен.
+// Draft ownership is local by default or controlled by the screen; messages
+// remain props, so the kit knows nothing about P2P, mocks, or history.
 // Оформления у блока нет вовсе — ни фона, ни рамок, ни собственного заголовка,
 // как у Rules. Он встаёт в чужое место (колонка экрана, выезжающая панель,
 // окно), и это место рисует себя и называет его само.
@@ -63,9 +67,16 @@ export default function Chat({
   selfMemberId,
   selfName,
   onSend,
+  draft: controlledDraft,
+  onDraftChange,
   className = '',
 }: ChatProps) {
-  const [draft, setDraft] = useState('')
+  const [localDraft, setLocalDraft] = useState('')
+  const draft = controlledDraft ?? localDraft
+  const setDraft = (value: string) => {
+    if (controlledDraft === undefined) setLocalDraft(value)
+    onDraftChange?.(value)
+  }
   const logRef = useRef<ScrollAreaHandle>(null)
   // прижат ли лог к низу. Это состояние ЧИТАТЬ после прихода сообщения уже
   // поздно — новые узлы меняют scrollHeight, — поэтому оно пишется на прокрутке.

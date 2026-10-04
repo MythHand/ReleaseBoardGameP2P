@@ -756,6 +756,21 @@ const SCENARIOS: Scenario[] = [
 const ISSUES: Issue[] = [
   {
     what: {
+      ru: 'ИСПРАВЛЕНО #143: старые анимации после возврата вкладки',
+      en: 'FIXED #143: stale animations after returning to a tab',
+    },
+    problem: {
+      ru: 'Скрытие сбрасывает временный Board и прерванную раздачу; возврат принимает текущую проекцию без старых полётов. Новые события снова анимируются. Порядок руки, панель, черновик чата и оплата Release сохраняются. Во время восстановления автоматические ответы отключены; очищается только собственный опубликованный выбор. Проверено тестами и двумя вкладками Chrome с общим движком через BroadcastChannel; полноценный PeerJS-матч не проверялся.',
+      en: 'Hiding resets temporary Board playback and completes an interrupted opening; returning adopts the current projection without old flights. New events animate again. Hand order, panel, chat draft and Release payment survive. Automatic answers wait for catch-up; only the local published pick is cleared. Verified by tests and two Chrome tabs sharing the engine through BroadcastChannel; a full PeerJS match was not tested.',
+    },
+    where: {
+      ru: 'pages/board/[gameId]/_Board.tsx, _useBoardVisibility.ts; docs/animations/backlog.md',
+      en: 'pages/board/[gameId]/_Board.tsx, _useBoardVisibility.ts; docs/animations/backlog.md',
+    },
+    status: 'ok',
+  },
+  {
+    what: {
       ru: 'ЗАКРЫТО #163: дублирующая подсказка защиты в центре',
       en: 'CLOSED #163: duplicate defense prompt at the centre',
     },

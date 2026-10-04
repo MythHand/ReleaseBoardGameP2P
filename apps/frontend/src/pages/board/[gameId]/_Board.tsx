@@ -78,9 +78,10 @@ import type {
 } from '~/entities/game/board/types'
 import { useBeats, useEliminationPreload } from '~/features/board-beats'
 import { useDealIntro } from '~/features/game-intro/useDealIntro'
-import { useHandOrder } from '~/features/hand-order/useHandOrder'
+import { type HandOrder, useHandOrder } from '~/features/hand-order/useHandOrder'
 import opening from './_Board.module.css'
 import { useBoardStaging } from './_useBoardStaging'
+import { useBoardVisibility } from './_useBoardVisibility'
 import { useCherryPickStaging } from './_useCherryPickStaging'
 import { useDefenseStaging } from './_useDefenseStaging'
 import { useHandLimit } from './_useHandLimit'
@@ -169,21 +170,130 @@ function SettingsField({
 
 // Стол = активное состояние игры. Каждый блок позиционируется независимо
 // (абсолютно), без жёсткой сетки. Заполняет экран без скролла.
-export default function Board({
+export default function Board(props: BoardProps) {
+  const { visible, catchingUp, epoch } = useBoardVisibility()
+  const handOrder = useHandOrder(props.intro?.gameId ?? null)
+  const [ownPanel, setOwnPanel] = useState<Panel | null>(null)
+  const controlledPanel = props.panel !== undefined
+  const gameId = props.intro?.gameId
+  const playback = useRef({ gameId, done: false, restoredThrough: 0 })
+  if (playback.current.gameId !== gameId) {
+    playback.current = { gameId, done: false, restoredThrough: 0 }
+  }
+  const onIntroDone = useCallback(() => {
+    if (playback.current.gameId !== gameId || playback.current.done) return
+    playback.current.done = true
+    props.intro?.onDone()
+  }, [gameId, props.intro?.onDone])
+  const preview = useRef<{ card: string | null; publish: BoardProps['onPickPreview'] }>({
+    card: null,
+    publish: props.onPickPreview,
+  })
+  preview.current.publish = props.onPickPreview
+  const publishPreview = useCallback((card: string | null) => {
+    preview.current.card = card
+    preview.current.publish?.(card)
+  }, [])
+  useLayoutEffect(() => {
+    // Local selections disappear with playback; tell the other seats too.
+    // A watching seat must not erase the actor's public selection.
+    if (!visible && preview.current.card != null) publishPreview(null)
+  }, [visible, publishPreview])
+  useLayoutEffect(() => {
+    // The host must not wait for a deal nobody can watch.
+    if (!visible) onIntroDone()
+  }, [visible, onIntroDone])
+  if (!visible || catchingUp) {
+    playback.current.restoredThrough = props.intro?.events.at(-1)?.id ?? 0
+  }
+  if (!visible) return null
+
+  return (
+    <BoardPlayback
+      {...props}
+      key={epoch}
+      handOrder={handOrder}
+      skipIntro={playback.current.done}
+      catchingUp={catchingUp}
+      onPickPreview={props.onPickPreview && publishPreview}
+      panel={controlledPanel ? props.panel : ownPanel}
+      onPanelChange={(panel) => {
+        if (!controlledPanel) setOwnPanel(panel)
+        props.onPanelChange?.(panel)
+      }}
+      intro={
+        props.intro && {
+          ...props.intro,
+          onDone: onIntroDone,
+          restoredThrough: Math.max(
+            props.intro.restoredThrough ?? 0,
+            playback.current.restoredThrough,
+          ),
+        }
+      }
+    />
+  )
+}
+
+function BoardPlayback({
   state: liveRaw,
   room,
   copy,
   slots,
   over = null,
-  actions: liveActions,
+  actions: actionsProp,
   dock,
   now,
   panel: panelProp,
   onPanelChange,
   intro,
   pickPreview,
-  onPickPreview,
-}: BoardProps) {
+  onPickPreview: publishPreview,
+  handOrder: savedHandOrder,
+  skipIntro,
+  catchingUp,
+}: BoardProps & { handOrder: HandOrder; skipIntro: boolean; catchingUp: boolean }) {
+  // An awaited gesture can finish after this visual instance was discarded.
+  // It may neither send an old intent nor overwrite the surviving hand order.
+  const mounted = useRef(true)
+  useLayoutEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
+  const protect = useCallback(
+    <Args extends unknown[]>(callback?: (...args: Args) => void) =>
+      callback &&
+      ((...args: Args) => {
+        if (mounted.current && document.visibilityState !== 'hidden') callback(...args)
+      }),
+    [],
+  )
+  const liveActions = useMemo<TableActions>(
+    () => ({
+      ...actionsProp,
+      onPlay: protect(actionsProp?.onPlay),
+      onDraw: protect(actionsProp?.onDraw),
+      onPush: protect(actionsProp?.onPush),
+      onAttack: protect(actionsProp?.onAttack),
+      onPass: protect(actionsProp?.onPass),
+      onResolve: protect(actionsProp?.onResolve),
+      onWindowExpired: protect(actionsProp?.onWindowExpired),
+      onOverContinue: protect(actionsProp?.onOverContinue),
+    }),
+    [actionsProp, protect],
+  )
+  const onPickPreview = useMemo(() => protect(publishPreview), [protect, publishPreview])
+  const handOrder = useMemo<HandOrder>(
+    () =>
+      ({
+        arrange: savedHandOrder.arrange,
+        commit: protect(savedHandOrder.commit),
+        place: protect(savedHandOrder.place),
+      }) as HandOrder,
+    [savedHandOrder, protect],
+  )
   // ===== the opening =====
   // Every node a flight aims at or leaves from — the board's own registry, not
   // just the deal's. The shift the `hudIn` preset applies rides on `transform`,
@@ -201,13 +311,12 @@ export default function Board({
   // publishes and every rect a flight measures already agrees with the fan on
   // screen. The engine has no hand order (it is a private, presentation fact),
   // which is why the overlay lives here and not in an action.
-  const handOrder = useHandOrder(intro?.gameId ?? null)
   const live = useMemo(() => handOrder.arrange(liveRaw), [handOrder, liveRaw])
 
   // The blocks stay hidden from the FIRST committed frame until the intro is
   // over — not merely while it is `active`. `hudIn` only holds a block down
   // once its own animation exists, and the last of them is armed seconds in.
-  const [introOver, setIntroOver] = useState(false)
+  const [introOver, setIntroOver] = useState(skipIntro)
   const onIntroDone = useCallback(() => {
     setIntroOver(true)
     intro?.onDone()
@@ -215,7 +324,7 @@ export default function Board({
   const deal = useDealIntro({
     live,
     gameId: intro?.gameId ?? null,
-    view: intro?.view ?? null,
+    view: skipIntro ? null : (intro?.view ?? null),
     events: intro?.events ?? [],
     refs: anchors,
     onDone: onIntroDone,
@@ -277,7 +386,7 @@ export default function Board({
     requestPick: requestPickRef,
     events: intro?.events ?? [],
     anchors,
-    enabled: introOver || intro == null,
+    enabled: !catchingUp && (introOver || intro == null),
     intro: deal.beat,
     restoredThrough: intro?.restoredThrough,
     staging: handoffRef,
@@ -313,7 +422,7 @@ export default function Board({
   // today, and a clip that may never be needed should not change that.
   useEliminationPreload(!deal.active)
 
-  const actions = deal.active || beats.exclusive ? INERT_ACTIONS : liveActions
+  const actions = catchingUp || deal.active || beats.exclusive ? INERT_ACTIONS : liveActions
 
   const { you, opponents, decks, turn, history, setup } = state
   const derived = deriveDock(state, state.selfId, now)
@@ -344,11 +453,9 @@ export default function Board({
     pauseHostId,
     onPauseToggleReady,
   } = room
-  const [ownPanel, setOwnPanel] = useState<Panel | null>(null)
   // the pointer has been on the rail: the drawer may build its heavy tab now
   const [railReached, setRailReached] = useState(false)
-  const controlled = panelProp !== undefined
-  const panel = controlled ? panelProp : ownPanel
+  const panel = panelProp ?? null
 
   // the staging gesture: pulling a card that needs a target out of the fan —
   // stands it at the centre, aims the arrow, dispatches on a lit target. Inert
@@ -356,10 +463,11 @@ export default function Board({
   // exclusive beat owns the table.
   const staging = useBoardStaging({
     state,
+    restoring: catchingUp,
     anchors,
     actions,
     events: intro?.events ?? [],
-    enabled: !(deal.active || beats.exclusive),
+    enabled: !(catchingUp || deal.active || beats.exclusive),
     onHandArrival: (order) => handOrder.place(order),
 
     // the match boundary (#101, Fix C, finding 3) — `<Board>` is not remounted
@@ -395,7 +503,7 @@ export default function Board({
     anchors,
     actions,
     events: intro?.events ?? [],
-    enabled: !(deal.active || beats.exclusive),
+    enabled: !(catchingUp || deal.active || beats.exclusive),
     matchKey: intro?.gameId ?? null,
     onHandArrival: (order) => handOrder.place(order),
   })
@@ -412,7 +520,7 @@ export default function Board({
     anchors,
     actions,
     events: intro?.events ?? [],
-    enabled: !(deal.active || beats.exclusive),
+    enabled: !(catchingUp || deal.active || beats.exclusive),
     matchKey: intro?.gameId ?? null,
     onHandArrival: (order) => handOrder.place(order),
   })
@@ -464,7 +572,7 @@ export default function Board({
     anchors,
     actions,
     events: intro?.events ?? [],
-    enabled: alarmMineOpen && !(deal.active || beats.exclusive),
+    enabled: alarmMineOpen && !(catchingUp || deal.active || beats.exclusive),
     matchKey: intro?.gameId ?? null,
     onHandArrival: (order) => handOrder.place(order),
   })
@@ -481,7 +589,7 @@ export default function Board({
       action: copy.pending.requestCard.action,
       confirm: copy.pending.confirm,
     },
-    enabled: !(deal.active || beats.exclusive),
+    enabled: !(catchingUp || deal.active || beats.exclusive),
     matchKey: intro?.gameId ?? null,
     pickPreview,
     onPickPreview,
@@ -506,7 +614,7 @@ export default function Board({
       noHand: copy.table.cherryPickNoHand,
       confirm: copy.pending.confirm,
     },
-    enabled: !(deal.active || beats.exclusive),
+    enabled: !(catchingUp || deal.active || beats.exclusive),
     pickPreview,
     onPickPreview,
   })
@@ -526,7 +634,7 @@ export default function Board({
       position: copy.table.rebasePosition,
       confirm: copy.pending.confirm,
     },
-    enabled: !(deal.active || beats.exclusive),
+    enabled: !(catchingUp || deal.active || beats.exclusive),
     suspended: paused || room.connection === 'reconnecting' || over != null,
   })
   // System Upgrade's centre (#108) — the one pending owed to several seats at
@@ -543,7 +651,7 @@ export default function Board({
       takePrompt: copy.table.upgradeTakePrompt,
       confirm: copy.pending.confirm,
     },
-    enabled: !(deal.active || beats.exclusive),
+    enabled: !(catchingUp || deal.active || beats.exclusive),
   })
   const upgradeOwnsHand = upgrade.asked || upgrade.stagedUid != null
   const neutralizeOwnsHand = alarmMineOpen || neutralizing.staged != null
@@ -1172,7 +1280,6 @@ export default function Board({
 
   const toggle = (p: Panel) => {
     const next = panel === p ? null : p
-    if (!controlled) setOwnPanel(next)
     onPanelChange?.(next)
   }
 

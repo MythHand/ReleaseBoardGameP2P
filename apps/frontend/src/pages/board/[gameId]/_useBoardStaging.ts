@@ -203,6 +203,8 @@ export interface Options {
    * to `useBeats`.
    */
   matchKey?: string | null
+  /** Adopt a pending delivered as the document returns to the current table. */
+  restoring?: boolean
   /**
    * The fan's private order. A card coming home lands in the MIDDLE of the fan
    * like every other arrival, so its slot has to be committed or the next
@@ -218,6 +220,7 @@ export function useBoardStaging({
   events,
   enabled,
   matchKey = null,
+  restoring = false,
   onHandArrival,
 }: Options): BoardStaging {
   const [staged, setStaged] = useState<StagedPlay | null>(null)
@@ -391,6 +394,11 @@ export function useBoardStaging({
   // carrier already carrying it — the doubling bug this family was grown to
   // prevent, once per direction.
   const [stage, setStage] = useState<StageState>('none')
+  useLayoutEffect(() => {
+    if (restoring && cost && !staged) {
+      setStage((current) => (current === 'none' ? 'standing' : current))
+    }
+  }, [restoring, cost, staged])
   // `paidCost` — the card that paid the cost, once ITS OWN flight (below,
   // `onCostPick`) has landed. The engine never says which uid was spent — only
   // the resolver knows, since its own pull named it —
@@ -1539,7 +1547,8 @@ export function useBoardStaging({
     foldingRef.current = false
     dispatchWatermarkRef.current = 0
     setCancelling(false)
-    setStage('none')
+    // A restored cost pending already has its release at the stage slot.
+    setStage(cost ? 'standing' : 'none')
     resetCostPayment()
     pairApi.current.release()
     arrowCtl.stop()
