@@ -1119,6 +1119,43 @@ it('keeps the AI cause on the table while its event asks for a choice', () => {
   expect(toBoardState(view, log, labels).aiCause).toBeUndefined()
 })
 
+// AN AI CARD STANDING ON ITS PROMPT is at the centre, not in the events deck.
+// The engine puts a card with no zone to go to back in the deck the moment it is
+// revealed; the board draws it at the centre until the prompt is answered, so
+// the deck's count leaves it out for that long (one card, one place) — and the
+// beat that flies it home counts it back as it lands.
+it.each([
+  [
+    'Bad Vibe-Coding',
+    {
+      kind: 'handLimit',
+      player: 'you',
+      excess: 1,
+      options: ['c1'],
+      source: 'ai-bad-vibe-coding',
+    },
+  ],
+  [
+    'Inside',
+    { kind: 'pickFromDiscard', player: 'you', options: [], picks: 1, source: 'ai-inside' },
+  ],
+])('leaves %s out of the events deck while its prompt stands', (_, pending) => {
+  const standing = toBoardState({ ...view, pending: pending as PlayerView['pending'] }, [], labels)
+  expect(standing.decks.events).toBe(view.decks.events - 1)
+  expect(toBoardState(view, [], labels).decks.events).toBe(view.decks.events)
+})
+
+it('counts the events deck as it is while a card from the main deck asks', () => {
+  const pending = {
+    kind: 'pickFromDiscard',
+    player: 'you',
+    options: [],
+    picks: 1,
+    source: 'operation-git-cherry-pick',
+  } as unknown as PlayerView['pending']
+  expect(toBoardState({ ...view, pending }, [], labels).decks.events).toBe(view.decks.events)
+})
+
 // AN OPERATION STANDING AT THE CENTRE is drawn there and nowhere else. The engine
 // banks its cards the moment it is played, so while its pending stands the heap
 // and its count are answered without them — on every board, reduced motion and

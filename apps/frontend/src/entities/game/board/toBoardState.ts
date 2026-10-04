@@ -669,10 +669,15 @@ export function toBoardState(view: PlayerView, log: Event[], labels: HistoryLabe
   )
 
   const source = view.pending && 'source' in view.pending ? view.pending.source : null
-  const reveal =
-    source && cardById(source)?.deck === 'ai'
-      ? [...visible].reverse().find((e) => e.type === 'aiRevealed' && e.eventCard === source)
-      : undefined
+  // An AI card asking for an answer stands at the centre (`_Board.tsx`'s
+  // `aiStanding`), while the engine has already put it back in the events deck:
+  // a card with no zone to go to returns the moment it is revealed. So the deck's
+  // count leaves it out until the prompt is answered (one card, one place — I12),
+  // and the beat that flies it home counts it back as it lands (#168).
+  const aiStanding = source != null && cardById(source)?.deck === 'ai'
+  const reveal = aiStanding
+    ? [...visible].reverse().find((e) => e.type === 'aiRevealed' && e.eventCard === source)
+    : undefined
   const filed =
     reveal?.type === 'aiRevealed'
       ? visible.find((e) => e.id > reveal.id && e.type === 'discarded' && e.card === reveal.aiCard)
@@ -715,7 +720,7 @@ export function toBoardState(view: PlayerView, log: Event[], labels: HistoryLabe
       // The projection's own pile list, not a total: `drawn.pile` names one of
       // these, and a split has to be visible for Git Branch to be aimable.
       main: view.decks.piles,
-      events: view.decks.events,
+      events: Math.max(0, view.decks.events - (aiStanding ? 1 : 0)),
       discard: lifted ? discardHeap.at(-1)?.card : discardTop,
       discardHeap,
       discardCount: Math.max(0, view.decks.discardCount - lifted),
