@@ -90,9 +90,10 @@ export function useCherryPickStaging(args: {
   overlay: ReactNode[]
   gapAt: number | null
   gapSize: number
-  /** what of the discard is out in the grid while it stands: all of it for a
-   *  Cherry-pick, only the releases for Inside — the pile shows the rest */
-  lifted: 'all' | 'releases' | null
+  /** what of the discard is out in the grid while it stands — the heap's own
+   *  entries the grid's cards are, and how many cards that is. The pile shows
+   *  the rest */
+  lifted: { uids: ReadonlySet<string>; count: number } | null
 } {
   const { state, anchors, actions, copy, enabled } = args
   const reduced = useReducedMotion()
@@ -398,7 +399,6 @@ export function useCherryPickStaging(args: {
     args.handoff.current = {
       card: ours.options.find((o) => o.uid === hand)?.id ?? '',
       run: async (ctx) => {
-        const after = ctx.after ?? ctx.base
         setFlying(true)
         const handData = cardById(ours.options.find((o) => o.uid === hand)?.id ?? '')
         const deckOpt = deck ? ours.options.find((o) => o.uid === deck) : undefined
@@ -455,15 +455,34 @@ export function useCherryPickStaging(args: {
           await wait(DECK_HOLD)
         })()
         const remaining = ours.options.filter((o) => o.uid !== hand && o.uid !== deck)
-        // Where each unpicked card ENDS UP in the pile — its own entry in the
-        // heap the projection has after this answer. One scatter drives both
-        // the flight and the rest (I7), and the place in that array is the
-        // layer the card travels on (I9): its depth there is what decides
-        // whether it lands in the open or sinks under the visible top, so a
-        // card never lands in full view and then drops out of it the moment
-        // the operation card settles above — which is the pile rearranging
-        // itself after everything had already landed.
-        const heap = after.decks.discardHeap ?? []
+        // THE PILE THE CARDS CAME OUT OF, less what was taken: the topmost copy
+        // of each taken card leaves it, the copy the projection itself takes out
+        // (`toDiscardHeap`). This is the heap the board draws once the grid has
+        // gone, so it is the one every card that goes home lands in.
+        const takenIds = [hand, deck].flatMap((uid) => {
+          const id = uid ? (ours.options.find((o) => o.uid === uid)?.id ?? '') : ''
+          return id ? [id] : []
+        })
+        const heapLeft = [...(ctx.base.decks.discardHeap ?? [])]
+        let taken = 0
+        for (const id of takenIds) {
+          for (let i = heapLeft.length - 1; i >= 0; i--) {
+            if (heapLeft[i].card.id !== id) continue
+            heapLeft.splice(i, 1)
+            taken++
+            break
+          }
+        }
+        // Where each unpicked card ENDS UP — ITS OWN entry in that pile: the
+        // spot it was lifted from, at its own pose (I7), and its depth there is
+        // the layer it travels on (I9), so it lands under what lies over it and
+        // over what lies under it. It used to be claimed by card in the heap
+        // AFTER the answer, which already holds the copy of an operation still
+        // standing at the centre: a Cherry-pick played over a Cherry-pick sent
+        // the first one home onto the second's pose and on top, and the pile then
+        // turned it back to its own the moment it took over (owner's
+        // recording, 04.10).
+        const heap = heapLeft
         const claimed = new Set<number>()
         const resting = new Map<string, { rest: (typeof heap)[number]; depth: number }>()
         for (const option of [...remaining].reverse()) {
@@ -505,20 +524,6 @@ export function useCherryPickStaging(args: {
         // later; until then the queue draws the shadow — the table as it was
         // BEFORE the answer — so without this the heap comes back the moment
         // the grid goes, with the card the player just took lying in it.
-        const takenIds = [hand, deck].flatMap((uid) => {
-          const id = uid ? (ours.options.find((o) => o.uid === uid)?.id ?? '') : ''
-          return id ? [id] : []
-        })
-        const heapLeft = [...(ctx.base.decks.discardHeap ?? [])]
-        let taken = 0
-        for (const id of takenIds) {
-          for (let i = heapLeft.length - 1; i >= 0; i--) {
-            if (heapLeft[i].card.id !== id) continue
-            heapLeft.splice(i, 1)
-            taken++
-            break
-          }
-        }
         if (taken > 0) {
           ctx.base = {
             ...ctx.base,
@@ -564,7 +569,7 @@ export function useCherryPickStaging(args: {
     args.handoff.current = {
       // the watcher lands nothing in OUR fan — somebody else takes the card —
       // so it has no run to grow, only its own choreography to play
-      run: async (_ctx, takenId) => {
+      run: async (ctx, takenId) => {
         const { watched: cells, sudo: two } = watchRef.current
         setFlying(true)
         const centre = anchors.centre.current?.getBoundingClientRect()
@@ -590,8 +595,12 @@ export function useCherryPickStaging(args: {
           el.style.zIndex = '100'
         }
         // WHICH CELL WAS TAKEN — by card id, the only thing this seat is told.
-        // Copies are interchangeable, so the first match is as right as any.
-        const takenUid = cells.find((o) => o.id === takenId)?.uid
+        // Copies look alike, but they do not lie alike: the TOPMOST is the one
+        // the projection takes out (`toDiscardHeap`), so it is the one that
+        // leaves here, or the pile would re-lay its copies once it took over.
+        let takenUid: string | undefined
+        for (let i = cells.length - 1; i >= 0 && !takenUid; i--)
+          if (cells[i].id === takenId) takenUid = cells[i].uid
         const taken = takenUid ? cellRefs.current.get(takenUid) : undefined
         const takenFrom = takenUid ? rects.get(takenUid) : undefined
 
@@ -613,18 +622,25 @@ export function useCherryPickStaging(args: {
 
         // everything else goes home, the deck one at the bottom of the heap
         const rest = cells.filter((o) => o.uid !== takenUid)
+        // …and every other card goes home to ITS OWN entry of the pile — the
+        // cells are the heap's own entries — at its own pose (I7) and its own
+        // depth (I9), the actor's rule. Sent to made-up poses, they landed and
+        // the pile re-laid them all the moment it took over.
+        const heapLeft = (ctx.base.decks.discardHeap ?? []).filter((c) => c.uid !== takenUid)
         const home = exit.send(
           rest.flatMap((o, i) => {
             const card = cardById(o.id)
+            const depth = heapLeft.findIndex((c) => c.uid === o.uid)
+            const own = heapLeft[depth]
             return card
               ? [
                   {
                     key: o.uid,
                     card,
                     node: cellRefs.current.get(o.uid),
-                    scatter: scatterAt(i, 116),
+                    scatter: own ?? scatterAt(i, 116),
                     delay: Math.min(i, STAGGER_CAP) * RETURN_STEP,
-                    layer: i,
+                    layer: own ? depth : i,
                   },
                 ]
               : []
@@ -653,6 +669,20 @@ export function useCherryPickStaging(args: {
       },
     }
   }, [theirs, reduced, anchors, exit.send, deckFlyer.raise, deckFlyer.drop, args.handoff])
+
+  // WHAT THE GRID HOLDS, as the pile knows it: each card laid out claims one
+  // copy of itself in the heap. Only those leave the pile while the grid
+  // stands. It used to be "everything" for a Cherry-pick, and without sudo the
+  // offer leaves the triggers out — they were then in neither place, and came
+  // back mid-heap as the grid closed (owner's recording, 04.10). Inside's
+  // "the releases" is the same rule, read off the offer instead of a category.
+  const heapNow = state.decks.discardHeap ?? []
+  const liftedUids = new Set<string>()
+  for (const o of options) {
+    const held = heapNow.find((c) => c.uid && !liftedUids.has(c.uid) && c.card.id === o.id)
+    if (held?.uid) liftedUids.add(held.uid)
+  }
+  const lifted = { uids: liftedUids, count: options.length }
 
   const overlay = [...arrival.overlay, ...exit.overlay, ...deckFlyer.overlay]
   const gaps = { gapAt: arrival.gapAt, gapSize: arrival.gapSize }
@@ -764,7 +794,7 @@ export function useCherryPickStaging(args: {
     ),
     overlay,
     ...gaps,
-    lifted: inside ? 'releases' : 'all',
+    lifted,
   }
 }
 

@@ -807,20 +807,17 @@ export default function Board({
   // of the fan.
   const surfaceOwnsTable =
     [cherry.grid, rebase.row, requesting.band].some(Boolean) || upgrade.answering
-  // WHAT OF THE DISCARD STAYS ON THE PILE while a pick lays it out: nothing for
-  // a Cherry-pick, whose grid IS the whole discard, and everything but the
-  // releases for Inside, which offers only them. The Inside trigger standing at
-  // the centre is off the pile either way (`aiCause`).
+  // WHAT OF THE DISCARD STAYS ON THE PILE while a pick lays it out: every card
+  // the grid does not hold, where it lay. The grid says which those are
+  // (`lifted`) — a Cherry-pick's offer is the whole discard under sudo and all
+  // but the triggers without it, Inside's only the releases — and a card it
+  // does not hold stays put instead of vanishing for the pick and coming back
+  // mid-heap (owner's recording, 04.10). The Inside trigger standing at the
+  // centre is off the pile either way (`aiCause`).
   const lifted = cherry.grid ? cherry.lifted : null
   const pileHeap = (decks.discardHeap ?? []).filter(
-    (c) =>
-      c.uid !== `d${state.aiCause?.eventId}` &&
-      !(lifted === 'releases' && c.card.category === 'release'),
+    (c) => c.uid !== `d${state.aiCause?.eventId}` && !(c.uid && lifted?.uids.has(c.uid)),
   )
-  const liftedReleases =
-    lifted === 'releases'
-      ? (decks.discardHeap ?? []).filter((c) => c.card.category === 'release').length
-      : 0
   // The scene's own rule (`ComboStory`: `merged || playing`): while the play is
   // ON THE TABLE — standing at the centre, or anything of this gesture still in
   // the air — the fan stops answering the cursor for the same reason. The one
@@ -1462,11 +1459,11 @@ export default function Board({
         <div className={enter} ref={anchors.discard}>
           <Pile
             label={copy.table.discard}
-            heap={lifted === 'all' || beats.discardOut === 'taken' ? [] : pileHeap}
+            heap={beats.discardOut === 'taken' ? [] : pileHeap}
             topCard={
-              lifted === 'all' || state.aiCause || beats.discardOut === 'taken'
+              state.aiCause || beats.discardOut === 'taken'
                 ? null
-                : lifted === 'releases'
+                : lifted
                   ? (pileHeap.at(-1)?.card ?? null)
                   : decks.discard
             }
@@ -1474,14 +1471,9 @@ export default function Board({
             // empty discard says `// 0` — that is what tells you it is empty,
             // and it is what a card returning to it passes under.
             //
-            // The cherry grid holds the discard's own cards, so the pile it
-            // left really is empty and says so; Inside's holds the releases, so
-            // the pile says what is left without them.
-            count={
-              lifted === 'all'
-                ? 0
-                : Math.max(0, decks.discardCount - (state.aiCause ? 1 : 0) - liftedReleases)
-            }
+            // The grid holds some of the discard's own cards, so the pile says
+            // what is left without them — nothing, when it holds them all.
+            count={Math.max(0, decks.discardCount - (state.aiCause ? 1 : 0) - (lifted?.count ?? 0))}
             // THE WHOLE DISCARD LEAVES, not its top card. Before it flies to a
             // pile the heap collects itself into a straight stack and the
             // counter goes WITH it — that gathering IS the pile becoming one
