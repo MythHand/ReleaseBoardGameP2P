@@ -226,3 +226,101 @@ it('traces the heap as the eye sees it: bottom to top, each card at its angle', 
   ]
   expect(heapTrace(entries)).toEqual(['      0 heap(2)[defense-hotfix@-3°,attack-bug@7°]  '])
 })
+
+// A CARD MOVED WITH NO FLIGHT. The AI 503 refused, 04.10: the hand flew out, and
+// then the trigger standing at the left was in the heap the next frame, and the
+// AI card standing at the centre was drawn nowhere — each still drawn once or
+// gone for good, so neither count saw a thing.
+describe('a card moved with no flight', () => {
+  const left: Pose = [757, 525, 150, 0, 0]
+  const heap: Pose = [1575, 585, 146, -11.5, 0]
+  const centre: Pose = [946, 525, 200, 0, 1]
+  const standing = (t: number) =>
+    lying(t, { aiSlot: [['trigger-ai', left]], 'board-ai-effect': [['ai-error-503', centre]] })
+
+  it('finds a standing card that was somewhere else the next frame, and one that vanished', () => {
+    const found = findings([
+      standing(0),
+      standing(300),
+      standing(600),
+      lying(620, { 'heapCard<stack<box': [['trigger-ai', heap]] }),
+    ])
+    expect(found.map((f) => [f.kind, f.card])).toEqual([
+      ['left', 'ai-error-503'],
+      ['jump', 'trigger-ai'],
+    ])
+  })
+
+  it('takes a card that leaves through a carrier for neither', () => {
+    const found = findings([
+      standing(0),
+      standing(300),
+      standing(600),
+      lying(620, {
+        'flyer<board-table': [
+          ['trigger-ai', left],
+          ['ai-error-503', centre],
+        ],
+      }),
+      lying(1000, { 'heapCard<stack<box': [['trigger-ai', heap]], 'pose<flyer': [['back', heap]] }),
+      lying(1100, { 'heapCard<stack<box': [['trigger-ai', heap]] }),
+    ])
+    expect(found.filter((f) => f.kind === 'jump' || f.kind === 'left')).toEqual([])
+  })
+
+  it('takes a hand-over to the place that draws it on the same spot for no jump', () => {
+    const found = findings([
+      lying(0, { 'cherry-cell-attack-bug#1<cells': [['attack-bug#1', heap]] }),
+      lying(300, { 'cherry-cell-attack-bug#1<cells': [['attack-bug#1', heap]] }),
+      lying(320, { 'heapCard<stack<box': [['attack-bug', heap]] }),
+    ])
+    expect(found.filter((f) => f.kind === 'jump')).toEqual([])
+  })
+
+  // a card that came to rest on a face-down pile went INTO it, and a heap
+  // leaving as one stack is drawn by its carrier with the top card only
+  it('takes a card gone into a face-down pile, or into a stack leaving as one, for no vanishing', () => {
+    const onDeck: Pose = [101, 439, 150, 0, 5]
+    const deck = (t: number, cards: Record<string, [string, Pose][]>) => {
+      const e = lying(t, cards)
+      e.data.decks = [[30, 340, 150, 210]]
+      return e
+    }
+    const intoDeck = findings([
+      deck(0, { cell: [['release-backend', onDeck]] }),
+      deck(600, { cell: [['release-backend', onDeck]] }),
+      deck(620, {}),
+    ])
+    const intoStack = findings([
+      lying(0, {
+        'heapCard<stack<box': [
+          ['operation-git-branch', heap],
+          ['support-sudo', heap],
+        ],
+      }),
+      lying(600, {
+        'heapCard<stack<box': [
+          ['operation-git-branch', heap],
+          ['support-sudo', heap],
+        ],
+      }),
+      lying(620, { 'flyer<board-table': [['support-sudo', heap]] }),
+    ])
+    expect([...intoDeck, ...intoStack].filter((f) => f.kind === 'left')).toEqual([])
+  })
+
+  it('takes neither from a card that had only just come to rest, or a scenario rebuilt', () => {
+    const brief = findings([
+      lying(0, { 'board-ai-effect': [['ai-error-503', centre]] }),
+      lying(200, { 'board-ai-effect': [['ai-error-503', centre]] }),
+      lying(220, {}),
+    ])
+    const rebuilt = findings([
+      standing(0),
+      standing(600),
+      { t: 610, from: 'stand', kind: 'scenario', data: { scenario: 'aiTrigger' } },
+      lying(620, { 'heapCard<stack<box': [['trigger-ai', heap]] }),
+    ])
+    expect([...brief, ...rebuilt].filter((f) => f.kind === 'jump' || f.kind === 'left')).toEqual([])
+  })
+})

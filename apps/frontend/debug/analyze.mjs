@@ -5,8 +5,11 @@
 //   pnpm --filter @release/web debug:log [name]
 //       every card that went missing, stood twice, or hopped — and, in a
 //       recording that keeps poses, every two cards at rest that swapped which
-//       lies on top and every card at rest that jumped — in the newest
-//       recording, or in every recording whose file name contains `name`
+//       lies on top, every card at rest that jumped, every standing card that
+//       was somewhere else the next frame with nothing carrying it (JUMP), and
+//       every standing card that vanished for good instead of leaving (LEFT) —
+//       in the newest recording, or in every recording whose file name contains
+//       `name`
 //   pnpm --filter @release/web debug:log <name> --heap <from> <to>
 //       the discard frame by frame between two moments (ms of the recording),
 //       bottom to top as the eye sees it, each card at its angle

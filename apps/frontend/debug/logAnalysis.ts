@@ -25,6 +25,16 @@ import type { LogEntry } from './recorder'
 //   snap   — a card at rest jumped to another pose in one frame and stayed
 //            there: it landed on one spot and the place drew it on another.
 //
+// And two about a card that MOVED WITHOUT A FLIGHT — the table changing under it
+// with nothing carrying it, which the count alone cannot see because the card
+// is still drawn once, or is gone for good:
+//   jump   — standing in one place, and the next frame standing in another,
+//            far from it, with no carrier between: it teleported;
+//   left   — standing still, and the next frame drawn nowhere, for good, from a
+//            place that was not carrying it: it vanished instead of leaving.
+// A carrier is a copy in the air (`flyer`, `arriving`, `carrier`); a card that
+// goes into a counted pile is last seen in one, so it is neither of these.
+//
 // Called from the command line through `analyze.mjs`, whose header says how.
 
 export interface Options {
@@ -34,12 +44,17 @@ export interface Options {
   short: number
   /** places that copy a card on purpose: the zoom and preview on hover */
   ignore: RegExp
+  /** a card that stood still at least this long and then vanished left without a flight */
+  stand: number
 }
 
-export const DEFAULTS: Options = { window: 2000, short: 60, ignore: /zoom|preview/ }
+export const DEFAULTS: Options = { window: 2000, short: 60, ignore: /zoom|preview/, stand: 500 }
+
+// a copy in the air — the carriers a flight raises
+const CARRIER = /flyer|arriving|carrier/
 
 export interface Finding {
-  kind: 'gone' | 'twice' | 'hop' | 'layer' | 'snap'
+  kind: 'gone' | 'twice' | 'hop' | 'layer' | 'snap' | 'jump' | 'left'
   card: string
   t: number
   lasted: number
@@ -58,6 +73,8 @@ interface Shot {
   cards: Record<string, string[]>
   /** absent in a recording made before poses were kept */
   poses?: Record<string, Pose[]>
+  /** the face-down piles' boxes — absent in a recording made before they were kept */
+  decks?: [number, number, number, number][]
 }
 
 const shotsOf = (entries: LogEntry[]): Shot[] =>
@@ -68,6 +85,7 @@ const shotsOf = (entries: LogEntry[]): Shot[] =>
             t: e.t,
             cards: e.data.cards as Record<string, string[]>,
             poses: e.data.poses as Record<string, Pose[]> | undefined,
+            decks: e.data.decks as Shot['decks'],
           },
         ]
       : [],
@@ -119,16 +137,48 @@ const overlap = (a: Pose, b: Pose) => {
   return Math.abs(a[0] - b[0]) < w && Math.abs(a[1] - b[1]) < w * 1.4
 }
 
+// somewhere else entirely, not a nudge: further than a third of a card or 40px
+const far = (a: Pose, b: Pose) =>
+  Math.hypot(a[0] - b[0], a[1] - b[1]) >= Math.max(40, 0.3 * Math.max(a[2], b[2]))
+
 const poseText = (p: Pose) => `(${p[0]},${p[1]} w${p[2]} ${p[3]}° z${p[4]})`
 
-/** A card that jumped at rest, and two that swapped which lies on top. */
-function lyingFindings(shots: Shot[], ignore: RegExp, beatsAt: (t: number) => string[]) {
+/** A card that jumped at rest, two that swapped which lies on top, and a card moved with no flight. */
+function lyingFindings(
+  shots: Shot[],
+  ignore: RegExp,
+  beatsAt: (t: number) => string[],
+  reset: (from: number, to: number) => boolean,
+) {
   const out: Finding[] = []
   const frames = shots.filter((s) => s.poses).map((s) => ({ t: s.t, lying: lyingIn(s, ignore) }))
   for (let i = 1; i < frames.length; i++) {
     const was = frames[i - 1].lying
     const now = frames[i].lying
     const t = frames[i].t
+    // JUMP — standing in one place, and now in another far from it, with nothing
+    // carrying it between. One copy only: two copies of a card are not told apart.
+    if (!reset(frames[i - 1].t, t)) {
+      for (const [key, prev] of was) {
+        const cur = now.get(key)
+        const older = frames[i - 2]?.lying.get(key)
+        if (!cur || !older || key.includes('~') || was.has(`${key}~2`) || now.has(`${key}~2`))
+          continue
+        if (prev.where === cur.where || CARRIER.test(prev.where) || CARRIER.test(cur.where))
+          continue
+        if (!still(older.pose, prev.pose) || !far(prev.pose, cur.pose)) continue
+        out.push({
+          kind: 'jump',
+          card: key,
+          t,
+          lasted: 0,
+          before: [`${prev.where} ${poseText(prev.pose)}`],
+          during: [`${cur.where} ${poseText(cur.pose)}`],
+          after: [],
+          beats: beatsAt(t),
+        })
+      }
+    }
     // SNAP — at rest the frame before, somewhere else now, and at rest there after
     for (const [key, cur] of now) {
       const prev = was.get(key)
@@ -218,12 +268,72 @@ function beatSpans(entries: LogEntry[]): Span[] {
   return spans
 }
 
+/**
+ * How long the card stood still in `where`, up to the frame before `t` — 0 when
+ * it was moving there, or when the recording keeps no poses.
+ */
+function stoodFor(shots: Shot[], card: string, where: string, t: number): number {
+  const before = shots.filter((s) => s.t < t && s.poses)
+  const last = before.at(-1)
+  if (!last) return 0
+  const posesIn = (s: Shot) =>
+    (s.cards[where] ?? []).flatMap((id, k) =>
+      cardOf(id) === card && s.poses?.[where]?.[k] ? [s.poses[where][k]] : [],
+    )
+  let longest = 0
+  for (const pose of posesIn(last)) {
+    let since = last.t
+    for (let k = before.length - 2; k >= 0; k--) {
+      if (!posesIn(before[k]).some((p) => still(p, pose))) break
+      since = before[k].t
+    }
+    longest = Math.max(longest, last.t - since)
+  }
+  return longest
+}
+
+/**
+ * Whether a card that stopped being drawn went INTO something rather than
+ * vanishing: it lay on a face-down pile (the pile draws it as one of its backs),
+ * or a carrier stood over where it lay in the frame it went (a stack leaving as
+ * one, drawn with its top card only).
+ */
+function wentInto(shots: Shot[], card: string, where: string, t: number): boolean {
+  const last = shots.filter((s) => s.t < t && s.poses).at(-1)
+  const then = shots.find((s) => s.t >= t)
+  const lay = (last?.cards[where] ?? []).flatMap((id, k) =>
+    cardOf(id) === card && last?.poses?.[where]?.[k] ? [last.poses[where][k]] : [],
+  )
+  const onDeck = (p: Pose) =>
+    (last?.decks ?? []).some(
+      ([l, top, w, h]) => p[0] >= l && p[0] <= l + w && p[1] >= top && p[1] <= top + h,
+    )
+  const carried = Object.entries(then?.poses ?? {})
+    .filter(([w]) => CARRIER.test(w))
+    .flatMap(([, ps]) => ps)
+  return lay.some((p) => onDeck(p) || carried.some((c) => overlap(c, p)))
+}
+
+/** the places in `a` that `b` no longer has, copy by copy */
+const lost = (a: string[], b: string[]) => {
+  const rest = [...b]
+  return a.filter((where) => {
+    const k = rest.indexOf(where)
+    if (k < 0) return true
+    rest.splice(k, 1)
+    return false
+  })
+}
+
 export function findings(entries: LogEntry[], options: Partial<Options> = {}): Finding[] {
-  const { window, short, ignore } = { ...DEFAULTS, ...options }
+  const { window, short, ignore, stand } = { ...DEFAULTS, ...options }
   const shots = shotsOf(entries)
   const spans = beatSpans(entries)
   const beatsAt = (t: number) =>
     spans.filter((s) => s.from <= t + 1 && t <= s.to + 20).map((s) => s.key)
+  // a scenario picked on the stand rebuilds the whole board: nothing moved
+  const resets = entries.filter((e) => e.kind === 'scenario').map((e) => e.t)
+  const reset = (from: number, to: number) => resets.some((r) => r >= from && r <= to)
   const cards = new Set<string>()
   for (const shot of shots)
     for (const ids of Object.values(shot.cards))
@@ -263,13 +373,35 @@ export function findings(entries: LogEntry[], options: Partial<Options> = {}): F
           i = j + 1
           continue
         }
+        // LEFT — fewer for good, and what went was standing still where it was,
+        // not in the air: it vanished from its place instead of leaving it
+        const from = lost(seq[i - 1].places, seq[i].places).filter((w) => !CARRIER.test(w))
+        if (
+          fewer &&
+          !reset(seq[i - 1].t, seq[i].t) &&
+          from.some(
+            (w) =>
+              stoodFor(shots, card, w, seq[i].t) >= stand && !wentInto(shots, card, w, seq[i].t),
+          )
+        ) {
+          out.push({
+            kind: 'left',
+            card,
+            t: seq[i].t,
+            lasted: 0,
+            before: seq[i - 1].places,
+            during: seq[i].places,
+            after: [],
+            beats: beatsAt(seq[i].t),
+          })
+        }
       } else if (i + 1 < seq.length && seq[i + 1].t - seq[i].t < short) {
         found('hop', i, i + 1)
       }
       i++
     }
   }
-  out.push(...lyingFindings(shots, ignore, beatsAt))
+  out.push(...lyingFindings(shots, ignore, beatsAt, reset))
   return out.sort((a, b) => a.t - b.t)
 }
 
@@ -299,7 +431,7 @@ export function report(entries: LogEntry[], options: Partial<Options> = {}): str
     ...actions(entries),
     ...found.map((f) => {
       // a jump or a swap happens between two frames: it has no length of its own
-      const lying = f.kind === 'layer' || f.kind === 'snap'
+      const lying = ['layer', 'snap', 'jump', 'left'].includes(f.kind)
       const lasted = lying ? '' : `  ${f.lasted.toFixed(0)}ms`
       return (
         `!! ${ms(f.t)} ${f.kind.toUpperCase().padEnd(5)} ${f.card}${lasted}  beat=${f.beats.join(',') || '-'}\n` +
@@ -307,7 +439,9 @@ export function report(entries: LogEntry[], options: Partial<Options> = {}): str
         (lying && f.after.length === 0 ? '' : `\n     after:  ${at(f.after)}`)
       )
     }),
-    ...(found.length > 0 ? [] : ['(nothing gone, doubled, hopping, re-stacked or jumping)']),
+    ...(found.length > 0
+      ? []
+      : ['(nothing gone, doubled, hopping, re-stacked, jumping, teleported or vanished)']),
   ]
 }
 

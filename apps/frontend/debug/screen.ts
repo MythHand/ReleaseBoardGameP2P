@@ -130,6 +130,11 @@ export interface ScreenFrame {
   // a card visible more than once at the same time — unless every one of those
   // is a different, named copy, which is two cards and not one drawn twice
   twice: string[]
+  // THE FACE-DOWN PILES, each as its box on the page: [left, top, width, height]
+  // — the draw piles and the events deck. A card that comes to rest on one and
+  // is then drawn nowhere has gone INTO it, and the pile draws it as a back
+  // among backs; seen without these, it would read as a card that vanished.
+  decks: [number, number, number, number][]
 }
 
 export function readScreen(): ScreenFrame {
@@ -176,7 +181,16 @@ export function readScreen(): ScreenFrame {
       return named.length < seen.length || new Set(named).size < named.length
     })
     .map(([id]) => id)
-  return { cards, poses, twice }
+  const decks = [...document.querySelectorAll('[data-pile-box], [data-events-box]')].map((el) => {
+    const r = el.getBoundingClientRect()
+    return [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)] as [
+      number,
+      number,
+      number,
+      number,
+    ]
+  })
+  return { cards, poses, twice, decks }
 }
 
 /** Reads the screen on every painted frame and hands on each one that differs. */

@@ -65,3 +65,14 @@ it('does not take two named copies of one card for one card drawn twice', () => 
   // …but the same named copy in two places is
   expect(frame.twice).toEqual(['defense-hotfix'])
 })
+
+// THE FACE-DOWN PILES, each as its box: a card that comes to rest on one and
+// is then drawn nowhere has gone into it, not vanished
+it('says where the face-down piles stand: the draw piles and the events deck', () => {
+  document.body.innerHTML = `
+    <div data-pile-box></div>
+    <div data-pile-box></div>
+    <div data-events-box></div>
+    <div data-testid="board-table"><div data-card="attack-bug"></div></div>`
+  expect(readScreen().decks).toHaveLength(3)
+})
