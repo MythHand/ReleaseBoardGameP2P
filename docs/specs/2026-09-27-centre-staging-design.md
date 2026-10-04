@@ -31,6 +31,19 @@ events — no peer ever knew»).
 - A release's play in base mode shows the release (and its Code Review); its cancel takes them
   back with `takenBack`.
 - The referee takes shown cards back when the turn's deadline fires (⚙️ in §1).
+- **Only a card its player could start a play with now** is accepted (`onShow`, `fake/shown.ts`):
+  playable on its own (`playableFor`), an attack thrown at a fresh release (`canAttackWith`), a Sudo
+  or Code Review with a partner, or that partner (`combosFor`) — the same answers the board lights
+  the fan by. Anything else is refused and stays home, so no other seat's card can stand beside
+  the one really out.
+- **One attack at a time** (`resolution.md` §1, `fake/window.ts`): while a responder's attack — or
+  the Sudo it goes with — is out, or an attack is being dealt with, other responders' `SHOW` and
+  `ATTACK` are refused (`another attack is out`, `an attack is being dealt with`) and
+  `canAttackWith` offers them nothing. Whoever reached the keeper first is the one.
+- **A responder's Sudo holds the time to attack** for `SUDO_PARTNER_MS` (10 s, the ⚙️ under
+  «Атакующие действуют одновременно» in §1): the window's deadline becomes the Sudo's own. If no
+  attack joins it, or it is taken back, the Sudo goes home and the time to attack starts anew
+  (`endSudoTime`). An attack card still out when the time to attack runs out goes home too.
 - **Projection:** `PlayerView.shown` — every shown card with its owner, for every viewer. An
   opponent's `handCount` leaves the shown cards out. `discardForRelease` no longer redacts
   `release`.
@@ -58,6 +71,9 @@ events — no peer ever knew»).
   viewer switch) finds our cards out with the gesture empty: the gesture takes up the step it
   would be at, read off `shownLayout`, and one with nothing left to choose goes home through the
   ordinary cancel.
+- **Refusals** — the keeper's "no" to an intent this peer sent reaches the board as its own list
+  (`useGame`'s `rejections`), never as an event of the feed. A refused `SHOW` of a staged card
+  sends it back to the fan through the ordinary cancel, whatever the reason.
 - **Transport** — every connection opens ordered (`reliable: true`), so the keeper receives a
   player's `SHOW` and `TAKE_BACK` in the order they were made.
 - **History** — `shown` and `takenBack` have no row in the move history.

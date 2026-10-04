@@ -19,8 +19,9 @@ comes back on the next.
 
 ## Done — these are shared now
 
-The pass of 22.09 took four of the five movements into modules. Each kept
-everything its fullest copy knew; the copies are gone, not weakened.
+The pass of 22.09 took four of the five movements into modules, and the pass of
+03–04.10 (#168) the fifth. Each kept everything its fullest copy knew; the copies
+are gone, not weakened.
 
 | Movement | Was | Is |
 |---|---|---|
@@ -29,6 +30,7 @@ everything its fullest copy knew; the copies are gone, not weakened.
 | One exchange, one send | two copies | `features/board-beats/exchange.ts` — layer from position, a missing half passed as `null` |
 | The flip's own duration | the number written out in four beats | `FLIP_MS`, exported from the preset that plays the flip |
 | A card returning to a hand | the module was there; two calls of it did not name the slot the card left | every return names it now; an arrival with nothing to point at still lands in the middle, which is the right answer for an arrival |
+| Letting go of what was standing (§5) | the order of "publish, then fly" written per beat — `takeOff`, `clearPaidCost` / `takeStagedRelease` / `release()`, a bare `ctx.publish` before an `await` | `features/board-beats/cardPlace.ts` (#168, 03–04.10) — `liftOff` as the carrier goes up, `setDown` as it comes down, one commit each (**I12**). On it: attacks and defences, pairs leaving for the discard, operations and System Upgrade's row, releases into a zone, Crush and the answered Error 503, transfers, the events deck, Inside, the arrival into the fan, the whole discard in a recycle or a merge, the hand limit |
 
 ## Left — and why it is not a deduplication
 
@@ -140,6 +142,8 @@ The module exists (`useHandArrival`) and every beat calls it. What differs is
 ---
 
 ## 5. Letting go of what was standing
+
+*Done — `cardPlace` (see the table at the top).*
 
 Not a movement — the rule every one of the above needs, written out per beat: the
 static render and the carrier swap in ONE React commit. It appears as `takeOff`
