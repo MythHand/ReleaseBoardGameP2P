@@ -452,6 +452,10 @@ export function resolveAiEvent(
 
     case 'ai-error-503': {
       log.add({ type: 'revealed', player, card: event.id })
+      if (state.players[player].release.monitoring) {
+        log.add({ type: 'neutralized', player, method: 'monitoring' })
+        return { ...state, eventSeq: log.seq }
+      }
       const methods = neutralizeOptions(state, player)
       if (methods.length === 0) return eliminate(state, log, player)
       // The event card is already back in the events deck by this point (the
