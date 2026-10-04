@@ -270,7 +270,46 @@
     "unmute": "unmute player",
     "muteMic": "mute microphone",
     "unmuteMic": "unmute microphone",
-    "micMuted": "microphone off"
+    "micMuted": "microphone off",
+    "close": "close",
+    "issues": {
+      "microphoneDenied": {
+        "title": "Microphone access was denied",
+        "text": "You can hear the other participants. To speak, allow microphone access in your browser settings."
+      },
+      "microphoneMissing": {
+        "title": "No microphone is available",
+        "text": "You can hear the other participants. To speak, connect a microphone."
+      },
+      "permissionUnsupported": {
+        "title": "Microphone access is unavailable in this browser",
+        "text": "You can hear the other participants. Speaking is not possible from this browser."
+      },
+      "permissionTimeout": {
+        "title": "The microphone request timed out",
+        "text": "To speak, turn on the microphone and allow access."
+      },
+      "captureFailed": {
+        "title": "The microphone could not start",
+        "text": "The microphone may be in use by another program. Try turning it on again."
+      },
+      "audioBlocked": {
+        "title": "Audio playback is blocked",
+        "text": "Try leaving voice chat and joining again."
+      },
+      "peersUnreachable": {
+        "title": "No voice connection with {{names}}",
+        "text": "Reconnecting. You can still hear the other participants."
+      },
+      "joinFailed": {
+        "title": "Could not connect to voice chat",
+        "text": "Try connecting again."
+      },
+      "roomDisconnected": {
+        "title": "The room connection was lost",
+        "text": "Voice chat will resume once the connection is restored."
+      }
+    }
   },
   "toasts": {
     "hide": "hide"

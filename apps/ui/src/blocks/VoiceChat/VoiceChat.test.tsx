@@ -1,7 +1,9 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
 import VoiceChat, {
   type VoiceChatCopy,
+  type VoiceIssue,
+  VoiceNotices,
   VoicePanel,
   type VoiceParticipant,
   type VoiceStatus,
@@ -21,6 +23,7 @@ const copy: VoiceChatCopy = {
   muteMic: 'выключить микрофон',
   unmuteMic: 'включить микрофон',
   micMuted: 'микрофон выключен',
+  close: 'закрыть',
 }
 
 const me: VoiceParticipant = { id: 'me', name: 'deadlock', role: 'player', volume: 100 }
@@ -172,4 +175,76 @@ it('marks a participant who turned their own microphone off', () => {
   const [spectator, player] = others as [VoiceParticipant, VoiceParticipant]
   panel('off', [spectator, { ...player, micOff: true }])
   expect(screen.getAllByRole('img', { name: 'микрофон выключен' })).toHaveLength(1)
+})
+
+// ---- notices -----------------------------------------------------------------
+
+const denied: VoiceIssue = {
+  key: 'microphoneDenied',
+  title: 'Доступ к микрофону запрещён',
+  text: 'Вы можете слушать.',
+  concerns: 'microphone',
+}
+
+const line = (issue: VoiceIssue | null) => (
+  <VoiceChat participants={[me]} status="connected" micOff volume={100} copy={copy} issue={issue} />
+)
+
+it('shows an issue as a notice, and names it in the hint of the button it explains', () => {
+  render(line(denied))
+  const notice = screen.getByRole('status')
+  expect(notice.textContent).toContain('Доступ к микрофону запрещён')
+  expect(notice.textContent).toContain('Вы можете слушать.')
+  expect(
+    screen.getByRole('button', { name: 'Доступ к микрофону запрещён · включить микрофон' }),
+  ).toBeTruthy()
+})
+
+it('closes a notice on its cross', () => {
+  render(line(denied))
+  fireEvent.click(screen.getByRole('button', { name: 'закрыть' }))
+  expect(screen.queryByRole('status')).toBeNull()
+})
+
+it('lets a notice go by itself after a while', () => {
+  vi.useFakeTimers()
+  try {
+    render(line(denied))
+    expect(screen.getByRole('status')).toBeTruthy()
+    act(() => {
+      vi.advanceTimersByTime(6000)
+    })
+    expect(screen.queryByRole('status')).toBeNull()
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+// At the table the panel can close, so the notices are the table's to hang:
+// the panel keeps only the hint, VoiceNotices shows the notice.
+it('leaves the table panel to name an issue only in its hints', () => {
+  render(
+    <VoicePanel
+      title="голосовой чат"
+      participants={[me]}
+      status="connected"
+      selfId="me"
+      micOff
+      volume={100}
+      copy={copy}
+      issue={denied}
+    />,
+  )
+  expect(screen.queryByRole('status')).toBeNull()
+  expect(
+    screen.getByRole('button', { name: 'Доступ к микрофону запрещён · включить микрофон' }),
+  ).toBeTruthy()
+  render(<VoiceNotices issue={denied} copy={copy} />)
+  expect(screen.getByRole('status').textContent).toContain('Доступ к микрофону запрещён')
+})
+
+it('takes the notice away once the issue is over', () => {
+  const { rerender } = render(line(denied))
+  rerender(line(null))
+  expect(screen.queryByRole('status')).toBeNull()
 })

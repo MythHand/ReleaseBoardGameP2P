@@ -55,12 +55,89 @@
   color: var(--white-45);
 }
 
-/* the microphone and the headphones at the line's end */
+/* the microphone and the headphones at the line's end; the notices hang from it */
 .controls {
+  position: relative;
   display: flex;
   gap: 20px;
   align-items: center;
   margin-inline-start: auto;
+}
+
+/* ---- notices about my voice ---- */
+
+/* under the microphone and the headphones, over whatever lies below: as far
+   below as the popover opens (6px), as wide as its list (380px), and out past
+   the pair's right edge exactly as far as the list's popover (its 18px padding
+   and 1px border), so the two share one right edge; several stand one under
+   another, as far apart as chat toasts (10px) */
+.notices {
+  position: absolute;
+  inset-block-start: calc(100% + 6px);
+  inset-inline-end: -19px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  inline-size: 380px;
+}
+
+/* a chat toast's dress: its black plate, and the same room on every side — the
+   message's side padding (owner, 30.09) */
+.notice {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 8px;
+  background: var(--surface-0);
+}
+
+.noticeBody {
+  flex: 1;
+  min-inline-size: 0;
+}
+
+/* the message's head and text: the same gap under the head, the same tight
+   leading */
+.noticeTitle {
+  margin-block-end: 5px;
+}
+
+/* the title takes the colour of what it explains: the red microphone, the
+   orange headphones */
+.microphone {
+  color: var(--coral);
+}
+
+.connection {
+  color: var(--cat-operation);
+}
+
+.noticeText {
+  margin: 0;
+  line-height: 1.25;
+  color: var(--white-80);
+  overflow-wrap: anywhere;
+}
+
+/* the cross, dressed like the rules' search clear button, without its frame */
+.noticeClose {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  inline-size: 22px;
+  block-size: 22px;
+  padding: 0;
+  font-size: 13px;
+  color: var(--white-70);
+  cursor: pointer;
+  background: transparent;
+  border: none;
+}
+
+.noticeClose:hover {
+  color: var(--fg);
 }
 
 .off {
