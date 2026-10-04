@@ -992,6 +992,39 @@ describe('the discard heap', () => {
     expect(heap?.[0]).toMatchObject(scatterAt(1))
   })
 
+  // A PICK NEVER TAKES THE CARDS ITS OWN PLAY SPENT. Cherry-pick and its sudo
+  // join the pile the moment they are played, but the pick offers what lay there
+  // before (`openPickFromDiscard`). Taking a card of the same name out of it took
+  // the NEW copy: the old one stayed under its pose and the sudo, tucked under
+  // nothing now, lay on top — the pair landed and swapped (owner's recording,
+  // 04.10).
+  it.each([
+    'operation-git-cherry-pick',
+    'support-sudo',
+  ])('takes an older %s, not the one the pick was just played with', (taken) => {
+    const log: Event[] = [
+      discardedEvent(1, taken),
+      discardedEvent(2, 'attack-bug'),
+      {
+        id: 3,
+        type: 'operationPlayed',
+        player: 'you',
+        card: 'operation-git-cherry-pick',
+        sudo: true,
+      } as Event,
+      discardedEvent(4, 'operation-git-cherry-pick'),
+      discardedEvent(5, 'support-sudo'),
+      { id: 6, type: 'takenFromDiscard', player: 'you', card: taken, to: 'hand' },
+    ]
+    const heap = toBoardState(
+      withDecks({ discardCount: 3, discardTop: 'support-sudo' }),
+      log,
+      labels,
+    ).decks.discardHeap
+    // the Bug, then the pair as it landed: the sudo under its Cherry-pick
+    expect(heap?.map((c) => c.uid)).toEqual(['d2', 'd5', 'd4'])
+  })
+
   it('does not append a top the fold already ends on', () => {
     const log = [discardedEvent(7, 'attack-bug')]
     const heap =

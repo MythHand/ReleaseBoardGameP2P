@@ -8,18 +8,14 @@ import { bankToDiscard, createLog, type Log, reject } from './core'
 // else about the two effects is identical, which is why they share a pending.
 //
 // A trigger is the one card the pile may hold that a hand may not: "обе карты
-// нельзя держать в руке" (docs/rules/cards.md). Under sudo it stays on offer —
-// the rules let a trigger be the card that goes onto the DECK — and
-// onPickFromDiscard is what refuses it the hand slot. Without sudo there is no
-// slot it could legally fill, so it is not offered at all.
-export function discardOptions(
-  state: GameState,
-  releasesOnly: boolean,
-  sudo = false,
-): CardInstance[] {
+// нельзя держать в руке" (docs/rules/cards.md). It is on offer all the same,
+// with sudo or without: Cherry-pick lays out the WHOLE discard (docs/rules/
+// cards.md: «для Cherry-pick это всегда полный сброс»), and what keeps a trigger
+// out of the hand is onPickFromDiscard refusing it that slot — the offer is
+// what the player sees, not what the player may take.
+export function discardOptions(state: GameState, releasesOnly: boolean): CardInstance[] {
   if (releasesOnly) return state.decks.discard.filter((c) => rulesFor(c.id)?.kind === 'release')
-  if (sudo) return state.decks.discard
-  return state.decks.discard.filter((c) => rulesFor(c.id)?.kind !== 'trigger')
+  return state.decks.discard
 }
 
 const discard = (state: GameState, cards: CardInstance[]): GameState => bankToDiscard(state, cards)
@@ -39,7 +35,7 @@ export function openPickFromDiscard(
   combo: CardInstance | undefined,
   releasesOnly: boolean,
 ): GameState {
-  const options = discardOptions(state, releasesOnly, combo !== undefined)
+  const options = discardOptions(state, releasesOnly)
   const spent = combo ? [card, combo] : [card]
   // Every other spend path logs a `discarded` event for the card it consumes
   // (release.ts's release-cost pay, reduce.ts's hand-limit discard,
@@ -88,8 +84,9 @@ export function onPickFromDiscard(
   // selection the current pending never offered must not resolve.
   if (!toHand) return reject(state, action, 'that card is not on offer')
 
-  // The offer may legitimately contain a trigger (a sudo pick can put one on
-  // the deck), so the hand slot is guarded here rather than by withholding it.
+  // The offer holds every trigger in the pile (a sudo pick can put one on the
+  // deck, and the whole discard is laid out either way), so the hand slot is
+  // guarded here rather than by withholding it.
   // A hostile or stale RESOLVE never passes through the board, which is why
   // this cannot live in the UI.
   if (rulesFor(toHand.id)?.kind === 'trigger') {

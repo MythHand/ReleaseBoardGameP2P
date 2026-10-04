@@ -185,10 +185,10 @@ describe("the grid that answers Git Cherry-pick's own pick", () => {
     expect(onResolve).toHaveBeenCalledWith({ kind: 'pickFromDiscard', card: 'c2' })
   })
 
-  // THE PILE KEEPS WHAT THE GRID DOES NOT HOLD. Without sudo the engine offers
-  // no trigger, and the pile used to lift itself whole for the grid anyway: the
-  // Error 503s were in neither place for the whole pick and came back mid-heap
-  // as the grid closed (owner's recording, 04.10).
+  // THE PILE KEEPS WHAT THE GRID DOES NOT HOLD — Inside's offer is the releases
+  // alone, and the pile used to lift itself whole for the grid anyway: the cards
+  // left out were in neither place for the whole pick and came back mid-heap as
+  // the grid closed (owner's recording, 04.10).
   it('leaves on the pile the cards the grid does not hold', async () => {
     const base = makeBoardProps()
     const heapCard = (eventId: number, id: string) => ({
@@ -510,6 +510,90 @@ it('sends a card home to the spot it was lifted from, not to another copy of it'
   // its own pose, and the bottom of what is left — not the new one's, on top
   expect(home?.scatter?.rot).toBe(scatterAt(103).rot)
   expect(home?.layer).toBe(0)
+})
+
+// …AND THEY LIE IN THE PILE'S ORDER THE MOMENT THEY LAND. The cells going home
+// all rode one layer and lay in the GRID's order; the pile re-laid them as the
+// grid closed. Two copies of one card show it: the lower Error 503 goes on the
+// deck, so the upper one goes home to the LOWER spot — under the Bug, though its
+// cell stands after the Bug's in the grid (owner's recording, 04.10).
+it('flies the cards going home on the layers of the spots they land in', async () => {
+  mockReducedMotion(false)
+  exits.sent = []
+  let finishReturn = () => {}
+  exits.pending = new Promise<void>((resolve) => {
+    finishReturn = resolve
+  })
+  try {
+    const base = makeBoardProps()
+    const entry = (eventId: number, id: string) => ({
+      uid: `d${eventId}`,
+      card: handItem('x', id).card,
+      ...scatterAt(eventId),
+    })
+    const lying = [
+      entry(1, 'trigger-error-503'),
+      entry(2, 'attack-bug'),
+      entry(3, 'trigger-error-503'),
+      entry(4, 'release-frontend'),
+    ]
+    const decks = { ...base.state.decks, discardCount: 4, discardHeap: lying }
+    const pending = cherryPending(
+      [
+        { uid: 'c1', id: 'trigger-error-503' },
+        { uid: 'c2', id: 'attack-bug' },
+        { uid: 'c3', id: 'trigger-error-503' },
+        { uid: 'c4', id: 'release-frontend' },
+      ],
+      2,
+    )
+    const props = {
+      ...base,
+      state: { ...base.state, decks, pending },
+      actions: { onResolve: vi.fn() },
+    }
+    const { rerender } = render(<Board {...props} />)
+    await afterDeal()
+    fireEvent.click(screen.getByTestId('cherry-cell-c4'))
+    fireEvent.click(screen.getByTestId('cherry-cell-c1'))
+    fireEvent.click(screen.getByRole('button', { name: /confirm|подтвердить/i }))
+    rerender(
+      <Board
+        {...props}
+        state={{
+          ...props.state,
+          decks: { ...decks, discardCount: 2, discardHeap: lying.slice(0, 2) },
+          pending: null,
+        }}
+        intro={{
+          gameId: null,
+          view: null,
+          onDone: () => {},
+          events: [
+            {
+              id: 5,
+              type: 'takenFromDiscard',
+              player: 'you',
+              card: 'release-frontend',
+              to: 'hand',
+            },
+          ],
+        }}
+      />,
+    )
+    await vi.waitFor(() => expect(exits.sent.map((s) => s.key)).toEqual(['c2', 'c3']), {
+      timeout: 3000,
+    })
+    expect(exits.sent.map((s) => s.layer)).toEqual([1, 0])
+    const z = (uid: string) => Number(screen.getByTestId(`cherry-cell-${uid}`).style.zIndex)
+    // the 503 lands under the Bug, and both under the cards going elsewhere
+    expect(z('c3')).toBeLessThan(z('c2'))
+    expect(z('c2')).toBeLessThan(z('c1'))
+    expect(z('c1')).toBeLessThan(z('c4'))
+  } finally {
+    finishReturn()
+    exits.pending = null
+  }
 })
 
 // …and across the table the same: the watcher's cells ARE the heap's entries,

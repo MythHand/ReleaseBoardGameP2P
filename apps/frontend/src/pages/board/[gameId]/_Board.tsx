@@ -809,8 +809,8 @@ export default function Board({
     [cherry.grid, rebase.row, requesting.band].some(Boolean) || upgrade.answering
   // WHAT OF THE DISCARD STAYS ON THE PILE while a pick lays it out: every card
   // the grid does not hold, where it lay. The grid says which those are
-  // (`lifted`) — a Cherry-pick's offer is the whole discard under sudo and all
-  // but the triggers without it, Inside's only the releases — and a card it
+  // (`lifted`) — a Cherry-pick's offer is the whole discard, Inside's only the
+  // releases — and a card it
   // does not hold stays put instead of vanishing for the pick and coming back
   // mid-heap (owner's recording, 04.10). The Inside trigger standing at the
   // centre is off the pile either way (`aiCause`).

@@ -380,20 +380,45 @@ function toDiscardHeap(log: Event[], top: CardData | undefined, count: number): 
   // projection's own top is THAT card (the engine banked it last), so the fold
   // still ends on the top even though the top is not the last entry
   let tucked: string | null = null
+  // THE CARDS AN OPERATION SPENT ITSELF — its own card and its sudo, filed the
+  // moment it was played, back to back under the play. A pick out of the discard
+  // never offers them: the engine reads the pile BEFORE they land in it
+  // (`openPickFromDiscard`). So a card taken out of the pile is never one of
+  // these, even when it shares their name — a Cherry-pick taken out of a pile
+  // that a Cherry-pick has just joined is the one that lay there before it.
+  // Taking the new one instead left the old one lying under its pose and the
+  // sudo tucked under nothing, on top: the pair landed the right way up and
+  // swapped the moment the heap took over (owner's recording, 04.10).
+  let ownSpent = new Set<string>()
+  // whose play is filing its own cards right now — only while they come
+  let filing: string | null = null
   for (const e of log) {
+    if (e.type !== 'discarded' && e.type !== 'operationPlayed') filing = null
     if (e.type === 'takenFromDiscard') {
       // Events identify the public card type, not a physical uid. Removing one
-      // matching copy preserves the visible inventory even with duplicates.
+      // matching copy preserves the visible inventory even with duplicates —
+      // the topmost of the copies that were on offer; failing those, the
+      // topmost of any, which is what this always removed.
+      let offered = -1
+      let any = -1
       for (let i = heap.length - 1; i >= 0; i--) {
         if (heap[i].card.id !== e.card) continue
-        heap.splice(i, 1)
+        if (any < 0) any = i
+        if (ownSpent.has(heap[i].uid ?? '')) continue
+        offered = i
         break
       }
+      const at = offered >= 0 ? offered : any
+      if (at >= 0) heap.splice(at, 1)
       continue
     }
     if (e.type === 'operationPlayed' || e.type === 'attacked') {
       const player = e.type === 'attacked' ? e.attacker : e.player
       pairing = e.sudo ? { player, main: e.card, support: 'support-sudo' } : null
+      if (e.type === 'operationPlayed') {
+        ownSpent = new Set()
+        filing = e.player
+      }
       continue
     }
     if (e.type === 'released') {
@@ -405,6 +430,8 @@ function toDiscardHeap(log: Event[], top: CardData | undefined, count: number): 
     // monotonic sequence, identical on every peer. No stringifying: `scatterAt`
     // hashes the number arithmetically.
     const entry = { uid: `d${e.id}`, card: cardOrPlaceholder(e.card), ...scatterAt(e.id) }
+    if (filing === e.player && e.reason === 'effect') ownSpent.add(entry.uid)
+    else filing = null
     // A pair's AUX lies under its main here too. On the table the support is
     // tucked under the card it paid for (`PAIR_AUX`), and the layer a card had
     // is what decides the order it joins the heap (README, `useDiscardExit`).
