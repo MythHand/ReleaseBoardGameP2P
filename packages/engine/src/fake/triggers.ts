@@ -70,25 +70,30 @@ export function eliminate(state: GameState, log: Log, player: PlayerId): GameSta
   return cleared.turn.player === player ? endTurn(cleared, log) : cleared
 }
 
+// A RELEASE DESTROYED IN ITS ZONE — by a Crush, a sacrifice, or an attack that
+// went through (`attacks.ts`). Every one of them says `releaseDestroyed` and
+// says where its cards went, so the board can fly them out of the slot.
+//
 // `reason` is only supplied when the destruction is a chosen answer (the
-// sacrifice neutralize method) rather than an automatic one (an unanswered
-// crush): a chosen sacrifice gets its own `discarded` event per card on top of
-// `releaseDestroyed`, matching the pattern the debugger/monitoring methods
-// use; an automatic destruction stays exactly as `takeRelease` in release.ts
-// already treats attack-caused destruction — `releaseDestroyed` alone.
-function destroySlot(
+// sacrifice neutralize method): its cards are `discarded` with that reason,
+// under `parent`, matching the pattern the debugger/monitoring methods use.
+// Otherwise they are `destroyed`, caused by the destruction itself. `cause` is
+// what the destruction answers — the hit an attack's goes under.
+export function destroySlot(
   state: GameState,
   log: Log,
   player: PlayerId,
   slot: ReleaseSlot,
-  reason?: DiscardReason,
-  parent?: number,
+  { reason, parent, cause }: { reason?: DiscardReason; parent?: number; cause?: number } = {},
 ): GameState {
   const me = state.players[player]
   const released = me.release[slot]
   if (!released) return { ...state, eventSeq: log.seq }
   const spoils = [released.card, ...(released.codeReview ? [released.codeReview] : [])]
-  const destroyedId = log.add({ type: 'releaseDestroyed', player, slot, card: released.card.id })
+  const destroyedId = log.add(
+    { type: 'releaseDestroyed', player, slot, card: released.card.id },
+    cause,
+  )
   if (reason) {
     for (const c of spoils) log.add({ type: 'discarded', player, card: c.id, reason }, parent)
   } else {
@@ -322,7 +327,10 @@ export function onNeutralize(state: GameState, action: Action & { type: 'RESOLVE
   if (!slot) return reject(state, action, 'you do not hold that release')
   const neutralizedId = log.add({ type: 'neutralized', player, method: 'sacrifice' })
   const withAlarm = bankAlarm(state, log, player, alarm, neutralizedId)
-  const destroyed = destroySlot(withAlarm, log, player, slot, 'neutralized', neutralizedId)
+  const destroyed = destroySlot(withAlarm, log, player, slot, {
+    reason: 'neutralized',
+    parent: neutralizedId,
+  })
   return { state: { ...destroyed, pending: null, eventSeq: log.seq }, events: log.events }
 }
 

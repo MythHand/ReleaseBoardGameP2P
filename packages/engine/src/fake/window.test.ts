@@ -353,6 +353,60 @@ describe('one attack at a time', () => {
     expect(r.state.players.p1.shown).toEqual([])
   })
 
+  it('files a release an attack destroys in the discard, caused by its destruction', () => {
+    const s = released()
+    const attacked = reduce(s, { type: 'ATTACK', player: 'p2', card: BUG.uid, at: 1001 })
+    const hit = reduce(attacked.state, {
+      type: 'RESOLVE',
+      player: 'p1',
+      choice: { kind: 'defend', card: null },
+      at: 1002,
+    })
+    const destroyed = hit.events.find((e) => e.type === 'releaseDestroyed')
+    expect(destroyed).toMatchObject({ player: 'p1', slot: 'frontend', card: FE.id })
+    expect(hit.events).toContainEqual(
+      expect.objectContaining({
+        type: 'discarded',
+        player: 'p1',
+        card: FE.id,
+        reason: 'destroyed',
+        parent: destroyed?.id,
+      }),
+    )
+    expect(hit.state.decks.discard.map((c) => c.uid)).toContain(FE.uid)
+  })
+
+  it('files the attacked release when a Security Bug finds its own slot taken, and keeps the thief’s', () => {
+    const security: CardInstance = { uid: 'attack-security-bug#0', id: 'attack-security-bug' }
+    const own: CardInstance = { uid: 'release-frontend#1', id: 'release-frontend' }
+    const s = released({ p2: [security] })
+    const holding: GameState = {
+      ...s,
+      players: { ...s.players, p2: { ...s.players.p2, release: { frontend: { card: own } } } },
+    }
+    const attacked = reduce(holding, {
+      type: 'ATTACK',
+      player: 'p2',
+      card: security.uid,
+      at: 1001,
+    })
+    const hit = reduce(attacked.state, {
+      type: 'RESOLVE',
+      player: 'p1',
+      choice: { kind: 'defend', card: null },
+      at: 1002,
+    })
+    expect(hit.events).toContainEqual(
+      expect.objectContaining({
+        type: 'discarded',
+        player: 'p1',
+        card: FE.id,
+        reason: 'destroyed',
+      }),
+    )
+    expect(hit.state.players.p2.release.frontend?.card.uid).toBe(own.uid)
+  })
+
   it('lets the player under attack put a Sudo out for their defence', () => {
     const sudo: CardInstance = { uid: 'support-sudo#1', id: 'support-sudo' }
     const rollback: CardInstance = { uid: 'defense-rollback#0', id: 'defense-rollback' }

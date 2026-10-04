@@ -15,6 +15,7 @@ import {
 import type { PendingView } from '../view'
 import { bankToDiscard, createLog, DEFEND_MS, defencesFor, type Log, reject, setHand } from './core'
 import { openHandChoice } from './handAttacks'
+import { destroySlot } from './triggers'
 import { canAttackWith, closeWindow, handOverWindow, openWindow, respondersFor } from './window'
 
 const SLOTS: readonly ReleaseSlot[] = ['frontend', 'backend', 'database']
@@ -77,11 +78,11 @@ function takeRelease(
 ): GameState {
   const released = state.players[owner].release[slot]
   if (!released) return { ...state, eventSeq: log.seq }
-  const spoils = [released.card, ...(released.codeReview ? [released.codeReview] : [])]
   const cleared = clearSlot(state, owner, slot)
 
-  // Security Bug takes the release for itself — unless that slot is occupied, in
-  // which case the stolen release is discarded instead.
+  // Security Bug takes the release for itself — unless the thief's own slot of
+  // that type is taken, in which case the thief's release stays where it is and
+  // the attacked one is destroyed, as by any attack.
   if (stealer && !cleared.players[stealer].release[slot]) {
     log.add(
       { type: 'releaseStolen', from: owner, to: stealer, slot, card: released.card.id },
@@ -106,8 +107,8 @@ function takeRelease(
     }
   }
 
-  log.add({ type: 'releaseDestroyed', player: owner, slot, card: released.card.id }, parent)
-  return { ...discard(cleared, spoils), eventSeq: log.seq }
+  // the same destruction a Crush's is: it says where the release's cards went
+  return destroySlot(state, log, owner, slot, { cause: parent })
 }
 
 export function onAttack(state: GameState, action: Action & { type: 'ATTACK' }): Reduction {

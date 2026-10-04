@@ -624,6 +624,40 @@ describe('planBeats — the combo pair (#100)', () => {
     ])
   })
 
+  // A hit that destroys a release banks the attack AND the release: the attack
+  // leaves through its pair exit, and the release flies out of the slot it stood
+  // in — its own `discarded` (#168), not swallowed by the attack's exit.
+  it('a hit that destroys a release flies it out of its slot beside the attack’s exit', () => {
+    const withPending = boardBefore({
+      pending: defendPending({ sudo: false }),
+    } as Partial<BoardState>)
+    const events = [
+      tookHit({ id: 9 }),
+      discarded(10, { player: 'p2', card: 'attack-bug', reason: 'attackSpent' }),
+      {
+        id: 11,
+        type: 'releaseDestroyed',
+        player: 'p1',
+        slot: 'frontend',
+        card: 'release-frontend',
+      } as Event,
+      discarded(12, { player: 'p1', card: 'release-frontend', reason: 'destroyed', parent: 11 }),
+    ]
+    expect(planBeats(events, withPending)).toMatchObject([
+      { kind: 'pairToDiscard', key: 'pairOut:10' },
+      {
+        kind: 'discard',
+        cards: [
+          {
+            eventId: 12,
+            card: 'release-frontend',
+            source: { kind: 'release', player: 'p1', slot: 'frontend' },
+          },
+        ],
+      },
+    ])
+  })
+
   // Rollback gives the attack card back to the attacker's hand instead of
   // discarding it (fake/attacks.ts's `effect === 'return'` branch), so only
   // the sudo half is banked — the pending still names `attackCard`, but no
