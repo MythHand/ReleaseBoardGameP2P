@@ -1252,13 +1252,15 @@ it('sends a Sudo home on its own deadline and opens the time to attack anew', ()
   if (!w) throw new Error('no window')
   const responder = opened.state.seating.find((id) => id !== w.target.player) ?? ''
   const sudo = { uid: 'support-sudo#99', id: 'support-sudo' }
+  // a Sudo is put out only with an attack to go with it
+  const bug = { uid: 'attack-bug#99', id: 'attack-bug' }
   const holding: GameState = {
     ...opened.state,
     players: {
       ...opened.state.players,
       [responder]: {
         ...opened.state.players[responder],
-        hand: [...opened.state.players[responder].hand, sudo],
+        hand: [...opened.state.players[responder].hand, sudo, bug],
       },
     },
   }

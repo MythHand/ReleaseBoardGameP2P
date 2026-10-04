@@ -345,4 +345,21 @@ describe('one attack at a time', () => {
     expect(out.state.players.p2.shown).toEqual([])
     expect(out.state.window).toBeNull()
   })
+
+  it('refuses the release owner a card put out while the release can be attacked', () => {
+    const s = released()
+    const r = reduce(s, { type: 'SHOW', player: 'p1', card: CR.uid, at: 1100 })
+    expect(r.events).toMatchObject([{ type: 'rejected', reason: 'that card cannot be played now' }])
+    expect(r.state.players.p1.shown).toEqual([])
+  })
+
+  it('lets the player under attack put a Sudo out for their defence', () => {
+    const sudo: CardInstance = { uid: 'support-sudo#1', id: 'support-sudo' }
+    const rollback: CardInstance = { uid: 'defense-rollback#0', id: 'defense-rollback' }
+    const s = released({ p1: [sudo, rollback] })
+    const attacked = reduce(s, { type: 'ATTACK', player: 'p2', card: BUG.uid, at: 1001 })
+    expect(attacked.state.pending).toMatchObject({ kind: 'defend' })
+    const r = reduce(attacked.state, { type: 'SHOW', player: 'p1', card: sudo.uid, at: 1002 })
+    expect(r.events.map((e) => e.type)).toEqual(['shown'])
+  })
 })

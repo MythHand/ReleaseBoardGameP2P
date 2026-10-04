@@ -1630,8 +1630,10 @@ export function useBoardStaging({
   // the play itself, once sent — ATTACK's carries both halves (`card` the main,
   // `combo` the support), so either naming ours is enough — and putting the card
   // out at the centre, which the table refuses while another player's attack is
-  // the one being dealt with (resolution.md §1, #168). The player saw the card
-  // land; the table puts it back, and the card goes home the ordinary way.
+  // the one being dealt with (resolution.md §1), or when the card can no longer
+  // start a play — the turn moved on before the put-out reached it (#168). The
+  // player saw the card land; the table puts it back, and the card goes home the
+  // ordinary way.
   useEffect(() => {
     // a new match's list starts over
     if (rejections.length < refusalsRead.current) refusalsRead.current = 0

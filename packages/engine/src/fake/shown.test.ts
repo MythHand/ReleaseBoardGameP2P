@@ -106,6 +106,18 @@ it('refuses a card not in the hand, a card already out, and taking back nothing'
   expect(reduce(s, { type: 'TAKE_BACK', player: 'p1', at: 1 }).events[0].type).toBe('rejected')
 })
 
+it('refuses a card its player could not play now — on another player’s turn', () => {
+  const bug: CardInstance = { uid: 'attack-bug#1', id: 'attack-bug' }
+  const s = table([SUDO, BUG, FE])
+  const theirs: GameState = {
+    ...s,
+    players: { ...s.players, p2: { ...s.players.p2, hand: [bug] } },
+  }
+  const r = reduce(theirs, { type: 'SHOW', player: 'p2', card: bug.uid, at: 1000 })
+  expect(r.events).toMatchObject([{ type: 'rejected', reason: 'that card cannot be played now' }])
+  expect(r.state.players.p2.shown).toEqual([])
+})
+
 it('reads both events back from a log', () => {
   const one = reduce(table([SUDO, BUG, FE]), {
     type: 'SHOW',
