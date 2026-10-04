@@ -45,6 +45,8 @@ export type Place =
   | { kind: 'pile'; pile: number }
   // the events deck's count
   | { kind: 'events' }
+  // the WHOLE discard, leaving at once: recycled into a deck, merged into one
+  | { kind: 'discard' }
 
 const without = <T extends object, K extends keyof T>(o: T | undefined, key: K) => {
   if (!o || !(key in o)) return o
@@ -107,6 +109,14 @@ export function withoutCard(board: BoardState, place: Place): BoardState {
     case 'events':
       if (board.decks.events <= 0) return board
       return { ...board, decks: { ...board.decks, events: board.decks.events - 1 } }
+    case 'discard':
+      // the heap, the top it draws and the count it says, all at once
+      if (board.decks.discardCount === 0 && (board.decks.discardHeap?.length ?? 0) === 0)
+        return board
+      return {
+        ...board,
+        decks: { ...board.decks, discard: null, discardHeap: [], discardCount: 0 },
+      }
   }
 }
 

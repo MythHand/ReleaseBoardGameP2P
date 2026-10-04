@@ -393,6 +393,9 @@ it('publishes the cards out of the hand, and files them into the heap once they 
   expect(published[1].decks.discardHeap?.map((card) => card.uid)).toEqual(
     plan().cards.map((card) => `d${card.eventId}`),
   )
+  // …and they are not back in the hand as they lie down: filed on a base that
+  // still held them, every card was in the fan AND the heap (#168)
+  expect(published[1].you.hand).toHaveLength(0)
 })
 
 // The road home (#106): the AI card standing behind this prompt
@@ -469,6 +472,9 @@ it('clears Bad Vibe’s standing pair and sends all three cards away together', 
       ),
     )
     expect(exits.items.map((item) => item.key)).toEqual(['d4', 'd3'])
+    // the trigger lands UNDER the card given up, as the heap holds them — on one
+    // layer the later-mounted trigger landed on top and then sank (#168)
+    expect(exits.items[1].layer ?? 0).toBeLessThan(exits.items[0].layer ?? 0)
     expect(exits.items[1]).toMatchObject({
       card: { id: 'trigger-ai' },
       from: { left: 250, top: 300, width: 150, height: 210 },

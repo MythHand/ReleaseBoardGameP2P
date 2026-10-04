@@ -38,6 +38,30 @@ const board = (over: Partial<BoardState> = {}): BoardState =>
   }) as unknown as BoardState
 
 describe('withoutCard', () => {
+  // the whole discard leaving at once — recycled into a deck, merged into one
+  it('takes the whole discard off at once: its heap, its top and its count', () => {
+    const lying = board({
+      decks: {
+        main: [0],
+        events: 4,
+        discard: c('attack-bug'),
+        discardCount: 2,
+        discardHeap: [
+          { uid: 'd1', card: c('release-frontend'), ...scatterAt(1) },
+          { uid: 'd2', card: c('attack-bug'), ...scatterAt(2) },
+        ],
+      },
+    })
+    expect(withoutCard(lying, { kind: 'discard' }).decks).toMatchObject({
+      discard: null,
+      discardCount: 0,
+      discardHeap: [],
+    })
+    // nothing to take: the very board, so nothing is published for it
+    const empty = board()
+    expect(withoutCard(empty, { kind: 'discard' })).toBe(empty)
+  })
+
   it('takes our own card out of the hand AND the centre it was put out at, named either way', () => {
     for (const from of [
       { kind: 'hand', uid: 'bug#1' },

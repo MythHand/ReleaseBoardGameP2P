@@ -4,6 +4,7 @@ import type { Rect } from '@release/ui/animations'
 import { nextFrames, play, useFlyer, wait } from '@release/ui/animations'
 import { useCallback, useRef, useState } from 'react'
 import type { BeatRun, BoardAnchors } from '~/entities/game/board'
+import { liftOff } from './cardPlace'
 import type { BeatPlan, PileStep } from './planBeats'
 
 // What happens to the draw piles themselves. Three movements, one scene
@@ -73,16 +74,20 @@ export function useDeckBeat(anchors: BoardAnchors) {
       // lying at its own scattered angle.
       setDiscardOut('gathering')
       await wait(GATHER_MS)
-      const [el] = await raise([{ key: 'pile', card: top, at: from }])
-      // GONE FROM THE PROJECTION, not only from the render — in the same commit
-      // the carrier takes it. `discardOut` is this beat's own state and dies
-      // with it; what the beat PUBLISHES is the board it hands over to (see
-      // `useBeats`), and the beat behind it reads that heap. Git Branch + Sudo
-      // is where the two came apart: the operation's own exit runs next, found
-      // the discard still standing in the base it was handed, and the centre's
-      // cards flew towards a heap that had already left to become a pile.
+      const raised = raise([{ key: 'pile', card: top, at: from }])
+      // GONE FROM ITS SPOT IN THE RUN ITS CARRIER GOES UP IN (`cardPlace`), not
+      // once the carrier has painted: emptied after that, the heap and the
+      // carrier standing on it were both on screen for the frames the raise
+      // waits (#168). And gone from the PROJECTION, not only from the render —
+      // `discardOut` is this beat's own state and dies with it; what the beat
+      // publishes is the board it hands over to (see `useBeats`), and the beat
+      // behind it reads that heap. Git Branch + Sudo is where the two came
+      // apart: the operation's own exit runs next, found the discard still
+      // standing in the base it was handed, and the centre's cards flew towards
+      // a heap that had already left to become a pile.
       setDiscardOut('taken')
-      emptyDiscard(ctx)
+      liftOff(ctx, [{ kind: 'discard' }])
+      const [el] = await raised
       if (el) {
         const anim = play('gatherToDeck', el, { to: cardAreaOf(toCell), duration: 560 })
         if (anim) await anim.finished
@@ -100,7 +105,7 @@ export function useDeckBeat(anchors: BoardAnchors) {
   )
 
   const runReshuffle = useCallback(
-    async (_plan: Extract<BeatPlan, { kind: 'reshuffle' }>, ctx: BeatRun) => {
+    async (plan: Extract<BeatPlan, { kind: 'reshuffle' }>, ctx: BeatRun) => {
       // Wait for the shadow before measuring anything — the same order, and for
       // the same reason, as `step()` below spells out at length. At entry the
       // board is still the one the batch produced: the discard already emptied,
@@ -112,7 +117,13 @@ export function useDeckBeat(anchors: BoardAnchors) {
       // only when every pile is empty and replaces `main` with a single one.
       // The card that carries the flight is the discard's own top, from the
       // projection the board is still showing — never a chosen one.
-      await discardOntoPile(ctx, 0, ctx.base.decks.discard ?? undefined)
+      //
+      // …and that single pile HOLDS the cards the moment the carrier comes
+      // down on it: left at its old count, the deck read empty until the queue
+      // drained, and a draw in the same batch took its card off an empty pile.
+      await discardOntoPile(ctx, 0, ctx.base.decks.discard ?? undefined, () =>
+        advance(ctx, [plan.cards]),
+      )
     },
     [discardOntoPile],
   )
@@ -167,10 +178,11 @@ export function useDeckBeat(anchors: BoardAnchors) {
           const top = ctx.base.decks.discard
           if (s.withDiscard && top && rectOf(a.discardBox.current)) {
             const heapBox = cardAreaOf(rectOf(a.discardBox.current) as Rect)
-            const [el] = await raise([{ key: 'merge', card: top, at: heapBox }])
-            // gone from its own spot in the same commit the carrier takes it
+            const raised = raise([{ key: 'merge', card: top, at: heapBox }])
+            // gone from its own spot in the run the carrier goes up in
             setDiscardOut('taken')
-            emptyDiscard(ctx)
+            liftOff(ctx, [{ kind: 'discard' }])
+            const [el] = await raised
             if (el) {
               const anim = play('absorbToDeck', el, {
                 to,
@@ -306,18 +318,5 @@ export function useDeckBeat(anchors: BoardAnchors) {
 // row that no longer exists.
 function advance(ctx: BeatRun, piles: number[]): void {
   ctx.base = { ...ctx.base, decks: { ...ctx.base.decks, main: piles } }
-  ctx.publish(ctx.base)
-}
-
-// The discard has left to become a pile — so the board this beat hands on has
-// no discard. Written back into the run's own base as well as published, for
-// the same reason `advance` does it: the step behind this one has to work
-// against the table this one left, and a heap that is still there in the base
-// comes back as cards nobody put down.
-function emptyDiscard(ctx: BeatRun): void {
-  ctx.base = {
-    ...ctx.base,
-    decks: { ...ctx.base.decks, discard: null, discardHeap: [], discardCount: 0 },
-  }
   ctx.publish(ctx.base)
 }

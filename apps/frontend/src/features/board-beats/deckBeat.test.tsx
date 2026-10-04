@@ -12,14 +12,29 @@ const played = vi.hoisted(() => ({ names: [] as string[] }))
 // (I1) is that the new pile is published before `flyFrom` measures it, and a
 // test that only checks both things happened would still pass if that flipped.
 const timeline = vi.hoisted(() => ({ events: [] as string[] }))
-vi.mock('@release/ui/animations', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@release/ui/animations')>()),
-  play: (name: string) => {
-    played.names.push(name)
-    timeline.events.push(`play:${name}`)
-    return { finished: Promise.resolve() } as unknown as Animation
-  },
-}))
+vi.mock('@release/ui/animations', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@release/ui/animations')>()
+  return {
+    ...real,
+    play: (name: string) => {
+      played.names.push(name)
+      timeline.events.push(`play:${name}`)
+      return { finished: Promise.resolve() } as unknown as Animation
+    },
+    // the real carrier, which marks on the timeline the moment it has painted
+    useFlyer: () => {
+      const step = real.useFlyer()
+      return {
+        ...step,
+        raise: (...args: Parameters<typeof step.raise>) =>
+          step.raise(...args).then((els) => {
+            timeline.events.push('raised')
+            return els
+          }),
+      }
+    },
+  }
+})
 
 const card = (id: string) => cardById(id) as CardData
 
@@ -154,6 +169,57 @@ it('carries the discard onto the deck when the table recycles it', async () => {
   } as Extract<BeatPlan, { kind: 'reshuffle' }>
   await drive(() => api.beat?.runReshuffle(plan, ctx))
   expect(played.names).toContain('gatherToDeck')
+})
+
+// ONE CARD, ONE PLACE (#168). The discard leaves its spot in the run its carrier
+// goes up in — emptied once the carrier had painted, the heap and the carrier
+// standing on it were both on screen for the frames the raise waits. And the
+// recycled pile holds its cards the moment the carrier comes down on it: left
+// at its old count, the deck read wrong until the queue drained.
+it('empties the discard as its carrier goes up, and lands its count on the deck', async () => {
+  timeline.events = []
+  const { api, ctx, published } = harness()
+  const watched = {
+    ...ctx,
+    publish: (s: BoardState) => {
+      if (s.decks.discardCount === 0) timeline.events.push('emptied')
+      ctx.publish(s)
+    },
+  }
+  const plan = {
+    kind: 'reshuffle',
+    key: 'reshuffle:3',
+    cards: 12,
+  } as Extract<BeatPlan, { kind: 'reshuffle' }>
+  await drive(() => api.beat?.runReshuffle(plan, watched))
+  expect(timeline.events.indexOf('emptied')).toBeGreaterThanOrEqual(0)
+  expect(timeline.events.indexOf('emptied')).toBeLessThan(timeline.events.indexOf('raised'))
+  expect(published.at(-1)?.decks.main).toEqual([12])
+  expect(published.at(-1)?.decks.discardCount).toBe(0)
+})
+
+it('empties the discard as its carrier goes up on a merge that takes it', async () => {
+  timeline.events = []
+  const merging = { ...base, decks: { ...base.decks, main: [8, 8] } } as BoardState
+  const { api, ctx, dom } = harness({ base: merging, live: [16] })
+  const watched = {
+    ...ctx,
+    publish: (s: BoardState) => {
+      if (s.decks.discardCount === 0) timeline.events.push('emptied')
+      ctx.publish(s)
+    },
+  }
+  const plan = {
+    kind: 'piles',
+    key: 'piles:5',
+    steps: [{ kind: 'merge', withDiscard: true, piles: [22] }],
+  } as Extract<BeatPlan, { kind: 'piles' }>
+  await drive(() => {
+    dom.commit(merging.decks.main)
+    return api.beat?.runPiles(plan, watched)
+  })
+  expect(timeline.events.indexOf('emptied')).toBeGreaterThanOrEqual(0)
+  expect(timeline.events.indexOf('emptied')).toBeLessThan(timeline.events.indexOf('raised'))
 })
 
 it('skips the flight when the discard has no top card to carry', async () => {
