@@ -150,6 +150,13 @@ export type BeatPlan =
       cards: DiscardCard[]
       gather?: true
       alarm?: { eventId: number; card: string }
+      /**
+       * The AI card standing behind the prompt the swept player refused, and
+       * the trigger that drew it — an AI Error 503 passed. Same fact, same
+       * reasoning, as the `neutralized` plan's own `homeward`.
+       */
+      homeward?: string
+      causeward?: { card: string; eventId: number }
     }
   // The excess a turn's end (or a Bad Vibe-Coding) costs, leaving as ONE
   // gesture: a grid at the centre, sized upfront from the count, held open for
@@ -1606,6 +1613,16 @@ export function planBeats(
         discard.alarm = passedAlarm
         passedAlarm = null
       }
+      // …AND THE AI CARD BEHIND THE PROMPT THEY REFUSED, with its trigger: the
+      // prompt is answered, so the two leave the way they leave after any
+      // answered prompt (`homewardOf`). Neither has an event in this batch — the
+      // trigger was filed at the reveal, the AI card goes home and is filed as
+      // nothing — so nothing else here flies them, and the board dropped both
+      // the moment the sweep ended (owner's recording, 04.10).
+      const owedBy =
+        before.pending && 'player' in before.pending ? before.pending.player : undefined
+      if (gather && !discard.homeward && owedBy === e.player)
+        Object.assign(discard, homewardOf(before))
       discard.cards.push({ key: `d${e.id}`, eventId: e.id, card: e.card, source })
       continue
     }

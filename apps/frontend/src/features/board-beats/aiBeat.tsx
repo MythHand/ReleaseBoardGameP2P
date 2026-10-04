@@ -524,9 +524,14 @@ export function useAiBeat(
   // prompt, and its trigger, are this runner's, and they leave the way they
   // leave after `runTaken`. Left to the grid they had no road at all: Inside
   // vanished and its trigger dropped into the heap the moment the queue drained
-  // (owner's recording, 04.10).
+  // (owner's recording, 04.10). The sweep of a player who refused an AI Error
+  // 503 is the same: it flies their table, and the AI card and its trigger
+  // leave beside it by this road.
   const runLeaving = useCallback(
-    async (plan: Extract<BeatPlan, { kind: 'takenFromDiscard' }>, beat: BeatRun) => {
+    async (
+      plan: { homeward?: string; causeward?: { card: string; eventId: number } },
+      beat: BeatRun,
+    ) => {
       ctx.current = beat
       await leaveTheStanding(plan)
     },

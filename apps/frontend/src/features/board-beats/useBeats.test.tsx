@@ -1022,3 +1022,66 @@ it('sends the AI card and its trigger on their way after the grid has played the
     motion.reduced = true
   }
 })
+
+// AN AI ERROR 503 REFUSED: the sweep flies the player's table, and the AI card
+// standing behind the prompt and its trigger leave beside it by the AI runner's
+// own road. They used to have none: the trigger was in the heap and the AI card
+// gone the frame the sweep ended (owner's recording, 04.10).
+it('sends the AI card and its trigger on their way beside the sweep of a refused AI 503', async () => {
+  motion.reduced = false
+  sent.calls = []
+  const trigger = card('trigger-ai')
+  const before = {
+    ...preDiscard,
+    decks: {
+      ...preDiscard.decks,
+      discard: trigger,
+      discardCount: 1,
+      discardHeap: [{ uid: 'd3', card: trigger, ...scatterAt(3) }],
+    },
+    aiCause: { card: 'trigger-ai', eventId: 3 },
+    pending: {
+      kind: 'neutralize503',
+      player: 'p1',
+      card: 'ai-error-503',
+      methods: ['debugger'],
+      source: 'ai-error-503',
+    },
+  } as unknown as BoardState
+  const after = {
+    ...before,
+    pending: null,
+    aiCause: undefined,
+    you: { ...before.you, hand: [] },
+    decks: { ...before.decks, discardCount: 2 },
+  } as unknown as BoardState
+  const batch = [
+    { id: 5, type: 'eliminated', player: 'p1' },
+    { id: 6, type: 'discarded', player: 'p1', card: 'attack-bug', reason: 'effect', parent: 5 },
+  ] as Event[]
+  const placed = {
+    ...stub,
+    cause: { current: node() },
+    effect: { current: node() },
+    eventsBox: { current: node() },
+  } as unknown as BoardAnchors
+  function SweepProbe({ live, feed }: { live: BoardState; feed: Event[] }) {
+    const beats = useBeats({ live, events: feed, anchors: placed, enabled: true })
+    return <>{beats.overlays}</>
+  }
+  vi.useFakeTimers()
+  try {
+    const view = render(<SweepProbe live={before} feed={[]} />)
+    view.rerender(<SweepProbe live={after} feed={batch} />)
+    for (let i = 0; i < 250; i++)
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(20)
+      })
+    // the trigger leaves beside the sweep, by the AI runner's own exit (the
+    // swept hand itself has no slot to be measured in this probe's page)
+    const keys = (sent.calls.flat() as { key: string }[]).map((c) => c.key)
+    expect(keys).toContain('d3')
+  } finally {
+    motion.reduced = true
+  }
+})

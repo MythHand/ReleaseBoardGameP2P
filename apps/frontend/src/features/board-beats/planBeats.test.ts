@@ -1242,6 +1242,42 @@ describe('planBeats — the sweep (#102)', () => {
     })
   })
 
+  // AN AI ERROR 503 REFUSED: the AI card standing behind the prompt and the
+  // trigger that drew it have no event in this batch — the trigger was filed at
+  // the reveal, the AI card goes home — so the sweep carries them, and they
+  // leave beside it (owner's recording, 04.10). An ordinary 503 has neither.
+  it('sends the AI card behind a refused AI Error 503 and its trigger with the sweep', () => {
+    const before = boardBefore({
+      pending: {
+        kind: 'neutralize503',
+        player: 'p1',
+        card: 'ai-error-503',
+        methods: ['debugger'],
+        source: 'ai-error-503',
+      },
+      aiCause: { card: 'trigger-ai', eventId: 3 },
+    } as unknown as Partial<BoardState>)
+    const plans = planBeats(
+      [eliminated({ id: 20 }), discarded(21, { card: 'attack-bug', reason: 'effect' })],
+      before,
+    )
+    expect(plans.map((p) => p.kind)).toEqual(['discard', 'eliminated'])
+    expect(plans[0]).toMatchObject({
+      gather: true,
+      homeward: 'ai-error-503',
+      causeward: { card: 'trigger-ai', eventId: 3 },
+    })
+    const ordinary = planBeats(
+      [
+        discarded(19, { card: 'trigger-error-503', reason: 'trigger' }),
+        eliminated({ id: 20 }),
+        discarded(21, { card: 'attack-bug', reason: 'effect' }),
+      ],
+      passedAlarm(),
+    )
+    expect(ordinary[0]).not.toHaveProperty('homeward')
+  })
+
   it('sends it alone when the player had nothing left to sweep', () => {
     const plans = planBeats(
       [discarded(19, { card: 'trigger-error-503', reason: 'trigger' }), eliminated({ id: 20 })],

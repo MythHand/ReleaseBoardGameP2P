@@ -299,7 +299,13 @@ export function useBeats(args: {
           base,
           exclusive: false,
           alarm: plan.gather === true,
-          run: (ctx) => discards.run(plan, ctx),
+          // …and the AI card behind the prompt a swept player refused goes home
+          // with its trigger beside the sweep, by the AI runner's own road — the
+          // way a refused Crush sends it beside the release it destroyed
+          run: (ctx) =>
+            plan.homeward || plan.causeward
+              ? Promise.all([discards.run(plan, ctx), ais.runLeaving(plan, ctx)]).then(() => {})
+              : discards.run(plan, ctx),
         }
       }
       if (plan.kind === 'handLimit') {
