@@ -40,6 +40,12 @@ events — no peer ever knew»).
   the Sudo it goes with — is out, or an attack is being dealt with, other responders' `SHOW` and
   `ATTACK` are refused (`another attack is out`, `an attack is being dealt with`) and
   `canAttackWith` offers them nothing. Whoever reached the keeper first is the one.
+- **A pass is only a mark** (the ⚙️ on passes in §1, owner 04.10): it costs the one who passed
+  nothing — they may still attack — and the window closes early only when every responder has
+  passed. An attack or its Sudo put out by a responder starts the passes over; no `PASS` is taken
+  while one is out (`an attack is out`); `UNPASS` takes a pass back and says so with `unpassed`,
+  which has no row in the move history. The dock shows it: no dots and no PASS while an attack is
+  out — its attacker sees the attack being made, everyone else the attacker's turn.
 - **A responder's Sudo holds the time to attack** for `SUDO_PARTNER_MS` (10 s, the ⚙️ under
   «Атакующие действуют одновременно» in §1): the window's deadline becomes the Sudo's own. If no
   attack joins it, or it is taken back, the Sudo goes home and the time to attack starts anew
