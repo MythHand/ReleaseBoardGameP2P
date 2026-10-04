@@ -45,6 +45,10 @@ const longest = (...xs: string[]): string => xs.reduce((a, b) => (b.length > a.l
 //               whose word flips reads as a different action, and this is the
 //               same one toggled. The engine never bars a later attack, so the
 //               caption stays "you may attack" throughout.
+//  - 'attacking' my own attack (or the Sudo it goes with) is out at the centre:
+//               the attack's word and violet, but no dots and no key — this
+//               chance to hit is being used, and backing out is the cancel of
+//               the card itself. The attacker's name in the key's slot.
 //  - 'exposed'  the window is on MY OWN release: the clock is the time others
 //               have to hit it. Turn-green, because this is still my turn's
 //               business, and no key — nothing here is mine to press. The pass
@@ -60,7 +64,15 @@ const longest = (...xs: string[]): string => xs.reduce((a, b) => (b.length > a.l
 // turn's own phase and accent while the cost is owed. What is wanted of the
 // player is said by the ask on the table, and the key stays live because
 // pressing it takes the staged release back first (`dock.ts`).
-export type TurnDockState = 'draw' | 'push' | 'waiting' | 'reaction' | 'attack' | 'exposed' | 'hold'
+export type TurnDockState =
+  | 'draw'
+  | 'push'
+  | 'waiting'
+  | 'reaction'
+  | 'attack'
+  | 'attacking'
+  | 'exposed'
+  | 'hold'
 
 export interface TurnDockCopy {
   yourTurn: string
@@ -100,7 +112,7 @@ interface TurnDockProps {
   danger?: boolean
   // 'attack' only: this seat has already passed on the open window. The key
   // lights up rather than disappearing or changing its word, and pressing it
-  // again does nothing — a pass cannot be taken back.
+  // again takes the pass back (`onUnpass`).
   passed?: boolean
   // How the open window's passes stand, as a count: one dot per seat that may
   // attack, lit for each one that has passed. Never per player — the row says
@@ -112,14 +124,18 @@ interface TurnDockProps {
   onDraw?: () => void
   onPush?: () => void
   onPass?: () => void
+  // 'attack', once passed: the lit key takes the pass back
+  onUnpass?: () => void
 }
 
 // The open window's passes, as a row of dots — one per seat that may attack,
 // lit for each pass made. Not tied to players on purpose: the engine knows WHO
 // passed, but a dot per name turns the row into a scoreboard of who is timid,
 // and the only thing the table needs from it is how close the window is to
-// closing early. Lit is a flat fill, never a pulse: nothing here is waiting on
-// the viewer.
+// closing early. They fill from the right and empty from the left (owner,
+// 04.10): a pass lights the next dot leftwards, a pass taken back puts out the
+// leftmost lit one. Lit is a flat fill, never a pulse: nothing here is waiting
+// on the viewer.
 function PassDots({
   total,
   lit,
@@ -144,7 +160,7 @@ function PassDots({
         <span
           // biome-ignore lint/suspicious/noArrayIndexKey: the dots ARE a count — there is nothing identifiable to key on, which is the point
           key={i}
-          className={`${styles.dot} ${i < lit ? styles.dotLit : ''}`}
+          className={`${styles.dot} ${i >= total - lit ? styles.dotLit : ''}`}
         />
       ))}
     </div>
@@ -157,6 +173,7 @@ const PHASE_KEY: Record<TurnDockState, keyof TurnDockCopy> = {
   waiting: 'turnOf',
   reaction: 'reaction',
   attack: 'attack',
+  attacking: 'attack',
   exposed: 'exposed',
   hold: 'reaction',
 }
@@ -168,7 +185,7 @@ function accentFor(state: TurnDockState, danger: boolean): string {
   // The offensive half of a window gets its own hue: the same ring, the same
   // key, but "I may hit" and "I must answer" are opposite situations and the
   // dock is read at a glance.
-  if (state === 'attack') return 'var(--attack-accent)'
+  if (state === 'attack' || state === 'attacking') return 'var(--attack-accent)'
   if (state === 'waiting') return 'var(--idle-accent)'
   // 'exposed' falls through to the turn accent deliberately: the window over my
   // own release is my turn still running, not a phase of somebody else's.
@@ -188,6 +205,7 @@ export default function TurnDock({
   onDraw,
   onPush,
   onPass,
+  onUnpass,
 }: TurnDockProps) {
   const mine = state === 'draw' || state === 'push'
   const reactionDanger = state === 'reaction' && danger
@@ -211,13 +229,13 @@ export default function TurnDock({
             : null
 
   // key/label states share one Button frame (draw / push / reaction / attack);
-  // 'waiting' shows the active player's name instead, and 'exposed' the dots.
+  // 'waiting' and 'attacking' show a player's name instead, and 'exposed' the dots.
   const buttonMode = mine || state === 'reaction' || state === 'attack'
   // three things can fill the action slot, and exactly one of them at a time
   const actionMode = buttonMode ? 'btn' : state === 'exposed' ? 'dots' : 'name'
   const label = state === 'draw' ? copy.draw : state === 'push' ? copy.push : copy.pass
   const handler =
-    state === 'draw' ? onDraw : state === 'push' ? onPush : attackPassed ? undefined : onPass
+    state === 'draw' ? onDraw : state === 'push' ? onPush : attackPassed ? onUnpass : onPass
 
   // re-arm the lockout whenever the actionable key changes (or reappears)
   const keyId = buttonMode ? `${state}${attackPassed ? ':passed' : ''}` : 'idle'
@@ -234,7 +252,7 @@ export default function TurnDock({
 
   // phase + key label share one plain fade; the action slot fades the name in
   // after the previous content clears (sequential), the key back in flat.
-  const modeAnim = state === 'waiting' ? NAME : MODE
+  const modeAnim = state === 'waiting' || state === 'attacking' ? NAME : MODE
 
   // opponent's turn — the ring is dimmed (empty arc, bare track) with NO
   // countdown: their per-phase inactivity timer resets on every action, so a
