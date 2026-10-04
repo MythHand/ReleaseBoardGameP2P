@@ -354,7 +354,7 @@ export default function LobbyView() {
 
         <section className={styles.chatCol}>
           <div className={styles.voiceLine}>
-            <Typography variant="sectionTitle" className={styles.h}>
+            <Typography variant="sectionTitle" className={styles.hInline}>
               {t('lobbyScreen.voiceChat')}
             </Typography>
             <RoomVoice view={voice} />

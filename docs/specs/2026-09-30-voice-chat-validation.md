@@ -56,7 +56,7 @@ The review set aside real host migration, spectator implementation #214 and a 34
 1. Clipboard success uses `undefined` instead of `void`; object contracts use interfaces because repository lint requires these equivalent forms. No runtime cost; if wrong, a type-only correction is needed.
 2. VoiceAudio adds `subscribeState(listener): unsubscribe` to observe browser output suspension without leaking AudioContext across the boundary. Cost: one additional tested event interface.
 3. Pending data dials track the owning DataConnection so an old callback cannot clear a newer dial and misclassify its failure as audio-only. Cost: a transport bookkeeping change; RED→GREEN regression preserves game error behavior.
-4. Host roster confirmation uses the existing 15000 ms setup deadline to avoid forever-connecting with an incompatible host. Cost: very slow admission can show interrupted/callFailed until a late valid roster arrives or the user rejoins.
+4. Host roster confirmation uses the existing 15000 ms setup deadline to avoid forever-connecting with an incompatible host. Cost: very slow admission can show interrupted/joinFailed until a late valid roster arrives or the user rejoins.
 
 5. Each remote stream owns one muted HTML audio decoder because Chromium does not start remote decoding from MediaStreamAudioSourceNode alone. Audible output remains exclusively in the gain graph. Cost: one extra media element per remote participant, with explicit pause/srcObject cleanup and playback-refusal reporting.
 
@@ -67,3 +67,16 @@ The review set aside real host migration, spectator implementation #214 and a 34
 ## Completion record
 
 All eight Native tasks complete, one final review and one verified fix pass complete. Execution ledger and final check logs are retained locally under `output/native-evidence/`; browser artefacts remain under `output/playwright/`. Only this plan's temporary `.superpowers/sdd/2026-09-30-voice-chat-plan/` workspace is removed after committing its final record. Branch/worktree remain available for the user's integration choice; nothing has been pushed or merged.
+
+
+## PR #218 review update — 2026-10-04
+
+Reviewed the current discussion at head `8977319465acb4537c593bef108ecf721feee9eb` and base `e6da26e3bf1fde265f0abd49e49fa769cbc2999b`. Integrated the approved notice UI from #219 head `7129bafef5138ccf657bfbd68fce475d95808981` into this branch; #214 and #219 remain open and are not merged to main by this update.
+
+- Replaced plain issue text with the #219 `{ key, title, text, concerns }` contract and EN/RU catalogs. VoiceChat owns lobby/results notices; VoicePanel keeps only hints. Board always renders its independent `voiceNotices` slot outside the drawer.
+- Split host admission failure (`joinFailed`, 15-second timeout or own presence removed) from failed calls (`peersUnreachable`). The snapshot exposes `unreachableMemberIds` filtered against current eligible members; recovery, departure and voice exit clear them. Issue keys distinguish changes to the failure set, without duplicating notices on volume changes.
+- Lobby mirrors the shared Lobby's single flex line: 12px gap, 28px bottom margin, zero heading margin, no divider.
+- RED: three runtime and six UI integration regressions failed on the prior code. GREEN: 42 focused frontend voice/integration tests and 22 shared VoiceChat tests. Full workspace suite **2401/2401**: peerserver 6, engine 487, UI 253, playground 3, frontend 1652. Typecheck, lint/Stylelint and build passed. Build and tests did not run concurrently.
+- Chrome, localhost ports 5187/5188: lobby at 1280×720 and 1920×1080 has identical heading/control center lines, 12px gap, 28px margin and no border, matching LobbyChatStory. Injected microphone refusal yields the translated notice in EN/RU. Hover preserves it past 6500ms; the cross closes it while the microphone hint retains the issue. The actual Board keeps one notice at 1280×720 and 1920×1080 with the voice drawer open or closed; without hovering it automatically disappears after the hold/exit animation. The actual Stats route shows the same notice and close control. Stats acceptance here navigates to the route without simulating the end of a match. Artifacts are under `output/playwright/review-*`.
+
+The earlier physical-audio, Firefox and cross-device acceptance limits remain. This update verifies issue presentation and runtime state with deterministic failures; it does not claim a new real-network media-failure recovery test.

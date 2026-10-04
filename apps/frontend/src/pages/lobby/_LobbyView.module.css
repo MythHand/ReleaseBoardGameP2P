@@ -216,7 +216,13 @@
 }
 
 .voiceLine {
-  padding-block-end: 20px;
-  margin-block-end: 20px;
-  border-block-end: 1px solid var(--white-08);
+  display: flex;
+  flex: none;
+  gap: 12px;
+  align-items: center;
+  margin-block-end: 28px;
+}
+
+.hInline {
+  margin: 0;
 }

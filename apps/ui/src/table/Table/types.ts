@@ -215,6 +215,10 @@ export interface TableSlots {
   // whether I am in the voice chat. No `voice` — no tab and no panel.
   voice?: ReactNode
   voiceTab?: ReactNode
+  // The voice chat's notices (VoiceNotices). The table hangs them where the
+  // microphone and the headphones stand in the open voice panel, and keeps them
+  // there whether the panel is open or not (owner, 30.09).
+  voiceNotices?: ReactNode
   // Всплывающие плашки в правом нижнем углу. Стол даёт им угол, ширину и слой;
   // что всплывает — дело потребителя. Одно правило стол берёт на себя: при
   // открытой панели чата плашек нет вовсе — лента и так на экране.

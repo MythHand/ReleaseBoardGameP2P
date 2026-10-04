@@ -34,11 +34,17 @@ it('provides every voice issue in both locales', () => {
     'permissionTimeout',
     'captureFailed',
     'audioBlocked',
-    'callFailed',
+    'joinFailed',
+    'peersUnreachable',
     'roomDisconnected',
   ]
   for (const locale of [en, ru])
     for (const issue of issues) {
-      expect((locale.voiceChat.issues as Record<string, string>)[issue]).toBeTruthy()
+      const copy = (locale.voiceChat.issues as Record<string, { title: string; text: string }>)[
+        issue
+      ]
+      expect(copy?.title).toBeTruthy()
+      expect(copy?.text).toBeTruthy()
+      if (issue === 'peersUnreachable') expect(copy?.title).toContain('{{names}}')
     }
 })

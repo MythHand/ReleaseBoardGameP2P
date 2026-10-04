@@ -8,7 +8,7 @@ import { pick, useLang } from '../../Playground/lang'
 import TechBar from '../controls/TechBar'
 import { TechSwitch } from '../controls/TechControls'
 import { copyText } from '../copyText'
-import { useVoiceDemo, VoiceDemoControls } from '../voiceDemo'
+import { useVoiceDemo, VoiceDemoControls, voiceIssueView } from '../voiceDemo'
 import styles from './LobbyChatStory.module.css'
 
 export default function LobbyChatStory() {
@@ -84,6 +84,7 @@ export default function LobbyChatStory() {
           voice={
             <VoiceChat
               {...voice.props}
+              issue={voiceIssueView(voice.issue, lang)}
               copy={pick(lang, { ru: ruCommon.voiceChat, en: enCommon.voiceChat })}
             />
           }

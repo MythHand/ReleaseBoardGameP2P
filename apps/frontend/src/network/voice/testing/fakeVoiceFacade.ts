@@ -10,6 +10,7 @@ export function createFakeVoiceFacade(overrides: Partial<RoomVoiceFacade> = {}):
     volume: 100,
     settings: {},
     issue: null,
+    unreachableMemberIds: [],
     connect: vi.fn(async () => {
       await Promise.resolve()
     }),

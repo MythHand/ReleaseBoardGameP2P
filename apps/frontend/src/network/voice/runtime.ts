@@ -21,7 +21,8 @@ export type VoiceIssue =
   | 'permissionTimeout'
   | 'captureFailed'
   | 'audioBlocked'
-  | 'callFailed'
+  | 'joinFailed'
+  | 'peersUnreachable'
   | 'roomDisconnected'
 export interface VoiceSnapshot {
   status: 'off' | 'connecting' | 'connected' | 'interrupted'
@@ -31,6 +32,7 @@ export interface VoiceSnapshot {
   volume: number
   settings: Record<string, ParticipantAudioSettings>
   issue: VoiceIssue | null
+  unreachableMemberIds: string[]
 }
 export interface VoiceRoomContext {
   roomCode: string
@@ -89,6 +91,7 @@ export function createRoomVoice(options: {
     volume: 100,
     settings: {},
     issue: null,
+    unreachableMemberIds: [],
   }
   let context: VoiceRoomContext | null = null
   let authority: VoiceAuthority | undefined
@@ -143,12 +146,15 @@ export function createRoomVoice(options: {
     roster?.participants.filter((p) => context?.peers[p.peerId]?.memberId === p.memberId) ?? []
   const refresh = () => {
     if (!wanted) {
-      publish({ status: 'off', issue: null })
+      publish({ status: 'off', issue: null, unreachableMemberIds: [] })
       return
     }
     const own = ownPresence()
     const expected = eligible().filter((p) => p.memberId !== context?.selfMemberId)
-    const failed = callState.failedMemberIds.length > 0
+    const unreachableMemberIds = expected
+      .filter((p) => callState.failedMemberIds.includes(p.memberId))
+      .map((p) => p.memberId)
+    const failed = unreachableMemberIds.length > 0
     const allReady = expected.every((p) => callState.readyMemberIds.includes(p.memberId))
     const interrupted =
       !context?.admitted ||
@@ -164,12 +170,15 @@ export function createRoomVoice(options: {
     if (status === 'connected') everConnected = true
     publish({
       status,
+      unreachableMemberIds,
       issue: context?.admitted
         ? !audioReady && !outputPending
           ? 'audioBlocked'
-          : failed || rosterTimedOut || (!own && everConnected)
-            ? 'callFailed'
-            : microphoneIssue
+          : rosterTimedOut || (!own && everConnected)
+            ? 'joinFailed'
+            : failed
+              ? 'peersUnreachable'
+              : microphoneIssue
         : 'roomDisconnected',
     })
   }
@@ -327,7 +336,7 @@ export function createRoomVoice(options: {
     joining = undefined
     enabling = undefined
     microphoneIssue = null
-    publish({ status: 'off', micOff: true, issue: null })
+    publish({ status: 'off', micOff: true, issue: null, unreachableMemberIds: [] })
   }
   const disconnect = () => {
     if (voiceSessionId) intent({ type: 'VOICE_LEAVE', payload: { voiceSessionId } })

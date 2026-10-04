@@ -1252,6 +1252,7 @@ function BoardView({
 
       {slots?.banner && <div className={kit.banner}>{slots.banner}</div>}
       {slots?.corner && <div className={kit.corner}>{slots.corner}</div>}
+      {slots?.voiceNotices && <div className={kit.voiceNotices}>{slots.voiceNotices}</div>}
 
       {/* the seats: each in its own wrapper, so the opening can drop them in one
           after another and the deal can aim a card at the seat it belongs to */}

@@ -2,7 +2,7 @@ import { en as enCommon, ru as ruCommon } from '@release/translation/catalog'
 import { useEffect, useMemo, useState } from 'react'
 import Chat, { type ChatMessage, type ChatRole } from '@/blocks/Chat'
 import { ToastStack } from '@/blocks/Toast'
-import { VoicePanel, VoiceTabIcon } from '@/blocks/VoiceChat'
+import { VoiceNotices, VoicePanel, VoiceTabIcon } from '@/blocks/VoiceChat'
 import { CHAT_SELF, makeChat } from '@/mocks/chat'
 import { makeSpectatorTable, makeTable } from '@/mocks/table'
 import Message from '@/primitives/Message'
@@ -13,7 +13,7 @@ import HoverSelect from '../controls/HoverSelect'
 import TechBar from '../controls/TechBar'
 import { TechButton, TechField, TechLabel, TechSwitch } from '../controls/TechControls'
 import { copyText } from '../copyText'
-import { useVoiceDemo, VoiceDemoControls } from '../voiceDemo'
+import { useVoiceDemo, VoiceDemoControls, voiceIssueView } from '../voiceDemo'
 import styles from './TableChatStory.module.css'
 
 type GameOverCondition = 'release' | 'lastStanding'
@@ -440,6 +440,13 @@ export default function TableChatStory() {
               <VoicePanel
                 {...voice.props}
                 title={tableCopy.tabVoice}
+                issue={voiceIssueView(voice.issue, lang)}
+                copy={pick(lang, { ru: ruCommon.voiceChat, en: enCommon.voiceChat })}
+              />
+            ),
+            voiceNotices: (
+              <VoiceNotices
+                issue={voiceIssueView(voice.issue, lang)}
                 copy={pick(lang, { ru: ruCommon.voiceChat, en: enCommon.voiceChat })}
               />
             ),

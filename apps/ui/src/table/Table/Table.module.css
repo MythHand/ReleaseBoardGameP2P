@@ -220,6 +220,20 @@
   inline-size: 280px;
 }
 
+/* Where the voice chat's notices hang: the box the microphone and the
+   headphones take in the open voice panel's head. Its right edge is the
+   panel's right edge (the rail's 56px, `--drawer-offset` above) less the
+   panel's padding (20px, Drawer's `.layer`) and the head's (4px, VoiceChat's
+   `.panelHead`); its top is that padding; its height the buttons' 20px icons.
+   The notices hang under it (VoiceNotices), over the open panel too. */
+.voiceNotices {
+  position: absolute;
+  inset-block-start: 20px;
+  inset-inline-end: calc(56px + 20px + 4px);
+  z-index: calc(var(--z-drawer) + 1);
+  block-size: 20px;
+}
+
 /* переписка занимает панель целиком: лента забирает всю высоту, поле ввода
    стоит у нижнего края. Прокрутку ведёт сам блок чата */
 .chatPanel {

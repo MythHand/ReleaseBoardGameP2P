@@ -1,6 +1,6 @@
 import type { Event } from '@release/engine'
 import { useTranslation } from '@release/translation'
-import { isCounting, Message, Reconnect, ToastStack, VoiceTabIcon } from '@release/ui'
+import { isCounting, Message, Reconnect, ToastStack, VoiceNotices, VoiceTabIcon } from '@release/ui'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { useSession } from '~/app/providers/SessionProvider'
@@ -220,6 +220,7 @@ export default function BoardPage() {
         slots={{
           voice: <RoomVoice view={voice} panelTitle={t('table.tabVoice')} />,
           voiceTab: <VoiceTabIcon status={voice.status} micOff={voice.micOff} />,
+          voiceNotices: <VoiceNotices issue={voice.issue} copy={voice.copy} />,
           chat: <RoomChat view={chat} />,
           toasts: (
             <ToastStack

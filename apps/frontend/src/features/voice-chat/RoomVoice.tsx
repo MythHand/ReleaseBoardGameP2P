@@ -1,10 +1,10 @@
 import { useTranslation } from '@release/translation'
-import { Typography, VoiceChat, type VoiceChatCopy, VoicePanel } from '@release/ui'
+import { VoiceChat, type VoiceChatCopy, VoicePanel } from '@release/ui'
 import type { ComponentProps } from 'react'
 import { useSession } from '~/app/providers/SessionProvider'
 import { toVoiceParticipants } from './model'
 
-export type RoomVoiceView = ComponentProps<typeof VoiceChat> & { issueText: string | null }
+export type RoomVoiceView = ComponentProps<typeof VoiceChat>
 export function useRoomVoiceView(): RoomVoiceView {
   const session = useSession()
   const { t } = useTranslation()
@@ -22,15 +22,35 @@ export function useRoomVoiceView(): RoomVoiceView {
     muteMic: t('voiceChat.muteMic'),
     unmuteMic: t('voiceChat.unmuteMic'),
     micMuted: t('voiceChat.micMuted'),
+    close: t('voiceChat.close'),
   }
+  const participants = toVoiceParticipants(voice, session.state?.peers ?? {})
+  const names = participants
+    .filter((p) => voice.unreachableMemberIds.includes(p.id))
+    .map((p) => p.name)
+    .join(', ')
   return {
-    participants: toVoiceParticipants(voice, session.state?.peers ?? {}),
+    participants,
     status: voice.status,
     selfId: voice.selfMemberId ?? undefined,
     volume: voice.volume,
     micOff: voice.micOff,
     copy,
-    issueText: voice.issue ? t(`voiceChat.issues.${voice.issue}`) : null,
+    issue: voice.issue
+      ? {
+          key:
+            voice.issue === 'peersUnreachable'
+              ? JSON.stringify([voice.issue, ...voice.unreachableMemberIds])
+              : voice.issue,
+          title: t(`voiceChat.issues.${voice.issue}.title`, { names }),
+          text: t(`voiceChat.issues.${voice.issue}.text`),
+          concerns: ['audioBlocked', 'joinFailed', 'peersUnreachable', 'roomDisconnected'].includes(
+            voice.issue,
+          )
+            ? 'connection'
+            : 'microphone',
+        }
+      : null,
     onConnect: () => {
       void voice.connect()
     },
@@ -44,15 +64,5 @@ export function useRoomVoiceView(): RoomVoiceView {
   }
 }
 export function RoomVoice({ view, panelTitle }: { view: RoomVoiceView; panelTitle?: string }) {
-  const { issueText, ...props } = view
-  return (
-    <>
-      {panelTitle ? <VoicePanel {...props} title={panelTitle} /> : <VoiceChat {...props} />}
-      {issueText && (
-        <Typography base="body" as="div" role="status">
-          {issueText}
-        </Typography>
-      )}
-    </>
-  )
+  return panelTitle ? <VoicePanel {...view} title={panelTitle} /> : <VoiceChat {...view} />
 }

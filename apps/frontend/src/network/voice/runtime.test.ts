@@ -202,6 +202,12 @@ it('accepts only current host roster, ignores older revisions and waits for own 
   expect(runtime.getSnapshot().status).toBe('connected')
   runtime.handleMessage({ ...frame, payload: { ...frame.payload, revision: 1, participants: [] } })
   expect(runtime.getSnapshot().roster).toHaveLength(1)
+  runtime.handleMessage({ ...frame, payload: { ...frame.payload, revision: 3, participants: [] } })
+  expect(runtime.getSnapshot()).toMatchObject({
+    status: 'interrupted',
+    issue: 'joinFailed',
+    unreachableMemberIds: [],
+  })
   runtime.dispose()
 })
 
@@ -268,7 +274,11 @@ it('bounds host confirmation wait and leaves no timer after exit', async () => {
   await runtime.connect()
   expect(runtime.getSnapshot().status).toBe('connecting')
   await vi.advanceTimersByTimeAsync(15000)
-  expect(runtime.getSnapshot()).toMatchObject({ status: 'interrupted', issue: 'callFailed' })
+  expect(runtime.getSnapshot()).toMatchObject({
+    status: 'interrupted',
+    issue: 'joinFailed',
+    unreachableMemberIds: [],
+  })
   runtime.dispose()
   expect(vi.getTimerCount()).toBe(0)
 })
@@ -334,6 +344,46 @@ it('negotiates one pair for two simultaneous listeners and enables a microphone 
   host.runtime.dispose()
   guest.runtime.dispose()
   expect(track.stop).toHaveBeenCalledOnce()
+})
+it('exposes only failed current members and clears them after recovery, departure and voice exit', async () => {
+  vi.useFakeTimers()
+  const { runtime, context, calls } = setup(vi.fn().mockResolvedValue(fakeStream()))
+  const peers = {
+    ...context.peers,
+    pb: { ...context.peers.pa, id: 'pb', memberId: 'b', name: 'B', role: 'player' as const },
+    pc: { ...context.peers.pa, id: 'pc', memberId: 'c', name: 'C', role: 'guest' as const },
+  }
+  runtime.updateRoom({ ...context, peers })
+  await runtime.connect()
+  for (const id of ['b', 'c'])
+    runtime.handleMessage({
+      from: `p${id}`,
+      seq: 1,
+      type: 'VOICE_JOIN',
+      payload: { voiceSessionId: `v${id}`, micOff: true },
+    })
+  for (const call of calls) call.ready()
+  calls[0].emit({ type: 'error', error: new Error('media failed') })
+  expect(runtime.getSnapshot()).toMatchObject({
+    status: 'interrupted',
+    issue: 'peersUnreachable',
+    unreachableMemberIds: ['b'],
+  })
+  await vi.advanceTimersByTimeAsync(3000)
+  calls[2].ready()
+  expect(runtime.getSnapshot()).toMatchObject({
+    status: 'connected',
+    issue: null,
+    unreachableMemberIds: [],
+  })
+  calls[2].emit({ type: 'error', error: new Error('media failed again') })
+  calls[1].emit({ type: 'error', error: new Error('spectator media failed') })
+  expect(runtime.getSnapshot().unreachableMemberIds).toEqual(['b', 'c'])
+  runtime.updateRoom({ ...context, peers: { pa: context.peers.pa, pc: peers.pc } })
+  expect(runtime.getSnapshot().unreachableMemberIds).toEqual(['c'])
+  runtime.disconnect()
+  expect(runtime.getSnapshot()).toMatchObject({ issue: null, unreachableMemberIds: [] })
+  runtime.dispose()
 })
 it('reports a missing microphone as listener mode rather than permission denial', async () => {
   const { runtime } = setup(vi.fn().mockRejectedValue(new DOMException('missing', 'NotFoundError')))

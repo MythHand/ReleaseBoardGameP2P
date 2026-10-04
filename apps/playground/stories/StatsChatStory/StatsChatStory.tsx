@@ -10,7 +10,7 @@ import type { StatsCopy } from '@/screens/Stats/Stats'
 import { pick, useLang } from '../../Playground/lang'
 import TechBar from '../controls/TechBar'
 import { TechSwitch, TechToggle } from '../controls/TechControls'
-import { useVoiceDemo, VoiceDemoControls } from '../voiceDemo'
+import { useVoiceDemo, VoiceDemoControls, voiceIssueView } from '../voiceDemo'
 import styles from './StatsChatStory.module.css'
 
 const COPY: Record<'ru' | 'en', StatsCopy> = {
@@ -174,6 +174,7 @@ export default function StatsChatStory() {
           voice={
             <VoiceChat
               {...voice.props}
+              issue={voiceIssueView(voice.issue, lang)}
               copy={pick(lang, { ru: ruCommon.voiceChat, en: enCommon.voiceChat })}
             />
           }

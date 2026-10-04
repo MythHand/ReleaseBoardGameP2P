@@ -33,11 +33,17 @@ export type { VideoPlayerCopy, VideoPlayerProps } from './blocks/VideoPlayer'
 export { default as VideoPlayer } from './blocks/VideoPlayer'
 export type {
   VoiceChatCopy,
+  VoiceIssue,
   VoiceParticipant,
   VoiceRole,
   VoiceStatus,
 } from './blocks/VoiceChat'
-export { default as VoiceChat, VoicePanel, VoiceTabIcon } from './blocks/VoiceChat'
+export {
+  default as VoiceChat,
+  VoiceNotices,
+  VoicePanel,
+  VoiceTabIcon,
+} from './blocks/VoiceChat'
 export { default as Loader } from './boot'
 export { buildSequence } from './boot/lines'
 export {

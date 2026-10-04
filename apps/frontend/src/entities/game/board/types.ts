@@ -368,6 +368,7 @@ export interface BoardSlots {
   banner?: ReactNode
   voice?: ReactNode
   voiceTab?: ReactNode
+  voiceNotices?: ReactNode
   chat?: ReactNode
   toasts?: ReactNode
 }
