@@ -690,10 +690,9 @@ it.each([false, true])('reopens a refused Cherry-pick choice (single offer: %s)'
   const pending = cherryPending(options)
   const state = { ...base.state, pending }
   const { rerender } = render(<Board {...base} state={state} actions={{ onResolve }} />)
-  if (!single) {
-    fireEvent.click(screen.getByTestId('cherry-cell-a'))
-    fireEvent.click(screen.getByRole('button', { name: /confirm/i }))
-  }
+  // one card or two, the player answers — Cherry-pick never answers itself
+  fireEvent.click(screen.getByTestId('cherry-cell-a'))
+  fireEvent.click(screen.getByRole('button', { name: /confirm/i }))
   expect(onResolve).toHaveBeenCalledTimes(1)
   rerender(
     <Board
@@ -725,4 +724,21 @@ it.each([false, true])('reopens a refused Cherry-pick choice (single offer: %s)'
   fireEvent.click(screen.getByRole('button', { name: /confirm/i }))
   expect(onResolve).toHaveBeenCalledTimes(2)
   expect(onResolve).toHaveBeenLastCalledWith({ kind: 'pickFromDiscard', card: single ? 'a' : 'b' })
+})
+
+// CHERRY-PICK ALWAYS LAYS THE DISCARD OUT. One card the hand can take — a
+// discard of one card, or a trigger beside it — used to be taken for the player
+// with no grid at all; it is the player's pick like any other (owner, 04.10).
+// Inside keeps answering a single release itself (`boardAi.test.tsx`).
+it('lays out a Cherry-pick of a single card and waits for the player', () => {
+  mockReducedMotion(true)
+  const base = makeBoardProps()
+  const onResolve = vi.fn()
+  const pending = cherryPending([{ uid: 'a', id: 'attack-bug' }])
+  render(<Board {...base} state={{ ...base.state, pending }} actions={{ onResolve }} />)
+  expect(screen.getByTestId('board-cherry-grid')).toBeTruthy()
+  expect(onResolve).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByTestId('cherry-cell-a'))
+  fireEvent.click(screen.getByRole('button', { name: /confirm/i }))
+  expect(onResolve).toHaveBeenCalledWith({ kind: 'pickFromDiscard', card: 'a' })
 })

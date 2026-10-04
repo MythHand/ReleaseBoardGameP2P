@@ -567,7 +567,8 @@ function createDdosScenario(initial: GameState): GameState {
 // slot a Crush Frontend aims at — a Debugger and a Hotfix in hand, and cards in
 // the pile under the trigger. Only what a card would otherwise find missing is
 // changed:
-//   Crush <slot>    — the release it destroys stands in its own slot;
+//   Crush <slot>    — the release it destroys stands in its own slot, and
+//                     Crush Backend's under a Code Review;
 //   Release <slot>  — that slot is empty, or the card has nowhere to go;
 //   Inside          — two releases of different types in the discard, so the
 //                     pick is a choice rather than a card handed over.
@@ -583,9 +584,19 @@ function aiTable(aiCard: string): {
   const crushed = slot('ai-crush-')
   const placed = slot('ai-release-')
   const standing: ReleaseSlot = crushed ?? 'frontend'
+  // Crush Backend's release stands under a Code Review, so the stand shows what
+  // a Crush does to a release paid for with one (owner, 04.10)
+  const reviewed = crushed === 'backend'
   return {
     release:
-      placed === standing ? {} : { [standing]: { card: instance(`release-${standing}`, 32) } },
+      placed === standing
+        ? {}
+        : {
+            [standing]: {
+              card: instance(`release-${standing}`, 32),
+              ...(reviewed ? { codeReview: instance('support-code-review', 35) } : {}),
+            },
+          },
     discard:
       aiCard === 'ai-inside'
         ? [instance('release-backend', 33), instance('release-database', 34)]

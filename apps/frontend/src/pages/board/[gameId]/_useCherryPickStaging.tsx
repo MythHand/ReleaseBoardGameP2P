@@ -227,8 +227,11 @@ export function useCherryPickStaging(args: {
   })
 
   // One candidate is not a choice — #105's Decision 2, and the rule Inside
-  // kept when it had a row of its own. Latched on the pending rather than the mount,
+  // kept when it had a row of its own. INSIDE'S ALONE: Cherry-pick lays the
+  // discard out every time, one card in it or many, and the player takes it
+  // themselves (owner, 04.10). Latched on the pending rather than the mount,
   // so a second, distinct pending is free to fire again.
+  const answersItself = ours?.source === 'ai-inside' && ours.picks === 1
   const answered = useRef<string | null>(null)
   useEffect(() => {
     if (!ours) {
@@ -236,13 +239,13 @@ export function useCherryPickStaging(args: {
       setManualRetry(false)
       return
     }
-    if (manualRetry || ours.picks !== 1 || ours.options.length !== 1) return
+    if (manualRetry || !answersItself || ours.options.length !== 1) return
     const only = ours.options[0]
     const key = `${ours.player}:${ours.source}:${only.uid}`
     if (answered.current === key) return
     answered.current = key
     resolve({ kind: 'pickFromDiscard', card: only.uid })
-  }, [ours, resolve, manualRetry])
+  }, [ours, resolve, manualRetry, answersItself])
 
   // Nothing armed survives the pending it was armed for. `flying` is left
   // alone here on purpose — it clears itself once its own flight lands, and a
@@ -701,7 +704,7 @@ export function useCherryPickStaging(args: {
     ((!ours && !theirs && !confirmed) ||
       (confirmed && reduced) ||
       (ours != null && answeredKey.current === offerKey(ours)) ||
-      (ours?.picks === 1 && ours.options.length < 2 && !manualRetry))
+      (answersItself && (ours?.options.length ?? 0) < 2 && !manualRetry))
   ) {
     return { grid: null, overlay, ...gaps, lifted: null }
   }
