@@ -123,19 +123,16 @@ export function useUpgradeBeat(
         if (!from || !centre || !card) return
         const key = `upgrade-take:${take.uid}`
         const raised = raise([{ key, card, at: from }])
-        // Reserve the departing card's cell, keeping the rest of the row fixed.
-        const ctx = {
+        // The seat it was taken from owes an answer again — the game's own
+        // bookkeeping, not where the card is drawn…
+        const ctx: BeatRun = {
           ...beat,
-          base: {
-            ...beat.base,
-            pending: {
-              ...pending,
-              thrown: pending.thrown.filter((t) => t.card.uid !== take.uid),
-              owed: [...pending.owed, take.fromPlayer],
-            },
-          },
+          base: { ...beat.base, pending: { ...pending, owed: [...pending.owed, take.fromPlayer] } },
         }
-        beat.publish(ctx.base)
+        // …and the row lets go of the card in the run its carrier goes up in,
+        // through the place the row is (`cardPlace`). The rest of the row stays
+        // where it stands: only that seat's answer leaves it.
+        liftOff(ctx, [{ kind: 'upgrade', player: take.fromPlayer }])
         const [el] = await raised
         if (el) await play('playToCenter', el, { to: centre, duration: THROW_DUR })?.finished
         pin(key, centre)

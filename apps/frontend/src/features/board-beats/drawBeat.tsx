@@ -172,13 +172,16 @@ export function useDrawBeat(
           patch('draw', { faceDown: false })
           await wait(AFTER_FLIP)
           const card = cardById(d.card)
-          const at = rectOf(elOf('draw'))
-          drop('draw')
           // The run is what the landing is measured against — the fan it has
           // already grown, not the projection the batch started with (I8).
+          // HANDED OVER AS THE ELEMENT: the step takes the card on screen in the
+          // commit its own flyer mounts, so the carrier comes down only once the
+          // card has landed — dropped first, a card queued behind another
+          // arrival was nowhere until its turn came (#168).
           const c = ctx.current
-          if (card && at && c)
-            await latest.current.land(c, { card, from: at, fallbackKey: `h${d.eventId}` })
+          if (card && c)
+            await latest.current.land(c, { card, el: elOf('draw'), fallbackKey: `h${d.eventId}` })
+          drop('draw')
           continue
         }
 

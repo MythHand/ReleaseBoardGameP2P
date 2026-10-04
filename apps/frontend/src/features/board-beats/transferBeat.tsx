@@ -420,14 +420,15 @@ export function useTransferBeat(
           }
           patch(KEY, { faceDown: false }) // Card plays its own flipCard
           await wait(REVEAL_HOLD)
-          const at = rectOf(elOf(KEY))
-          drop(KEY)
           // A card taken off somebody's hand ARRIVES — the shared movement puts
           // it in the middle of the fan and keeps it there, the same as every
           // reference scene, `PickOpponentCardStory` (this very play) included.
+          // Handed over as the element, and its carrier down once it has landed
+          // (`drawBeat`'s own landing says why).
           const c = ctx.current
-          if (at && c)
-            await latest.current.land(c, { card, from: at, fallbackKey: `t${plan.eventId}` })
+          if (c)
+            await latest.current.land(c, { card, el: elOf(KEY), fallbackKey: `t${plan.eventId}` })
+          drop(KEY)
           return
         }
         if (plan.role === 'victim') {

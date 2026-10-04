@@ -501,8 +501,10 @@ export function useAiBeat(
       await wait(SHOW_HOLD)
       const from = rectOf(elOf(EFF))
       if (plan.mine && from) {
+        // handed over as the element, its carrier down once it has landed
+        // (`drawBeat`'s own landing says why)
+        await latest.current.land(beat, { card, el: elOf(EFF), fallbackKey: `ins${plan.eventId}` })
         drop(EFF)
-        await latest.current.land(beat, { card, from, fallbackKey: `ins${plan.eventId}` })
       } else {
         const seat = a.seatBox(plan.player)
         const el = elOf(EFF)
@@ -552,6 +554,21 @@ export function useAiBeat(
     [raiseCrushed, sendCrushed, leaveTheStanding],
   )
 
+  // THE SAME ROAD HOME after a pick another surface played. Inside's pick is laid
+  // out on Cherry-pick's grid, and that grid plays the taken card and the rest
+  // itself (`useBeats`, `discardPick`) — but the AI card standing behind the
+  // prompt, and its trigger, are this runner's, and they leave the way they
+  // leave after `runTaken`. Left to the grid they had no road at all: Inside
+  // vanished and its trigger dropped into the heap the moment the queue drained
+  // (owner's recording, 04.10).
+  const runLeaving = useCallback(
+    async (plan: Extract<BeatPlan, { kind: 'takenFromDiscard' }>, beat: BeatRun) => {
+      ctx.current = beat
+      await leaveTheStanding(plan)
+    },
+    [leaveTheStanding],
+  )
+
   const reset = useCallback(() => {
     drop()
     resetArrival()
@@ -565,6 +582,7 @@ export function useAiBeat(
     run,
     runTaken,
     runRefused,
+    runLeaving,
     reset,
   }
 }

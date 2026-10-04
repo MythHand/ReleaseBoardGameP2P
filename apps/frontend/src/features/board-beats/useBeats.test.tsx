@@ -966,3 +966,77 @@ it.each([
   expect(view.getByTestId('standing-operation').textContent).toBe('false')
   expect(view.getByTestId('operation-heap').textContent).toBe('d2')
 })
+
+// INSIDE'S PICK IS PLAYED BY THE GRID, and what stood behind it still leaves.
+// Inside lays its pick out on Cherry-pick's surface, so the surface's own
+// handoff plays the taken card and the rest — and the AI card and its trigger,
+// standing at the centre since the reveal, used to have no road at all: Inside
+// vanished and the trigger dropped into the heap the moment the queue drained
+// (owner's recording, 04.10). They leave by the AI runner's own road, after the
+// grid is done.
+it('sends the AI card and its trigger on their way after the grid has played the pick', async () => {
+  motion.reduced = false
+  sent.calls = []
+  const trigger = card('trigger-ai')
+  const before = {
+    ...preDiscard,
+    decks: {
+      ...preDiscard.decks,
+      discard: trigger,
+      discardCount: 1,
+      discardHeap: [{ uid: 'd3', card: trigger, ...scatterAt(3) }],
+    },
+    aiCause: { card: 'trigger-ai', eventId: 3 },
+    pending: {
+      kind: 'pickFromDiscard',
+      raisedAt: 1,
+      picks: 1,
+      player: 'p1',
+      options: [],
+      source: 'ai-inside',
+    },
+  } as unknown as BoardState
+  const after = {
+    ...before,
+    pending: null,
+    aiCause: undefined,
+    you: {
+      ...before.you,
+      hand: [...before.you.hand, { uid: 'r1', card: card('release-frontend') }],
+    },
+  } as unknown as BoardState
+  const taken = {
+    id: 5,
+    type: 'takenFromDiscard',
+    player: 'p1',
+    card: 'release-frontend',
+    to: 'hand',
+  } as Event
+  const grid = vi.fn(async () => {})
+  const discardPick = { current: { card: 'release-frontend', run: grid } }
+  const placed = {
+    ...stub,
+    cause: { current: node() },
+    effect: { current: node() },
+    eventsBox: { current: node() },
+  } as unknown as BoardAnchors
+  function PickProbe({ live, feed }: { live: BoardState; feed: Event[] }) {
+    const beats = useBeats({ live, events: feed, anchors: placed, enabled: true, discardPick })
+    return <>{beats.overlays}</>
+  }
+  vi.useFakeTimers()
+  try {
+    const view = render(<PickProbe live={before} feed={[]} />)
+    view.rerender(<PickProbe live={after} feed={[taken]} />)
+    for (let i = 0; i < 150; i++)
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(20)
+      })
+    // the grid played the pick…
+    expect(grid).toHaveBeenCalledTimes(1)
+    // …and the trigger flew to the heap after it, by the AI runner's own exit
+    expect(sent.calls.flat()).toEqual([expect.objectContaining({ key: 'd3' })])
+  } finally {
+    motion.reduced = true
+  }
+})

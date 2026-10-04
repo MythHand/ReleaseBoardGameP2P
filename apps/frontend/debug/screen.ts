@@ -65,10 +65,68 @@ function copyOf(card: Element, id: string): string | null {
   return null
 }
 
+// HOW A CARD LIES, as the eye sees it: its centre and width on the page, the
+// angle it is turned to, and its LAYER — where it falls in the order the page
+// paints every visible card, 0 the lowest. Which card covers which, and whether
+// a card at rest jumped or slid under its neighbour, is read off these.
+export type Pose = [x: number, y: number, w: number, rot: number, z: number]
+
+// The angle a node is drawn at: its own turn and every turn around it, read off
+// the computed transform — the one an animation is playing included.
+function angleOf(el: Element): number {
+  let deg = 0
+  for (let n: Element | null = el; n && n !== document.body; n = n.parentElement) {
+    const t = getComputedStyle(n).transform
+    if (!t || t === 'none') continue
+    const m = /^matrix(?:3d)?\(([^)]+)\)/.exec(t)
+    if (m) {
+      const [a, b] = m[1].split(',').map(Number)
+      deg += (Math.atan2(b, a) * 180) / Math.PI
+      continue
+    }
+    // a page that does not resolve transforms to a matrix (a test's) keeps it as written
+    const r = /rotate\((-?[\d.]+)deg\)/.exec(t)
+    if (r) deg += Number(r[1])
+  }
+  return Math.round(deg * 10) / 10
+}
+
+// The stacking contexts a node is painted in, outermost first, each with the
+// level it is given in its parent — the CSS painting order, reduced to what
+// tells two cards apart. The card itself closes the chain.
+function layersOf(el: Element): { node: Element; z: number }[] {
+  const chain: { node: Element; z: number }[] = [{ node: el, z: 0 }]
+  for (let n = el.parentElement; n && n !== document.documentElement; n = n.parentElement) {
+    const s = getComputedStyle(n)
+    const z = s.zIndex === 'auto' ? null : Number(s.zIndex)
+    const positioned = s.position !== 'static'
+    const context =
+      (positioned && z !== null) ||
+      s.position === 'fixed' ||
+      s.position === 'sticky' ||
+      Number(s.opacity) < 1 ||
+      (s.transform !== '' && s.transform !== 'none') ||
+      s.isolation === 'isolate'
+    if (context) chain.unshift({ node: n, z: z ?? 0 })
+  }
+  return chain
+}
+
+// which of two cards the page paints later — over the other where they overlap
+function above(a: { node: Element; z: number }[], b: { node: Element; z: number }[]): number {
+  let i = 0
+  while (i < a.length - 1 && i < b.length - 1 && a[i].node === b[i].node) i++
+  if (a[i].z !== b[i].z) return a[i].z - b[i].z
+  if (a[i].node === b[i].node) return 0
+  return a[i].node.compareDocumentPosition(b[i].node) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1
+}
+
 export interface ScreenFrame {
   // place → the cards visible in it, in page order: the copy (`attack-bug#6`)
   // where the page names it, the card (`attack-bug`) where it does not
   cards: Record<string, string[]>
+  // place → how each of those cards lies, in the same order as `cards`
+  poses: Record<string, Pose[]>
   // a card visible more than once at the same time — unless every one of those
   // is a different, named copy, which is two cards and not one drawn twice
   twice: string[]
@@ -76,7 +134,9 @@ export interface ScreenFrame {
 
 export function readScreen(): ScreenFrame {
   const cards: Record<string, string[]> = {}
+  const poses: Record<string, Pose[]> = {}
   const copies = new Map<string, (string | null)[]>()
+  const visible: { el: Element; pose: Pose }[] = []
   for (const el of document.querySelectorAll('[data-card], [data-face-down]')) {
     // a card face nested inside another card's node is the same card
     if (el.parentElement?.closest('[data-card], [data-face-down]')) continue
@@ -85,9 +145,30 @@ export function readScreen(): ScreenFrame {
     const copy = id === 'back' ? null : copyOf(el, id)
     const where = whereOf(el)
     if (!cards[where]) cards[where] = []
+    if (!poses[where]) poses[where] = []
     cards[where].push(copy ?? id)
+    const r = el.getBoundingClientRect()
+    const pose: Pose = [
+      Math.round(r.left + r.width / 2),
+      Math.round(r.top + r.height / 2),
+      Math.round(r.width),
+      angleOf(el),
+      0,
+    ]
+    poses[where].push(pose)
+    visible.push({ el, pose })
     if (id !== 'back') copies.set(id, [...(copies.get(id) ?? []), copy])
   }
+  // the layer is the card's place in the order the page paints them all
+  const chains = new Map(visible.map((s) => [s.el, layersOf(s.el)]))
+  const painted = [...visible].sort((a, b) => {
+    const ca = chains.get(a.el) ?? []
+    const cb = chains.get(b.el) ?? []
+    return above(ca, cb)
+  })
+  painted.forEach((s, z) => {
+    s.pose[4] = z
+  })
   const twice = [...copies]
     .filter(([, seen]) => {
       if (seen.length < 2) return false
@@ -95,7 +176,7 @@ export function readScreen(): ScreenFrame {
       return named.length < seen.length || new Set(named).size < named.length
     })
     .map(([id]) => id)
-  return { cards, twice }
+  return { cards, poses, twice }
 }
 
 /** Reads the screen on every painted frame and hands on each one that differs. */

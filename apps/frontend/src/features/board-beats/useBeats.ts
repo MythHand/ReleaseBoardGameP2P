@@ -513,7 +513,9 @@ export function useBeats(args: {
             // the handoff is the one that knows whose pick it is.
             if (discardPick && local && (local.card === undefined || local.card === plan.card)) {
               discardPick.current = null
-              return local.run(ctx, plan.card)
+              // …and what stood behind the prompt leaves after it, by the AI
+              // runner's own road — the surface owns the pick, not the AI card
+              return local.run(ctx, plan.card).then(() => ais.runLeaving(plan, ctx))
             }
             return ais.runTaken(plan, ctx)
           },
@@ -544,6 +546,7 @@ export function useBeats(args: {
       ais.run,
       ais.runTaken,
       ais.runRefused,
+      ais.runLeaving,
       shownCards.runShown,
       shownCards.runTakenBack,
       discardPick,

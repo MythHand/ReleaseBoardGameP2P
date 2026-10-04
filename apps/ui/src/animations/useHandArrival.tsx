@@ -80,6 +80,9 @@ interface Flight {
   // into poses — translate along the path, turning and resizing as it goes
   frames: Keyframe[]
   z: number // the slot's layer, taken once it has tucked under the fan
+  // the card already drawn on screen that this flyer IS — stepped aside in the
+  // commit the flyer mounts, see the overlay's ref
+  source?: HTMLElement
 }
 
 export function useHandArrival(
@@ -238,12 +241,13 @@ export function useHandArrival(
             }
           }),
           z: place.z,
+          // a card already drawn on screen is not copied — it steps aside for
+          // its flyer. One half of a pair is not: the pair stands on as a whole
+          source: it.el && !it.anchor ? it.el : undefined,
         }
       })
       .filter((f): f is Flight => f != null)
     if (list.length === 0) return false
-    // a card already drawn on screen is not copied — it steps aside for its flyer
-    for (const it of items) if (it.el && !it.anchor) it.el.style.opacity = '0'
 
     size.current = list.length
     setFlights(list)
@@ -275,6 +279,11 @@ export function useHandArrival(
         // the flight is played ON the node, so the step has to hold it
         if (el) nodes.current.set(f.key, el)
         else nodes.current.delete(f.key)
+        // ONE CARD, ONE PLACE (#168): the card on screen steps aside in the very
+        // commit its flyer mounts — before the paint, so no frame has both and
+        // none has neither. Hidden when the flight was asked for, it was gone a
+        // render before the flyer that replaces it existed.
+        if (el && f.source) f.source.style.opacity = '0'
       }}
       className={styles.arriving}
       style={{

@@ -27,6 +27,34 @@ it('says where each card stands, by the places marked around it', () => {
   expect(frame.twice).toEqual(['attack-bug'])
 })
 
+// HOW EACH CARD LIES, beside where it stands: its angle and its layer — the
+// order the page paints the cards in, which is what says which covers which.
+// The heap names its own layers; a carrier in the air is painted over them all,
+// though the page holds it first.
+it('says how each card lies: its angle, and which card is painted over which', () => {
+  document.body.innerHTML = `
+    <div class="_flyer_x1y2" style="position: fixed; z-index: 50; transform: rotate(-4deg)">
+      <div data-card="attack-ddos"></div>
+    </div>
+    <div class="_box_a1">
+      <div class="_heapCard_b2" style="position: absolute; z-index: 1; transform: rotate(7deg)">
+        <div data-card="attack-bug"></div>
+      </div>
+      <div class="_heapCard_b2" style="position: absolute; z-index: 0; transform: rotate(-3deg)">
+        <div data-card="defense-hotfix"></div>
+      </div>
+    </div>`
+  const frame = readScreen()
+  expect(frame.cards['heapCard<box']).toEqual(['attack-bug', 'defense-hotfix'])
+  // the angle each is drawn at
+  expect(frame.poses['heapCard<box'].map((p) => p[3])).toEqual([7, -3])
+  expect(frame.poses.flyer[0][3]).toBe(-4)
+  // the layer: the Hotfix under the Bug though the page holds it later, and the
+  // carrier over both though the page holds it first
+  expect(frame.poses['heapCard<box'].map((p) => p[4])).toEqual([1, 0])
+  expect(frame.poses.flyer[0][4]).toBe(2)
+})
+
 it('does not take two named copies of one card for one card drawn twice', () => {
   document.body.innerHTML = `
     <div data-hand-slot="defense-hotfix#1"><div data-card="defense-hotfix"></div></div>

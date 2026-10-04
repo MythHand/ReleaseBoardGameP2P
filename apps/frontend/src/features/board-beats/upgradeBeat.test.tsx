@@ -345,6 +345,13 @@ it.each([
   } as Extract<BeatPlan, { kind: 'upgrade' }>
   await drive(() => api.beat?.run(take, { ...ctx, base: before }))
   expect(timeline.motions[0]).toBe('playToCenter')
+  // the row lets go of the taken card as its carrier goes up — that seat's
+  // answer alone, the rest of the row standing — and that seat owes again
+  const lifted = ctx.publish.mock.calls[0][0] as BoardState
+  expect(lifted.pending?.kind === 'systemUpgrade' && lifted.pending.thrown).toEqual([
+    { player: 'p3', card: { uid: 'remaining', id: 'attack-bug' } },
+  ])
+  expect(lifted.pending?.kind === 'systemUpgrade' && lifted.pending.owed).toEqual(['p2'])
   // the card that stays behind leaves on a carrier raised where IT stands (p3's
   // place), and the row stops drawing it in the commit that carrier goes up
   expect(timeline.exits).toHaveBeenCalledWith([
