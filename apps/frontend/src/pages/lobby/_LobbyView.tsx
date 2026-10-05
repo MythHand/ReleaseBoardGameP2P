@@ -61,7 +61,7 @@ export default function LobbyView() {
   // me, when I hold a seat — a spectator has no readiness to give
   const me = players.find((p) => p.id === state.selfId)
   const capacity = state.maxPlayers
-  const minCapacity = 2
+  const minCapacity = Math.max(2, players.length)
   // What the table can actually give right now — capped by the free seats — as
   // distinct from `state.bots`, the raw number the host asked for. They differ
   // whenever people fill or leave seats.
@@ -308,8 +308,16 @@ export default function LobbyView() {
                 className={styles.capRow}
                 label={t('lobbyScreen.specLimit')}
                 value={state.maxSpectators}
-                min={spectators.length}
+                min={0}
                 max={28}
+                color={
+                  state.maxSpectators <= 8
+                    ? 'var(--mint)'
+                    : state.maxSpectators <= 18
+                      ? 'var(--gold)'
+                      : 'var(--coral)'
+                }
+                fill
                 onChange={session.setMaxSpectators}
               />
             )}

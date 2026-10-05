@@ -124,9 +124,9 @@ const MOCK_SPECTATORS: Spectator[] = [
 // светофор для лимита зрителей: 0–8 зелёный, 9–18 жёлтый, 19–28 красный
 const SPEC_MAX = 28
 function specColorFor(n: number) {
-  if (n <= 8) return '#8fd9b0'
-  if (n <= 18) return '#e3b341'
-  return '#ff6b81'
+  if (n <= 8) return 'var(--mint)'
+  if (n <= 18) return 'var(--gold)'
+  return 'var(--coral)'
 }
 
 export default function Lobby({
@@ -373,11 +373,10 @@ export default function Lobby({
                 className={styles.capRow}
                 label={copy.specLimit}
                 value={specCapacity}
-                min={spectators.length}
+                min={0}
                 max={SPEC_MAX}
                 onChange={(n) => {
-                  if (Number.isInteger(n) && n >= spectators.length && n <= SPEC_MAX)
-                    setSpecCapacity(n)
+                  if (Number.isInteger(n) && n >= 0 && n <= SPEC_MAX) setSpecCapacity(n)
                 }}
                 color={specColor}
                 fill

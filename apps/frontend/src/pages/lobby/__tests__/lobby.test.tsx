@@ -585,3 +585,36 @@ it('shows voice above chat and joins through the session facade', () => {
   fireEvent.click(screen.getByRole('button', { name: 'voiceChat.connect' }))
   expect(sessionValue.voice.connect).toHaveBeenCalledOnce()
 })
+
+it('keeps spectator admission adjustable below occupancy and player capacity above occupancy', () => {
+  const session = inSession()
+  if (!session.state) throw new Error('Missing lobby')
+  sessionValue = {
+    ...session,
+    state: {
+      ...session.state,
+      peers: {
+        ...session.state.peers,
+        p2: { id: 'p2', memberId: 'p2', name: 'Two', role: 'player', ready: false, where: 'lobby' },
+        s1: {
+          id: 's1',
+          memberId: 's1',
+          name: 'Watcher',
+          role: 'guest',
+          ready: false,
+          where: 'lobby',
+        },
+      },
+    },
+  }
+  renderInRouter(<LobbyView />)
+  const sliders = screen.getAllByRole('slider')
+  const quota = sliders.find((slider) => slider.getAttribute('max') === '28')
+  const capacity = sliders.find((slider) => slider.getAttribute('max') === '6')
+  expect(capacity?.getAttribute('min')).toBe('3')
+  expect(quota?.getAttribute('min')).toBe('0')
+  if (!quota) throw new Error('Missing spectator quota')
+  fireEvent.change(quota, { target: { value: '0' } })
+  expect(sessionValue.setMaxSpectators).toHaveBeenCalledWith(0)
+  expect(screen.getByText('Watcher')).toBeTruthy()
+})

@@ -25,6 +25,7 @@
 
 .name {
   composes: body-sm tk-03 from '../../design/typography.module.css';
+  min-inline-size: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -49,6 +50,7 @@
 }
 
 .eliminated .name {
+  min-inline-size: 0;
   color: var(--white-50);
 }
 

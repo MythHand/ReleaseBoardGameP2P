@@ -350,34 +350,24 @@
   z-index: 5;
 }
 
-/* Observers use every seat; the shared centre moves below the second row. */
+/* Spectators keep up to five seats in the player's usual upper row. Only a
+   full six-seat table adds three seats in the vacant hand area below. */
 .table[data-spectator] {
-  --table-centre-top: 60%;
+  --table-centre-top: 50%;
 }
 
-.table[data-spectator] .opponents {
+.table[data-spectator][data-seats="6"] .opponents {
+  inset-block-end: 140px;
   display: grid;
+  grid-template-rows: repeat(2, max-content);
   grid-template-columns: repeat(3, max-content);
+  align-content: space-between;
 }
 
-.table[data-spectator][data-seats="2"] .opponents {
-  grid-template-columns: repeat(2, max-content);
-}
-
-.table[data-spectator]:is([data-seats="4"], [data-seats="5"], [data-seats="6"]) {
-  --table-centre-top: 74%;
-}
-
-/* Public piles occupy one row below the seats. Their measured card boxes stay
-   untransformed so the same anchors can receive live flights. */
+/* Measured pile boxes stay untransformed so they retain live flight anchors. */
 .table[data-spectator] .decks,
 .table[data-spectator] .discard {
   inset-block: 174px 142px;
-}
-
-.table[data-spectator]:is([data-seats="4"], [data-seats="5"], [data-seats="6"]) .decks,
-.table[data-spectator]:is([data-seats="4"], [data-seats="5"], [data-seats="6"]) .discard {
-  inset-block-start: 324px;
 }
 
 .table[data-spectator] .decksGrid {
@@ -387,4 +377,37 @@
 .table[data-spectator] .eventsPile {
   grid-row: auto;
   grid-column: auto;
+}
+
+/* Four/five public seats share the available row width. Card sizes are real
+   layout dimensions, so flights continue to measure the visible slot boxes. */
+.table[data-spectator]:is([data-seats="4"], [data-seats="5"]) .opponents {
+  inset-inline: 40px 86px;
+  inline-size: auto;
+  max-inline-size: none;
+  container-type: inline-size;
+  transform: none;
+}
+
+.table[data-spectator][data-seats="4"] .opponents {
+  --seat-card-size: min(72px, calc((100cqw - 310px) * 0.0875));
+}
+
+.table[data-spectator][data-seats="5"] .opponents {
+  --seat-card-size: min(72px, calc((100cqw - 392px) * 0.07));
+}
+
+.table[data-spectator][data-seats="6"] .decks,
+.table[data-spectator][data-seats="6"] .discard {
+  inset-block-end: 280px;
+}
+
+.table[data-spectator][data-seats="4"] .opponents > * {
+  inline-size: calc((100% - 54px) / 4);
+  max-inline-size: 270px;
+}
+
+.table[data-spectator][data-seats="5"] .opponents > * {
+  inline-size: calc((100% - 72px) / 5);
+  max-inline-size: 270px;
 }

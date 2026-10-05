@@ -57,3 +57,25 @@
 **Отложенное Minor:** форма входа не показывает доступность другой роли из joinAvailability после отказа. Отказ выбранной роли объяснён, но свободную альтернативу пользователь узнает после дополнительной попытки.
 
 **Принятые решения и риск:** реальный P2P прогон оставлен неподтверждённым после неудачного ICE в Chrome; после проверки во встроенном браузере это ограничение сохранено. В обоих случаях цена решения — сетевой дефект может остаться до проверки в рабочем WebRTC-окружении. Существующая видимость neutralize503.methods/crush.methods между игроками сохранена согласно согласованному объёму; для зрителей поля удалены. Цена этого решения — прежняя доступность информации между игроками остаётся и требует отдельного продуктового решения.
+
+
+## Review corrections 2026-10-05
+
+- SYNC snapshots retain refusals separately from history, including repeated IDs. The
+  keeper -> useLobby -> useGame regression covers two refusals before mount, a successful
+  SYNC and another refusal, without persistence or replay.
+- Owner comments supersede the original quota rules: lowering spectator admission does
+  not remove connected spectators; player capacity cannot demote connected players.
+- Spectator layout uses one upper row for 2-5 seats and a 3+3 layout for six. The lobby
+  spectator slider restores green/yellow/red feedback for 0-8/9-18/19-28.
+
+Validation of the corrections: Node 24.13.0 / pnpm 9.15.0; 2,488 tests in
+196 files passed with two workers (engine 509, frontend 1,709, UI 261, PeerServer 6,
+playground 3). Typecheck, lint/Stylelint, build and diff whitespace checks passed.
+Existing Vite deprecation, jsdom canvas and bundle-size warnings remain.
+
+Fresh in-app Chromium checks covered 5-seat upper-row and 6-seat 3+3 layouts at
+1280x720, plus the six-seat layout at 1920x1080. The actual debug Board public
+attack/defence centre remained clear of seats with no local hand. The prototype
+lobby slider showed gold fill at 17, then retained both watchers at limit 0.
+These are local UI checks; the real P2P acceptance limitation above remains.
