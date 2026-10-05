@@ -4708,14 +4708,15 @@ it('exposes moderation errors and persists the spectator limit in room and keepe
     })
     expect(result.current.state?.peers[GUEST]).toMatchObject({ role: 'guest', ready: false })
     act(() => result.current.setMaxSpectators(0))
-    expect(result.current.lobbyActionError).toBe('spectators-full')
-    expect(readSession()?.lobbyConfig?.maxSpectators).toBe(1)
+    expect(result.current.lobbyActionError).toBeNull()
+    expect(result.current.state?.peers[GUEST].role).toBe('guest')
+    expect(readSession()?.lobbyConfig?.maxSpectators).toBe(0)
     act(() => {
       result.current.setParticipantRole(GUEST, 'player')
       result.current.startGame([])
       vi.advanceTimersByTime(KEEPER_SAVE_MS)
     })
-    expect(readKeeper()?.lobbyConfig?.maxSpectators).toBe(1)
+    expect(readKeeper()?.lobbyConfig?.maxSpectators).toBe(0)
   } finally {
     vi.useRealTimers()
   }
@@ -4904,4 +4905,38 @@ it('ignores host moderation invoked through a guest API', async () => {
   })
   expect(result.current.state).toBe(before)
   expect(transports[0].broadcast).not.toHaveBeenCalled()
+})
+
+it('delivers repeated keeper refusals through the session to useGame without logging or replaying them', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => result.current.createRoom('Ann', 2))
+  act(() => {
+    result.current.setBots(1)
+    result.current.startGame(['Bot'])
+    result.current.introReady()
+  })
+  act(() => {
+    result.current.gameLink?.submit({ type: 'PLAY', card: 'missing-card' })
+    result.current.gameLink?.submit({ type: 'PLAY', card: 'missing-card' })
+  })
+  gameSession = result.current
+  const game = renderTestingHook(() => useGame())
+  try {
+    expect(game.result.current.rejections).toHaveLength(2)
+    expect(game.result.current.rejections[0].id).toBe(game.result.current.rejections[1].id)
+    expect(game.result.current.events.some((event) => event.type === 'rejected')).toBe(false)
+    act(() => result.current.gameLink?.submit({ type: 'DRAW' }))
+    gameSession = result.current
+    game.rerender()
+    expect(game.result.current.rejections).toHaveLength(2)
+    act(() => result.current.gameLink?.submit({ type: 'PLAY', card: 'missing-card' }))
+    gameSession = result.current
+    game.rerender()
+    expect(game.result.current.rejections).toHaveLength(3)
+    expect(readLog(result.current.gameId ?? '')?.some((event) => event.type === 'rejected')).toBe(
+      false,
+    )
+  } finally {
+    game.unmount()
+  }
 })

@@ -178,7 +178,9 @@ export function useGame(): Game {
     view: sync?.view ?? null,
     events: pending.length > 0 ? mergeEvents(carried, pending) : carried,
     restoredThrough: restoredNow,
-    rejections: pendingRefused.length > 0 ? [...rejections, ...pendingRefused] : rejections,
+    rejections:
+      sync?.rejections ??
+      (pendingRefused.length > 0 ? [...rejections, ...pendingRefused] : rejections),
     play: (card, target, combo) => submit({ type: 'PLAY', card, target, combo }),
     draw: (pile) => submit({ type: 'DRAW', pile }),
     push: () => submit({ type: 'PUSH' }),

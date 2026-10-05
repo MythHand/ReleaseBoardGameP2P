@@ -20,6 +20,7 @@ export type LobbyActionError =
   | 'invalid-limit'
   | 'spectators-full'
   | 'players-full'
+  | 'players-present'
   | 'match-running'
   | 'invalid-target'
 
@@ -197,54 +198,14 @@ export function kick(state: LobbyState, peerId: string, reason?: string): Result
 export function setMaxPlayers(state: LobbyState, maxPlayers: number): Result {
   if (!Number.isInteger(maxPlayers)) return { state, outgoing: [], error: 'invalid-limit' }
   const clamped = Math.min(6, Math.max(2, Math.trunc(maxPlayers)))
-  // Lowering the cap must demote the now over-capacity players to guests in
-  // join order, otherwise playerCount()/canStart() would still count them and
-  // the game could start above the new cap. The host always keeps a slot.
-  const peers: Record<string, PeerInfo> = {}
-  const demoted: PeerInfo[] = []
-  let players = 0
-  for (const peer of Object.values(state.peers)) {
-    if (peer.role === 'host') {
-      peers[peer.id] = peer
-      players += 1
-    } else if (peer.role === 'player') {
-      if (players < clamped) {
-        peers[peer.id] = peer
-        players += 1
-      } else {
-        const guest: PeerInfo = { ...peer, role: 'guest', ready: false }
-        peers[peer.id] = guest
-        demoted.push(guest)
-      }
-    } else {
-      peers[peer.id] = peer
-    }
-  }
-  if (spectatorCount(state) + demoted.length > state.maxSpectators)
-    return { state, outgoing: [], error: 'spectators-full' }
-  const next = applyConfig({ ...state, peers }, { maxPlayers: clamped })
+  if (clamped < playerCount(state)) return { state, outgoing: [], error: 'players-present' }
   return {
-    state: next,
+    state: applyConfig(state, { maxPlayers: clamped }),
     outgoing: [
       {
         to: 'broadcast',
         message: { type: 'LOBBY_CONFIG_UPDATED', payload: { maxPlayers: clamped } },
       },
-      // Propagate each demotion so guests' rosters stay consistent with the host.
-      ...demoted.map((peer) => ({
-        to: 'broadcast' as const,
-        message: {
-          type: 'PEER_JOINED' as const,
-          payload: {
-            id: peer.id,
-            memberId: peer.memberId,
-            name: peer.name,
-            role: peer.role,
-            ready: peer.ready,
-            where: peer.where,
-          },
-        },
-      })),
     ],
   }
 }
@@ -286,8 +247,6 @@ export function disbandLobby(state: LobbyState): Result {
 
 export function setMaxSpectators(state: LobbyState, maxSpectators: number): Result {
   if (!validSpectatorLimit(maxSpectators)) return { state, outgoing: [], error: 'invalid-limit' }
-  if (maxSpectators < spectatorCount(state))
-    return { state, outgoing: [], error: 'spectators-full' }
   return {
     state: applyConfig(state, { maxSpectators }),
     outgoing: [

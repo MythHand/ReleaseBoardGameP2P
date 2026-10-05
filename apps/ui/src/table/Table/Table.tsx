@@ -40,9 +40,9 @@ import { useTableInteractions } from './useTableInteractions'
 // 0–8 зелёный, 9–18 жёлтый, 19–28 красный
 const SPEC_MAX = 28
 function specColorFor(n: number) {
-  if (n <= 8) return '#8fd9b0'
-  if (n <= 18) return '#e3b341'
-  return '#ff6b81'
+  if (n <= 8) return 'var(--mint)'
+  if (n <= 18) return 'var(--gold)'
+  return 'var(--coral)'
 }
 
 // Ширина выезжающей панели зависит от типа контента вкладки.
@@ -573,7 +573,7 @@ function TableView({
                       <SettingsField label={copy.table.specLimit}>
                         <Slider
                           value={spectatorLimit ?? 0}
-                          min={spectators.length}
+                          min={0}
                           max={SPEC_MAX}
                           onChange={(n) => onSpectatorLimitChange?.(n)}
                           color={specColorFor(spectatorLimit ?? 0)}

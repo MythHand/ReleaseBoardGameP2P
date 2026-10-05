@@ -468,9 +468,10 @@
     "bugRunner": "Mini-game: press to make the bug jump",
     "cancel": "cancel",
     "errors": {
-      "invalid-limit": "Choose a whole number between 0 and 28, at least the number of connected spectators.",
-      "spectators-full": "No free spectator places. Increase the spectator limit first.",
+      "invalid-limit": "Choose a whole spectator limit between 0 and 28 or a player capacity between 2 and 6.",
+      "spectators-full": "The spectator limit is reached. Increase it or wait for a spectator to leave.",
       "players-full": "No free player seats.",
+      "players-present": "Player capacity cannot be lower than the number of connected players.",
       "match-running": "Roles can be changed after the match.",
       "invalid-target": "Only a human participant in the lobby can change roles."
     }

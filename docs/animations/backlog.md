@@ -2359,3 +2359,12 @@ keeper отдаёт публичный snapshot и события. Ранее о
 **Что закроет.** Слои вуали, веера, TurnDock и мест соперников как одно решение вместе с полётами в
 них. Владелец 04.10: не в #168.
 **Статус.** `открыто`.
+
+
+### Spectator layout - owner clarification 2026-10-05
+
+[PR #214 comment](https://github.com/MythHand/ReleaseBoardGameP2P/pull/214#issuecomment-5998127154)
+supersedes the earlier rows of three: 2-5 seats share the upper row; six seats split three
+above and three in the vacant hand area. Four/five seats adapt their real card dimensions
+to the available row width. Flight anchors measure those dimensions without CSS scaling.
+With six seats, the piles occupy the gap between rows.
