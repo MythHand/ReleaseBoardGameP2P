@@ -78,6 +78,7 @@ export function createGame(config: GameConfig): GameState {
       release: {},
       frozen: [],
       replayLocked: [],
+      shown: [],
       // Only the reserved Debugger is dealt openly. A seat that got none — an
       // under-supplied deck — has nothing face up, even if a surplus Debugger
       // happened to come off `rest` into this hand.

@@ -4,7 +4,7 @@ Each recipe is an **independent action**: an explicit trigger + guard, the exact
 sequence, the verbatim params/timings, the invariants that keep it stable, and the cleanup —
 so it can be called at the right game moment and replay identically on repeat.
 
-Read the shared model and the `I1…I10` invariants in [`README.md`](./README.md) first; recipes
+Read the shared model and the `I1…I12` invariants in [`README.md`](./README.md) first; recipes
 reference those by number instead of repeating them.
 
 **Where a movement has a step, the recipe names the step — it does not restate its mechanics.**
@@ -1457,7 +1457,7 @@ plan field — see Task 10) is what keeps the strong glow lit for the length of 
 |---|---|
 | answer's open hold before the exchange leaves | `SHOW_HOLD = 1200` |
 | the cover's own offset | `COVER_POSE = { rot: 6, dx: 16, dy: -12 }` |
-| the alarm's own rest tilt | `ATTACK_POSE = { rot: -4, dx: 0, dy: 0 }` |
+| the alarm stands and leaves straight (dealt by the system, **I11**; `Error503Story`, owner 03.10) | `ALARM_POSE = { rot: 0, dx: 0, dy: 0 }` |
 | gather hold before the defenceless sweep scatters | `GATHER_HOLD = 1500` |
 
 **Building blocks**
@@ -1722,7 +1722,7 @@ each one read off what the plan already decided rather than re-derived from the 
 | Ending | What the table sees |
 |---|---|
 | `zone` | the effect card settles into an empty release/monitoring slot (`playToReleaseZone`) and STAYS — a card standing in a zone slot is what the batch's own `released`/`placed` looks like from outside this beat. |
-| `crush` | the destroyed release rises as its own flyer at its own slot, in the same commit the zone lets go of it, and takes its own road — the events deck (`returnToDeck`) or the discard (the discard-exit step), whichever the plan's `destination` says (read off `releaseEventsOf`, never guessed from the card's id); the effect card goes home once the trigger and the destroyed release have left. |
+| `crush` | the destroyed release rises as its own flyer at its own slot — with its Code Review, if it stood under one, as a second flyer at the pair's tilt — in the same commit the zone lets go of them, and takes its own road: the events deck (`returnToDeck`) for an AI release, the discard otherwise, whichever the plan's `destination` says (read off `releaseEventsOf`, never guessed from the card's id). Into the discard they fly on their own `discarded` events and land in one commit, the Code Review under the release (`resolution.md` §9, owner 04.10); the effect card goes home once the trigger and the destroyed release have left. |
 | `turnEnded` | the turn simply ends; the effect goes home. |
 | `alarm` | the effect mimics an Error 503 that resolved with nobody able to answer it (no pending raised); the effect goes home. |
 | `none` | nothing else followed in the batch; the effect goes home. |
@@ -1761,10 +1761,15 @@ question remains open in the backlog. This is a presentation handoff, not an eng
 4. A `standing` ending publishes the pending and `aiCause`, waits a frame boundary and releases
    both reveal flyers without an exit. Other endings continue below.
 5. A `crush` raises the destroyed release as its own flyer, at its own slot, in the same commit the
-   zone lets go of it.
+   zone lets go of it (`raiseCrushed`, `liftOff` the zone — **I12**). Its Code Review rises beside
+   it at `PAIR_AUX`'s tilt; the two take the exit ladder's layers (`exitLayer(1)` the Code Review,
+   `exitLayer(2)` the release), the trigger lower still.
 6. Three legs run together (`Promise.all`): the trigger to the discard on
    `scatterAt(plan.triggerDiscardId)` (**I7**); the effect down its ending's road; a `crush`'s
-   destroyed release down `plan.tail.destination`'s road.
+   destroyed release down `plan.tail.destination`'s road (`sendCrushed`). Into the discard, the
+   release and its Code Review fly on `scatterAt` of their own `discarded` events
+   (`releaseDiscardId`, `codeReviewDiscardId`, which the plan claims so no discard beat flies them
+   twice) and land in one `setDown` onto the heap — Code Review under, release on top.
 
 **Sequence — `runTaken` (`takenFromDiscard`)**
 `ai-inside`'s own answer, resolved. One path, two audiences:

@@ -455,6 +455,7 @@ function TableView({
             onDraw={actions?.onDraw ? () => actions.onDraw?.() : undefined}
             onPush={actions?.onPush}
             onPass={actions?.onPass}
+            onUnpass={actions?.onUnpass}
           />
         </div>
 

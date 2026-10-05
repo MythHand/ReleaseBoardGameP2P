@@ -166,8 +166,15 @@ export function createTransport(args: {
         media,
         id: id as string,
         connectTo(peerId) {
+          // ORDERED (#168). Without `reliable`, PeerJS opens the channel with
+          // `ordered: false`, and nothing here puts frames back in order: a
+          // player's take-back could reach the keeper ahead of the put-out it
+          // answers and be refused, and the put-out then left the card on the
+          // table the player had taken it off. The keeper runs a player's
+          // intents one by one; this makes them arrive in the order made — and
+          // the keeper's own syncs back in the order sent.
           dataDialPeers.add(peerId)
-          const connection = peer.connect(peerId)
+          const connection = peer.connect(peerId, { reliable: true })
           dataDials.set(peerId, connection)
           wire(connection, true)
         },

@@ -41,6 +41,6 @@ export async function toEventsDeck({ node, from, deck, turnFaceDown }: Homeward)
   }
   const box = deck?.getBoundingClientRect()
   if (!node || !from || !box) return
-  const anim = play('returnToDeck', node, { from, to: cardAreaOf(box) })
+  const anim = play('returnToDeck', node, { to: cardAreaOf(box) })
   if (anim) await anim.finished
 }

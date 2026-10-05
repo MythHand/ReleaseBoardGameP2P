@@ -52,7 +52,7 @@ it('resolves discardForRelease with the picked card', () => {
   const onResolve = vi.fn()
   const { getAllByRole, getByRole } = render(
     <PendingPrompt
-      pending={{ kind: 'discardForRelease', player: 'you', options: ['c1', 'c2'] }}
+      pending={{ kind: 'discardForRelease', player: 'you', release: 'rel', options: ['c1', 'c2'] }}
       hand={[
         { uid: 'c1', card: { id: 'attack-bug' } as Card },
         { uid: 'c2', card: { id: 'release-frontend' } as Card },
@@ -150,8 +150,18 @@ it('cannot resolve a stale selection once a new pending of the same kind/player 
     { uid: 'c2', card: makeCard('release-frontend') },
     { uid: 'c3', card: makeCard('release-backend') },
   ]
-  const first: TablePending = { kind: 'discardForRelease', player: 'you', options: ['c1', 'c2'] }
-  const second: TablePending = { kind: 'discardForRelease', player: 'you', options: ['c3'] }
+  const first: TablePending = {
+    kind: 'discardForRelease',
+    player: 'you',
+    release: 'rel',
+    options: ['c1', 'c2'],
+  }
+  const second: TablePending = {
+    kind: 'discardForRelease',
+    player: 'you',
+    release: 'rel',
+    options: ['c3'],
+  }
   const { getAllByRole, getByRole, rerender } = render(
     <PendingPrompt pending={first} hand={handAll} copy={copy} onResolve={onResolve} />,
   )

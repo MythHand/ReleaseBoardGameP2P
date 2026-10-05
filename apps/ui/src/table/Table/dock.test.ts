@@ -193,14 +193,66 @@ it('offers `attack` to a responder holding no attack card — passing is theirs 
 })
 
 it('tells the attack phase that this seat has already passed', () => {
-  // The pass is final, but not a forfeit: the window still stands, so the dock
-  // says so and the key stays lit (TurnDock).
+  // A pass is only a mark: the window still stands, so the dock says so and the
+  // key stays lit — pressing it again takes the pass back (TurnDock).
   const window: TableWindow = { ...windowOnYou, player: 'p2', passed: ['you'] }
   const d = deriveDock({ ...base, turn: 'p2', window }, 'you', 0)
   expect(d.state).toBe('attack')
   expect(d.passed).toBe(true)
   // and the clock is still yours to watch — it is the time YOU have to hit
   expect(d.seconds).toBeGreaterThan(0)
+})
+
+// AN ATTACK OUT AT THE CENTRE is a chance to hit being used (owner, 04.10): no
+// dots and no PASS for anyone. Its attacker keeps the attack's phase with no
+// key; everyone else, the release's owner included, waits on the attacker.
+describe('while an attack is out at the centre', () => {
+  const card = { id: 'attack-bug' } as unknown as NonNullable<
+    PlayerTableState['shown']
+  >[number]['card']
+  const opponents: PlayerTableState['opponents'] = [
+    ...base.opponents,
+    { id: 'p3', name: 'segfault', handCount: 3, release: {} },
+  ]
+
+  it('shows its attacker the attack with their own name, no key and the clock', () => {
+    const window: TableWindow = { ...windowOnYou, player: 'p2', passed: [] }
+    const shown = [{ player: 'you', uid: 'a', card }]
+    const state: PlayerTableState = { ...base, opponents, turn: 'p2', window, shown }
+    const d = deriveDock(state, 'you', 6_000)
+    expect(d.state).toBe('attacking')
+    expect(d.activePlayer).toBe('you')
+    expect(d.passes).toBeUndefined()
+    expect(d.seconds).toBe(9)
+    expect(isCounting(state, 'you')).toBe(true)
+  })
+
+  it('shows another opponent the attacker’s turn, with no clock of theirs', () => {
+    const window: TableWindow = { ...windowOnYou, player: 'p2', passed: [] }
+    const shown = [{ player: 'p3', uid: 'a', card }]
+    const state: PlayerTableState = { ...base, opponents, turn: 'p2', window, shown }
+    const d = deriveDock(state, 'you', 6_000)
+    expect(d.state).toBe('waiting')
+    expect(d.activePlayer).toBe('segfault')
+    expect(d.seconds).toBeUndefined()
+    expect(isCounting(state, 'you')).toBe(false)
+  })
+
+  it('shows the release’s owner the attacker’s turn', () => {
+    const shown = [{ player: 'p2', uid: 'a', card }]
+    const state: PlayerTableState = {
+      ...base,
+      opponents,
+      turn: 'you',
+      hasDrawn: true,
+      window: windowOnYou,
+      shown,
+    }
+    const d = deriveDock(state, 'you', 6_000)
+    expect(d.state).toBe('waiting')
+    expect(d.activePlayer).toBe('kernel_panic')
+    expect(d.passes).toBeUndefined()
+  })
 })
 
 it('keeps an eliminated viewer at `waiting` even while a window runs', () => {

@@ -69,6 +69,16 @@ export const animationsTrace = {
   // leaves it empty — the two arrays are only aligned for the files that fill
   // both, which is why `playedWith()` below looks the index up by name.
   params: [] as (Record<string, unknown> | undefined)[],
+  // Where the flown element STOOD as each `play()` call began, index-aligned
+  // with `played` the same way `params` is. A travel is no longer told where
+  // it starts — it reads that off the card itself (`presets.ts`'s `standing`)
+  // — so "the flight left from HERE" is asked of the element, via `standing()`.
+  starts: [] as (Spot | undefined)[],
+  // …pushed through this, from a test's own `vi.mock`: a property of the trace
+  // survives the factory's hoisting where a bare imported function does not
+  markStart: (el: Element | null | undefined) => {
+    animationsTrace.starts.push(standing(el))
+  },
   waited: [] as number[],
   // A single merged, chronologically-ordered log of `nextFrames()` calls
   // (pushed as `'nextFrames'`) and `drop(key)` calls (pushed as `` `drop:${key}` ``).
@@ -102,6 +112,46 @@ export function playedWith(name: string): Record<string, unknown> | undefined {
  */
 export function playedAll(name: string): (Record<string, unknown> | undefined)[] {
   return animationsTrace.played.flatMap((n, i) => (n === name ? [animationsTrace.params[i]] : []))
+}
+
+/**
+ * A place on the table as a carrier takes it: left, top and width. No height —
+ * a carrier is mounted by its left, top and inline size, and its height is the
+ * card's own aspect, which jsdom does not lay out.
+ */
+export interface Spot {
+  left: number
+  top: number
+  width: number
+}
+
+export const spot = (r: Rect): Spot => ({ left: r.left, top: r.top, width: r.width })
+
+/**
+ * WHERE AN ELEMENT STANDS — the start a travel reads off it. jsdom lays nothing
+ * out, so a node built to measure as a rect (`nodeAt`) answers with that rect,
+ * and a carrier answers with the coordinates it was mounted at, which it holds
+ * inline (I10).
+ */
+export function standing(el: Element | null | undefined): Spot | undefined {
+  if (!(el instanceof HTMLElement)) return undefined
+  const r = el.getBoundingClientRect()
+  if (r.width > 0) return spot(r)
+  const left = Number.parseFloat(el.style.left)
+  const top = Number.parseFloat(el.style.top)
+  const width = Number.parseFloat(el.style.inlineSize || el.style.width)
+  return [left, top, width].some(Number.isNaN) ? undefined : { left, top, width }
+}
+
+/** Where the element of EVERY `play(name, …)` call stood as it began, in call order. */
+export function startedAll(name: string): (Spot | undefined)[] {
+  return animationsTrace.played.flatMap((n, i) => (n === name ? [animationsTrace.starts[i]] : []))
+}
+
+/** Where the element of the FIRST `play(name, …)` call stood as it began. */
+export function startedWith(name: string): Spot | undefined {
+  const at = animationsTrace.played.indexOf(name)
+  return at < 0 ? undefined : animationsTrace.starts[at]
 }
 
 /**
@@ -158,6 +208,7 @@ export type AnchorsFixture = BoardAnchors & {
 export function anchorsFixture(overrides: Partial<BoardAnchors> = {}): AnchorsFixture {
   animationsTrace.played = []
   animationsTrace.params = []
+  animationsTrace.starts = []
   animationsTrace.waited = []
   animationsTrace.order = []
   animationsTrace.exitSpy = vi.fn(async () => {})
@@ -252,6 +303,7 @@ export async function runBeat<P>(
 ): Promise<{ published: BoardState[] }> {
   animationsTrace.played = []
   animationsTrace.params = []
+  animationsTrace.starts = []
   animationsTrace.waited = []
   animationsTrace.order = []
   anchors.exitSpy.mockClear()

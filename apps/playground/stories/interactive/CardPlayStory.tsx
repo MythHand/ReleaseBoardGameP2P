@@ -76,7 +76,7 @@ export default function CardPlayStory() {
     const toRect = centerRef.current?.getBoundingClientRect()
     const [el] = await raise([{ key: 'play', card, at: from }])
     if (el && toRect) {
-      const anim = play('playToCenter', el, { from, to: toRect })
+      const anim = play('playToCenter', el, { to: toRect })
       if (anim) await anim.finished
     }
     setCenter(card)

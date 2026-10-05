@@ -268,9 +268,16 @@ it('never sends a peer a card identity it is not entitled to', () => {
       // held is fine to see in their own SYNC even if the same uid later moves
       // to someone else's hand. Same exact-value check as clause 3, for the
       // same reason.
+      //
+      // Excused: a card its owner has put out at the centre (`shown`). It is
+      // still in their hand, and it is lying face up on the table in everyone's
+      // view — the rules make it public (resolution.md §1).
       const others = Object.values(state.players).filter((p) => p.id !== viewer.playerId)
-      for (const uid of others.flatMap((p) => p.hand.map((c) => c.uid))) {
-        expect(onWire.has(uid)).toBe(false)
+      for (const p of others) {
+        for (const uid of p.hand.map((c) => c.uid)) {
+          if (p.shown.includes(uid)) continue
+          expect(onWire.has(uid)).toBe(false)
+        }
       }
     }
   }

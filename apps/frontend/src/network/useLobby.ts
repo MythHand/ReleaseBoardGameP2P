@@ -369,8 +369,23 @@ function normalizeKeeperSnapshot(
     }
   }
 
+  // A snapshot keeps the state as it was saved, so a field the engine grew since
+  // is absent from it — while the engine reads every field as present. `shown`
+  // (#168): a match saved before it existed had nothing out at the centre, so it
+  // comes back empty rather than failing the projection below and taking the
+  // match down with it.
+  const restored: GameState = {
+    ...(snapshot.state as GameState),
+    players: Object.fromEntries(
+      playerIds.map((playerId) => {
+        const player = players[playerId] as GameState['players'][PlayerId]
+        return [playerId, { ...player, shown: Array.isArray(player.shown) ? player.shown : [] }]
+      }),
+    ),
+  }
+
   try {
-    for (const playerId of playerIds) engine.project(snapshot.state as GameState, playerId)
+    for (const playerId of playerIds) engine.project(restored, playerId)
   } catch {
     return null
   }
@@ -378,7 +393,7 @@ function normalizeKeeperSnapshot(
   return {
     gameId: snapshot.gameId,
     keeperId: snapshot.keeperId,
-    state: snapshot.state as GameState,
+    state: restored,
     seats,
     privateSeats,
     log,

@@ -856,8 +856,8 @@ describe('public spectator projection', () => {
   const context = { owner: 'p1', attack: inst('attack-security-bug', 90), parent: 1 }
   const cases: { pending: Pending; publicFields: object }[] = [
     {
-      pending: { kind: 'discardForRelease', player: 'p1', release: secret.uid },
-      publicFields: { kind: 'discardForRelease', options: [] },
+      pending: { kind: 'discardForRelease', player: 'p1', release: 'public-release' },
+      publicFields: { kind: 'discardForRelease', release: 'public-release', options: [] },
     },
     {
       pending: {
@@ -970,10 +970,14 @@ describe('public spectator projection', () => {
   }) => {
     const state = createGame(config())
     state.players.p1.hand = [secret]
+    if (pending.kind === 'discardForRelease') {
+      state.players.p1.hand.push({ uid: 'public-release', id: 'release-frontend' })
+      state.players.p1.shown = ['public-release']
+    }
     state.pending = pending
     const view = spectate(state)
     expect(view.pending).toMatchObject(publicFields)
-    expect(view.pending).not.toHaveProperty('release')
+    if (pending.kind !== 'discardForRelease') expect(view.pending).not.toHaveProperty('release')
     expect(JSON.stringify(view)).not.toContain(secret.uid)
     if (pending.kind === 'neutralize503' || pending.kind === 'crush') {
       expect(project(state, 'p2').pending).toMatchObject({ methods: ['debugger'] })

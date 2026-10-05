@@ -10,6 +10,7 @@ import type {
   PlayerBoardState,
   StagedHandoff,
 } from '~/entities/game/board'
+import { ALARM_POSE } from '~/entities/game/board'
 import { useDiscardBeat } from './discardBeat'
 import type { BeatPlan } from './planBeats'
 
@@ -214,4 +215,48 @@ it('flies an ordinary discard straight out, with no gather', async () => {
   )
   expect(played.calls.filter((c) => c.name === 'glide')).toEqual([])
   expect(exits.items).toHaveLength(1)
+})
+
+// THE ERROR 503 THE PLAYER PASSED leaves with their sweep (owner, 03.10): from
+// where it stands, straight, under the swept cards, and the centre stops drawing
+// it as it goes. Nothing flew it before, and it jumped into the heap.
+it('sends the Error 503 a player passed with their sweep, under it, and files both', async () => {
+  exits.items = []
+  const { api, Probe } = harness()
+  render(<Probe />)
+  const published: BoardState[] = []
+  const standing = {
+    ...base,
+    pending: {
+      kind: 'neutralize503',
+      player: 'p1',
+      card: 'trigger-error-503',
+      methods: ['debugger'],
+    },
+  } as unknown as BoardState
+  await drive(() =>
+    api.beat?.run(
+      {
+        kind: 'discard',
+        key: 'discard:21',
+        gather: true,
+        alarm: { eventId: 19, card: 'trigger-error-503' },
+        cards: [
+          { key: 'd21', eventId: 21, card: 'attack-bug', source: { kind: 'hand', index: 0 } },
+        ],
+      },
+      { base: standing, publish: (s) => published.push(s) },
+    ),
+  )
+  expect(exits.items.find((i) => i.card.id === 'trigger-error-503')).toMatchObject({
+    layer: 0,
+    pose: ALARM_POSE,
+    scatter: scatterAt(19),
+  })
+  expect(exits.items.find((i) => i.card.id === 'attack-bug')?.layer).toBeGreaterThan(0)
+  expect(published.some((s) => s.pending === null)).toBe(true)
+  const last = published.at(-1)
+  expect(last?.decks.discardHeap?.map((c) => c.uid)).toEqual(['d19', 'd21'])
+  // filed on the run's own base — the swept card stays out of the hand
+  expect(last?.you?.hand.map((h) => h.uid)).toEqual(['u2'])
 })

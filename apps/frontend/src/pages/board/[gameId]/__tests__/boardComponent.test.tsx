@@ -243,6 +243,37 @@ it('draws from the dock, once its mount lockout clears', () => {
   vi.useRealTimers()
 })
 
+// A pass is only a mark (owner, 04.10): the lit key takes it back.
+it('takes a pass back with the lit dock key', () => {
+  vi.useFakeTimers()
+  const base = makeBoardProps()
+  const onPass = vi.fn()
+  const onUnpass = vi.fn()
+  const { getByTestId } = render(
+    <Board
+      {...base}
+      state={{
+        ...base.state,
+        window: {
+          player: 'p2',
+          slot: 'frontend',
+          round: 1,
+          openedAt: 0,
+          deadline: 10_000,
+          passed: [base.state.selfId],
+          canAttackWith: [],
+        },
+      }}
+      actions={{ onPass, onUnpass }}
+    />,
+  )
+  act(() => vi.advanceTimersByTime(400))
+  fireEvent.click(getByTestId('dock-key'))
+  expect(onUnpass).toHaveBeenCalledTimes(1)
+  expect(onPass).not.toHaveBeenCalled()
+  vi.useRealTimers()
+})
+
 it('sweeps the countdown from the now it is given', () => {
   const base = makeBoardProps()
   const props = makeBoardProps({
@@ -287,6 +318,7 @@ it('shows no countdown readout for a pending that carries no deadline', () => {
       pending: {
         kind: 'discardForRelease',
         player: base.state.selfId,
+        release: 'rel',
         options: [base.state.you.hand[0]?.uid ?? 'x'],
       },
     },

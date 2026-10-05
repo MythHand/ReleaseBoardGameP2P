@@ -67,7 +67,15 @@ import {
 // nothing to catch it — a type check cannot see a position. `opening` holds only
 // what the deal adds on top.
 import kit from '@/table/Table/Table.module.css'
-import { ATTACK_POSE, COVER_POSE, SUDO_POSE, useBoardAnchors } from '~/entities/game/board'
+import {
+  ALARM_POSE,
+  ATTACK_POSE,
+  COVER_POSE,
+  glowsFor,
+  SUDO_POSE,
+  shownLayout,
+  useBoardAnchors,
+} from '~/entities/game/board'
 import type {
   BoardProps,
   DiscardPickHandoff,
@@ -79,6 +87,7 @@ import type {
 import { useBeats, useEliminationPreload } from '~/features/board-beats'
 import { useDealIntro } from '~/features/game-intro/useDealIntro'
 import { useHandOrder } from '~/features/hand-order/useHandOrder'
+import { trace, tracing } from '~/shared/lib/debugTrace'
 import opening from './_Board.module.css'
 import { useBoardStaging } from './_useBoardStaging'
 import { useCherryPickStaging } from './_useCherryPickStaging'
@@ -194,6 +203,7 @@ function BoardView({
   playback,
   pickPreview,
   onPickPreview,
+  rejections,
 }: BoardProps) {
   // ===== the opening =====
   // Every node a flight aims at or leaves from — the board's own registry, not
@@ -331,14 +341,6 @@ function BoardView({
   const actions = deal.active || beats.exclusive ? INERT_ACTIONS : liveActions
 
   const { you, opponents, decks, turn, history, setup } = state
-  const derived = deriveDock(state, state.selfId, now)
-  // Nobody is on turn during the opening: the dock stands in its waiting state
-  // and names the moment where it would name a player.
-  const dockView: DockView = deal.active
-    ? { state: 'waiting', danger: false, seconds: 0, progress: 0, activePlayer: undefined }
-    : state.you
-      ? { ...derived, ...dock }
-      : derived
   const dockCopy = deal.active
     ? { ...copy.turnDock, turnOf: copy.turnDock.gameStart }
     : copy.turnDock
@@ -376,6 +378,8 @@ function BoardView({
     anchors,
     actions,
     events: playback?.events ?? intro?.events ?? [],
+    rejections,
+    beatsRunning: beats.running,
     enabled: state.you !== null && !(deal.active || beats.exclusive),
     onHandArrival: (order) => handOrder.place(order),
 
@@ -396,6 +400,25 @@ function BoardView({
     // `docs/animations/backlog.md` and the audit register.
     matchKey: intro?.gameId ?? null,
   })
+
+  // WHO HAS AN ATTACK OUT AT THE CENTRE, for the dock (owner, 04.10). Our own
+  // counts the moment we put it out, not once the host confirms it — the board
+  // never waits for the host — and one we have asked back is home already.
+  const stagedOut = staging.staged?.main ?? staging.staged?.support
+  const shownForDock =
+    state.window && state.selfId !== null && stagedOut
+      ? [...(state.shown ?? []), { player: state.selfId, uid: stagedOut.uid, card: stagedOut.card }]
+      : (state.shown ?? []).filter(
+          (s) => s.player !== state.selfId || !staging.returning.has(s.uid),
+        )
+  const derived = deriveDock({ ...state, shown: shownForDock }, state.selfId, now)
+  // Nobody is on turn during the opening: the dock stands in its waiting state
+  // and names the moment where it would name a player.
+  const dockView: DockView = deal.active
+    ? { state: 'waiting', danger: false, seconds: 0, progress: 0, activePlayer: undefined }
+    : state.you
+      ? { ...derived, ...dock }
+      : derived
 
   // a `defend` pending owed to us means the defence hook owns the fan instead
   // of the turn hook — the two never run at once (the engine suspends normal
@@ -465,7 +488,7 @@ function BoardView({
   // raises no `pending` at all (the engine eliminates in the same batch as
   // the reveal), so without this the hand would fly away with nothing on
   // screen explaining it.
-  const glowStrong = (pendingNeutralize != null && alarmMine) || beats.alarm
+  const glowStrong = glowsFor(state.pending, state.selfId) || beats.alarm
   // An Error 503 or AI Crush owed to US means the neutralize hook owns the fan and the
   // zone — the third staging hook, and the third mutually exclusive one: the
   // engine suspends normal play while a pending is open, and a pending has one
@@ -674,6 +697,34 @@ function BoardView({
       ? { support: staging.staged.support, main: staging.staged.main }
       : null
 
+  // WHAT ANOTHER PLAYER HAS PUT OUT AT THE CENTRE (resolution.md §1) — read off
+  // the projection and stood in the SAME places our own staging stands in
+  // (`shownLayout`, which the beat flying it in reads too). Our own cards are
+  // our own staging's to draw while it holds them; once it holds nothing — the
+  // board was rebuilt (the stand's viewer switch, a reconnect) — the projection
+  // is what still knows they are out, so they are drawn from it too. Save a card
+  // we have asked back: it is home for us, whatever the table still says (#168).
+  const theirs = shownLayout(
+    (state.shown ?? []).filter(
+      (s) => s.player !== state.selfId || (!staging.holdingCentre && !staging.returning.has(s.uid)),
+    ),
+  )
+  const theirPair = theirs.pair
+    ? { main: theirs.pair.main.card, aux: theirs.pair.aux.card, at: theirs.pair.at }
+    : null
+  const theirRow = theirs.row ? { support: theirs.row[0], main: theirs.row[1] } : null
+  const theirRelease = theirs.stage?.card ?? null
+  const theirSolo = theirs.solo?.card ?? null
+  // …and what the row holds, whoever's it is
+  const centreRow = assembling ?? theirRow
+  const rowTestIds = assembling
+    ? ['board-centre-staged', 'board-centre-partner']
+    : ['board-centre-shown', 'board-centre-shown']
+  // …and what stands at the middle. Ours only once the flyer has dropped it and
+  // no pair flyer owns the centre instead (ComboStory.tsx's own guard).
+  const ownSolo = soloStaged && !assembling && staging.overlay.length === 0 ? soloStaged.card : null
+  const centreSolo = ownSolo ?? theirSolo
+
   // The hue the arrow was ARMED with (#101, Fix B, Defect 5): whichever hook
   // aimed it named the colour of the card the line leaves, in the same call
   // that said where it starts. The board no longer re-derives that from
@@ -722,7 +773,9 @@ function BoardView({
     if (!held || !cover) return null
     return { card: cover, aux: held.sudo ? cardById('support-sudo') : null }
   })()
-  const operationSource = pendingSourceCard?.category === 'operation' ? pendingSourceCard : null
+  // the operation standing at the centre — while our own gesture still holds
+  // the play it put out there, the gesture draws it and the table does not
+  const centreOperation = staging.staged ? null : state.centreOperation
 
   // the release standing at the stage slot while its cost is unpaid — read
   // ONCE, same reason as `pendingDefend` above, and its OWNERSHIP stated here
@@ -782,20 +835,17 @@ function BoardView({
   // of the fan.
   const surfaceOwnsTable =
     [cherry.grid, rebase.row, requesting.band].some(Boolean) || upgrade.answering
-  // WHAT OF THE DISCARD STAYS ON THE PILE while a pick lays it out: nothing for
-  // a Cherry-pick, whose grid IS the whole discard, and everything but the
-  // releases for Inside, which offers only them. The Inside trigger standing at
-  // the centre is off the pile either way (`aiCause`).
+  // WHAT OF THE DISCARD STAYS ON THE PILE while a pick lays it out: every card
+  // the grid does not hold, where it lay. The grid says which those are
+  // (`lifted`) — a Cherry-pick's offer is the whole discard, Inside's only the
+  // releases — and a card it
+  // does not hold stays put instead of vanishing for the pick and coming back
+  // mid-heap (owner's recording, 04.10). The Inside trigger standing at the
+  // centre is off the pile either way (`aiCause`).
   const lifted = cherry.grid ? cherry.lifted : null
   const pileHeap = (decks.discardHeap ?? []).filter(
-    (c) =>
-      c.uid !== `d${state.aiCause?.eventId}` &&
-      !(lifted === 'releases' && c.card.category === 'release'),
+    (c) => c.uid !== `d${state.aiCause?.eventId}` && !(c.uid && lifted?.uids.has(c.uid)),
   )
-  const liftedReleases =
-    lifted === 'releases'
-      ? (decks.discardHeap ?? []).filter((c) => c.card.category === 'release').length
-      : 0
   // The scene's own rule (`ComboStory`: `merged || playing`): while the play is
   // ON THE TABLE — standing at the centre, or anything of this gesture still in
   // the air — the fan stops answering the cursor for the same reason. The one
@@ -869,6 +919,80 @@ function BoardView({
     ? ((costPending ? you?.hand.find((c) => c.uid === costPending.release) : undefined) ??
       stagedReleaseLocal)
     : undefined
+  // whichever release is standing at the stage slot — ours, or another player's
+  const releaseAtStage = stagedRelease?.card ?? theirRelease
+
+  // THE FRAME, for the stand's recorder (#168): what this render puts on the
+  // screen — which table it draws from, the fan, every part of the centre, the
+  // gesture and the beats. Written only when it differs from the last one, so a
+  // clock tick that changes nothing on the table writes nothing. Silent in the
+  // game: nothing is gathered unless the stand is recording.
+  const lastFrame = useRef('')
+  useLayoutEffect(() => {
+    if (!tracing()) return
+    const named = (c: { card: { name: string }; uid?: string } | null | undefined) =>
+      c ? `${c.card.name}${c.uid ? ` ${c.uid}` : ''}` : null
+    type Slots = Partial<
+      Record<'frontend' | 'backend' | 'database' | 'monitoring', { name: string } | null>
+    >
+    const zone = (release: Slots, support?: Slots) =>
+      (['frontend', 'backend', 'database', 'monitoring'] as const).flatMap((slot) => {
+        const card = release[slot]
+        if (!card) return []
+        const under = support?.[slot]
+        return [`${slot}:${card.name}${under ? `+${under.name}` : ''}`]
+      })
+    const frame = {
+      table: deal.shadow ? 'deal' : beats.shadow ? 'beat' : 'live',
+      fan: fanItems.map(named),
+      centre: {
+        middle: centreSolo?.name ?? null,
+        row: centreRow ? [named(centreRow.support), named(centreRow.main)] : null,
+        pair: theirPair
+          ? `${theirPair.main.name}+${theirPair.aux.name}`
+          : staging.staged?.merged
+            ? `${staging.staged.main?.card.name}+${staging.staged.support?.card.name}`
+            : null,
+        stage: releaseAtStage?.name ?? null,
+        attack: centreAttack
+          ? `${centreAttack.attackCard}${centreAttack.sudo ? '+sudo' : ''}`
+          : null,
+        cover: standingCover?.card.name ?? null,
+      },
+      shown: (state.shown ?? []).map((s) => `${s.player}:${s.card.name}`),
+      zones: Object.fromEntries([
+        ...(state.you ? [[state.selfId, zone(state.you.release, state.you.support)]] : []),
+        ...state.opponents.map((o) => [o.id, zone(o.release, o.support)]),
+      ]),
+      hands: Object.fromEntries(state.opponents.map((o) => [o.id, o.handCount])),
+      decks: {
+        piles: state.decks.main,
+        events: state.decks.events,
+        discard: state.decks.discardCount,
+        discardTop: state.decks.discardHeap?.at(-1)?.card.name ?? state.decks.discard?.name ?? null,
+      },
+      pending: state.pending?.kind ?? null,
+      fanOwner: upgradeOwnsHand
+        ? 'upgrade'
+        : discarding
+          ? 'handLimit'
+          : defenseOwnsHand
+            ? 'defence'
+            : neutralizeOwnsHand
+              ? 'neutralize'
+              : 'play',
+      gesture: staging.staged?.phase ?? null,
+      defence: defenseStaging.staged?.phase ?? null,
+      notInFan: [...staging.handOut],
+      arrow: staging.arrow.active,
+      flying: { gesture: staging.overlay.length, beats: beats.overlays.length },
+      beat: beats.running,
+    }
+    const text = JSON.stringify(frame)
+    if (text === lastFrame.current) return
+    lastFrame.current = text
+    trace('frame', frame)
+  })
 
   // Read this render's staging only after its DOM refs have bound. This is a
   // function declaration so the earlier layout effect can register it before
@@ -1370,11 +1494,11 @@ function BoardView({
         <div className={enter} ref={anchors.discard}>
           <Pile
             label={copy.table.discard}
-            heap={lifted === 'all' || beats.discardOut === 'taken' ? [] : pileHeap}
+            heap={beats.discardOut === 'taken' ? [] : pileHeap}
             topCard={
-              lifted === 'all' || state.aiCause || beats.discardOut === 'taken'
+              state.aiCause || beats.discardOut === 'taken'
                 ? null
-                : lifted === 'releases'
+                : lifted
                   ? (pileHeap.at(-1)?.card ?? null)
                   : decks.discard
             }
@@ -1382,14 +1506,9 @@ function BoardView({
             // empty discard says `// 0` — that is what tells you it is empty,
             // and it is what a card returning to it passes under.
             //
-            // The cherry grid holds the discard's own cards, so the pile it
-            // left really is empty and says so; Inside's holds the releases, so
-            // the pile says what is left without them.
-            count={
-              lifted === 'all'
-                ? 0
-                : Math.max(0, decks.discardCount - (state.aiCause ? 1 : 0) - liftedReleases)
-            }
+            // The grid holds some of the discard's own cards, so the pile says
+            // what is left without them — nothing, when it holds them all.
+            count={Math.max(0, decks.discardCount - (state.aiCause ? 1 : 0) - (lifted?.count ?? 0))}
             // THE WHOLE DISCARD LEAVES, not its top card. Before it flies to a
             // pile the heap collects itself into a straight stack and the
             // counter goes WITH it — that gathering IS the pile becoming one
@@ -1411,9 +1530,9 @@ function BoardView({
         style={centrePlaceStyle('release', 'stage')}
         data-centre-slot="stage"
         ref={anchors.stage}
-        {...previewProps(stagedRelease?.card ?? null)}
+        {...previewProps(releaseAtStage)}
       >
-        {stagedRelease && <Card card={stagedRelease.card} interactive={false} width="100%" />}
+        {releaseAtStage && <Card card={releaseAtStage} interactive={false} width="100%" />}
       </div>
       <div
         className={opening.costSlot}
@@ -1551,8 +1670,8 @@ function BoardView({
           and that gap is how the table asks what it goes with. Both places are
           real nodes, because the flight out of the fan aims at the first one
           and the static render fills the same node it aimed at. */}
-      {assembling &&
-        [assembling.support, assembling.main].map((card, i) => (
+      {centreRow &&
+        [centreRow.support, centreRow.main].map((card, i) => (
           <div
             // biome-ignore lint/suspicious/noArrayIndexKey: the index IS the place — a place keeps its identity while what stands in it changes
             key={i}
@@ -1566,15 +1685,24 @@ function BoardView({
                 enhances was still on its way in */}
             {card && !staging.carrying.includes(card.uid) && (
               <div
-                ref={i === 0 ? soloStagedRef : undefined}
+                ref={i === 0 && assembling ? soloStagedRef : undefined}
                 className={opening.centreCard}
-                data-testid={i === 0 ? 'board-centre-staged' : 'board-centre-partner'}
+                data-testid={rowTestIds[i]}
               >
                 <Card card={card.card} interactive={false} width="100%" />
               </div>
             )}
           </div>
         ))}
+      {/* another player's Code Review folded with its release — where our own
+          pair folds, the row's first place (`_useBoardStaging`'s fold box) */}
+      {theirPair?.at === 'row0' && (
+        <div className={opening.rowSlot} style={rowPlaceStyle('staging', 2, 0)}>
+          <div className={opening.centreCard} data-testid="board-centre-shown">
+            <CardPair main={theirPair.main} aux={theirPair.aux} width="100%" />
+          </div>
+        </div>
+      )}
 
       {/* the attack slot — where cards stand while the table is looking at them:
           the player's own cards gather here during the opening, and every drawn
@@ -1615,7 +1743,7 @@ function BoardView({
             the carrier or a return flight still holds it, the static render
             would double it (ComboStory.tsx's own guard on this). Once a
             partner folds in, the pair flyer below owns the centre instead. */}
-        {soloStaged && !assembling && staging.overlay.length === 0 && (
+        {centreSolo && (
           // IT LANDS IN THE POSE IT WILL KEEP. An attack rests at the centre
           // tilted (`ATTACK_POSE`, and I11: the tilt is what marks a card as
           // PLAYED), and this render used to be straight — so the card flew in
@@ -1623,14 +1751,27 @@ function BoardView({
           // standing render took over. The turn read as the card correcting
           // itself after it had already landed. The tilt lives on an INNER
           // element, so the node the beat measures stays the true card box (I6).
-          <div ref={soloStagedRef} className={opening.centreCard} data-testid="board-centre-staged">
-            {soloStaged.card.category === 'attack' ? (
+          <div
+            ref={ownSolo ? soloStagedRef : undefined}
+            className={opening.centreCard}
+            data-testid={ownSolo ? 'board-centre-staged' : 'board-centre-shown'}
+          >
+            {centreSolo.category === 'attack' ? (
               <div className={opening.pose} style={{ transform: restTransform(ATTACK_POSE) }}>
-                <Card card={soloStaged.card} interactive={false} width="100%" />
+                <Card card={centreSolo} interactive={false} width="100%" />
               </div>
             ) : (
-              <Card card={soloStaged.card} interactive={false} width="100%" />
+              <Card card={centreSolo} interactive={false} width="100%" />
             )}
+          </div>
+        )}
+        {/* another player's attack lying on its Sudo — the stack our own staging
+            folds at the middle, at the played tilt */}
+        {!ownSolo && theirPair?.at === 'solo' && (
+          <div className={opening.centreCard} data-testid="board-centre-shown">
+            <div className={opening.pose} style={{ transform: restTransform(ATTACK_POSE) }}>
+              <CardPair main={theirPair.main} aux={theirPair.aux} width="100%" />
+            </div>
           </div>
         )}
         {centreAttack &&
@@ -1678,28 +1819,25 @@ function BoardView({
                 data-testid="board-centre-alarm"
                 data-pending-play
               >
-                <div className={opening.pose} style={{ transform: restTransform(ATTACK_POSE) }}>
+                <div className={opening.pose} style={{ transform: restTransform(ALARM_POSE) }}>
                   <Card card={data} interactive={false} width="100%" />
                 </div>
               </div>
             )
           })()}
-        {operationSource && !beats.operationStanding && !staging.staged && (
-          <div className={opening.centreCard} data-testid="board-operation-pending">
-            <Card card={operationSource} interactive={false} width="100%" />
-          </div>
-        )}
-        {/* The operation card once it has landed: resting on the table, so the
-            effect's own surface (a pick grid, a row) opens OVER it. The beat
-            keeps it here across batches until its exit takes it to the heap. */}
-        {beats.operationLanded &&
+        {/* The operation standing at the centre: resting on the table, so the
+            effect's own surface (a pick grid, a row) opens OVER it. One field of
+            the board draws it (`centreOperation`) — the projection's while its
+            effect runs, a beat's while it moves it. While our own gesture still
+            holds the play it put out, the gesture draws it. */}
+        {centreOperation &&
           (() => {
-            const main = cardById(beats.operationLanded.card)
+            const main = cardById(centreOperation.card)
             // A sudo does NOT lie under the card it paid for: it stands beside
             // it, in its own place of the centre's row — the same two places the
             // play was assembled in, so standing is where assembling left it.
             // The row is rendered outside this slot, below.
-            if (!main || beats.operationLanded.sudo) return null
+            if (!main || centreOperation.sudo) return null
             return (
               <div
                 className={opening.centreCard}
@@ -1719,9 +1857,9 @@ function BoardView({
           its own position. The operation keeps `data-public-operation` — its own
           exit finds it by that — and the sudo is named beside it, so that exit
           can take it from where it actually stands. */}
-      {beats.operationLanded?.sudo &&
+      {centreOperation?.sudo &&
         (() => {
-          const main = cardById(beats.operationLanded.card)
+          const main = cardById(centreOperation.card)
           const aux = cardById('support-sudo')
           if (!main || !aux) return null
           return [aux, main].map((card, i) => (
@@ -2051,6 +2189,8 @@ function BoardView({
             seconds={dockView.seconds}
             progress={dockView.progress}
             activePlayer={dockView.activePlayer}
+            passed={dockView.passed}
+            passes={dockView.passes}
             copy={dockCopy}
             paused={paused}
             onDraw={actions?.onDraw ? () => dockKey(actions.onDraw) : undefined}
@@ -2058,6 +2198,7 @@ function BoardView({
             onPass={
               answering ? (unanswered ? defenseStaging.onDecline : undefined) : actions?.onPass
             }
+            onUnpass={actions?.onUnpass}
           />
         </div>
       </div>

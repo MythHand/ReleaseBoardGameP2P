@@ -199,7 +199,7 @@ export default function AiCardsStory() {
     const from = cardAreaOf(fromCell)
     const [el] = await raise([{ key: 'draw', card, at: from, faceDown: true }])
     if (el) {
-      const anim = play('drawToCenter', el, { from, to: toRect })
+      const anim = play('drawToCenter', el, { to: toRect })
       if (anim) await anim.finished
       pin('draw', toRect) // I4 — it stands in the slot, so the flip plays in place
     }
@@ -215,7 +215,7 @@ export default function AiCardsStory() {
     await wait(FLIP_MS)
     const el = elOf('eff')
     if (!el || !fromRect || !deckRect) return
-    const anim = play('returnToDeck', el, { from: fromRect, to: cardAreaOf(deckRect) })
+    const anim = play('returnToDeck', el, { to: cardAreaOf(deckRect) })
     if (anim) await anim.finished
   }
 
@@ -228,7 +228,7 @@ export default function AiCardsStory() {
   ) => {
     const el = elOf('eff')
     if (el && fromRect && slotRect) {
-      const anim = play('playToReleaseZone', el, { from: fromRect, to: slotRect })
+      const anim = play('playToReleaseZone', el, { to: slotRect })
       if (anim) await anim.finished
     }
     setRelease((r) => ({ ...r, [slotKey]: ai }))
@@ -243,7 +243,7 @@ export default function AiCardsStory() {
       await wait(FLIP_MS)
       const deckRect = aiDeckRef.current?.getBoundingClientRect()
       if (el && fromRect && deckRect) {
-        const anim = play('returnToDeck', el, { from: fromRect, to: cardAreaOf(deckRect) })
+        const anim = play('returnToDeck', el, { to: cardAreaOf(deckRect) })
         if (anim) await anim.finished
       }
       return
@@ -287,7 +287,7 @@ export default function AiCardsStory() {
           const el = elOf(`pick${i}`)
           const to = targets[i]
           if (!el || !to) return
-          const anim = play('drawToCenter', el, { from: fromHeap, to }) // up to row size
+          const anim = play('drawToCenter', el, { to }) // up to row size
           if (anim) await anim.finished
           pin(`pick${i}`, to)
         }),
@@ -355,7 +355,7 @@ export default function AiCardsStory() {
     const from = cardAreaOf(discardRect)
     const [el] = await raise([{ key: 'inside', card, at: from }])
     if (el) {
-      const anim = play('drawToCenter', el, { from, to: centerRect })
+      const anim = play('drawToCenter', el, { to: centerRect })
       if (anim) await anim.finished
       pin('inside', centerRect) // I4 — it stands at the centre for the hold
     }
@@ -378,7 +378,7 @@ export default function AiCardsStory() {
     if (!to) return
     const [el] = await raise([{ key: 'picked', card, at: fromRect }])
     if (el) {
-      const anim = play('playToCenter', el, { from: fromRect, to })
+      const anim = play('playToCenter', el, { to })
       if (anim) await anim.finished
       pin('picked', to) // I4 — it stands there, open to everyone
     }

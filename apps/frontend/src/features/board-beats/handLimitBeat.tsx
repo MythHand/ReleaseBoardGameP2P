@@ -150,7 +150,13 @@ export function useHandLimitBeat(
       // TAKEOFF: the cards are gone from wherever they stood — publish before
       // the movement, or the board shows each card twice for its whole flight.
       // The discard end stays `ctx.base`'s own (see `withoutFlown`).
+      //
+      // …and the run's base MOVES WITH it, as `discardBeat`'s does: the cards
+      // are filed into the heap once they land, on `ctx.base`, and a base left
+      // holding them put every one back in the hand — or back on a rival's
+      // count — in the very frame it lay down in the discard (#168).
       const flown = withoutFlown(ctx.base, plan.cards)
+      ctx.base = flown
       ctx.publish(flown)
 
       let items: Leaving[] = []
@@ -242,7 +248,7 @@ export function useHandLimitBeat(
           await Promise.all(
             flying.map(async (f) => {
               const el = flyer.elOf(f.key)
-              const movement = el ? play('playToCenter', el, { from: f.from, to: f.box }) : null
+              const movement = el ? play('playToCenter', el, { to: f.box }) : null
               if (movement) {
                 await movement.finished
                 if (isStale()) return
@@ -292,6 +298,19 @@ export function useHandLimitBeat(
       // go to the discard while the AI card returns to its deck. Clear the
       // standing pair in the same commit that mounts those exit carriers.
       const causeItems = aiCauseExit(plan.causeward, a)
+      // THE TRIGGER LANDS UNDER THE CARD GIVEN UP — it is under it in the heap,
+      // filed at the reveal, long before the hand gave anything up. Both rode
+      // layer 0 and the later-mounted trigger landed on top, then sank under the
+      // card the moment the heap took over (owner's recording, 04.10). The 503
+      // answer's own rule (`defenseBeat`'s `runNeutralized`): the cause at the
+      // bottom, everything this exchange sends one layer above it.
+      const sent =
+        causeItems.length > 0
+          ? [
+              ...items.map((it) => ({ ...it, layer: (it.layer ?? 0) + 1 })),
+              ...causeItems.map((it) => ({ ...it, layer: 0 })),
+            ]
+          : items
       // the standing pair goes in the same commit that mounts those exit
       // carriers — the step's own `takeOff`, which is where that ordering lives
       const clearStanding = () => {
@@ -302,7 +321,7 @@ export function useHandLimitBeat(
       }
       if (items.length + causeItems.length === 0) clearStanding()
       await Promise.all([
-        latest.current.send([...items, ...causeItems], clearStanding).then(() => {
+        latest.current.send(sent, clearStanding).then(() => {
           if (isStale()) return
           // the cause goes back into the heap it was taken out of for its flight…
           const restored = causeItems.length > 0 ? { ...ctx.base, decks: flown.decks } : ctx.base

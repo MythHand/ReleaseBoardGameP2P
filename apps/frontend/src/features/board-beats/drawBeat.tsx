@@ -1,7 +1,7 @@
 import type { CardData } from '@release/ui'
 import { cardAreaOf, cardById } from '@release/ui'
 import type { Rect } from '@release/ui/animations'
-import { nextFrames, play, scatterAt, useDiscardExit, wait } from '@release/ui/animations'
+import { play, scatterAt, useDiscardExit, wait } from '@release/ui/animations'
 import { useCallback, useRef } from 'react'
 import type { BeatRun, BoardAnchors, BoardState } from '~/entities/game/board'
 import { offThePile } from './offThePile'
@@ -9,6 +9,7 @@ import type { BeatPlan, PlannedDraw } from './planBeats'
 import { seatCardBox } from './seat'
 import { TABLE_HOLD, useToCentre } from './toCentre'
 import { useToHand } from './toHand'
+import { settleInto } from './toHeap'
 
 // A card is drawn. One flight to the centre, then a branch on who drew it and
 // what it turned out to be — the scene is `DrawCardStory`, driven here by the
@@ -122,6 +123,11 @@ export function useDrawBeat(
               // so the step flies that very node and there is no copy to hide
               null,
             )
+            // …and it is in the heap in the commit its carrier comes down,
+            // filed by this beat like every other exit's (`toHeap`): dropped
+            // with nothing filed, it was nowhere until the projection caught up
+            const c = ctx.current
+            if (c) settleInto(c, [{ eventId: d.reveal.discardId, card: d.reveal.card }])
             drop('draw')
             continue
           }
@@ -154,7 +160,9 @@ export function useDrawBeat(
             c.base = next
             c.publish(next)
           }
-          await nextFrames() // the publish above has committed (I2)
+          // …and the carrier comes down in the same commit (`setDown`'s rule):
+          // waiting two frames between drew the alarm standing AND on its
+          // carrier, twice over (owner's recordings, 03.10)
           drop('draw')
           continue
         }
@@ -164,13 +172,16 @@ export function useDrawBeat(
           patch('draw', { faceDown: false })
           await wait(AFTER_FLIP)
           const card = cardById(d.card)
-          const at = rectOf(elOf('draw'))
-          drop('draw')
           // The run is what the landing is measured against — the fan it has
           // already grown, not the projection the batch started with (I8).
+          // HANDED OVER AS THE ELEMENT: the step takes the card on screen in the
+          // commit its own flyer mounts, so the carrier comes down only once the
+          // card has landed — dropped first, a card queued behind another
+          // arrival was nowhere until its turn came (#168).
           const c = ctx.current
-          if (card && at && c)
-            await latest.current.land(c, { card, from: at, fallbackKey: `h${d.eventId}` })
+          if (card && c)
+            await latest.current.land(c, { card, el: elOf('draw'), fallbackKey: `h${d.eventId}` })
+          drop('draw')
           continue
         }
 
@@ -184,7 +195,7 @@ export function useDrawBeat(
           // second, smaller trim — down to `SEAT_SHRINK` of a card width — not
           // a duplicate of the first.
           const to = seatCardBox(seat)
-          const anim = play('dealToSeat', el, { from: centre, to })
+          const anim = play('dealToSeat', el, { to })
           if (anim) await anim.finished
         }
         drop('draw')

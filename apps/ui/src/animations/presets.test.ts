@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { PRESETS } from './presets'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { PRESETS, type PresetFn } from './presets'
 
 // jsdom ships no WAAPI, and this package has no global test setup to add one
 // (the frontend's `test-setup.ts` is where that lives). This suite is not about
@@ -47,25 +47,113 @@ describe('hudIn', () => {
   })
 })
 
-describe('playToReleaseZone', () => {
-  it('approaches Database above the neighboring Backend slot', () => {
-    const from = { left: 200, top: 100, width: 150, height: 200 }
-    const backend = { left: 390, top: 500, width: 100, height: 133 }
-    const database = { left: 500, top: 500, width: 100, height: 133 }
-    const { frames } = declared('playToReleaseZone', { from, to: database })
-    const via = frames[1]?.transform?.toString().match(/translate\(([-\d.]+)px, ([-\d.]+)px\)/)
-    expect(via).toBeTruthy()
-    const [dx, dy] = [Number(via?.[1]), Number(via?.[2])]
-    // By the time the card descends toward the release row, its centre is
-    // already aligned with Database and still above Backend's top edge.
-    expect(from.left + from.width / 2 + dx).toBe(database.left + database.width / 2)
-    expect(from.top + from.height / 2 + dy).toBeLessThan(backend.top)
-    expect(frames.at(-1)?.transform?.toString()).toContain('translate(275px, 366.5px)')
+// POINT A IS THE CARD. A travel reads where it starts off the element it moves
+// — its box and the pose it stands in — and is never told. Told, it flew the
+// difference between the told rect and the target from wherever the card really
+// was, and a release with its Code Review landed beside its slot by exactly the
+// gap between the two (#168).
+describe('travel start', () => {
+  const box = { left: 200, top: 100, width: 150, height: 210 }
+  const to = { left: 500, top: 500, width: 100, height: 140 }
+  // centre to centre: (550, 570) − (275, 205), scaled by width
+  const landing = 'translate(275px, 365px) scale(0.6666666666666666) rotate(0deg)'
+
+  const standingAt = (rect: typeof box, pose?: { look: string; e: number; f: number }) => {
+    let seen: Keyframe[] = []
+    const el = document.createElement('div')
+    el.getBoundingClientRect = () => ({ ...rect }) as DOMRect
+    if (pose) {
+      el.style.transform = pose.look
+      Object.defineProperty(el, 'offsetWidth', { value: box.width })
+      Object.defineProperty(el, 'offsetHeight', { value: box.height })
+      // jsdom has no DOMMatrix: the pose's translation is all the start needs
+      const moved = { e: pose.e, f: pose.f }
+      vi.stubGlobal(
+        'DOMMatrixReadOnly',
+        class {
+          e = moved.e
+          f = moved.f
+        },
+      )
+    }
+    el.animate = ((frames: Keyframe[]) => {
+      seen = frames
+      return { cancel: () => {}, finished: Promise.resolve() } as unknown as Animation
+    }) as never
+    return { el, frames: () => seen }
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
   })
 
-  it('keeps the direct landing when the destination is already in the same column', () => {
-    const from = { left: 400, top: 100, width: 150, height: 200 }
-    const to = { left: 425, top: 500, width: 100, height: 133 }
-    expect(declared('playToReleaseZone', { from, to }).frames).toHaveLength(2)
+  it('starts a card standing square on the keyframe it always did, from where it stands', () => {
+    const { el, frames } = standingAt(box)
+    ;(PRESETS.playToReleaseZone as PresetFn)(el, { to })
+    expect(frames().map((k) => k.transform)).toEqual([
+      'translate(0, 0) scale(1) rotate(0deg)',
+      landing,
+    ])
+  })
+
+  it('does not take a start from the caller', () => {
+    const { el, frames } = standingAt(box)
+    const elsewhere = { left: 0, top: 0, width: 150, height: 210 }
+    ;(PRESETS.playToReleaseZone as PresetFn)(el, { from: elsewhere, to })
+    expect(frames()[1]?.transform).toBe(landing)
+  })
+
+  it('starts a card standing in a pose IN that pose, and aims from its own box', () => {
+    // the pose moves the card's centre by (16, −12); what the screen reports is
+    // the box around the turned card, centred on the moved centre
+    const around = { left: 201, top: 70, width: 180, height: 246 }
+    const look = 'translate(16px, -12px) rotate(6deg)'
+    const { el, frames } = standingAt(around, { look, e: 16, f: -12 })
+    ;(PRESETS.dealToSeat as PresetFn)(el, { to })
+    expect(frames()[0]?.transform).toBe(look)
+    expect(frames()[1]?.transform).toBe(landing)
+  })
+
+  it('still turns the start by `rotateFrom`', () => {
+    const { el, frames } = standingAt(box)
+    ;(PRESETS.takeFromSeat as PresetFn)(el, { to, rotateFrom: 180 })
+    expect(frames()[0]?.transform).toBe('translate(0, 0) scale(1) rotate(180deg)')
+  })
+})
+
+describe('playToReleaseZone', () => {
+  // A landing in the zone is one straight flight on the LAND curve. A waypoint
+  // that sent the card sideways first (#178) bent every landing into a hook
+  // and was removed by the owner's decision.
+  it('flies straight to a slot far to the side, with no waypoint', () => {
+    const to = { left: 500, top: 500, width: 100, height: 133 }
+    expect(declared('playToReleaseZone', { to }).frames).toHaveLength(2)
+  })
+})
+
+// A CARD LEAVING THE DISCARD LEAVES IT TURNED. The heap lays every card at a
+// tilt, and a card that flies out of it (into Cherry-pick's grid) starts AT that
+// tilt: started straight, it clicked a few degrees on its first frame. Without
+// `rotateFrom` the landing is what it always was, to the character.
+describe('landInPose', () => {
+  const from = { left: 100, top: 100, width: 100, height: 140 }
+  const box = { left: 400, top: 300, width: 150, height: 210 }
+
+  it('starts at the tilt it lay at and ends square', () => {
+    const { frames } = declared('landInPose', { from, box, rotateFrom: -11.5 })
+    expect((frames[0] as { transform?: string }).transform).toBe(
+      'translate(-325px, -235px) scale(0.6666666666666666) rotate(-11.5deg)',
+    )
+    expect((frames[1] as { transform?: string }).transform).toBe(
+      'translate(0, 0) scale(1) rotate(0deg)',
+    )
+  })
+
+  it('is unchanged without a starting tilt', () => {
+    const { frames } = declared('landInPose', { from, box })
+    expect(frames.map((f) => (f as { transform?: string }).transform)).toEqual([
+      'translate(-325px, -235px) scale(0.6666666666666666)',
+      'translate(0, 0) scale(1)',
+    ])
   })
 })

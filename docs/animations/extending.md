@@ -57,12 +57,14 @@ glossary. Durations are parameters, not names (see the glossary).
 
 ## Follow the invariants
 
-Any new flight obeys **I1–I10** (see [`README.md`](./README.md)): measure before mutate; `nextFrames`
+Any new flight obeys **I1–I10** and **I12** (see [`README.md`](./README.md)): measure before mutate; `nextFrames`
 before start; cancel leftover animations on a reused node; pin the flyer after landing; `key={seq}` for a
 reused flyer `Card`; aim at the card box (**I6**); precompute variance and pass it in (**I7**); pass data
 as arguments inside async sequences (**I8**); make a card's layer a value it carries, never DOM order
 (**I9**); render the flyer at the coordinates it mounts with (**I10**). The last two are the flight
 ones — a new flight that skips them lands in the wrong order or flashes at the bottom of the page.
+On the board, take the card off where it stood and put it where it lands through `cardPlace`'s
+`liftOff` / `setDown` (**I12**) — a place published by hand is how a card ends up drawn twice.
 
 ---
 

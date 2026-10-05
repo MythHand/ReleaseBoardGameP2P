@@ -49,12 +49,9 @@ export type PendingView =
   | {
       kind: 'discardForRelease'
       player: PlayerId
-      // The owner's own staged card: they need to know which of their cards is
-      // standing at the centre while its cost is unpaid. Redacted for anyone
-      // else, exactly as `options` already is (fake/attacks.ts's `pendingView`)
-      // — whether an opponent should see it too is an open rules question
-      // (docs/rules/backlog.md).
-      release?: CardUid
+      // The release standing at the centre while its cost is unpaid. Public:
+      // the whole table sees it (resolution.md §1). `options` stays the owner's.
+      release: CardUid
       options: CardUid[]
     }
   | {
@@ -183,10 +180,20 @@ export type PendingView =
       source: CardId
     }
 
+// A card put out at the centre while its play is being made — face up, the
+// same for every viewer (resolution.md §1). `uid` is its identity in its
+// owner's hand, so that hand can leave it out of the fan.
+export interface ShownView {
+  player: PlayerId
+  uid: CardUid
+  card: CardId
+}
+
 export interface OpponentView {
   id: PlayerId
   name: string
-  // Count only — never identity.
+  // Count only — never identity. Cards they have put out at the centre are
+  // not counted: they are lying on the table, in `PlayerView.shown`.
   handCount: number
   release: ReleaseView
   eliminated: boolean
@@ -213,6 +220,9 @@ export interface PlayerView {
     frozen: CardUid[]
   }
   opponents: OpponentView[]
+  // Every card put out at the centre and still waiting on its play — seat by
+  // seat, each in the order it was put out, the viewer's own among them.
+  shown: ShownView[]
   decks: {
     piles: number[]
     events: number

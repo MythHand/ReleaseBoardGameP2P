@@ -47,6 +47,7 @@ export type {
   PlayerView,
   ReleasedView,
   ReleaseView,
+  ShownView,
   SpectatorView,
   WindowView,
 } from './view'

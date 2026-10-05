@@ -56,7 +56,7 @@ describe.each([
       .map((event) => redactFor(event, viewer))
     const before = toBoardState(engine.project(staged, viewer), [], labels)
     const after = toBoardState(engine.project(reduction.state, viewer), events, labels)
-    const plans = planBeats(events, before, after.pending, after.decks.discardCount)
+    const plans = planBeats(events, before, after.pending)
 
     expect(events).toContainEqual(
       expect.objectContaining({ type: 'neutralized', player: 'p1', method: 'monitoring' }),

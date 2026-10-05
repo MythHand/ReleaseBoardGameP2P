@@ -344,7 +344,7 @@ export default function CherryPick({ selector }: { selector: ReactNode }) {
       later(() => {
         const dEl = cellRefs.current.get(deckUid)
         const r = rects.get(deckUid)
-        if (dEl && r && deckRect) play('returnToDeck', dEl, { from: r, to: deckRect })
+        if (dEl && r && deckRect) play('returnToDeck', dEl, { to: deckRect })
       }, FLIP_DUR)
     }
 

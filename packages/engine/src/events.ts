@@ -39,6 +39,7 @@ export type Event = EventBase &
     | { type: 'windowOpened'; player: PlayerId; slot: ReleaseSlot; round: number; deadline: number }
     | { type: 'windowClosed'; player: PlayerId; slot: ReleaseSlot }
     | { type: 'passed'; player: PlayerId }
+    | { type: 'unpassed'; player: PlayerId }
     | { type: 'attacked'; attacker: PlayerId; card: CardId; sudo: boolean; target: PlayerId }
     | { type: 'defended'; player: PlayerId; card: CardId; effect: DefenceEffect }
     | { type: 'tookHit'; player: PlayerId }
@@ -78,6 +79,10 @@ export type Event = EventBase &
     // sizes because that is the whole visible effect — the cards themselves are
     // face down before and after.
     | { type: 'pilesChanged'; piles: number[] }
+    // A card put out at the centre while its play is being made, and the cards
+    // taken back from there into the hand — public, face up (resolution.md §1).
+    | { type: 'shown'; player: PlayerId; card: CardId }
+    | { type: 'takenBack'; player: PlayerId; cards: CardId[] }
   )
 
 export type DiscardReason =
@@ -140,6 +145,7 @@ const EVENT_PAYLOAD_KEYS: Record<EventType, readonly string[]> = {
   windowOpened: ['player', 'slot', 'round', 'deadline'],
   windowClosed: ['player', 'slot'],
   passed: ['player'],
+  unpassed: ['player'],
   attacked: ['attacker', 'card', 'sudo', 'target'],
   defended: ['player', 'card', 'effect'],
   tookHit: ['player'],
@@ -162,6 +168,8 @@ const EVENT_PAYLOAD_KEYS: Record<EventType, readonly string[]> = {
   upgradeTaken: ['player', 'card'],
   deckReshuffled: ['cards'],
   pilesChanged: ['piles'],
+  shown: ['player', 'card'],
+  takenBack: ['player', 'cards'],
 }
 
 function hasOnlyEventKeys(event: UnknownRecord): boolean {
@@ -225,7 +233,15 @@ function hasEventShape(event: UnknownRecord): boolean {
     case 'revealed':
     case 'upgradeThrown':
     case 'upgradeTaken':
+    case 'shown':
       return hasString(event, 'player') && hasString(event, 'card')
+    case 'takenBack':
+      return (
+        hasString(event, 'player') &&
+        Array.isArray(event.cards) &&
+        event.cards.length > 0 &&
+        event.cards.every((card) => typeof card === 'string' && card.length > 0)
+      )
     case 'operationPlayed':
       return (
         hasString(event, 'player') && hasString(event, 'card') && typeof event.sudo === 'boolean'
@@ -255,6 +271,7 @@ function hasEventShape(event: UnknownRecord): boolean {
     case 'windowClosed':
       return hasString(event, 'player') && isOneOf(event.slot, ['frontend', 'backend', 'database'])
     case 'passed':
+    case 'unpassed':
     case 'tookHit':
     case 'eliminated':
     case 'turnEnded':
@@ -323,9 +340,12 @@ function hasEventShape(event: UnknownRecord): boolean {
           'PUSH',
           'ATTACK',
           'PASS',
+          'UNPASS',
           'WINDOW_EXPIRED',
           'CLOCK_STARTED',
           'RESOLVE',
+          'SHOW',
+          'TAKE_BACK',
         ]) &&
         hasFiniteNumber(event.action, 'at') &&
         hasString(event, 'reason')

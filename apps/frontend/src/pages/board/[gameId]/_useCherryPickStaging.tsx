@@ -1,7 +1,15 @@
 import type { Event } from '@release/engine'
-import type { CardData, TableActions } from '@release/ui'
-import { Card, ConfirmAction, cardById, TableSurface, Typography } from '@release/ui'
-import { nextFrames, play, scatterAt, useDiscardExit, useFlyer, wait } from '@release/ui/animations'
+import type { CardData, HeapCard, TableActions } from '@release/ui'
+import { Card, ConfirmAction, cardAreaOf, cardById, TableSurface, Typography } from '@release/ui'
+import {
+  exitLayer,
+  nextFrames,
+  play,
+  scatterAt,
+  useDiscardExit,
+  useFlyer,
+  wait,
+} from '@release/ui/animations'
 import type { ReactNode, RefObject } from 'react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { BoardAnchors, BoardState } from '~/entities/game/board'
@@ -43,10 +51,8 @@ const COVER: CardData = {
   qty: 0,
 }
 
-// timings — the approved scene, the three legs that actually travel (deal,
-// hand-reveal, deck)
-const DEAL_DUR = 360 // dealing out of the pile into the grid
-const DEAL_STEP = 16 // per-card stagger, dealing out
+// timings — the legs this surface times itself (hand-reveal, deck, the return);
+// the deal out of the pile is `landInPose`'s own
 const STAGGER_CAP = 40 // don't stagger past this many cards
 const REVEAL_W = 220 // width the chosen card reaches in the centre
 const REVEAL_DUR = 460 // fly-to-centre duration
@@ -55,13 +61,16 @@ const FLIP_DUR = 420 // = the flipCard preset duration (flip before the deck fli
 const DECK_HOLD = 360 // deck card holds face-down before it merges
 const RETURN_STEP = 14 // per-card stagger, returning to the pile
 
-// centre-to-centre translate + scale to move an element from one rect to
-// another — the story's own `between()`, ported verbatim.
-function between(from: DOMRect, to: DOMRect): string {
-  const dx = to.left + to.width / 2 - (from.left + from.width / 2)
-  const dy = to.top + to.height / 2 - (from.top + from.height / 2)
-  return `translate(${dx}px, ${dy}px) scale(${to.width / from.width})`
-}
+// THE LAYER A PINNED CELL RIDES. Pinned cells stack inside the surface and
+// compare only with one another. Each one going home rides the rung of the spot
+// it lands in — the exit step's own ladder (`exitLayer`, I9) — so the cards lie
+// in the pile's order the moment they land, and the pile taking over draws
+// nothing new. They all used to ride one layer and lay in the GRID's order,
+// and the pile re-laid them as the grid closed (owner's recording, 04.10).
+// What goes anywhere else rides over all of them: the deck card, and over it
+// the card that is taken.
+const PIN_Z = 100
+const homeZ = (depth: number) => PIN_Z + exitLayer(depth)
 
 export function useCherryPickStaging(args: {
   handoff: RefObject<DiscardPickHandoff | null>
@@ -90,9 +99,10 @@ export function useCherryPickStaging(args: {
   overlay: ReactNode[]
   gapAt: number | null
   gapSize: number
-  /** what of the discard is out in the grid while it stands: all of it for a
-   *  Cherry-pick, only the releases for Inside — the pile shows the rest */
-  lifted: 'all' | 'releases' | null
+  /** what of the discard is out in the grid while it stands — the heap's own
+   *  entries the grid's cards are, and how many cards that is. The pile shows
+   *  the rest */
+  lifted: { uids: ReadonlySet<string>; count: number } | null
 } {
   const { state, anchors, actions, copy, enabled } = args
   const reduced = useReducedMotion()
@@ -179,6 +189,9 @@ export function useCherryPickStaging(args: {
   // change across re-renders (a projection tick) without the offer itself
   // changing, and re-running the deal would fly the same cards a second time.
   const dealtKey = useRef<string | null>(null)
+  // which deal is the live one — a deal that a newer one has replaced does not
+  // get to end it
+  const dealRun = useRef(0)
   // The offer this hook has already answered and flown. The queue keeps
   // drawing the projection its NEXT beat moves away from — the one where this
   // pending is still open — for as long as the operation card's own exit runs,
@@ -187,18 +200,6 @@ export function useCherryPickStaging(args: {
   // before it leaves. Cleared when the offer itself goes (below) and when a
   // RESOLVE is refused, because then the choice really is open again.
   const answeredKey = useRef<string | null>(null)
-  const timers = useRef<number[]>([])
-  const later = (fn: () => void, ms: number) => {
-    timers.current.push(window.setTimeout(fn, ms))
-  }
-  const clearTimers = () => {
-    for (const t of timers.current) window.clearTimeout(t)
-    timers.current = []
-  }
-  // No timer survives the hook. useLayoutEffect with no deps: mount-once,
-  // cleanup-on-unmount only — the same idiom the story's own version uses.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: mount-once by design — `clearTimers` is a plain function recreated every render, so listing it would clear timers on every render instead of only on unmount
-  useLayoutEffect(() => clearTimers, [])
 
   const [manualRetry, setManualRetry] = useState(false)
   const exit = useDiscardExit(anchors.discardBox)
@@ -219,7 +220,6 @@ export function useCherryPickStaging(args: {
     setConfirmed(false)
     setFlying(false)
     setFlipped(new Set())
-    clearTimers()
     for (const el of cellRefs.current.values()) {
       for (const animation of el.getAnimations?.() ?? []) animation.cancel()
       el.style.cssText = ''
@@ -227,8 +227,11 @@ export function useCherryPickStaging(args: {
   })
 
   // One candidate is not a choice — #105's Decision 2, and the rule Inside
-  // kept when it had a row of its own. Latched on the pending rather than the mount,
+  // kept when it had a row of its own. INSIDE'S ALONE: Cherry-pick lays the
+  // discard out every time, one card in it or many, and the player takes it
+  // themselves (owner, 04.10). Latched on the pending rather than the mount,
   // so a second, distinct pending is free to fire again.
+  const answersItself = ours?.source === 'ai-inside' && ours.picks === 1
   const answered = useRef<string | null>(null)
   useEffect(() => {
     if (!ours) {
@@ -236,13 +239,13 @@ export function useCherryPickStaging(args: {
       setManualRetry(false)
       return
     }
-    if (manualRetry || ours.picks !== 1 || ours.options.length !== 1) return
+    if (manualRetry || !answersItself || ours.options.length !== 1) return
     const only = ours.options[0]
     const key = `${ours.player}:${ours.source}:${only.uid}`
     if (answered.current === key) return
     answered.current = key
     resolve({ kind: 'pickFromDiscard', card: only.uid })
-  }, [ours, resolve, manualRetry])
+  }, [ours, resolve, manualRetry, answersItself])
 
   // Nothing armed survives the pending it was armed for. `flying` is left
   // alone here on purpose — it clears itself once its own flight lands, and a
@@ -254,9 +257,17 @@ export function useCherryPickStaging(args: {
     }
   }, [ours, confirmed, flying])
 
-  // deal the offer OUT of the discard pile into the grid: every cell starts
-  // at the pile's own rect and flies to its slot, staggered — purely cosmetic,
-  // so it never gates a click (the discard is face-up and known throughout).
+  // DEAL THE OFFER OUT OF THE DISCARD PILE into the grid. Each cell flies out
+  // of the very spot its card lay at in the pile — its place, its tilt, its
+  // depth — all of them at once, and the pile lets those cards go in the same
+  // commit (`lifted`), so the first frame is the pile as it was. The cell is
+  // already standing in its slot; `landInPose` flies its ENTRY, the module every
+  // card landing on the table goes through. It used to start every cell at the
+  // middle of the pile's box, square and transparent, on a curve that covers
+  // most of the way in its first fifth: by the time a card could be seen it
+  // was nearly in its slot, and the deal read as cards appearing (owner, 04.10).
+  // Purely cosmetic, so it never gates a click (the discard is face-up and
+  // known throughout); the confirm bar waits for it.
   // biome-ignore lint/correctness/useExhaustiveDependencies: fires once per episode (guarded by `dealtKey`), not on every render `ours`/`options` produce a new identity for
   useLayoutEffect(() => {
     if (!offer) {
@@ -270,31 +281,35 @@ export function useCherryPickStaging(args: {
     if (reduced) return
     const pileRect = anchors.discardBox.current?.getBoundingClientRect()
     if (!pileRect) return
-    const els = offer.options.map((o) => cellRefs.current.get(o.uid))
-    if (els.every((el) => !el)) return
-    for (const el of els) {
-      if (!el) continue
-      el.style.transition = 'none'
-      el.style.transform = between(el.getBoundingClientRect(), pileRect)
-      el.style.opacity = '0'
-    }
+    // where the pile draws a card, and where in it each of these cards lies —
+    // the same pairing the pile reads to let them go
+    const area = cardAreaOf(pileRect)
+    const lying = claimInHeap(offer.options, state.decks.discardHeap ?? [])
+    const flights = offer.options.flatMap((o, i) => {
+      const el = cellRefs.current.get(o.uid)
+      if (!el) return []
+      const claim = lying.get(o.uid)
+      const at = claim?.rest ?? { dx: 0, dy: 0, rot: 0 }
+      const from = { ...area, left: area.left + at.dx, top: area.top + at.dy }
+      const box = el.getBoundingClientRect()
+      // on its way out it keeps the depth it lay at, so the cards leave the
+      // pile stacked the way they lay in it
+      el.style.zIndex = String(homeZ(claim?.depth ?? i))
+      return [{ el, anim: play('landInPose', el, { from, box, rotateFrom: at.rot }) }]
+    })
+    if (flights.length === 0) return
+    const run = ++dealRun.current
     setDealing(true)
-    requestAnimationFrame(() =>
-      requestAnimationFrame(() => {
-        els.forEach((el, i) => {
-          if (!el) return
-          const delay = Math.min(i, STAGGER_CAP) * DEAL_STEP
-          el.style.transition = `transform ${DEAL_DUR}ms var(--ease-out) ${delay}ms, opacity ${DEAL_DUR}ms ${delay}ms`
-          el.style.transform = ''
-          el.style.opacity = ''
-        })
-        const total = DEAL_DUR + Math.min(els.length, STAGGER_CAP) * DEAL_STEP + 60
-        later(() => {
-          for (const el of els) if (el) el.style.transition = ''
-          setDealing(false)
-        }, total)
-      }),
-    )
+    void Promise.allSettled(flights.map((f) => f.anim?.finished)).then(() => {
+      if (run !== dealRun.current) return
+      // the last frame is the cell's own place, so letting go of it moves
+      // nothing — and it frees the cell's hover lift, which a held frame blocks
+      for (const { el, anim } of flights) {
+        anim?.cancel()
+        el.style.zIndex = ''
+      }
+      setDealing(false)
+    })
   }, [offer, reduced])
 
   // roles by the rules: a trigger (if chosen) is always the deck card; a
@@ -398,7 +413,6 @@ export function useCherryPickStaging(args: {
     args.handoff.current = {
       card: ours.options.find((o) => o.uid === hand)?.id ?? '',
       run: async (ctx) => {
-        const after = ctx.after ?? ctx.base
         setFlying(true)
         const handData = cardById(ours.options.find((o) => o.uid === hand)?.id ?? '')
         const deckOpt = deck ? ours.options.find((o) => o.uid === deck) : undefined
@@ -411,11 +425,49 @@ export function useCherryPickStaging(args: {
           const el = cellRefs.current.get(o.uid)
           if (el) rects.set(o.uid, el.getBoundingClientRect())
         }
-        // pass 2: pin them all at their captured rects (no more reflow matters)
-        for (const o of ours.options) {
+
+        const remaining = ours.options.filter((o) => o.uid !== hand && o.uid !== deck)
+        // THE PILE THE CARDS CAME OUT OF, less what was taken: the topmost copy
+        // of each taken card leaves it, the copy the projection itself takes out
+        // (`toDiscardHeap`). This is the heap the board draws once the grid has
+        // gone, so it is the one every card that goes home lands in.
+        const takenIds = [hand, deck].flatMap((uid) => {
+          const id = uid ? (ours.options.find((o) => o.uid === uid)?.id ?? '') : ''
+          return id ? [id] : []
+        })
+        const heapLeft = [...(ctx.base.decks.discardHeap ?? [])]
+        let taken = 0
+        for (const id of takenIds) {
+          for (let i = heapLeft.length - 1; i >= 0; i--) {
+            if (heapLeft[i].card.id !== id) continue
+            heapLeft.splice(i, 1)
+            taken++
+            break
+          }
+        }
+        // Where each unpicked card ENDS UP — ITS OWN entry in that pile: the
+        // spot it was lifted from, at its own pose (I7), and its depth there is
+        // the layer it travels on (I9), so it lands under what lies over it and
+        // over what lies under it. It used to be claimed by card in the heap
+        // AFTER the answer, which already holds the copy of an operation still
+        // standing at the centre: a Cherry-pick played over a Cherry-pick sent
+        // the first one home onto the second's pose and on top, and the pile then
+        // turned it back to its own the moment it took over (owner's
+        // recording, 04.10).
+        const resting = claimInHeap(remaining, heapLeft)
+        const zOf = (uid: string, i: number) =>
+          uid === hand
+            ? homeZ(heapLeft.length) + 1
+            : uid === deck
+              ? homeZ(heapLeft.length)
+              : homeZ(resting.get(uid)?.depth ?? i)
+
+        // pass 2: pin them all at their captured rects (no more reflow matters),
+        // each on the layer it travels on
+        ours.options.forEach((o, i) => {
           const el = cellRefs.current.get(o.uid)
           const r = rects.get(o.uid)
-          if (!el || !r) continue
+          if (!el || !r) return
           el.style.transition = 'none'
           el.style.transform = 'none'
           el.style.position = 'fixed'
@@ -423,8 +475,8 @@ export function useCherryPickStaging(args: {
           el.style.top = `${r.top}px`
           el.style.width = `${r.width}px`
           el.style.margin = '0'
-          el.style.zIndex = '100'
-        }
+          el.style.zIndex = String(zOf(o.uid, i))
+        })
 
         const handFlight = (async () => {
           const el = cellRefs.current.get(hand)
@@ -437,9 +489,8 @@ export function useCherryPickStaging(args: {
             width: REVEAL_W,
             height: (REVEAL_W * from.height) / from.width,
           }
-          el.style.zIndex = '130'
           await nextFrames()
-          await play('playToCenter', el, { from, to, duration: REVEAL_DUR })?.finished
+          await play('playToCenter', el, { to, duration: REVEAL_DUR })?.finished
           await wait(REVEAL_HOLD)
           await arrival.land(ctx, { card: handData, el, fallbackKey: hand })
         })()
@@ -448,32 +499,11 @@ export function useCherryPickStaging(args: {
           const el = cellRefs.current.get(deck)
           const from = rects.get(deck)
           if (!el || !from) return
-          el.style.zIndex = '120'
           setFlipped(new Set([deck]))
           await wait(FLIP_DUR)
-          await play('returnToDeck', el, { from, to: deckRect })?.finished
+          await play('returnToDeck', el, { to: deckRect })?.finished
           await wait(DECK_HOLD)
         })()
-        const remaining = ours.options.filter((o) => o.uid !== hand && o.uid !== deck)
-        // Where each unpicked card ENDS UP in the pile — its own entry in the
-        // heap the projection has after this answer. One scatter drives both
-        // the flight and the rest (I7), and the place in that array is the
-        // layer the card travels on (I9): its depth there is what decides
-        // whether it lands in the open or sinks under the visible top, so a
-        // card never lands in full view and then drops out of it the moment
-        // the operation card settles above — which is the pile rearranging
-        // itself after everything had already landed.
-        const heap = after.decks.discardHeap ?? []
-        const claimed = new Set<number>()
-        const resting = new Map<string, { rest: (typeof heap)[number]; depth: number }>()
-        for (const option of [...remaining].reverse()) {
-          for (let i = heap.length - 1; i >= 0; i--) {
-            if (claimed.has(i) || heap[i].card.id !== option.id) continue
-            claimed.add(i)
-            resting.set(option.uid, { rest: heap[i], depth: i })
-            break
-          }
-        }
         const returnFlight = exit.send(
           remaining.flatMap((o, i) => {
             const card = cardById(o.id)
@@ -505,20 +535,6 @@ export function useCherryPickStaging(args: {
         // later; until then the queue draws the shadow — the table as it was
         // BEFORE the answer — so without this the heap comes back the moment
         // the grid goes, with the card the player just took lying in it.
-        const takenIds = [hand, deck].flatMap((uid) => {
-          const id = uid ? (ours.options.find((o) => o.uid === uid)?.id ?? '') : ''
-          return id ? [id] : []
-        })
-        const heapLeft = [...(ctx.base.decks.discardHeap ?? [])]
-        let taken = 0
-        for (const id of takenIds) {
-          for (let i = heapLeft.length - 1; i >= 0; i--) {
-            if (heapLeft[i].card.id !== id) continue
-            heapLeft.splice(i, 1)
-            taken++
-            break
-          }
-        }
         if (taken > 0) {
           ctx.base = {
             ...ctx.base,
@@ -564,7 +580,7 @@ export function useCherryPickStaging(args: {
     args.handoff.current = {
       // the watcher lands nothing in OUR fan — somebody else takes the card —
       // so it has no run to grow, only its own choreography to play
-      run: async (_ctx, takenId) => {
+      run: async (ctx, takenId) => {
         const { watched: cells, sudo: two } = watchRef.current
         setFlying(true)
         const centre = anchors.centre.current?.getBoundingClientRect()
@@ -576,10 +592,23 @@ export function useCherryPickStaging(args: {
           const el = cellRefs.current.get(o.uid)
           if (el) rects.set(o.uid, el.getBoundingClientRect())
         }
-        for (const o of cells) {
+        // WHICH CELL WAS TAKEN — by card id, the only thing this seat is told.
+        // Copies look alike, but they do not lie alike: the TOPMOST is the one
+        // the projection takes out (`toDiscardHeap`), so it is the one that
+        // leaves here, or the pile would re-lay its copies once it took over.
+        let takenUid: string | undefined
+        for (let i = cells.length - 1; i >= 0 && !takenUid; i--)
+          if (cells[i].id === takenId) takenUid = cells[i].uid
+        const taken = takenUid ? cellRefs.current.get(takenUid) : undefined
+        const takenFrom = takenUid ? rects.get(takenUid) : undefined
+        // the pile every other cell lands back in — the cells ARE its entries
+        const heapLeft = (ctx.base.decks.discardHeap ?? []).filter((c) => c.uid !== takenUid)
+        // each on the layer it travels on, the actor's rule
+        cells.forEach((o, i) => {
           const el = cellRefs.current.get(o.uid)
           const r = rects.get(o.uid)
-          if (!el || !r) continue
+          if (!el || !r) return
+          const depth = heapLeft.findIndex((c) => c.uid === o.uid)
           el.style.transition = 'none'
           el.style.transform = 'none'
           el.style.position = 'fixed'
@@ -587,13 +616,10 @@ export function useCherryPickStaging(args: {
           el.style.top = `${r.top}px`
           el.style.width = `${r.width}px`
           el.style.margin = '0'
-          el.style.zIndex = '100'
-        }
-        // WHICH CELL WAS TAKEN — by card id, the only thing this seat is told.
-        // Copies are interchangeable, so the first match is as right as any.
-        const takenUid = cells.find((o) => o.id === takenId)?.uid
-        const taken = takenUid ? cellRefs.current.get(takenUid) : undefined
-        const takenFrom = takenUid ? rects.get(takenUid) : undefined
+          el.style.zIndex = String(
+            o.uid === takenUid ? homeZ(heapLeft.length) + 1 : homeZ(depth < 0 ? i : depth),
+          )
+        })
 
         const goes = (async () => {
           if (!taken || !takenFrom || !centre) return
@@ -603,30 +629,33 @@ export function useCherryPickStaging(args: {
             width: REVEAL_W,
             height: (REVEAL_W * takenFrom.height) / takenFrom.width,
           }
-          taken.style.zIndex = '130'
           await nextFrames()
-          await play('playToCenter', taken, { from: takenFrom, to, duration: REVEAL_DUR })?.finished
+          await play('playToCenter', taken, { to, duration: REVEAL_DUR })?.finished
           await wait(REVEAL_HOLD)
-          const at = taken.getBoundingClientRect()
-          if (seat)
-            await play('dealToSeat', taken, { from: at, to: seat, scale: SEAT_SHRINK })?.finished
+          if (seat) await play('dealToSeat', taken, { to: seat, scale: SEAT_SHRINK })?.finished
           taken.style.opacity = '0'
         })()
 
         // everything else goes home, the deck one at the bottom of the heap
         const rest = cells.filter((o) => o.uid !== takenUid)
+        // …and every other card goes home to ITS OWN entry of the pile — the
+        // cells are the heap's own entries — at its own pose (I7) and its own
+        // depth (I9), the actor's rule. Sent to made-up poses, they landed and
+        // the pile re-laid them all the moment it took over.
         const home = exit.send(
           rest.flatMap((o, i) => {
             const card = cardById(o.id)
+            const depth = heapLeft.findIndex((c) => c.uid === o.uid)
+            const own = heapLeft[depth]
             return card
               ? [
                   {
                     key: o.uid,
                     card,
                     node: cellRefs.current.get(o.uid),
-                    scatter: scatterAt(i, 116),
+                    scatter: own ?? scatterAt(i, 116),
                     delay: Math.min(i, STAGGER_CAP) * RETURN_STEP,
-                    layer: i,
+                    layer: own ? depth : i,
                   },
                 ]
               : []
@@ -647,7 +676,7 @@ export function useCherryPickStaging(args: {
           const [el] = await deckFlyer.raise([
             { key: 'to-deck', card: COVER, at: heapBox, faceDown: true },
           ])
-          if (el) await play('returnToDeck', el, { from: heapBox, to: pile })?.finished
+          if (el) await play('returnToDeck', el, { to: pile })?.finished
           await wait(DECK_HOLD)
           deckFlyer.drop('to-deck')
         }
@@ -655,6 +684,17 @@ export function useCherryPickStaging(args: {
       },
     }
   }, [theirs, reduced, anchors, exit.send, deckFlyer.raise, deckFlyer.drop, args.handoff])
+
+  // WHAT THE GRID HOLDS, as the pile knows it: each card laid out claims one
+  // copy of itself in the heap. Only those leave the pile while the grid
+  // stands. A Cherry-pick's offer is the whole discard, so the pile is empty
+  // under it; Inside's is the releases, and what is not one stays where it lay
+  // instead of vanishing for the pick and coming back mid-heap as the grid
+  // closed (owner's recording, 04.10).
+  const liftedUids = new Set<string>()
+  for (const { rest } of claimInHeap(options, state.decks.discardHeap ?? []).values())
+    if (rest.uid) liftedUids.add(rest.uid)
+  const lifted = { uids: liftedUids, count: options.length }
 
   const overlay = [...arrival.overlay, ...exit.overlay, ...deckFlyer.overlay]
   const gaps = { gapAt: arrival.gapAt, gapSize: arrival.gapSize }
@@ -664,7 +704,7 @@ export function useCherryPickStaging(args: {
     ((!ours && !theirs && !confirmed) ||
       (confirmed && reduced) ||
       (ours != null && answeredKey.current === offerKey(ours)) ||
-      (ours?.picks === 1 && ours.options.length < 2 && !manualRetry))
+      (answersItself && (ours?.options.length ?? 0) < 2 && !manualRetry))
   ) {
     return { grid: null, overlay, ...gaps, lifted: null }
   }
@@ -766,7 +806,7 @@ export function useCherryPickStaging(args: {
     ),
     overlay,
     ...gaps,
-    lifted: inside ? 'releases' : 'all',
+    lifted,
   }
 }
 
@@ -785,3 +825,28 @@ const offerKey = (pending: { player: string; raisedAt: number }) =>
 
 const idOfOption = (options: { uid: string; id: string }[], uid: string) =>
   options.find((o) => o.uid === uid)?.id ?? ''
+
+/**
+ * WHICH ENTRY OF THE PILE EACH CELL IS. A cell is named by the engine and an
+ * entry by the projection; the one thing they share is the card. So copies pair
+ * up in order — the n-th copy of a card in the offer is the n-th copy of it in
+ * the pile, counted from the BOTTOM: a card filed after the offer was made (the
+ * operation standing at the centre) only ever lies above the copies the offer
+ * holds. One rule for every reader of the pairing — what the pile leaves out
+ * while the grid stands, and where each card goes home to — so they cannot
+ * disagree about which copy is which.
+ */
+function claimInHeap(
+  cells: readonly { uid: string; id: string }[],
+  heap: readonly HeapCard[],
+): Map<string, { rest: HeapCard; depth: number }> {
+  const claimed = new Map<string, { rest: HeapCard; depth: number }>()
+  const used = new Set<number>()
+  for (const cell of cells) {
+    const depth = heap.findIndex((c, i) => !used.has(i) && c.card.id === cell.id)
+    if (depth < 0) continue
+    used.add(depth)
+    claimed.set(cell.uid, { rest: heap[depth], depth })
+  }
+  return claimed
+}

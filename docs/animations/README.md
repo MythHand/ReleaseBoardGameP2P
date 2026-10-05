@@ -200,10 +200,10 @@ if (anim) await anim.finished                      // wait for the flight
 
 ## Global invariants
 
-These hold across **every** recipe. Recipes reference them by number (I1…I10) instead of
+These hold across **every** recipe. Recipes reference them by number (I1…I12) instead of
 repeating them. Break one and the animation "works on paper" but jumps, double-flips, or
-teleports on screen. I1–I10 are mechanical; **I11** is the one rule of meaning among them —
-what the tilt of a card on the table says about who put it there.
+teleports on screen. I1–I10 and I12 are mechanical; **I11** is the one rule of meaning among
+them — what the tilt of a card on the table says about who put it there.
 
 - **I1 — Measure rects before mutating the DOM.** Capture `getBoundingClientRect()` for
   `from`/`to` before you mount or move anything. When many elements fly to one target,
@@ -282,6 +282,18 @@ what the tilt of a card on the table says about who put it there.
 > after it lands. A card that stops square and tilts a frame later reads as a click, and that is a
 > different event on screen from the one that happened. Rules owner's call, written down here
 > because it is a rule about every scene rather than about one movement.
+
+- **I12 — One card, one place.** In any frame a card is drawn in exactly one place: a hand, a
+  seat's count, a zone slot, the centre, a pile, the heap — or a carrier in flight. So the place
+  it leaves gives it up **in the same commit its carrier goes up**, and the place it lands in has
+  it **in the same commit its carrier comes down** — not a frame before (drawn twice) and not a
+  frame after (drawn nowhere). On the board this is `cardPlace`
+  (`apps/frontend/src/features/board-beats/cardPlace.ts`): the places a card can be drawn from,
+  and `liftOff` / `setDown`, which take it off or put it on any of them in that commit. A beat
+  never publishes a place by hand before an `await`; the order of "publish, then fly" is the one
+  the module owns. The stand's sentinel (`apps/frontend/debug/oneCardOnePlace.test.tsx`) checks
+  the rule on the real board, and the recording analyzer (`debug:log`) names every frame that
+  breaks it.
 
 ---
 

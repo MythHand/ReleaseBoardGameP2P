@@ -3166,6 +3166,31 @@ it('falls back to the restored game setup for an older snapshot without lobby co
   expect(result.current.gameSync?.view.decks.piles).toEqual([94])
 })
 
+it('restores an older snapshot whose players predate what is out at the centre', async () => {
+  storedHostSession('g1')
+  const snapshot = storedKeeperSnapshot('peer0')
+  // Saved before `shown` existed (#168): the projection reads it for every
+  // player, so without it the restore would reject the match and clear it.
+  const state = snapshot.state as Record<string, unknown>
+  const players = state.players as Record<string, Record<string, unknown>>
+  snapshot.state = {
+    ...state,
+    players: Object.fromEntries(
+      Object.entries(players).map(([id, { shown: _shown, ...player }]) => [id, player]),
+    ),
+  }
+  sessionStorage.setItem(KEEPER_KEY, JSON.stringify(snapshot))
+
+  const { result } = renderHook(() => useLobby())
+  await act(async () => {
+    await Promise.resolve()
+  })
+
+  expect(result.current.gameId).toBe('g1')
+  expect(result.current.gameSync?.view.shown).toEqual([])
+  expect(sessionStorage.getItem(SESSION_KEY)).not.toBeNull()
+})
+
 it('normalizes restored private seats before sending rejoin seating', async () => {
   storedHostSession('g1')
   const snapshot = storedKeeperSnapshot('peer0')

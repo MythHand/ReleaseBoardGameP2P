@@ -67,7 +67,12 @@ export function isCounting(state: TableState, selfId: string | null, timers = tr
   // Mirrors the window branch below exactly: the window's OWNER gets the hold
   // ring with a live clock whoever they are — elimination only silences a
   // would-be responder, whose branch is the guarded one.
-  if (state.window) return state.window.player === selfId || !state.you.eliminated
+  if (state.window) {
+    // someone else's attack out: the dock waits on them with a flat ring
+    const attacker = attackerOut(state)
+    if (attacker && attacker !== selfId) return false
+    return state.window.player === selfId || !state.you.eliminated
+  }
   return state.turn === selfId && state.turnClock != null
 }
 
@@ -85,6 +90,15 @@ function passesOf(state: TableState, target: string): { total: number; lit: numb
   const total = seats.filter((s) => s.id !== target && !s.eliminated).length
   const passed = state.window?.passed.length ?? 0
   return { total, lit: Math.min(passed, total) }
+}
+
+// WHO HAS AN ATTACK OUT while a fresh release can be attacked — the attack card,
+// or the Sudo it goes with. Only a responder can have cards out in a window, so
+// the first seat that is not the release's owner is the one (owner, 04.10).
+function attackerOut(state: TableState): string | undefined {
+  const owner = state.window?.player
+  if (!owner) return undefined
+  return state.shown?.find((s) => s.player !== owner)?.player
 }
 
 // `now` is supplied by the caller — the kit never reads the clock itself.
@@ -178,6 +192,27 @@ export function deriveDock(
 
   if (state.window) {
     const { openedAt, deadline } = state.window
+    // AN ATTACK OUT AT THE CENTRE is this chance to hit being used (owner,
+    // 04.10): no dots and no PASS for anyone. Its attacker keeps the attack's
+    // phase with their name and no key — backing out is the cancel of the card
+    // itself; everyone else, the release's owner included, waits on them.
+    const attacker = attackerOut(state)
+    if (attacker === selfId) {
+      return {
+        state: 'attacking',
+        danger: false,
+        ...clock(openedAt, deadline, now),
+        activePlayer: state.you.name,
+      }
+    }
+    if (attacker) {
+      return {
+        state: 'waiting',
+        danger: false,
+        progress: 0,
+        activePlayer: state.opponents.find((o) => o.id === attacker)?.name,
+      }
+    }
     // Your own release under the window: nothing here is yours to press — you
     // cannot attack it, pass on it, or end the turn under it — so the window's
     // countdown IS the content, and it is your own clock to read: the time

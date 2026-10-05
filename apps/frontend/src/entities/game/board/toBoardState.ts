@@ -3,12 +3,18 @@ import type { HeapCard, HistoryEntry, ReleaseSupport } from '@release/ui'
 import { type CardData, COVERS, cardById } from '@release/ui'
 import type { Scatter } from '@release/ui/animations'
 import { scatterAt } from '@release/ui/animations'
+import { standingOperation } from './standingOperation'
 import type { BoardState, PlayerBoardState, SpectatorBoardState } from './types'
 
 // One label per member of the engine's Event union — the adapter maps event
 // types to translated text, replacing the mock's free-form `kind` literals.
 // Task 15 adds the matching keys under `moveHistory` in both catalogs.
-export type HistoryLabels = Record<Event['type'], string>
+export type HistoryLabels = Record<HistoryEvent['type'], string>
+
+// A card put out at the centre and taken back is what the table sees while a
+// play is being made, not a move: it has no row in the history.
+// a pass taken back is a mark withdrawn, not a move (owner, 04.10)
+type HistoryEvent = Exclude<Event, { type: 'shown' | 'takenBack' | 'unpassed' }>
 
 // `assetUrl` throws on a key the catalogue does not recognise, so a card id
 // the catalogue does not know cannot resolve through it — `toTableState` must
@@ -229,7 +235,7 @@ function attackerOf(
 // default means a new member of the engine's Event union fails `pnpm typecheck`
 // here rather than rendering as an unlabelled grey line nobody notices.
 function toHistoryEntry(
-  e: Event,
+  e: HistoryEvent,
   labels: HistoryLabels,
   nameOf: Map<string, string>,
   byId: Map<number, Event>,
@@ -374,25 +380,61 @@ function toDiscardHeap(log: Event[], top: CardData | undefined, count: number): 
   // one, so any later pair of discards that happened to end on that support —
   // two cards going out to a hand limit, say — was read as this play's own and
   // tucked. The pile then re-sorted itself behind the player's back (#168).
-  let pairing: { player: string; main: string; support: string } | null = null
+  //
+  // A DESTROYED RELEASE names its pair too: what lay in its slot was the release
+  // with its Code Review tucked under it, and the two leave together, the
+  // release first (`destroySlot`). That one is FLEETING — it holds only over the
+  // discards that come straight after the destruction, so a release destroyed
+  // with nothing under it leaves nothing armed behind it.
+  let pairing: { player: string; main: string; support: string; fleeting?: true } | null = null
   // the support just tucked under its main, if the last step did that: the
   // projection's own top is THAT card (the engine banked it last), so the fold
   // still ends on the top even though the top is not the last entry
   let tucked: string | null = null
+  // THE CARDS AN OPERATION SPENT ITSELF — its own card and its sudo, filed the
+  // moment it was played, back to back under the play. A pick out of the discard
+  // never offers them: the engine reads the pile BEFORE they land in it
+  // (`openPickFromDiscard`). So a card taken out of the pile is never one of
+  // these, even when it shares their name — a Cherry-pick taken out of a pile
+  // that a Cherry-pick has just joined is the one that lay there before it.
+  // Taking the new one instead left the old one lying under its pose and the
+  // sudo tucked under nothing, on top: the pair landed the right way up and
+  // swapped the moment the heap took over (owner's recording, 04.10).
+  let ownSpent = new Set<string>()
+  // whose play is filing its own cards right now — only while they come
+  let filing: string | null = null
   for (const e of log) {
+    if (e.type !== 'discarded' && e.type !== 'operationPlayed') filing = null
+    if (pairing?.fleeting && e.type !== 'discarded') pairing = null
+    if (e.type === 'releaseDestroyed') {
+      pairing = { player: e.player, main: e.card, support: 'support-code-review', fleeting: true }
+      continue
+    }
     if (e.type === 'takenFromDiscard') {
       // Events identify the public card type, not a physical uid. Removing one
-      // matching copy preserves the visible inventory even with duplicates.
+      // matching copy preserves the visible inventory even with duplicates —
+      // the topmost of the copies that were on offer; failing those, the
+      // topmost of any, which is what this always removed.
+      let offered = -1
+      let any = -1
       for (let i = heap.length - 1; i >= 0; i--) {
         if (heap[i].card.id !== e.card) continue
-        heap.splice(i, 1)
+        if (any < 0) any = i
+        if (ownSpent.has(heap[i].uid ?? '')) continue
+        offered = i
         break
       }
+      const at = offered >= 0 ? offered : any
+      if (at >= 0) heap.splice(at, 1)
       continue
     }
     if (e.type === 'operationPlayed' || e.type === 'attacked') {
       const player = e.type === 'attacked' ? e.attacker : e.player
       pairing = e.sudo ? { player, main: e.card, support: 'support-sudo' } : null
+      if (e.type === 'operationPlayed') {
+        ownSpent = new Set()
+        filing = e.player
+      }
       continue
     }
     if (e.type === 'released') {
@@ -404,6 +446,8 @@ function toDiscardHeap(log: Event[], top: CardData | undefined, count: number): 
     // monotonic sequence, identical on every peer. No stringifying: `scatterAt`
     // hashes the number arithmetically.
     const entry = { uid: `d${e.id}`, card: cardOrPlaceholder(e.card), ...scatterAt(e.id) }
+    if (filing === e.player && e.reason === 'effect') ownSpent.add(entry.uid)
+    else filing = null
     // A pair's AUX lies under its main here too. On the table the support is
     // tucked under the card it paid for (`PAIR_AUX`), and the layer a card had
     // is what decides the order it joins the heap (README, `useDiscardExit`).
@@ -549,7 +593,7 @@ export function buildHistoryTree(entries: HistoryEntry[]): HistoryEntry[] {
 // in the history. Keep the raw log intact; omit only a discard we can identify
 // from the immediately surrounding causal events. In particular, a later
 // discard of another copy of the same card remains a separate row.
-function historyEvents(events: Event[]): Event[] {
+function historyEvents(events: Event[]): HistoryEvent[] {
   const hidden = new Set<number>()
   const byId = new Map(events.map((event) => [event.id, event]))
 
@@ -602,7 +646,13 @@ function historyEvents(events: Event[]): Event[] {
     }
   }
 
-  return events.filter((event) => !hidden.has(event.id))
+  return events.filter(
+    (event): event is HistoryEvent =>
+      !hidden.has(event.id) &&
+      event.type !== 'shown' &&
+      event.type !== 'takenBack' &&
+      event.type !== 'unpassed',
+  )
 }
 
 // The projection becomes a table: PlayerView + the event log + translated
@@ -640,16 +690,31 @@ export function toBoardState(view: GameView, log: Event[], labels: HistoryLabels
   )
 
   const source = view.pending && 'source' in view.pending ? view.pending.source : null
-  const reveal =
-    source && cardById(source)?.deck === 'ai'
-      ? [...visible].reverse().find((e) => e.type === 'aiRevealed' && e.eventCard === source)
-      : undefined
+  // An AI card asking for an answer stands at the centre (`_Board.tsx`'s
+  // `aiStanding`), while the engine has already put it back in the events deck:
+  // a card with no zone to go to returns the moment it is revealed. So the deck's
+  // count leaves it out until the prompt is answered (one card, one place — I12),
+  // and the beat that flies it home counts it back as it lands (#168).
+  const aiStanding = source != null && cardById(source)?.deck === 'ai'
+  const reveal = aiStanding
+    ? [...visible].reverse().find((e) => e.type === 'aiRevealed' && e.eventCard === source)
+    : undefined
   const filed =
     reveal?.type === 'aiRevealed'
       ? visible.find((e) => e.id > reveal.id && e.type === 'discarded' && e.card === reveal.aiCard)
       : undefined
   const aiCause =
     reveal?.type === 'aiRevealed' && filed ? { card: reveal.aiCard, eventId: filed.id } : undefined
+
+  // An operation standing at the centre is drawn there and nowhere else: its own
+  // cards come out of the heap and its count for as long as it stands (one card,
+  // one place — `centreOperation` above, `cardPlace`).
+  const centreOperation = standingOperation(view.pending, visible)
+  const discardTop = view.decks.discardTop ? cardOrPlaceholder(view.decks.discardTop) : undefined
+  const fullHeap = toDiscardHeap(visible, discardTop, view.decks.discardCount)
+  const standing = new Set(centreOperation?.spent.map((c) => `d${c.eventId}`))
+  const discardHeap = fullHeap.filter((c) => !c.uid || !standing.has(c.uid))
+  const lifted = fullHeap.length - discardHeap.length
 
   return {
     ...(view.self
@@ -681,14 +746,10 @@ export function toBoardState(view: GameView, log: Event[], labels: HistoryLabels
       // The projection's own pile list, not a total: `drawn.pile` names one of
       // these, and a split has to be visible for Git Branch to be aimable.
       main: view.decks.piles,
-      events: view.decks.events,
-      discard: view.decks.discardTop ? cardOrPlaceholder(view.decks.discardTop) : undefined,
-      discardHeap: toDiscardHeap(
-        visible,
-        view.decks.discardTop ? cardOrPlaceholder(view.decks.discardTop) : undefined,
-        view.decks.discardCount,
-      ),
-      discardCount: view.decks.discardCount,
+      events: Math.max(0, view.decks.events - (aiStanding ? 1 : 0)),
+      discard: lifted ? discardHeap.at(-1)?.card : discardTop,
+      discardHeap,
+      discardCount: Math.max(0, view.decks.discardCount - lifted),
     },
     turn: view.turn.player,
     hasDrawn: view.turn.hasDrawn,
@@ -709,6 +770,12 @@ export function toBoardState(view: GameView, log: Event[], labels: HistoryLabels
     // contract.test-d.ts. Both carry openedAt alongside deadline already.
     pending: view.pending,
     ...(aiCause ? { aiCause } : {}),
+    ...(centreOperation ? { centreOperation } : {}),
+    shown: view.shown.map((s) => ({
+      player: s.player,
+      uid: s.uid,
+      card: cardOrPlaceholder(s.card),
+    })),
     window: view.window,
     // Structural passthrough — the engine's own answer to which pairs a
     // support may start. participants/spectators are room facts and are

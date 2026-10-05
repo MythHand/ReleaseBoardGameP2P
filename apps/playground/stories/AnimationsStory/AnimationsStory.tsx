@@ -652,12 +652,11 @@ export default function AnimationsStory() {
     // travel: the card stands at "from", flies to "to" and returns
     clear(cardRef.current)
     setBusy(true)
-    const from = cardRef.current?.getBoundingClientRect()
     const to = toRef.current?.getBoundingClientRect()
-    if (!from || !to) return setBusy(false)
+    if (!cardRef.current || !to) return setBusy(false)
     // the discard lands with a turn/scatter — show jitter at the finish
     const j = spec.name === 'centerToDiscard' ? jitter() : null
-    const params = j ? { from, to, rotate: j.rot, dx: j.dx, dy: j.dy } : { from, to }
+    const params = j ? { to, rotate: j.rot, dx: j.dx, dy: j.dy } : { to }
     const anim = play(spec.name, cardRef.current, params)
     if (anim) await anim.finished
     await wait(700)

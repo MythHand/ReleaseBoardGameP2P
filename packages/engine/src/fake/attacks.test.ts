@@ -91,11 +91,13 @@ it('destroys the release when the owner takes the hit', () => {
   expect(r.state.window).toBeNull()
   expect(r.state.decks.discard.map((c) => c.uid)).toContain(FE.uid)
   // The attack card is now banked (and says so) at resolution, between the hit
-  // and the release it destroyed — Task 8 (#100).
+  // and the release it destroyed — Task 8 (#100) — and the destroyed release
+  // says it went to the discard, as a Crush's does (#168).
   expect(r.events.map((e) => e.type)).toEqual([
     'tookHit',
     'discarded',
     'releaseDestroyed',
+    'discarded',
     'windowClosed',
   ])
 })
@@ -174,7 +176,8 @@ it('banks both halves with attackSpent when the hit is taken', () => {
     choice: { kind: 'defend', card: null },
     at: 1002,
   })
-  const discards = r.events.filter((e) => e.type === 'discarded')
+  // the attack's own halves — the release it destroyed is filed after them
+  const discards = r.events.filter((e) => e.type === 'discarded' && e.reason === 'attackSpent')
   expect(discards).toMatchObject([
     { card: BUG.id, reason: 'attackSpent', player: 'p2' },
     { card: SUDO.id, reason: 'attackSpent', player: 'p2' },
@@ -472,6 +475,7 @@ it('does not open a window when the steal fell through to a discard', () => {
     'tookHit',
     'discarded',
     'releaseDestroyed',
+    'discarded',
     'windowClosed',
   ])
 })

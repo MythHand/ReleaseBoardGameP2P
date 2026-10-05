@@ -5,6 +5,7 @@
 // `_useInsideStaging`'s row was never built for. `_useCherryPickStaging`
 // gives it a sibling surface rather than widening that row.
 import { cardById } from '@release/ui'
+import { scatterAt } from '@release/ui/animations'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { useEffect } from 'react'
 import { describe, expect, it, vi } from 'vitest'
@@ -28,15 +29,27 @@ vi.mock('~/features/game-intro/useDealIntro', () => ({
     }
   },
 }))
-const exits = vi.hoisted(() => ({ items: [] as string[][], pending: null as Promise<void> | null }))
+const exits = vi.hoisted(() => ({
+  items: [] as string[][],
+  // …and what each card was sent to: the pose it lands on, the layer it rides
+  sent: [] as { key: string; scatter?: { rot: number }; layer?: number }[],
+  pending: null as Promise<void> | null,
+  // every preset played, and what it was told — the deal out of the pile is one
+  played: [] as [string, Record<string, unknown> | undefined][],
+}))
 vi.mock('@release/ui/animations', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@release/ui/animations')>()
   return {
     ...actual,
+    play: (...args: Parameters<typeof actual.play>) => {
+      exits.played.push([args[0], args[2]])
+      return actual.play(...args)
+    },
     useDiscardExit: () => ({
       overlay: [],
-      send: (items: { key: string }[]) => {
+      send: (items: { key: string; scatter?: { rot: number }; layer?: number }[]) => {
         exits.items.push(items.map((item) => item.key))
+        exits.sent.push(...items)
         return exits.pending ?? Promise.resolve()
       },
       reset: () => {},
@@ -176,6 +189,52 @@ describe("the grid that answers Git Cherry-pick's own pick", () => {
     fireEvent.click(screen.getByTestId('cherry-cell-c2'))
     fireEvent.click(screen.getByRole('button', { name: /confirm|подтвердить/i }))
     expect(onResolve).toHaveBeenCalledWith({ kind: 'pickFromDiscard', card: 'c2' })
+  })
+
+  // THE PILE KEEPS WHAT THE GRID DOES NOT HOLD — Inside's offer is the releases
+  // alone, and the pile used to lift itself whole for the grid anyway: the cards
+  // left out were in neither place for the whole pick and came back mid-heap as
+  // the grid closed (owner's recording, 04.10).
+  it('leaves on the pile the cards the grid does not hold', async () => {
+    const base = makeBoardProps()
+    const heapCard = (eventId: number, id: string) => ({
+      uid: `d${eventId}`,
+      card: handItem('x', id).card,
+      rot: 0,
+      dx: 0,
+      dy: 0,
+    })
+    render(
+      <Board
+        {...makeBoardProps({
+          state: {
+            ...base.state,
+            decks: {
+              ...base.state.decks,
+              discard: handItem('x', 'release-frontend').card,
+              discardCount: 3,
+              discardHeap: [
+                heapCard(1, 'attack-bug'),
+                heapCard(2, 'trigger-error-503'),
+                heapCard(3, 'release-frontend'),
+              ],
+            },
+            pending: cherryPending([
+              { uid: 'c1', id: 'attack-bug' },
+              { uid: 'c2', id: 'release-frontend' },
+            ]),
+          },
+        })}
+      />,
+    )
+    await afterDeal()
+    // the 503 lies on the pile — the one card left there — and not in the grid
+    const pile = [...document.querySelectorAll('[class*="heapCard"] [data-card]')].map((el) =>
+      el.getAttribute('data-card'),
+    )
+    expect(pile).toEqual(['trigger-error-503'])
+    const grid = screen.getByTestId('board-cherry-grid')
+    expect(grid.querySelector('[data-card="trigger-error-503"]')).toBeNull()
   })
 
   it('names both roles under a sudo pick and sends toDeck', async () => {
@@ -403,6 +462,223 @@ it('returns unpicked cards only after the engine accepts the local pick', async 
   await vi.waitFor(() => expect(exits.items.flat()).toContain('a'), { timeout: 3000 })
 })
 
+// EACH CARD GOES HOME TO ITS OWN SPOT. A Cherry-pick played over a Cherry-pick
+// lying in the pile: the projection after the answer already holds the new one
+// (it stands at the centre, but the engine has filed it), and the card going
+// home was claimed by NAME in that heap — the first Cherry-pick flew onto the
+// second's pose, on top, and the pile turned it back to its own the moment it
+// took over (owner's recording, 04.10).
+it('sends a card home to the spot it was lifted from, not to another copy of it', async () => {
+  mockReducedMotion(false)
+  exits.sent = []
+  const base = makeBoardProps()
+  const entry = (eventId: number, id: string) => ({
+    uid: `d${eventId}`,
+    card: handItem('x', id).card,
+    ...scatterAt(eventId),
+  })
+  const lying = [entry(1, 'attack-bug'), entry(103, 'operation-git-cherry-pick')]
+  const decks = { ...base.state.decks, discardCount: 2, discardHeap: lying }
+  const pending = cherryPending([
+    { uid: 'c1', id: 'attack-bug' },
+    { uid: 'c2', id: 'operation-git-cherry-pick' },
+  ])
+  const props = {
+    ...base,
+    state: { ...base.state, decks, pending },
+    actions: { onResolve: vi.fn() },
+  }
+  const { rerender } = render(<Board {...props} />)
+  await afterDeal()
+  fireEvent.click(screen.getByTestId('cherry-cell-c1'))
+  fireEvent.click(screen.getByRole('button', { name: /confirm|подтвердить/i }))
+  // the answer's projection: the Bug gone, the new Cherry-pick filed on top
+  const answered = {
+    ...decks,
+    discardHeap: [lying[1], entry(108, 'operation-git-cherry-pick')],
+  }
+  rerender(
+    <Board
+      {...props}
+      state={{ ...props.state, decks: answered, pending: null }}
+      intro={{
+        gameId: null,
+        view: null,
+        onDone: () => {},
+        events: [
+          { id: 109, type: 'takenFromDiscard', player: 'you', card: 'attack-bug', to: 'hand' },
+        ],
+      }}
+    />,
+  )
+  await vi.waitFor(() => expect(exits.sent.map((s) => s.key)).toContain('c2'), { timeout: 3000 })
+  const home = exits.sent.find((s) => s.key === 'c2')
+  // its own pose, and the bottom of what is left — not the new one's, on top
+  expect(home?.scatter?.rot).toBe(scatterAt(103).rot)
+  expect(home?.layer).toBe(0)
+})
+
+// THE DEAL COMES OUT OF THE PILE. Every cell flies out of the spot its card lay
+// at — that card's own tilt, copies each from their own — and all of them at
+// once. It used to start every cell at the middle of the pile's box, square and
+// transparent, staggered: the cards appeared rather than left (owner, 04.10).
+it('deals each card out of its own spot in the pile, all at once', () => {
+  mockReducedMotion(false)
+  exits.played = []
+  const base = makeBoardProps()
+  const entry = (eventId: number, id: string) => ({
+    uid: `d${eventId}`,
+    card: handItem('x', id).card,
+    ...scatterAt(eventId),
+  })
+  const lying = [
+    entry(1, 'trigger-error-503'),
+    entry(2, 'attack-bug'),
+    entry(3, 'trigger-error-503'),
+  ]
+  const decks = { ...base.state.decks, discardCount: 3, discardHeap: lying }
+  const pending = cherryPending([
+    { uid: 'c1', id: 'trigger-error-503' },
+    { uid: 'c2', id: 'attack-bug' },
+    { uid: 'c3', id: 'trigger-error-503' },
+  ])
+  render(<Board {...base} state={{ ...base.state, decks, pending }} />)
+  const deal = exits.played.filter(([name]) => name === 'landInPose').map(([, p]) => p)
+  expect(deal.map((p) => p?.rotateFrom)).toEqual([
+    scatterAt(1).rot,
+    scatterAt(2).rot,
+    scatterAt(3).rot,
+  ])
+  // nothing waits its turn
+  expect(deal.every((p) => p?.delay === undefined)).toBe(true)
+})
+
+// …AND THEY LIE IN THE PILE'S ORDER THE MOMENT THEY LAND. The cells going home
+// all rode one layer and lay in the GRID's order; the pile re-laid them as the
+// grid closed. Two copies of one card show it: the lower Error 503 goes on the
+// deck, so the upper one goes home to the LOWER spot — under the Bug, though its
+// cell stands after the Bug's in the grid (owner's recording, 04.10).
+it('flies the cards going home on the layers of the spots they land in', async () => {
+  mockReducedMotion(false)
+  exits.sent = []
+  let finishReturn = () => {}
+  exits.pending = new Promise<void>((resolve) => {
+    finishReturn = resolve
+  })
+  try {
+    const base = makeBoardProps()
+    const entry = (eventId: number, id: string) => ({
+      uid: `d${eventId}`,
+      card: handItem('x', id).card,
+      ...scatterAt(eventId),
+    })
+    const lying = [
+      entry(1, 'trigger-error-503'),
+      entry(2, 'attack-bug'),
+      entry(3, 'trigger-error-503'),
+      entry(4, 'release-frontend'),
+    ]
+    const decks = { ...base.state.decks, discardCount: 4, discardHeap: lying }
+    const pending = cherryPending(
+      [
+        { uid: 'c1', id: 'trigger-error-503' },
+        { uid: 'c2', id: 'attack-bug' },
+        { uid: 'c3', id: 'trigger-error-503' },
+        { uid: 'c4', id: 'release-frontend' },
+      ],
+      2,
+    )
+    const props = {
+      ...base,
+      state: { ...base.state, decks, pending },
+      actions: { onResolve: vi.fn() },
+    }
+    const { rerender } = render(<Board {...props} />)
+    await afterDeal()
+    fireEvent.click(screen.getByTestId('cherry-cell-c4'))
+    fireEvent.click(screen.getByTestId('cherry-cell-c1'))
+    fireEvent.click(screen.getByRole('button', { name: /confirm|подтвердить/i }))
+    rerender(
+      <Board
+        {...props}
+        state={{
+          ...props.state,
+          decks: { ...decks, discardCount: 2, discardHeap: lying.slice(0, 2) },
+          pending: null,
+        }}
+        intro={{
+          gameId: null,
+          view: null,
+          onDone: () => {},
+          events: [
+            {
+              id: 5,
+              type: 'takenFromDiscard',
+              player: 'you',
+              card: 'release-frontend',
+              to: 'hand',
+            },
+          ],
+        }}
+      />,
+    )
+    await vi.waitFor(() => expect(exits.sent.map((s) => s.key)).toEqual(['c2', 'c3']), {
+      timeout: 3000,
+    })
+    expect(exits.sent.map((s) => s.layer)).toEqual([1, 0])
+    const z = (uid: string) => Number(screen.getByTestId(`cherry-cell-${uid}`).style.zIndex)
+    // the 503 lands under the Bug, and both under the cards going elsewhere
+    expect(z('c3')).toBeLessThan(z('c2'))
+    expect(z('c2')).toBeLessThan(z('c1'))
+    expect(z('c1')).toBeLessThan(z('c4'))
+  } finally {
+    finishReturn()
+    exits.pending = null
+  }
+})
+
+// …and across the table the same: the watcher's cells ARE the heap's entries,
+// and each goes home to its own. The taken copy is the TOPMOST of its kind —
+// the one the projection takes out. Before, the first copy was taken and the
+// rest went home to made-up poses, and the pile re-laid them all once it took
+// over (owner's recording, 04.10).
+it('sends a watched pick home to the spots the cards were lifted from', async () => {
+  mockReducedMotion(false)
+  exits.sent = []
+  const base = makeBoardProps()
+  const actor = base.state.opponents[0].id
+  const entry = (eventId: number, id: string) => ({
+    uid: `d${eventId}`,
+    card: handItem('x', id).card,
+    ...scatterAt(eventId),
+  })
+  const lying = [entry(1, 'attack-bug'), entry(2, 'release-frontend'), entry(3, 'attack-bug')]
+  const decks = { ...base.state.decks, discardCount: 3, discardHeap: lying }
+  const pending = { ...cherryPending([]), player: actor }
+  const props = { ...base, state: { ...base.state, decks, pending } }
+  const { rerender } = render(<Board {...props} />)
+  await afterDeal()
+  rerender(
+    <Board
+      {...props}
+      state={{ ...props.state, decks: { ...decks, discardHeap: lying.slice(0, 2) }, pending: null }}
+      intro={{
+        gameId: null,
+        view: null,
+        onDone: () => {},
+        events: [
+          { id: 4, type: 'takenFromDiscard', player: actor, card: 'attack-bug', to: 'hand' },
+        ],
+      }}
+    />,
+  )
+  await vi.waitFor(() => expect(exits.sent.length).toBeGreaterThan(0), { timeout: 3000 })
+  expect(exits.sent.map((s) => [s.key, s.scatter?.rot, s.layer])).toEqual([
+    ['d1', scatterAt(1).rot, 0],
+    ['d2', scatterAt(2).rot, 1],
+  ])
+})
+
 it.each([false, true])('reopens a refused Cherry-pick choice (single offer: %s)', (single) => {
   mockReducedMotion(true)
   const base = makeBoardProps()
@@ -414,10 +690,9 @@ it.each([false, true])('reopens a refused Cherry-pick choice (single offer: %s)'
   const pending = cherryPending(options)
   const state = { ...base.state, pending }
   const { rerender } = render(<Board {...base} state={state} actions={{ onResolve }} />)
-  if (!single) {
-    fireEvent.click(screen.getByTestId('cherry-cell-a'))
-    fireEvent.click(screen.getByRole('button', { name: /confirm/i }))
-  }
+  // one card or two, the player answers — Cherry-pick never answers itself
+  fireEvent.click(screen.getByTestId('cherry-cell-a'))
+  fireEvent.click(screen.getByRole('button', { name: /confirm/i }))
   expect(onResolve).toHaveBeenCalledTimes(1)
   rerender(
     <Board
@@ -449,4 +724,21 @@ it.each([false, true])('reopens a refused Cherry-pick choice (single offer: %s)'
   fireEvent.click(screen.getByRole('button', { name: /confirm/i }))
   expect(onResolve).toHaveBeenCalledTimes(2)
   expect(onResolve).toHaveBeenLastCalledWith({ kind: 'pickFromDiscard', card: single ? 'a' : 'b' })
+})
+
+// CHERRY-PICK ALWAYS LAYS THE DISCARD OUT. One card the hand can take — a
+// discard of one card, or a trigger beside it — used to be taken for the player
+// with no grid at all; it is the player's pick like any other (owner, 04.10).
+// Inside keeps answering a single release itself (`boardAi.test.tsx`).
+it('lays out a Cherry-pick of a single card and waits for the player', () => {
+  mockReducedMotion(true)
+  const base = makeBoardProps()
+  const onResolve = vi.fn()
+  const pending = cherryPending([{ uid: 'a', id: 'attack-bug' }])
+  render(<Board {...base} state={{ ...base.state, pending }} actions={{ onResolve }} />)
+  expect(screen.getByTestId('board-cherry-grid')).toBeTruthy()
+  expect(onResolve).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByTestId('cherry-cell-a'))
+  fireEvent.click(screen.getByRole('button', { name: /confirm/i }))
+  expect(onResolve).toHaveBeenCalledWith({ kind: 'pickFromDiscard', card: 'a' })
 })

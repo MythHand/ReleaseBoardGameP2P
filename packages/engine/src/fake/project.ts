@@ -2,7 +2,7 @@ import type { Target } from '../actions'
 import { rulesFor } from '../cards'
 import type { CardUid, GameState, PlayerId, Released } from '../state'
 import { emptyTally, type PlayerTally } from '../tally'
-import type { PlayerView, ReleasedView, ReleaseView, SpectatorView } from '../view'
+import type { PlayerView, ReleasedView, ReleaseView, ShownView, SpectatorView } from '../view'
 import { pendingView } from './attacks'
 import { attackTargets, drawObligationMet } from './core'
 import { canAttackWith } from './window'
@@ -177,6 +177,17 @@ function tallyView(state: GameState): Record<PlayerId, PlayerTally> | null {
   return out
 }
 
+// What lies at the centre while plays are being made — every seat's, face up.
+function shownView(state: GameState): ShownView[] {
+  return state.seating.flatMap((player) => {
+    const { hand, shown } = state.players[player]
+    return shown.flatMap((uid) => {
+      const card = hand.find((c) => c.uid === uid)
+      return card ? [{ player, uid, card: card.id }] : []
+    })
+  })
+}
+
 export function project(state: GameState, viewerId: PlayerId): PlayerView {
   const me = state.players[viewerId]
   return {
@@ -207,10 +218,11 @@ function publicView(state: GameState, viewerId: PlayerId | null): Omit<PlayerVie
       .map((id) => ({
         id,
         name: state.players[id].name,
-        handCount: state.players[id].hand.length,
+        handCount: state.players[id].hand.length - state.players[id].shown.length,
         release: releaseView(state, id),
         eliminated: state.eliminated.includes(id),
       })),
+    shown: shownView(state),
     decks: {
       piles: state.decks.main.map((p) => p.length),
       events: state.decks.events.length,

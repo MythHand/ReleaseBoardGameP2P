@@ -122,6 +122,38 @@ it('takes a second arrival too, and lands it after the first', async () => {
   }
 })
 
+// ONE CARD, ONE PLACE (#168). A card already on screen is the flight's source,
+// and it steps aside for its flyer — in the commit that flyer mounts, not when
+// the flight is asked for. Hidden at the call, it was nowhere for the render the
+// flyer still had to wait for.
+it('keeps a card on screen drawn until the flyer that replaces it is mounted', async () => {
+  landed.length = 0
+  handRef.current = document.createElement('div')
+  const { container } = render(<Probe />)
+  const el = document.createElement('div')
+  document.body.append(el)
+  vi.useFakeTimers()
+  try {
+    const flight = api.step?.arrive([{ key: 'c1', card, el }], 3)
+    // asked for, not yet mounted: the card is still the only copy on screen
+    expect(container.children).toHaveLength(0)
+    expect(el.style.opacity).toBe('')
+    // the flyer's commit — and the card steps aside in that same commit
+    await act(async () => {})
+    expect(container.children).toHaveLength(1)
+    expect(el.style.opacity).toBe('0')
+    for (let i = 0; i < 4 && landed.length === 0; i++) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(600)
+      })
+    }
+    expect(await flight).toBe(true)
+  } finally {
+    vi.useRealTimers()
+    el.remove()
+  }
+})
+
 it('says it took the flight once that flight has landed', async () => {
   landed.length = 0
   handRef.current = document.createElement('div')

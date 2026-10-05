@@ -56,15 +56,18 @@ vi.mock('~/shared/lib/useReducedMotion', () => ({ useReducedMotion: () => false 
 // the table are both a `playToCenter` in `names`.
 const played = vi.hoisted(() => ({
   names: [] as string[],
-  calls: [] as { name: string; params: Record<string, unknown> }[],
+  // `start` — where the flown element stood as the flight began: the start a
+  // travel reads off the card itself (`board-beats/testing.tsx`'s `standing`)
+  calls: [] as { name: string; params: Record<string, unknown>; start?: { left: number } }[],
 }))
 vi.mock('@release/ui/animations', async (importOriginal) => {
   const real = await importOriginal<typeof import('@release/ui/animations')>()
+  const { standing } = await import('~/features/board-beats/testing')
   return {
     ...real,
     play: (name: string, el: Element, params?: Record<string, unknown>) => {
       played.names.push(name)
-      played.calls.push({ name, params: params ?? {} })
+      played.calls.push({ name, params: params ?? {}, start: standing(el) })
       return real.play(name, el, params)
     },
   }
@@ -637,8 +640,8 @@ const soloReleaseBefore: BoardState = {
   comboOptions: {},
 } as unknown as BoardState
 
-// The engine's answer to the play: it emits NOTHING and holds a pending
-// instead, so the release is still in the hand and only the pending moved.
+// The engine's answer to the play: the release is shown at the centre and a
+// pending holds it there — still in the hand, out of the fan (resolution.md §1).
 const soloReleasePending: BoardState = {
   ...soloReleaseBefore,
   playable: [],
@@ -648,6 +651,7 @@ const soloReleasePending: BoardState = {
     release: 'release-frontend#0',
     options: ['attack-bug#0'],
   },
+  shown: [{ player: 'p1', uid: 'release-frontend#0', card: card('release-frontend') }],
 } as unknown as BoardState
 
 const soloReleaseAfter: BoardState = {
@@ -933,8 +937,8 @@ it('plays the whole exchange for a watching peer that gets both events at once',
   // `cardBoxIn` of the stubbed rect above (centre 475/305, a CARD_W box), not a
   // zero-distance raise at the cover slot it lands on
   const cover = played.calls.find((c) => c.name === 'playToCenter')
-  expect(cover?.params.from).toMatchObject({ left: 475 - CARD_W / 2 })
-  expect(cover?.params.from).not.toEqual(cover?.params.to)
+  expect(cover?.start).toMatchObject({ left: 475 - CARD_W / 2 })
+  expect(cover?.start?.left).not.toBe((cover?.params.to as { left: number } | undefined)?.left)
   // the landing happened first: the cover covers something that is already there
   expect(played.names.indexOf('landInPose')).toBeLessThan(played.names.indexOf('playToCenter'))
   // and the exchange reached the heap, in the order it lay on the table

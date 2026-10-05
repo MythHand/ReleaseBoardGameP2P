@@ -277,7 +277,7 @@ export function useNeutralizeStaging({
         const [el] = await flyer.raise([{ key: 'home', at: from, card: s.card }])
         // `playToCenter` in reverse: the centre it is given is the zone slot the
         // release stands in, so the same preset carries it back with no pose.
-        if (el) await play('playToCenter', el, { from, to })?.finished
+        if (el) await play('playToCenter', el, { to })?.finished
       } finally {
         flyer.drop('home')
         // cleared only once the carrier has let go — the slot's own `liftedAt`

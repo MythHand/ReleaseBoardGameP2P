@@ -336,7 +336,7 @@ export function useDealIntro(args: {
       if (halt()) return null
       // the same Scatter drives the flight and the rest, so the card lands
       // exactly where it then lies (the discard heap's own coupling)
-      const anim = play('drawToCenter', el, { from, to, rotate: sc.rot, dx: sc.dx, dy: sc.dy })
+      const anim = play('drawToCenter', el, { to, rotate: sc.rot, dx: sc.dx, dy: sc.dy })
       if (anim) await anim.finished
       if (halt()) return null
       const placed: StagedCard = { uid, card: card.id, sc, faceDown: down }
@@ -359,7 +359,7 @@ export function useDealIntro(args: {
       if (halt()) return
       // aim at a card-sized box INSIDE the seat, not at the seat itself — its
       // rect is far wider than a card and the card would inflate to it
-      const anim = play('dealToSeat', el, { from, to: cardBoxIn(seat, from.width * 0.7) })
+      const anim = play('dealToSeat', el, { to: cardBoxIn(seat, from.width * 0.7) })
       if (anim) await anim.finished
       if (halt()) return
       setDealtTo((c) => ({ ...c, [player]: (c[player] ?? 0) + 1 }))

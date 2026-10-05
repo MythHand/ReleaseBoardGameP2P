@@ -14,12 +14,23 @@ export interface Game {
   // layer must not plan it as a movement anybody should watch. `0` when
   // nothing was restored.
   restoredThrough: number
+  // This peer's own refusals: the keeper's "no" to an intent it submitted,
+  // addressed to it alone. Kept apart from `events` — a refusal is not a move,
+  // never enters the history or the stored log, and its id is not one of the
+  // feed's — and handed to the board, whose gestures take a refused card home
+  // (#168). Per game, like the feed; never stored.
+  rejections: Event[]
   play(card: string, target?: Target, combo?: string): void
   draw(pile?: number): void
   push(): void
   attack(card: string, combo?: string): void
   pass(): void
+  // a pass taken back while the time to attack still runs
+  unpass(): void
   resolve(choice: Choice): void
+  // a card put out at the centre while a play is made, and taken back
+  show(card: string): void
+  takeBack(): void
 }
 
 // The page's whole relationship with the game. It holds a `GameLink` and a
@@ -49,6 +60,7 @@ export function useGame(): Game {
   // instant it fired.
   const seenGame = useRef<string | null>(gameId)
   const seenSync = useRef<typeof sync>(null)
+  const [rejections, setRejections] = useState<Event[]>([])
 
   // The high-water mark the beat queue starts from: everything restored is
   // already reflected in the projection the board is about to render, so none
@@ -79,6 +91,7 @@ export function useGame(): Game {
       if (!storedForGame) clearLog()
       restoredThrough.current = incomingEvents.at(-1)?.id ?? 0
       setEvents(incomingEvents)
+      setRejections([])
     }
   }, [gameId, incomingEvents, storedForGame])
 
@@ -91,7 +104,9 @@ export function useGame(): Game {
     // rejection path answers with exactly one of these in a SYNC, addressed
     // only to whoever submitted the rejected intent, and it belongs nowhere
     // near the feed this effect folds into `events` (and from there,
-    // `writeLog`).
+    // `writeLog`). It goes to the board on its own list instead.
+    const refused = sync.events.filter((e) => e.type === 'rejected')
+    if (refused.length > 0) setRejections((prev) => [...prev, ...refused])
     const syncEvents = sync.events.filter((e) => e.type !== 'rejected')
     if (syncEvents.length === 0) return
     // A resend is what this peer already ought to know. It belongs in the feed
@@ -137,6 +152,9 @@ export function useGame(): Game {
   // single render before the effect has folded this sync in.
   const pending =
     sync && sync !== seenSync.current ? sync.events.filter((e) => e.type !== 'rejected') : []
+  // …and a refusal in that same unseen sync reaches the board on the same render
+  const pendingRefused =
+    sync && sync !== seenSync.current ? sync.events.filter((e) => e.type === 'rejected') : []
   // `events` is likewise replaced by an effect, so for one commit after a new
   // game starts it still holds the last one's feed. Expose the incoming game's
   // stored snapshot instead — the seat ids repeat between games, so the
@@ -160,11 +178,15 @@ export function useGame(): Game {
     view: sync?.view ?? null,
     events: pending.length > 0 ? mergeEvents(carried, pending) : carried,
     restoredThrough: restoredNow,
+    rejections: pendingRefused.length > 0 ? [...rejections, ...pendingRefused] : rejections,
     play: (card, target, combo) => submit({ type: 'PLAY', card, target, combo }),
     draw: (pile) => submit({ type: 'DRAW', pile }),
     push: () => submit({ type: 'PUSH' }),
     attack: (card, combo) => submit({ type: 'ATTACK', card, combo }),
     pass: () => submit({ type: 'PASS' }),
+    unpass: () => submit({ type: 'UNPASS' }),
     resolve: (choice) => submit({ type: 'RESOLVE', choice }),
+    show: (card) => submit({ type: 'SHOW', card }),
+    takeBack: () => submit({ type: 'TAKE_BACK' }),
   }
 }

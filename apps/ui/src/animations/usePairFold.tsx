@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useCallback, useId, useLayoutEffect, useRef, useState } from 'react'
 import type { Card as CardType } from '@/cards/types'
 import CardPair, { PAIR_AUX_POSE } from '@/primitives/CardPair'
 import { play } from './play'
@@ -23,12 +23,16 @@ import styles from './usePairFold.module.css'
 //     — nothing teleports to a common origin first.
 //   • the aux lands on CardPair's OWN resting pose (PAIR_AUX_POSE), so handing
 //     the finished pair over to a static render changes nothing on screen.
-//   • the pair is mounted INVISIBLE and revealed in the same tick its halves get
-//     their entry poses (I2). This is the blind spot of the flyer form: a carrier
-//     paints before the caller can reach into it, so three of the four copies
-//     showed the pair already folded for a frame or two before it started to
-//     fold. Here it cannot happen — there is no frame in which the halves have
-//     no entry pose and the node is visible.
+//   • the pair is revealed in THE COMMIT IT MOUNTS IN, its halves already in
+//     their entry poses (I2). Two ways of getting this wrong, both met: a
+//     carrier that paints before the caller can reach into it showed the pair
+//     already folded for a frame or two (three of the four copies); and a pair
+//     kept invisible until two frames later showed NOTHING for those frames,
+//     because the cards it took over — the Sudo standing in the row, the card
+//     in the fan — stop being drawn in the very commit it mounts in (#168, one
+//     card one place). So the poses and the reveal are a layout effect of the
+//     mount: there is no frame with the node visible and the halves unposed,
+//     and none with the cards drawn nowhere.
 //   • the node STAYS UP after the fold. The caller hands the pair to whatever
 //     renders it at rest and only then calls `release()` — dropping it here would
 //     blink the pair out between the last frame and the static render (I4's
@@ -65,6 +69,9 @@ export function usePairFold() {
   const [pair, setPair] = useState<Mounted | null>(null)
   const nodeRef = useRef<HTMLDivElement | null>(null)
   const seq = useRef(0)
+  // scoped to this instance: another step's carriers share the list it renders
+  // in and count from one too (see `useFlyer`)
+  const scope = useId()
 
   /** the pair's node — for a caller that has something of its own to do with it */
   const node = () => nodeRef.current
@@ -72,27 +79,42 @@ export function usePairFold() {
   /** the static render has taken over: the node can go */
   const release = () => setPair(null)
 
-  const fold = async (it: Folding): Promise<void> => {
-    setPair({ ...it, seq: ++seq.current })
-    await nextFrames() // mounted — and still invisible
+  // THE ENTRY POSES AND THE REVEAL, in the commit the pair mounts in and before
+  // it is painted: the first frame the pair is drawn in is the frame its halves
+  // still stand where the cards were — the same commit those cards stop being
+  // drawn anywhere else. `enterPose` is the formula the fold starts from, so the
+  // painted frame and the animation's first keyframe are the same pose.
+  const posed = useCallback((it: Folding) => {
     const el = nodeRef.current
     const mainEl = el?.querySelector<HTMLElement>('[data-main]')
     const auxEl = el?.querySelector<HTMLElement>('[data-aux]')
+    if (!el || !mainEl || !auxEl) return null
+    mainEl.style.transform = enterPose(it.mainFrom, it.box)
+    auxEl.style.transform = enterPose(it.auxFrom, it.box)
+    el.dataset.shown = 'true'
+    return { el, mainEl, auxEl }
+  }, [])
+  useLayoutEffect(() => {
+    if (pair) posed(pair)
+  }, [pair, posed])
+
+  const fold = async (it: Folding): Promise<void> => {
+    setPair({ ...it, seq: ++seq.current })
+    await nextFrames() // mounted, posed and shown
+    const el = nodeRef.current
     // a fold with no node means the scene never rendered `overlay` — and without
     // this it would simply not happen, with no error anywhere (the same silence
     // useDiscardExit had to answer for)
-    if (!el || !mainEl || !auxEl) {
+    if (!el?.querySelector('[data-main]') || !el.querySelector('[data-aux]')) {
       console.error('usePairFold: no pair node — is `overlay` rendered?')
       return
     }
     for (const a of el.getAnimations()) a.cancel() // I3
-    // the entry poses and the reveal happen in ONE tick, BEFORE a frame is
-    // painted: the first frame the pair is visible in is the frame its halves
-    // are still apart. `enterPose` is the same formula the fold starts from, so
-    // the painted frame and the animation's first keyframe are the same pose.
-    mainEl.style.transform = enterPose(it.mainFrom, it.box)
-    auxEl.style.transform = enterPose(it.auxFrom, it.box)
-    el.dataset.shown = 'true'
+    // …and posed again after the cancel, in the same tick, so a leftover
+    // animation cannot have moved a half off its start
+    const halves = posed(it)
+    if (!halves) return
+    const { mainEl, auxEl } = halves
     await nextFrames() // I2 — both halves have painted apart before they move
     const dur = it.dur ?? FOLD_MS
     const a1 = play('foldIntoPair', mainEl, { from: it.mainFrom, box: it.box, dur })
@@ -108,7 +130,7 @@ export function usePairFold() {
 
   const overlay = pair && (
     <div
-      key={pair.seq} // a fresh node per fold (I5)
+      key={`${scope}${pair.seq}`} // a fresh node per fold (I5), this instance's own
       className={styles.flyer}
       ref={(el) => {
         nodeRef.current = el

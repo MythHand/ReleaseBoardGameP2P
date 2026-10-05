@@ -1,9 +1,8 @@
 import type { DiscardReason, Event } from '@release/engine'
 import type { ReleaseSlots, ReleaseSupport, TablePending } from '@release/ui'
 import { cardById } from '@release/ui'
-import type { Scatter } from '@release/ui/animations'
 import type { BoardState } from '~/entities/game/board'
-import { standInScatter } from '~/entities/game/board'
+import { glowsFor } from '~/entities/game/board'
 
 // A batch of engine events becomes the movements the board should play. Pure:
 // it reads the projection as it stood BEFORE the batch, because that is the
@@ -81,34 +80,27 @@ export type AiTail =
       card: string
       destination: 'events' | 'discard'
       /**
-       * Where the heap will actually REST this release — the pose the board's
-       * own `toDiscardHeap` gives its stand-in for the discard's top, read
-       * through the shared `standInScatter` rather than spelled out again
-       * here (I7: one value, two readers; the flight and the rest must agree
-       * or the card jumps on its last frame).
+       * The `discarded` events the destruction filed its cards by
+       * (`destroySlot`) — the release's, and the Code Review's under it. The
+       * heap rests every card on the pose its own event keys (`scatterAt`), so
+       * the flight lands on exactly that (I7), and the two go in the way they
+       * lay in the slot: the Code Review under, the release over it
+       * (`toDiscardHeap`'s pairing; owner, 04.10). The release has none when
+       * it goes home to the events deck.
        *
-       * A stand-in, because there is no `discarded` event to key a real
-       * scatter off: an automatic `destroySlot` emits `releaseDestroyed`
-       * alone (fake/triggers.ts:88-92). Present ONLY when this release is
-       * what the discard's top will be — that is, when it goes to the heap at
-       * all AND wears no Code Review. `bankToDiscard` banks the spoils in the
-       * order `destroySlot` lists them, `[release, codeReview]`, so a
-       * protected release is buried under its own Code Review and the heap
-       * holds nothing for it; that half stays recorded in
-       * `docs/animations/backlog.md` rather than guessed at here.
+       * Both used to be banked with no event at all, and the heap drew a
+       * stand-in for its top: the release under its own Code Review was
+       * nowhere, and the two swapped layers on the way in.
        */
-      rest?: Scatter
+      releaseDiscardId?: number
+      codeReviewDiscardId?: number
       /**
        * The Code Review tucked under the destroyed release. `destroySlot`'s
-       * spoils are the release AND its Code Review (fake/triggers.ts:87), so
-       * the two leave the zone together; without this the board flies one of
-       * them and the other simply blinks out of the zone.
-       *
-       * Read off the pre-batch projection's `support`, not off an event:
-       * an automatic destruction emits `releaseDestroyed` alone and names
-       * only the release. Same shape of answer `neutralized.spent[1]` gives
-       * the sacrifice ending, which is the same pair leaving for the same
-       * reason.
+       * spoils are the release AND its Code Review, so the two leave the zone
+       * together; without this the board flies one of them and the other
+       * simply blinks out of the zone. Read off the pre-batch projection's
+       * `support`, the same answer `neutralized.spent[1]` gives the sacrifice
+       * ending.
        */
       codeReview?: string
     }
@@ -148,7 +140,24 @@ export type BeatPlan =
   // `gather` marks a defenceless player's whole table leaving as one sweep —
   // everything they owned gathered at the centre and held before it scatters
   // (#102). Absent for an ordinary discard, never `false`.
-  | { kind: 'discard'; key: string; cards: DiscardCard[]; gather?: true }
+  //
+  // `alarm` is the Error 503 standing at the centre when that player passed it:
+  // it leaves for the discard in the same send as the swept cards, from where
+  // it stands, at the bottom — the engine banks it first (owner, 03.10).
+  | {
+      kind: 'discard'
+      key: string
+      cards: DiscardCard[]
+      gather?: true
+      alarm?: { eventId: number; card: string }
+      /**
+       * The AI card standing behind the prompt the swept player refused, and
+       * the trigger that drew it — an AI Error 503 passed. Same fact, same
+       * reasoning, as the `neutralized` plan's own `homeward`.
+       */
+      homeward?: string
+      causeward?: { card: string; eventId: number }
+    }
   // The excess a turn's end (or a Bad Vibe-Coding) costs, leaving as ONE
   // gesture: a grid at the centre, sized upfront from the count, held open for
   // the table to read and only then sent to the heap. Its own kind rather than
@@ -322,6 +331,11 @@ export type BeatPlan =
       codeReview?: string
       cost?: { eventId: number; card: string }
     }
+  // Another player put a card out at the centre while making a play, or took
+  // what they had put out back into the hand (resolution.md §1). Our own is
+  // where our gesture put it, so these are planned for the other seats only.
+  | { kind: 'shown'; key: string; eventId: number; player: string; card: string }
+  | { kind: 'takenBack'; key: string; eventId: number; player: string; cards: string[] }
   // The pending pair splitting back into two singles for the discard. `main`
   // is optional, not `aux`: a sudo Rollback banks only the sudo half (the
   // attack card returns to its owner's hand instead), so the pair this beat
@@ -625,23 +639,36 @@ const pickedPlace = (before: BoardState): { picked?: true } => {
 function crushTailOf(
   before: BoardState,
   destroyed: { player: string; slot: string; card: string },
-  discardAfter: number | undefined,
+  filed: Extract<Event, { type: 'discarded' }>[],
 ): Extract<AiTail, { kind: 'crush' }> {
   const home =
     releaseEventsOf(before, destroyed.player)?.[destroyed.slot as keyof ReleaseSlots] !== undefined
   const aux = releaseSupportOf(before, destroyed.player)?.[destroyed.slot as keyof ReleaseSupport]
-  // Only the card that ends up on TOP of the discard has a pose the heap
-  // will actually rest it on — see `rest`'s own comment on `AiTail`.
-  const rest =
-    !home && !aux && discardAfter !== undefined ? standInScatter(discardAfter) : undefined
+  const release = home ? undefined : filed.find((d) => d.card === destroyed.card)
+  const review = aux ? filed.find((d) => d.card === aux.id) : undefined
   return {
     kind: 'crush',
     slot: destroyed.slot,
     card: destroyed.card,
     destination: home ? 'events' : 'discard',
-    ...(rest ? { rest } : {}),
+    ...(release ? { releaseDiscardId: release.id } : {}),
+    ...(review ? { codeReviewDiscardId: review.id } : {}),
     ...(aux ? { codeReview: aux.id } : {}),
   }
+}
+
+// THE CARDS A DESTRUCTION FILED: the `discarded` events straight after it and
+// caused by it (`destroySlot`). Its caller claims them, so the discard planner
+// never flies the same two cards a second time.
+function filedBy(events: Event[], at: number): Extract<Event, { type: 'discarded' }>[] {
+  const cause = events[at]
+  const filed: Extract<Event, { type: 'discarded' }>[] = []
+  for (let j = at + 1; j < events.length; j++) {
+    const d = events[j]
+    if (d.type !== 'discarded' || d.parent !== cause?.id) break
+    filed.push(d)
+  }
+  return filed
 }
 
 // What the AI card DID, read from the events behind it rather than from its own
@@ -660,7 +687,6 @@ function aiTailAfter(
   before: BoardState,
   eventCard: string,
   owed: TablePending | null | undefined,
-  discardAfter: number | undefined,
 ): AiTail {
   const next = events[i + 3]
   if (next?.type === 'released') {
@@ -669,7 +695,7 @@ function aiTailAfter(
   if (next?.type === 'placed') {
     return { kind: 'zone', slot: 'monitoring', card: next.card }
   }
-  if (next?.type === 'releaseDestroyed') return crushTailOf(before, next, discardAfter)
+  if (next?.type === 'releaseDestroyed') return crushTailOf(before, next, filedBy(events, i + 3))
   if (next?.type === 'turnEnded') return { kind: 'turnEnded' }
   const mimic = next?.type === 'revealed' && next.card === eventCard
   // A prompt is owed for THIS card — not merely "some pending exists", which a
@@ -679,7 +705,12 @@ function aiTailAfter(
   // makes the check compile against the union: some of its members (`defend`,
   // `requestCard`, …) carry no `source` field at all.
   const standing = owed != null && 'source' in owed && owed.source === eventCard
-  if (standing) return { kind: 'standing', ...(mimic ? { alarm: true as const } : {}) }
+  // …and it is an alarm on this board when the prompt it raises glows here — the
+  // board's own rule (`glowsFor`), read at the reveal so the glow lights as the
+  // card turns up rather than once the prompt is published: a Crush owed to us
+  // as much as the 503 mimic (owner, 03.10)
+  if (standing)
+    return { kind: 'standing', ...(glowsFor(owed, before.selfId) ? { alarm: true as const } : {}) }
   if (mimic) return { kind: 'alarm' }
   return { kind: 'none' }
 }
@@ -721,16 +752,6 @@ export function planBeats(
   // fact a batch cannot report about itself, because raising a pending emits no
   // event. Optional so every existing caller and test keeps compiling.
   owed?: TablePending | null,
-  // The discard's card count AFTER this batch — `useBeats`'s
-  // `live.decks.discardCount`. Passed for the same reason `owed` is: it is a
-  // fact about the batch that the batch cannot report about itself, because
-  // the engine banks some cards with no event at all. READ off the projection
-  // that will render the heap, never reconstructed from `before` plus what
-  // this batch appears to have banked — that arithmetic would make this file a
-  // second source for the engine's own banking order. Optional so every
-  // existing caller and test keeps compiling; absent, the crush ending simply
-  // carries no resting pose.
-  discardAfter?: number,
 ): BeatPlan[] {
   const claimed = new Set<number>()
   // Events another plan has already taken over, keyed by id rather than type —
@@ -819,11 +840,28 @@ export function planBeats(
   // arrives BEFORE the discards it opens. `flush()` is what puts it behind
   // them — and what emits it at all when there was nothing to sweep.
   let elimination: Extract<BeatPlan, { kind: 'eliminated' }> | null = null
+  // The Error 503 a player passed, held until the sweep it opens is planned:
+  // its `discarded` arrives BEFORE the `eliminated`, and it stands at the
+  // centre, where `sourceOf` never looks — so it used to be skipped and the
+  // projection put it in the heap in one jump (owner's recording, 03.10).
+  let passedAlarm: { eventId: number; card: string } | null = null
   const flush = () => {
     if (draw) plans.push(draw)
+    // A passed alarm whose player had nothing to sweep still leaves — alone,
+    // ahead of the elimination it opened
+    if (passedAlarm && elimination && !discard) {
+      discard = {
+        kind: 'discard',
+        key: `discard:${passedAlarm.eventId}`,
+        cards: [],
+        gather: true,
+        alarm: passedAlarm,
+      }
+      passedAlarm = null
+    }
     // A discard beat with nothing aimable is not a beat: every card in the run
     // failed to find a source, which the projection still resolves on its own.
-    if (discard && discard.cards.length > 0) plans.push(discard)
+    if (discard && (discard.cards.length > 0 || discard.alarm)) plans.push(discard)
     if (pileRun) plans.push(pileRun)
     if (pairOut) plans.push(pairOut)
     if (handLimit) plans.push(handLimit)
@@ -862,6 +900,24 @@ export function planBeats(
       e.type === 'gameOver'
     )
       closeOperation()
+    // One event, one beat, the same as `released`: a card put out at the centre
+    // or taken back from it by another player.
+    if (e.type === 'shown' || e.type === 'takenBack') {
+      if (e.player === before.selfId) continue
+      flush()
+      plans.push(
+        e.type === 'shown'
+          ? { kind: 'shown', key: `shown:${e.id}`, eventId: e.id, player: e.player, card: e.card }
+          : {
+              kind: 'takenBack',
+              key: `takenBack:${e.id}`,
+              eventId: e.id,
+              player: e.player,
+              cards: e.cards,
+            },
+      )
+      continue
+    }
     if (e.type === 'operationPlayed') {
       closeOperation()
       flush()
@@ -986,6 +1042,10 @@ export function planBeats(
         // `eliminated` firing for the defenceless-503 sweep is intended).
         const tail = events[i + 3]
         if (tail?.type === 'released' || tail?.type === 'placed') owned.add(tail.id)
+        // …and what a Crush destroyed, filed under the destruction: the crush
+        // ending flies those cards itself
+        if (tail?.type === 'releaseDestroyed')
+          for (const d of filedBy(events, i + 3)) owned.add(d.id)
         plans.push({
           kind: 'aiEvent',
           key: `ai:${e.id}`,
@@ -995,7 +1055,7 @@ export function planBeats(
           trigger: ai.aiCard,
           triggerDiscardId: filed?.type === 'discarded' ? filed.id : -1,
           eventCard: ai.eventCard,
-          tail: aiTailAfter(events, i, before, ai.eventCard, owed, discardAfter),
+          tail: aiTailAfter(events, i, before, ai.eventCard, owed),
         })
         continue
       }
@@ -1316,12 +1376,14 @@ export function planBeats(
       before.pending.player === e.player
     ) {
       flush()
+      const filed = filedBy(events, i)
+      for (const d of filed) owned.add(d.id)
       plans.push({
         kind: 'crushRefused',
         key: `refused:${e.id}`,
         eventId: e.id,
         player: e.player,
-        tail: crushTailOf(before, e, discardAfter),
+        tail: crushTailOf(before, e, filed),
         ...homewardOf(before),
       })
       continue
@@ -1439,6 +1501,20 @@ export function planBeats(
         handLimit.cards.push({ key: `d${e.id}`, eventId: e.id, card: e.card, source })
         continue
       }
+      // THE ALARM, standing at the centre — claimed the way the attack card is
+      // below, when the player it is owed to goes out in this same batch: it
+      // joins their sweep rather than finding no source and being skipped.
+      const alarm = before.pending?.kind === 'neutralize503' ? before.pending : null
+      if (
+        alarm &&
+        e.reason === 'trigger' &&
+        e.card === alarm.card &&
+        !passedAlarm &&
+        events.some((x) => x.type === 'eliminated' && x.player === alarm.player)
+      ) {
+        passedAlarm = { eventId: e.id, card: e.card }
+        continue
+      }
       const p = openAttack
       // The sudo half of a resolving pair — checked ahead of the attack card
       // so a sudo Rollback (which banks ONLY this half; the attack card
@@ -1533,6 +1609,20 @@ export function planBeats(
         cards: [],
         ...(gather ? { gather: true as const } : {}),
       }
+      if (gather && passedAlarm && !discard.alarm) {
+        discard.alarm = passedAlarm
+        passedAlarm = null
+      }
+      // …AND THE AI CARD BEHIND THE PROMPT THEY REFUSED, with its trigger: the
+      // prompt is answered, so the two leave the way they leave after any
+      // answered prompt (`homewardOf`). Neither has an event in this batch — the
+      // trigger was filed at the reveal, the AI card goes home and is filed as
+      // nothing — so nothing else here flies them, and the board dropped both
+      // the moment the sweep ended (owner's recording, 04.10).
+      const owedBy =
+        before.pending && 'player' in before.pending ? before.pending.player : undefined
+      if (gather && !discard.homeward && owedBy === e.player)
+        Object.assign(discard, homewardOf(before))
       discard.cards.push({ key: `d${e.id}`, eventId: e.id, card: e.card, source })
       continue
     }

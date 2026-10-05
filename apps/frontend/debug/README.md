@@ -106,6 +106,48 @@ The frontend `typecheck` and `stylelint` scripts include `debug/`, so the regula
 CI checks validate this entry as well as `src/`. The production build still uses
 the application entry only.
 
+## A recording, and reading it back (#168)
+
+A defect on this stand is found from a recording and the code, not from a guess.
+**Record** and **Save log** sit at the right of the viewer row. A recording keeps
+everything the board did, not what one case needs: the actions sent and the
+engine's answer, the board's own frames, every beat with what it published, the
+gesture's trace, and the screen on every animation frame — each card's place,
+pose and paint layer, and the boxes of the draw piles and the events deck. The
+dev server writes the file to `apps/frontend/debug/logs/`, which git ignores.
+
+Read it back from the repository root:
+
+```sh
+pnpm --filter @release/web --silent debug:log [name]
+pnpm --filter @release/web --silent debug:log <name> --heap <from> <to>
+pnpm --filter @release/web --silent debug:log <name> --card <id> [<from> <to>]
+```
+
+With no name it reads the newest recording. The first form lists the actions and
+every finding, each with the beat running at the time and the card's place before
+and during it:
+
+| Finding | What the card did |
+|---|---|
+| `GONE` | drawn nowhere for a while, then back |
+| `TWICE` | drawn in two places at once |
+| `HOP` | drawn somewhere else for a moment — passed through a place it never meant to stand in |
+| `LAYER` | two cards at rest swapped which lies on top |
+| `SNAP` | a card at rest jumped to another pose in one frame and stayed — landed on one spot, drawn on another |
+| `JUMP` | a standing card was somewhere else, far, the next frame, with no carrier between |
+| `LEFT` | a standing card vanished for good instead of leaving |
+
+`--heap` prints the discard frame by frame, bottom to top as the eye sees it;
+`--card` prints one card's whole path. `--window <ms>` (2000 by default) is how
+long a card may be gone or doubled and still count as a slip. A viewer switch
+rebuilds the board, so the findings stamped with its beat are the switch, not a
+defect.
+
+The rule the recording serves is **one card, one place** (`docs/animations`, I12).
+`oneCardOnePlace.test.tsx` is its sentinel: it plays scenes through the real board
+(`standHarness.tsx`) and fails the frame a card is drawn twice or nowhere.
+
 ## Centre and transfer regression presets (#154–157)
 
 The additional presets start from seeded hands and reach intermediate decisions
@@ -142,12 +184,10 @@ new attack animation. Restart resets the same card identities into a new game.
 - **Release into a zone:** your turn, zones empty. Put the release down — pay its
   cost if the setup charges one, or play it with Code Review so the cost rides it
   instead. Monitoring is in the hand too, for the other thing that goes into a
-  zone. The opponent holds a Bug and a Sudo, so the window the fresh release
-  opens has something to answer it.
-- **Release: pay a card:** the same hand with the game's base cost. Pull
-  Frontend onto the table, then pull Hotfix (or another available hand card)
-  out of the fan to pay. The selected card leaves the hand when its flight starts, stands
-  beside the release, then goes to discard. It must not reappear in the fan.
+  zone. Both opponents can answer the window the fresh release opens: the first
+  holds a Bug, a Sudo and a Security Bug, the second a Bug and a Security Bug — so
+  a hit that goes through, a steal, and a second attack refused while the first
+  is out can all be played from here.
 - **DDoS: the standing zone:** your turn, five DDoS in hand, and two opponent
   zones already holding one of each thing a DDoS can aim at. The first seat has a
   Monitoring, a bare release and a release under Code Review; the second has the
@@ -166,7 +206,9 @@ new attack animation. Restart resets the same card identities into a new game.
   picking one restarts the scene. The events deck is seeded with that single
   card, so every run reveals it, and the table is laid for what it acts on — the
   matching release for a Crush, an empty slot for an AI release, two releases of
-  different types in the discard for Inside (`aiTable` in `scenarios.ts`).
+  different types in the discard for Inside (`aiTable` in `scenarios.ts`). Crush
+  Backend's release stands under a Code Review, so the two leaving together — in
+  the order they lay — can be watched.
 - **Defences in the defender's hand:** every preset that throws an attack gives
   the defender every defence card, one copy each — Hotfix, Rubber ducky, PR
   approved, Rollback, Not a bug, Works on my machine. A stand is where you reach
