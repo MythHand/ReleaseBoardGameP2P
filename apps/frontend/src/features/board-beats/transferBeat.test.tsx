@@ -2,23 +2,31 @@ import { act, render } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
 import type { BoardAnchors, BoardState } from '~/entities/game/board'
 import type { BeatPlan } from './planBeats'
+import { spot } from './testing'
 import { useTransferBeat } from './transferBeat'
 
 const played = vi.hoisted(() => ({
   names: [] as string[],
   shakes: [] as unknown[],
   takes: [] as unknown[],
+  // where each `takeFromSeat` element STOOD as it began — the start a travel
+  // reads off the card itself (`testing.tsx`'s `standing`)
+  takeStarts: [] as unknown[],
 }))
 const arrivals = vi.hoisted(() => ({ handLengths: [] as number[], calls: 0 }))
 
 vi.mock('@release/ui/animations', async (importOriginal) => {
   const real = await importOriginal<typeof import('@release/ui/animations')>()
+  const { standing } = await import('./testing')
   return {
     ...real,
-    play: (name: string, _el: unknown, params?: unknown) => {
+    play: (name: string, el: Element | null, params?: unknown) => {
       played.names.push(name)
       if (name === 'shake') played.shakes.push(params)
-      if (name === 'takeFromSeat') played.takes.push(params)
+      if (name === 'takeFromSeat') {
+        played.takes.push(params)
+        played.takeStarts.push(standing(el))
+      }
       return { finished: Promise.resolve() } as unknown as Animation
     },
     useHandArrival: (...args: Parameters<typeof real.useHandArrival>) => {
@@ -129,6 +137,7 @@ beforeEach(() => {
   played.names = []
   played.shakes = []
   played.takes = []
+  played.takeStarts = []
   arrivals.handLengths = []
   arrivals.calls = 0
 })
@@ -402,7 +411,7 @@ it('takes the chosen closed card from its parked position without replaying a fa
   const r = runTransfer(transferPlan({ named: false, index: 2 }), pending)
   await r.go()
   expect(played.names.filter((name) => name === 'takeFromSeat')).toHaveLength(1)
-  expect(played.takes[0]).toMatchObject({ from: { left: 620, top: 430, width: 150, height: 210 } })
+  expect(played.takeStarts[0]).toEqual({ left: 620, top: 430, width: 150 })
   root.removeChild(centreNode)
 })
 
@@ -529,5 +538,97 @@ it('takes the card out of the place the fan names, not one of its own choosing',
     vi.useRealTimers()
     root.remove()
   }
-  expect(played.takes[0]).toMatchObject({ from: pickedRect })
+  expect(played.takeStarts[0]).toEqual(spot(pickedRect))
+})
+
+// ONE COMMIT (#168): a watcher's board lets go of the named card standing at the
+// centre in the commit its flyer goes up — the taker's leg already does. Let go
+// only once the flyer had mounted, the card stood at the centre AND on its
+// flyer for two frames.
+it('lets a watcher’s board go of the named card in the commit its flyer goes up', async () => {
+  const on = {
+    ...base,
+    pending: { kind: 'giveCard', player: 'p2', attacker: 'p3', requested: 'attack-bug' },
+  } as unknown as BoardState
+  const plan = transferPlan({
+    role: 'watcher',
+    from: 'p2',
+    to: 'p3',
+    named: true,
+    card: 'attack-bug',
+  })
+  let flyerUp: boolean | null = null
+  let container: HTMLElement | null = null
+  const runner: { start?: () => Promise<void> } = {}
+  function Probe() {
+    const beat = useTransferBeat(anchors)
+    runner.start = () =>
+      beat.runTransfer(plan, {
+        base: on,
+        publish: (s) => {
+          if (flyerUp === null && s.pending === null)
+            flyerUp = Boolean(container?.innerHTML.includes('data-card="attack-bug"'))
+        },
+      })
+    return <>{beat.overlay}</>
+  }
+  container = render(<Probe />).container
+  vi.useFakeTimers()
+  try {
+    let done = false
+    const finished = runner.start?.().then(() => {
+      done = true
+    })
+    while (!done) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(20)
+      })
+    }
+    await finished
+  } finally {
+    vi.useRealTimers()
+  }
+  // let go before the flyer was on screen — the two land in one commit
+  expect(flyerUp).toBe(false)
+})
+
+// THE DONOR'S HAND, as the card leaves it (#168): one card lighter in the
+// commit its carrier goes up, for the taker and for a watcher alike. It used to
+// lighten only once the card had reached the centre.
+it.each([
+  ['the taker', transferPlan()],
+  ['a watcher', transferPlan({ role: 'watcher', from: 'p2', to: 'p3', named: true })],
+] as const)('lightens the donor’s hand as the card takes off, for %s', async (_who, plan) => {
+  let liftedAfter: string[] | null = null
+  const runner: { start?: () => Promise<void> } = {}
+  function Probe() {
+    const beat = useTransferBeat(anchors)
+    runner.start = () =>
+      beat.runTransfer(plan, {
+        base,
+        publish: (s) => {
+          if (liftedAfter === null && s.opponents[0].handCount === 4)
+            liftedAfter = [...played.names]
+        },
+      })
+    return <>{beat.overlay}</>
+  }
+  render(<Probe />)
+  vi.useFakeTimers()
+  try {
+    let done = false
+    const finished = runner.start?.().then(() => {
+      done = true
+    })
+    while (!done) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(20)
+      })
+    }
+    await finished
+  } finally {
+    vi.useRealTimers()
+  }
+  expect(liftedAfter).not.toBeNull()
+  expect(liftedAfter).not.toContain('takeFromSeat')
 })

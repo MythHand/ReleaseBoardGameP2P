@@ -29,17 +29,12 @@ interface Rect {
 }
 
 interface MoveParams {
-  from?: Rect
   to?: Rect
-  // Approach a release slot from its own column. A long straight diagonal to
-  // Database passes over Backend and reads as a landing in the wrong slot.
-  releaseApproach?: boolean
   rotate?: number
-  // Разворот, С КОТОРОГО начинается перелёт. Нужен, когда карта уже лежит
-  // повёрнутой и выпрямляется ПО ДОРОГЕ: веер соперника протянут к тебе и
-  // развёрнут на 180°, и взятая из него карта не должна дёргаться прямой в
-  // первом же кадре. Позой носителя (`useFlyer` → `Raise.pose`) это не
-  // решается: первый кадр анимации перекрывает inline-transform узла.
+  // A turn the flight STARTS with, on top of however the card stands: the
+  // opponent's closed fan is held out across the table turned 180°, and the
+  // card taken out of it straightens over the flight instead of on its first
+  // frame.
   rotateFrom?: number
   dx?: number
   dy?: number
@@ -47,30 +42,58 @@ interface MoveParams {
   fade?: boolean
 }
 
-// Общий travel: перелёт элемента из прямоугольника from в прямоугольник to
+/**
+ * POINT A OF A FLIGHT — read off the card itself, never taken from the caller.
+ *
+ * A travel used to be handed its start as a rect and fly the difference
+ * between that rect and the target from wherever the element really stood. When
+ * the two disagreed the card landed beside its target by exactly that
+ * disagreement and jumped when the resting render took over — the release with
+ * its Code Review, which the gesture stands in the row's first place while the
+ * beat named the middle of the table as its start (#168). A start that is
+ * measured cannot disagree with the card.
+ *
+ * `box` is the element's own box without its own transform — the frame the
+ * keyframes below are written in. `look` is how it stands on screen right now
+ * (its own pose, a filled earlier flight), or null when it stands square.
+ * The transform turns about the centre (every flown element keeps the default
+ * origin), so the centre is displaced by the matrix's translation alone.
+ */
+const standing = (el: Element): { box: Rect; look: string | null } => {
+  const r = el.getBoundingClientRect()
+  const square = { box: { left: r.left, top: r.top, width: r.width, height: r.height }, look: null }
+  const look = getComputedStyle(el).transform
+  if (!look || look === 'none' || !(el instanceof HTMLElement)) return square
+  if (typeof DOMMatrixReadOnly === 'undefined') return square
+  const m = new DOMMatrixReadOnly(look)
+  const cx = r.left + r.width / 2 - m.e
+  const cy = r.top + r.height / 2 - m.f
+  const w = el.offsetWidth
+  const h = el.offsetHeight
+  return { box: { left: cx - w / 2, top: cy - h / 2, width: w, height: h }, look }
+}
+
+// Общий travel: перелёт элемента туда, где он стоит, в прямоугольник to
 // (translate по центрам + масштаб по ширине). Базис под все «полёты» карт.
 // rotate/dx/dy — финальный разворот и доп. смещение (чтобы прилёт сразу был
 // в правильной конечной позиции, без последующего рывка). fade — гасит opacity.
+// A card standing square starts on exactly the keyframe it always did; one
+// standing in a pose starts IN that pose and leaves it over the flight.
 const move = (
   el: Element,
-  {
-    from,
-    to,
-    releaseApproach = false,
-    rotate = 0,
-    rotateFrom = 0,
-    dx = 0,
-    dy = 0,
-    fade = false,
-  }: MoveParams = {},
+  { to, rotate = 0, rotateFrom = 0, dx = 0, dy = 0, fade = false }: MoveParams = {},
   duration = 460,
   easing = EASE,
 ): Animation | null => {
-  if (!el || !from || !to) return null
+  if (!el || !to) return null
+  const { box: from, look } = standing(el)
   const mx = to.left + to.width / 2 - (from.left + from.width / 2) + dx
   const my = to.top + to.height / 2 - (from.top + from.height / 2) + dy
   const scale = to.width / from.width
-  const start: Keyframe = { transform: `translate(0, 0) scale(1) rotate(${rotateFrom}deg)` }
+  const turn = `rotate(${rotateFrom}deg)`
+  const start: Keyframe = {
+    transform: look ? `${look}${rotateFrom ? ` ${turn}` : ''}` : `translate(0, 0) scale(1) ${turn}`,
+  }
   const end: Keyframe = {
     transform: `translate(${mx}px, ${my}px) scale(${scale}) rotate(${rotate}deg)`,
   }
@@ -78,16 +101,7 @@ const move = (
     start.opacity = 1
     end.opacity = 0
   }
-  const approach: Keyframe[] =
-    releaseApproach && Math.abs(mx) > from.width / 2
-      ? [
-          {
-            offset: 0.55,
-            transform: `translate(${mx}px, ${my * 0.25}px) scale(${1 + (scale - 1) * 0.55}) rotate(${rotateFrom + (rotate - rotateFrom) * 0.55}deg)`,
-          },
-        ]
-      : []
-  return el.animate([start, ...approach, end], { duration, easing, fill: 'forwards' })
+  return el.animate([start, end], { duration, easing, fill: 'forwards' })
 }
 
 // FLIP-полёт на месте: элемент уже стоит там, где должен, поэтому анимируется
@@ -102,10 +116,14 @@ const flipTo = (
   pose: string,
   dur: number,
   snap: boolean,
+  rotateFrom = 0,
 ): Animation | null => {
   if (!from || !box) return null
+  // a start that is turned ends on a turn of nought, so the two keyframes are
+  // the same list of functions and the turn unwinds over the flight
+  const rest = rotateFrom ? 'translate(0, 0) scale(1) rotate(0deg)' : 'translate(0, 0) scale(1)'
   return el.animate(
-    [{ transform: enterPose(from, box) }, { transform: pose || 'translate(0, 0) scale(1)' }],
+    [{ transform: enterPose(from, box, rotateFrom) }, { transform: pose || rest }],
     { duration: dur, easing: snap ? LAND : EASE, fill: 'forwards' },
   )
 }
@@ -114,11 +132,17 @@ const flipTo = (
  * Поза, в которой элемент, стоящий на своём месте, ВЫГЛЯДИТ стоящим в `from`:
  * смещение центр-в-центр плюс масштаб по ширине. Вход FLIP-полёта — им красят
  * первый кадр, чтобы карта не мигнула в конечной позе до старта анимации.
+ *
+ * `rotateFrom` — наклон, с которым карта лежит в `from` (карта в куче сброса
+ * лежит повёрнутой). Без него карта, вылетающая из кучи, стартовала бы ровной и
+ * щёлкала на несколько градусов в первый же кадр. Не задан — поза та же, что и
+ * была, до символа.
  */
-export const enterPose = (from: Rect, box: Rect): string => {
+export const enterPose = (from: Rect, box: Rect, rotateFrom = 0): string => {
   const dx = from.left + from.width / 2 - (box.left + box.width / 2)
   const dy = from.top + from.height / 2 - (box.top + box.height / 2)
-  return `translate(${dx}px, ${dy}px) scale(${from.width / box.width})`
+  const turn = rotateFrom ? ` rotate(${rotateFrom}deg)` : ''
+  return `translate(${dx}px, ${dy}px) scale(${from.width / box.width})${turn}`
 }
 
 // ХАРАКТЕР тряски — доли от размаха по кадрам (см. пресет shake). Не сила и не
@@ -193,7 +217,7 @@ export const PRESETS: Record<string, Preset> = {
     move(el, p as MoveParams, 480, EASE),
   // Релиз — в слот зоны релиза, с лёгким снап-приземлением.
   playToReleaseZone: (el: Element, p?: Record<string, unknown>): Animation | null =>
-    move(el, { ...(p as MoveParams), releaseApproach: true }, 480, LAND),
+    move(el, p as MoveParams, 480, LAND),
   // Перенос разыгранной карты из центра в сброс.
   centerToDiscard: (el: Element, p?: Record<string, unknown>): Animation | null =>
     move(el, p as MoveParams, 420, EASE),
@@ -254,7 +278,8 @@ export const PRESETS: Record<string, Preset> = {
   // элемент уже стоит на своём месте, а летит «из» прямоугольника from.
   //   from — откуда карта пришла (её rect на момент старта),
   //   box  — рамка места, где она уже стоит,
-  //   pose — поза покоя на столе (наклон и смещение), в которую она садится.
+  //   pose — поза покоя на столе (наклон и смещение), в которую она садится,
+  //   rotateFrom — наклон, с которым она лежала в from (карта из кучи сброса).
   //
   // Наклон едет ВМЕСТЕ с картой и в неё же приземляется. Ровная посадка с
   // наклоном, догоняющим её следующим кадром, читается как щелчок — это
@@ -271,8 +296,16 @@ export const PRESETS: Record<string, Preset> = {
       pose = '',
       dur = 480,
       snap = false,
-    } = (p ?? {}) as { from?: Rect; box?: Rect; pose?: string; dur?: number; snap?: boolean }
-    return flipTo(el, from, box, pose, dur, snap)
+      rotateFrom = 0,
+    } = (p ?? {}) as {
+      from?: Rect
+      box?: Rect
+      pose?: string
+      dur?: number
+      snap?: boolean
+      rotateFrom?: number
+    }
+    return flipTo(el, from, box, pose, dur, snap, rotateFrom)
   },
 
   // ===== Смена содержимого слота (HUD, turn dock) =====

@@ -4,9 +4,11 @@ import { nextFrames, play, scatterAt, useDiscardExit, useFlyer, wait } from '@re
 import { type RefObject, useCallback, useRef } from 'react'
 import type { BeatRun, BoardAnchors, StagedHandoff } from '~/entities/game/board'
 import { upgradeCard, upgradeSlot } from '~/entities/game/board/upgradeSlot'
+import { liftOff, type Place } from './cardPlace'
 import type { BeatPlan } from './planBeats'
 import { SEAT_SHRINK } from './seat'
 import { useToHand } from './toHand'
+import { settleInto } from './toHeap'
 
 const THROW_DUR = 460
 const THROW_STEP = 260
@@ -53,17 +55,59 @@ export function useUpgradeBeat(
   // another, so its own beat could only start once these had landed. Its halves
   // keep layers 0/1 and the answers stack above, which is the order the engine
   // discarded them in and therefore the order the heap already holds (I9).
-  const emptyCentre = useCallback(async (ctx: BeatRun, items: Leaving[]) => {
-    const op = latest.current.operationHandOver?.(ctx)
-    const all = op ? [...op.items, ...items.map((it, i) => ({ ...it, layer: 2 + i }))] : items
-    // the resting card goes down in the commit the carriers go up — the step's
-    // own `takeOff`. The answers themselves stand nowhere: the grid they were
-    // thrown into is what these carriers are raised out of.
-    await latest.current.exit.send(all, () => {
-      op?.takeOff()
-    })
-    op?.settle()
-  }, [])
+  //
+  // EVERY CARD RIDES THE SAME LADDER. The answers leave on carriers of the exit
+  // too, raised where they stand, rather than flying their own nodes: a node
+  // flies on the layer of the surface that holds it, and that surface drops to
+  // the flight band itself once the choice is confirmed — under the operation's
+  // carriers. The answers then crossed the table under the System Upgrade and
+  // came out on top of it the instant they landed (owner, 03.10). So the row
+  // stops drawing them in the commit their carriers go up, the same moment the
+  // operation leaves the centre.
+  //
+  // …AND THE CARDS GO INTO THE HEAP AS THEY LAND, put there by this beat like
+  // every other exit's (`toHeap`). The carriers come down at the end of the
+  // send, and the beat's own last publish can be a whole flight later — with
+  // Sudo the taken card still has to reach its hand — so left to that publish,
+  // the answers were nowhere for as long as it took (owner's recording, 03.10).
+  const emptyCentre = useCallback(
+    async (ctx: BeatRun, clear: { eventId: number; player: string; card: string }[]) => {
+      const a = latest.current.anchors
+      const op = latest.current.operationHandOver?.(ctx)
+      // the operation's own halves keep layers 0/1, the answers stack above in
+      // the order the engine discarded them — the order the heap holds (I9)
+      const above = op ? 2 : 0
+      const answers: Leaving[] = clear.flatMap((t, i) => {
+        const card = cardById(t.card)
+        const from = rectOf(upgradeCard(a, t.player))
+        return card && from
+          ? [
+              {
+                key: `upgrade-exit:${t.eventId}`,
+                card,
+                from,
+                scatter: scatterAt(t.eventId),
+                layer: above + i,
+              },
+            ]
+          : []
+      })
+      const leaving: Place[] = clear.map((t) => ({ kind: 'upgrade', player: t.player }))
+      await latest.current.exit.send([...(op?.items ?? []), ...answers], () => {
+        liftOff(ctx, leaving)
+        op?.takeOff()
+      })
+      // nothing in the air (no row to measure): the answers still leave it — a
+      // no-op when the send already took them off
+      liftOff(ctx, leaving)
+      op?.settle()
+      settleInto(
+        ctx,
+        clear.map((t, i) => ({ eventId: t.eventId, card: t.card, layer: above + i })),
+      )
+    },
+    [],
+  )
 
   const run = useCallback(
     async (plan: Extract<BeatPlan, { kind: 'upgrade' }>, beat: BeatRun) => {
@@ -79,39 +123,20 @@ export function useUpgradeBeat(
         if (!from || !centre || !card) return
         const key = `upgrade-take:${take.uid}`
         const raised = raise([{ key, card, at: from }])
-        // Reserve the departing card's cell, keeping the rest of the row fixed.
-        const ctx = {
+        // The seat it was taken from owes an answer again — the game's own
+        // bookkeeping, not where the card is drawn…
+        const ctx: BeatRun = {
           ...beat,
-          base: {
-            ...beat.base,
-            pending: {
-              ...pending,
-              thrown: pending.thrown.filter((t) => t.card.uid !== take.uid),
-              owed: [...pending.owed, take.fromPlayer],
-            },
-          },
+          base: { ...beat.base, pending: { ...pending, owed: [...pending.owed, take.fromPlayer] } },
         }
-        beat.publish(ctx.base)
+        // …and the row lets go of the card in the run its carrier goes up in,
+        // through the place the row is (`cardPlace`). The rest of the row stays
+        // where it stands: only that seat's answer leaves it.
+        liftOff(ctx, [{ kind: 'upgrade', player: take.fromPlayer }])
         const [el] = await raised
-        if (el) await play('playToCenter', el, { from, to: centre, duration: THROW_DUR })?.finished
+        if (el) await play('playToCenter', el, { to: centre, duration: THROW_DUR })?.finished
         pin(key, centre)
-        const clear = async () => {
-          const items = (plan.clear ?? []).flatMap((t) => {
-            const restCard = cardById(t.card)
-            const node = upgradeCard(a, t.player)
-            return restCard && node
-              ? [
-                  {
-                    key: `upgrade-exit:${t.eventId}`,
-                    card: restCard,
-                    node,
-                    scatter: scatterAt(t.eventId),
-                  },
-                ]
-              : []
-          })
-          await emptyCentre(ctx, items)
-        }
+        const clear = () => emptyCentre(ctx, plan.clear ?? [])
         const receive = async () => {
           await wait(560)
           const chosen = elOf(key)
@@ -125,8 +150,7 @@ export function useUpgradeBeat(
           } else {
             const seat = a.seatBox(take.player)
             if (chosen && seat)
-              await play('dealToSeat', chosen, { from: centre, to: seat, scale: SEAT_SHRINK })
-                ?.finished
+              await play('dealToSeat', chosen, { to: seat, scale: SEAT_SHRINK })?.finished
             ctx.base = {
               ...ctx.base,
               opponents: ctx.base.opponents.map((p) =>
@@ -162,8 +186,7 @@ export function useUpgradeBeat(
             height: target.height * THROW_SCALE,
           }
           const [el] = await raise([{ key: `upgrade:${t.eventId}`, card, at: from }])
-          if (el)
-            await play('playToCenter', el, { from, to: target, duration: THROW_DUR })?.finished
+          if (el) await play('playToCenter', el, { to: target, duration: THROW_DUR })?.finished
         }),
       )
       const pending = beat.base.pending
@@ -210,25 +233,10 @@ export function useUpgradeBeat(
       // that cards leave for the discard one by one but ALL AT ONCE, and it is
       // the simultaneity that reads as "the centre went to the discard". Sent
       // one after another they read as several separate discards (owner, 17.09).
-      const items = plan.clear.flatMap((t) => {
-        const card = cardById(t.card)
-        const node = upgradeCard(a, t.player)
-        return card && node
-          ? [
-              {
-                key: `upgrade-exit:${t.eventId}`,
-                card,
-                node,
-                scatter: scatterAt(t.eventId),
-              },
-            ]
-          : []
-      })
-      // The shared exit takes over the measured nodes before pending clears.
       // Its own run, so what the exit files into the heap is still there in the
       // publish below — a throwaway would take the filed cards with it.
       const ctx: BeatRun = { ...beat, base: landed }
-      await emptyCentre(ctx, items)
+      await emptyCentre(ctx, plan.clear)
       beat.publish({ ...ctx.base, pending: null, decks: beat.after?.decks ?? ctx.base.decks })
     },
     [raise, drop, pin, elOf, emptyCentre],

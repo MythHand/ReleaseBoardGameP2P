@@ -78,6 +78,9 @@ importers:
       postcss:
         specifier: ^8.5.23
         version: 8.5.23
+      tsx:
+        specifier: ^4.22.4
+        version: 4.22.4
       vite:
         specifier: ^6.4.3
         version: 6.4.3(@types/node@26.0.0)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.22.4)(yaml@2.9.0)

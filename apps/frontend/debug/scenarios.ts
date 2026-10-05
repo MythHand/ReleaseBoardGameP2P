@@ -22,7 +22,6 @@ export const SCENARIOS = [
   'handDefense',
   'elimination',
   'release',
-  'releaseCost',
   'ddos',
   'alarm503',
   'aiTrigger',
@@ -156,7 +155,7 @@ export function createScenario(
   if (scenario === 'securityRelease' || scenario === 'securityHand')
     return createSecurityScenario(initial, scenario)
   if (transfer) return createTransferScenario(initial, scenario)
-  if (scenario === 'release' || scenario === 'releaseCost') return createReleaseScenario(initial)
+  if (scenario === 'release') return createReleaseScenario(initial)
   if (scenario === 'ddos') return createDdosScenario(initial)
   if (scenario === 'alarm503' || scenario === 'aiTrigger')
     return createTriggerScenario(initial, scenario, aiCard)
@@ -430,7 +429,7 @@ function createTransferScenario(initial: GameState, scenario: Scenario): GameSta
 // Monitoring comes along because it is the OTHER thing that goes into a zone,
 // and nothing else on this stand ever puts one there (owner, 20.09).
 function createReleaseScenario(initial: GameState): GameState {
-  const { take, piles } = fromTheGame(initial, ['you', 'p2'])
+  const { take, piles } = fromTheGame(initial, ['you', 'p2', 'p3'])
   return {
     ...initial,
     eventSeq: 100,
@@ -455,9 +454,21 @@ function createReleaseScenario(initial: GameState): GameState {
       },
       // The window a fresh release opens is answered by somebody, so the
       // opponent holds something to answer it with.
+      // …and each opponent holds a Security Bug too: the attack that takes the
+      // release for itself, so a release crossing from your zone into theirs
+      // can be played on this board (owner, 03.10).
       p2: {
         ...initial.players.p2,
-        hand: [take('attack-bug'), take('support-sudo')],
+        hand: [take('attack-bug'), take('support-sudo'), take('attack-security-bug')],
+        release: {},
+        openedAtDeal: [],
+      },
+      // A second opponent with an attack of their own: one attack is dealt with
+      // at a time (resolution.md §1), and a card put out after the first one has
+      // to have somebody to come from (#168).
+      p3: {
+        ...initial.players.p3,
+        hand: [take('attack-bug'), take('attack-security-bug')],
         release: {},
         openedAtDeal: [],
       },
@@ -556,7 +567,8 @@ function createDdosScenario(initial: GameState): GameState {
 // slot a Crush Frontend aims at — a Debugger and a Hotfix in hand, and cards in
 // the pile under the trigger. Only what a card would otherwise find missing is
 // changed:
-//   Crush <slot>    — the release it destroys stands in its own slot;
+//   Crush <slot>    — the release it destroys stands in its own slot, and
+//                     Crush Backend's under a Code Review;
 //   Release <slot>  — that slot is empty, or the card has nowhere to go;
 //   Inside          — two releases of different types in the discard, so the
 //                     pick is a choice rather than a card handed over.
@@ -572,9 +584,19 @@ function aiTable(aiCard: string): {
   const crushed = slot('ai-crush-')
   const placed = slot('ai-release-')
   const standing: ReleaseSlot = crushed ?? 'frontend'
+  // Crush Backend's release stands under a Code Review, so the stand shows what
+  // a Crush does to a release paid for with one (owner, 04.10)
+  const reviewed = crushed === 'backend'
   return {
     release:
-      placed === standing ? {} : { [standing]: { card: instance(`release-${standing}`, 32) } },
+      placed === standing
+        ? {}
+        : {
+            [standing]: {
+              card: instance(`release-${standing}`, 32),
+              ...(reviewed ? { codeReview: instance('support-code-review', 35) } : {}),
+            },
+          },
     discard:
       aiCard === 'ai-inside'
         ? [instance('release-backend', 33), instance('release-database', 34)]

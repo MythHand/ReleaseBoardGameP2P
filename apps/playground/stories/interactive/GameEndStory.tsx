@@ -246,7 +246,7 @@ export default function GameEndStory() {
     ])
     if (el && slot) {
       // a release lands with a snap — the preset every release in the game uses
-      const anim = play('playToReleaseZone', el, { from, to: slot })
+      const anim = play('playToReleaseZone', el, { to: slot })
       if (anim) await anim.finished
     }
     setRelease((r) => ({ ...r, database: item.card }))

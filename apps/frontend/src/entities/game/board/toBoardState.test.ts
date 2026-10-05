@@ -34,6 +34,7 @@ const view: PlayerView = {
     frozen: [],
   },
   opponents: [{ id: 'p2', name: 'bot', handCount: 3, release: {}, eliminated: false }],
+  shown: [],
   decks: { piles: [30, 10], events: 8, discardCount: 2, discardTop: 'attack-ddos' },
   turn: { player: 'you', index: 4, hasDrawn: false },
   window: null,
@@ -991,6 +992,87 @@ describe('the discard heap', () => {
     expect(heap?.[0]).toMatchObject(scatterAt(1))
   })
 
+  // A DESTROYED RELEASE GOES INTO THE HEAP AS IT LAY: its Code Review under it.
+  // Crush Backend refused — the trigger first, then the pair, the release on
+  // top (owner's recording, 04.10).
+  it('lays a destroyed release over the Code Review it stood on', () => {
+    const log: Event[] = [
+      discardedEvent(1, 'trigger-ai', 'trigger'),
+      {
+        id: 2,
+        type: 'releaseDestroyed',
+        player: 'you',
+        slot: 'backend',
+        card: 'release-backend',
+      } as Event,
+      discardedEvent(3, 'release-backend', 'destroyed'),
+      discardedEvent(4, 'support-code-review', 'destroyed'),
+    ]
+    const heap = toBoardState(
+      withDecks({ discardCount: 3, discardTop: 'support-code-review' }),
+      log,
+      labels,
+    ).decks.discardHeap
+    expect(heap?.map((c) => c.uid)).toEqual(['d1', 'd4', 'd3'])
+  })
+
+  // …and only straight after the destruction: nothing is left armed for two
+  // cards of the same names thrown out later
+  it('leaves nothing armed after a release destroyed alone', () => {
+    const log: Event[] = [
+      {
+        id: 1,
+        type: 'releaseDestroyed',
+        player: 'you',
+        slot: 'backend',
+        card: 'release-backend',
+      } as Event,
+      discardedEvent(2, 'release-backend', 'destroyed'),
+      { id: 3, type: 'passed', player: 'you' } as Event,
+      discardedEvent(4, 'release-backend', 'handLimit'),
+      discardedEvent(5, 'support-code-review', 'handLimit'),
+    ]
+    const heap = toBoardState(
+      withDecks({ discardCount: 3, discardTop: 'support-code-review' }),
+      log,
+      labels,
+    ).decks.discardHeap
+    expect(heap?.map((c) => c.uid)).toEqual(['d2', 'd4', 'd5'])
+  })
+
+  // A PICK NEVER TAKES THE CARDS ITS OWN PLAY SPENT. Cherry-pick and its sudo
+  // join the pile the moment they are played, but the pick offers what lay there
+  // before (`openPickFromDiscard`). Taking a card of the same name out of it took
+  // the NEW copy: the old one stayed under its pose and the sudo, tucked under
+  // nothing now, lay on top — the pair landed and swapped (owner's recording,
+  // 04.10).
+  it.each([
+    'operation-git-cherry-pick',
+    'support-sudo',
+  ])('takes an older %s, not the one the pick was just played with', (taken) => {
+    const log: Event[] = [
+      discardedEvent(1, taken),
+      discardedEvent(2, 'attack-bug'),
+      {
+        id: 3,
+        type: 'operationPlayed',
+        player: 'you',
+        card: 'operation-git-cherry-pick',
+        sudo: true,
+      } as Event,
+      discardedEvent(4, 'operation-git-cherry-pick'),
+      discardedEvent(5, 'support-sudo'),
+      { id: 6, type: 'takenFromDiscard', player: 'you', card: taken, to: 'hand' },
+    ]
+    const heap = toBoardState(
+      withDecks({ discardCount: 3, discardTop: 'support-sudo' }),
+      log,
+      labels,
+    ).decks.discardHeap
+    // the Bug, then the pair as it landed: the sudo under its Cherry-pick
+    expect(heap?.map((c) => c.uid)).toEqual(['d2', 'd5', 'd4'])
+  })
+
   it('does not append a top the fold already ends on', () => {
     const log = [discardedEvent(7, 'attack-bug')]
     const heap =
@@ -1035,4 +1117,80 @@ it('keeps the AI cause on the table while its event asks for a choice', () => {
   const result = toBoardState({ ...view, pending }, log, labels)
   expect(result.aiCause).toEqual({ card: 'trigger-ai', eventId: 11 })
   expect(toBoardState(view, log, labels).aiCause).toBeUndefined()
+})
+
+// AN AI CARD STANDING ON ITS PROMPT is at the centre, not in the events deck.
+// The engine puts a card with no zone to go to back in the deck the moment it is
+// revealed; the board draws it at the centre until the prompt is answered, so
+// the deck's count leaves it out for that long (one card, one place) — and the
+// beat that flies it home counts it back as it lands.
+it.each([
+  [
+    'Bad Vibe-Coding',
+    {
+      kind: 'handLimit',
+      player: 'you',
+      excess: 1,
+      options: ['c1'],
+      source: 'ai-bad-vibe-coding',
+    },
+  ],
+  [
+    'Inside',
+    { kind: 'pickFromDiscard', player: 'you', options: [], picks: 1, source: 'ai-inside' },
+  ],
+])('leaves %s out of the events deck while its prompt stands', (_, pending) => {
+  const standing = toBoardState({ ...view, pending: pending as PlayerView['pending'] }, [], labels)
+  expect(standing.decks.events).toBe(view.decks.events - 1)
+  expect(toBoardState(view, [], labels).decks.events).toBe(view.decks.events)
+})
+
+it('counts the events deck as it is while a card from the main deck asks', () => {
+  const pending = {
+    kind: 'pickFromDiscard',
+    player: 'you',
+    options: [],
+    picks: 1,
+    source: 'operation-git-cherry-pick',
+  } as unknown as PlayerView['pending']
+  expect(toBoardState({ ...view, pending }, [], labels).decks.events).toBe(view.decks.events)
+})
+
+// AN OPERATION STANDING AT THE CENTRE is drawn there and nowhere else. The engine
+// banks its cards the moment it is played, so while its pending stands the heap
+// and its count are answered without them — on every board, reduced motion and
+// a rebuilt one included — and the operation itself, with its Sudo, is a field
+// of the table rather than something a beat has to remember.
+it.each([
+  ['operation-git-rebase', { kind: 'reorderTop', player: 'p2', source: 'operation-git-rebase' }],
+  [
+    'operation-system-upgrade',
+    { kind: 'systemUpgrade', actor: 'p2', source: 'operation-system-upgrade', sudo: true },
+  ],
+])('stands %s at the centre, out of the heap, until its pending resolves', (source, pending) => {
+  const log = [
+    { id: 1, type: 'operationPlayed', player: 'p2', card: source, sudo: true },
+    { id: 2, type: 'discarded', player: 'p2', card: source, reason: 'effect' },
+    { id: 3, type: 'discarded', player: 'p2', card: 'support-sudo', reason: 'effect' },
+  ] as Event[]
+  const decks = { ...view.decks, discardCount: 2, discardTop: 'support-sudo' }
+  const standing = toBoardState(
+    { ...view, decks, pending: pending as PlayerView['pending'] },
+    log,
+    labels,
+  )
+  expect(standing.centreOperation).toEqual({
+    card: source,
+    sudo: true,
+    spent: [
+      { eventId: 2, card: source },
+      { eventId: 3, card: 'support-sudo' },
+    ],
+  })
+  expect(standing.decks.discardHeap).toEqual([])
+  expect(standing.decks.discardCount).toBe(0)
+  const answered = toBoardState({ ...view, decks, pending: null }, log, labels)
+  expect(answered.centreOperation).toBeUndefined()
+  expect(answered.decks.discardHeap?.map((c) => c.uid)).toEqual(['d3', 'd2'])
+  expect(answered.decks.discardCount).toBe(2)
 })

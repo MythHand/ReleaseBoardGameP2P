@@ -213,7 +213,10 @@ describe('Git Cherry-pick', () => {
   // "Обе карты нельзя держать в руке" (docs/rules/cards.md, the trigger
   // section). Both trigger types reach the discard in ordinary play, because
   // that is where fireTrigger banks them.
-  it('does not offer a trigger to a base pick — it could only go to the hand', () => {
+  // …and a base pick still LAYS IT OUT: Cherry-pick shows the whole discard
+  // («для Cherry-pick это всегда полный сброс»), and the hand slot is refused
+  // to it when the answer comes, not by hiding it from the offer.
+  it('offers a base pick the whole discard, triggers included, and refuses a trigger the hand', () => {
     const state = gameWith(['trigger-error-503', 'attack-bug'], [CHERRY])
     const { state: next } = engine.reduce(state, {
       type: 'PLAY',
@@ -222,8 +225,16 @@ describe('Git Cherry-pick', () => {
       at: 1,
     })
     const pending = next.pending as { options: { id: string }[]; picks: number }
-    expect(pending.options.map((o) => o.id)).toEqual(['attack-bug'])
+    expect(pending.options.map((o) => o.id)).toEqual(['trigger-error-503', 'attack-bug'])
     expect(pending.picks).toBe(1)
+    const refused = engine.reduce(next, {
+      type: 'RESOLVE',
+      player: 'p1',
+      choice: { kind: 'pickFromDiscard', card: 'trigger-error-503#d0' },
+      at: 2,
+    })
+    expect(refused.events.map((e) => e.type)).toEqual(['rejected'])
+    expect(refused.state).toBe(next)
   })
 
   it('raises no pending at all when the discard holds nothing but triggers', () => {

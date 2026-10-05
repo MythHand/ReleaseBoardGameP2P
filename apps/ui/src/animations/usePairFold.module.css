@@ -1,7 +1,8 @@
 /* the pair in the air — same rung and same rules as the carrier's node
    (useFlyer.module.css): fixed, viewport coords inline, never catching the
-   pointer. It mounts INVISIBLE and is revealed in the same tick the halves get
-   their entry poses, so the pair cannot be seen already folded for a frame. */
+   pointer. Hidden until its halves have their entry poses — which the step
+   gives them in the commit it mounts in, before it is painted — so the pair is
+   never seen already folded, and never missing either. */
 .flyer {
   position: fixed;
   z-index: var(--z-flight);

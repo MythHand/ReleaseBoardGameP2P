@@ -188,7 +188,7 @@ export default function HandLimitStory() {
     if (runId.current !== run) return
     const to = cellRefs.current[slot]?.getBoundingClientRect()
     if (el && to) {
-      const anim = play('playToCenter', el, { from: fromRect, to })
+      const anim = play('playToCenter', el, { to })
       if (anim) await anim.finished
     }
     if (runId.current !== run) return
@@ -282,7 +282,7 @@ export default function HandLimitStory() {
       const el = backRef.current
       const to = cellRefs.current[back.slot]?.getBoundingClientRect()
       if (el && rect && to) {
-        const anim = play('playToCenter', el, { from: rect, to })
+        const anim = play('playToCenter', el, { to })
         if (anim) await anim.finished
       }
       claimed.current.add(back.slot)

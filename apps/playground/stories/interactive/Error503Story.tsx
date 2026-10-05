@@ -343,7 +343,7 @@ export default function Error503Story() {
       const from = cardAreaOf(deckRect)
       const [el] = await raise([{ key: 'draw', card: ERROR503_CARD, at: from, faceDown: true }])
       if (el) {
-        const anim = play('drawToCenter', el, { from, to: centerRect })
+        const anim = play('drawToCenter', el, { to: centerRect })
         if (anim) await anim.finished
         pin('draw', centerRect) // I4 — it stands at the centre, the flip plays in place
       }
@@ -456,7 +456,7 @@ export default function Error503Story() {
     if (to) {
       const [el] = await raise([{ key: 'cover', card, at: fromRect }])
       if (el) {
-        const anim = play('playToCenter', el, { from: fromRect, to, rotate: COVER_POSE.rot })
+        const anim = play('playToCenter', el, { to, rotate: COVER_POSE.rot })
         if (anim) await anim.finished
         // I4 is declined here on purpose: the landing tilt lives in the filled
         // animation, and pinning cancels it — the card would straighten for the

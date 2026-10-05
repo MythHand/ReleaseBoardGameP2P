@@ -27,6 +27,8 @@ class FakeConn {
 
 // Records every outbound connection by peer id so tests can inspect what was sent.
 const outboundConns = new Map<string, FakeConn>()
+// …and the options each was opened with
+const connectOptions = new Map<string, unknown>()
 
 // The most recently constructed peer, so a test can play the broker and push
 // an inbound connection at the transport.
@@ -47,9 +49,10 @@ class FakePeer {
   emit(event: string, arg?: unknown) {
     for (const cb of this.handlers[event] ?? []) cb(arg)
   }
-  connect(peerId: string) {
+  connect(peerId: string, options?: unknown) {
     const conn = new FakeConn(peerId)
     outboundConns.set(peerId, conn)
+    connectOptions.set(peerId, options)
     queueMicrotask(() => conn.emit('open'))
     return conn
   }
@@ -65,12 +68,23 @@ beforeEach(async () => {
 afterEach(() => {
   vi.clearAllMocks()
   outboundConns.clear()
+  connectOptions.clear()
   lastPeer = null
 })
 
 it('resolves with an id when the peer opens', async () => {
   const t = await createTransport({ peerId: 'host-1', onMessage: () => {} })
   expect(t.id).toBe('host-1')
+})
+
+// A player's intents must reach the keeper in the order they were made: a
+// take-back overtaking the put-out it answers is refused, and the put-out then
+// leaves on the table a card the player took home (#168). PeerJS opens an
+// unordered channel unless asked for a reliable one.
+it('opens every connection ordered', async () => {
+  const t = await createTransport({ peerId: 'host-1', onMessage: () => {} })
+  t.connectTo('peer-2')
+  expect(connectOptions.get('peer-2')).toEqual({ reliable: true })
 })
 
 it('send serializes an envelope to the target connection', async () => {

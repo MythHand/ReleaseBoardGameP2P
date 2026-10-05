@@ -390,7 +390,10 @@ const PEER_INTENT_TYPES: ReadonlySet<string> = new Set<Action['type']>([
   'PUSH',
   'ATTACK',
   'PASS',
+  'UNPASS',
   'RESOLVE',
+  'SHOW',
+  'TAKE_BACK',
 ])
 
 // Parsed JSON, not an `Intent`: the type annotation on the wire is a claim the
@@ -638,8 +641,8 @@ export function tick(session: Session, now: number): SessionResult {
       // stands, anything other than paying takes it back — and here nothing
       // paid it. It is also what makes the draw/push below reachable at all,
       // since the engine refuses both while any pending is open. `cancelRelease`
-      // is free of consequences by construction: the play emitted nothing and
-      // moved no card, so clearing the pending IS the whole undo.
+      // moves no card — the release never left the hand — and the table sees it
+      // taken back (`takenBack`), as it saw it put out.
       if (costPending) {
         const taken = session.engine.reduce(state, {
           type: 'RESOLVE',
@@ -650,11 +653,22 @@ export function tick(session: Session, now: number): SessionResult {
         state = taken.state
         events = taken.events
       }
+      // Anything else still out at the centre goes back too, in everyone's view
+      // — the turn is over, and nothing is left to complete its play
+      // (resolution.md §1, the ⚙️ timeout note).
+      if (state.players[turn.player].shown.length > 0) {
+        const back = session.engine.reduce(state, {
+          type: 'TAKE_BACK',
+          player: turn.player,
+          at: now,
+        })
+        state = back.state
+        events = [...events, ...back.events]
+      }
       if (!drawObligationMet(state)) {
         const drawn = session.engine.reduce(state, { type: 'DRAW', player: turn.player, at: now })
         state = drawn.state
-        // Appended, not assigned: the cancel above may have run first. It emits
-        // nothing today, and this is what keeps that from being load-bearing.
+        // Appended, not assigned: the take-backs above may have run first.
         events = [...events, ...drawn.events]
       }
       if (

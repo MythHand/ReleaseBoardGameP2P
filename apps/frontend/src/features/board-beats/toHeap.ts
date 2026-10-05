@@ -55,12 +55,52 @@ export const inTableOrder = (filed: Filed[]): Filed[] =>
  */
 export function withLanded(state: BoardState, filed: Filed[]): BoardState {
   const heap = [...(state.decks.discardHeap ?? [])]
-  let added = 0
+  // A STAND-IN ON TOP STAYS THE TOP until the count passes the one it is named
+  // by (`toDiscardHeap`): it stands for the card banked last, so a card filed
+  // beneath that count lies under it — the order the projection folds them in.
+  // Two cards of one batch can land in either order (a refused crush's release
+  // and the trigger beside it, 03.10), and the heap must not depend on which.
+  const last = heap.at(-1)
+  const standIn = last?.uid?.startsWith('top') ? Number(last.uid.slice(3)) : null
+  const under = standIn === null ? undefined : heap.pop()
+  // A CARD THAT LANDS LATE STILL LIES WHERE IT WAS FILED. The cards already on
+  // top that were filed AFTER it — a later event id — lie over it, because the
+  // projection folds the heap in event order and puts it under them the moment
+  // it takes over. Two beats of one batch land in whichever order their flights
+  // happen to end: a crushed release and its Code Review could come down before
+  // the trigger beside them, and the trigger then lay on top and dropped under
+  // them a moment later (owner's recording, 04.10). Only what lay there BEFORE
+  // this landing counts — the cards of one landing keep the order the table
+  // gave them (`inTableOrder`), a support under its card included.
+  const lying = heap.splice(0)
+  // how many of the cards lying there stay UNDER a card filed by this event
+  const settlesAt = (eventId: number) => {
+    let at = lying.length
+    while (at > 0) {
+      const id = Number(lying[at - 1].uid?.match(/^d(\d+)$/)?.[1] ?? Number.NaN)
+      if (!(id > eventId)) break
+      at--
+    }
+    return at
+  }
+  const landed: { at: number; entry: (typeof lying)[number] }[] = []
   for (const item of inTableOrder(filed)) {
     const card = cardById(item.card)
-    if (!card || heap.some((entry) => entry.uid === `d${item.eventId}`)) continue
-    heap.push({ uid: `d${item.eventId}`, card, ...scatterAt(item.eventId) })
-    added++
+    const uid = `d${item.eventId}`
+    if (!card || lying.some((e) => e.uid === uid) || landed.some((l) => l.entry.uid === uid))
+      continue
+    landed.push({ at: settlesAt(item.eventId), entry: { uid, card, ...scatterAt(item.eventId) } })
+  }
+  for (let k = 0; k <= lying.length; k++) {
+    for (const l of landed) if (l.at === k) heap.push(l.entry)
+    if (k < lying.length) heap.push(lying[k])
+  }
+  const added = landed.length
+  if (under) {
+    // under the cards this landing put on top, over everything else
+    const onTop = landed.filter((l) => l.at === lying.length).length
+    if (standIn !== null && state.decks.discardCount + added <= standIn) heap.push(under)
+    else heap.splice(heap.length - onTop, 0, under)
   }
   if (added === 0) return state
   return {
@@ -91,6 +131,33 @@ export function settleInto(
   if (next === ctx.base) return
   ctx.base = next
   ctx.publish(next)
+}
+
+/**
+ * A card TAKEN BACK OUT of the discard — Inside's pick. The event names the
+ * card, not which copy, so the topmost copy leaves: the one the projection
+ * takes out for a `takenFromDiscard` (`toDiscardHeap`), so the heap the beat
+ * draws while the card is in the air is the heap the live board then draws.
+ */
+export function withoutTopCopy(state: BoardState, card: string): BoardState {
+  const heap = state.decks.discardHeap ?? []
+  let at = -1
+  for (let i = heap.length - 1; i >= 0; i--) {
+    if (heap[i].card.id !== card) continue
+    at = i
+    break
+  }
+  if (at < 0) return state
+  const remaining = heap.filter((_, i) => i !== at)
+  return {
+    ...state,
+    decks: {
+      ...state.decks,
+      discardHeap: remaining,
+      discard: remaining.at(-1)?.card,
+      discardCount: Math.max(0, state.decks.discardCount - 1),
+    },
+  }
 }
 
 /**

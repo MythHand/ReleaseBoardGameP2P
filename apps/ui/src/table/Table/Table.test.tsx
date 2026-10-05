@@ -314,6 +314,7 @@ it('shows no countdown readout for a pending that carries no deadline', () => {
       pending: {
         kind: 'discardForRelease',
         player: base.state.selfId,
+        release: 'rel',
         options: [base.state.you.hand[0]?.uid ?? 'x'],
       },
     },

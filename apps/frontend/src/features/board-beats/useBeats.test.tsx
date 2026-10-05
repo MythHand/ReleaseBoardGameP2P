@@ -562,24 +562,6 @@ it('keeps the rematch’s opening when it lands while a beat is in flight', asyn
   expect(log).toEqual(['intro', 'intro2'])
 })
 
-// The heap's own stand-in pose is keyed by the discard count AFTER the batch
-// (`toBoardState`'s `standInScatter`), and a plan reads it to land a silently
-// banked card exactly where the heap will rest it (#106, the crush ending).
-// That count exists nowhere in the events — the engine banks some cards with no
-// event at all — so it reaches the planner only through this argument.
-it('hands the planner the discard count the batch left behind', async () => {
-  motion.reduced = false
-  planned.calls = []
-  sent.hang = false
-  const { rerender } = render(<Probe live={preDiscard} events={[]} anchors={stub} />)
-  rerender(<Probe live={afterDiscard} events={[discardEvent]} anchors={stub} />)
-  await flush()
-  const args = planned.calls.at(-1)
-  // …the POST-batch count, not the projection the beat animates away from
-  expect(args?.[3]).toBe(afterDiscard.decks.discardCount)
-  expect(args?.[3]).not.toBe(preDiscard.decks.discardCount)
-})
-
 // ===== the watermark a restore or a resend seeds the queue with (#136, Task
 // 16). `isOpening` reads the PROJECTION, so mid-match `intro` is null and
 // beats are ENABLED from the first frame — without the mark, the whole
@@ -901,15 +883,25 @@ it.each([
     { id: 1, type: 'operationPlayed', player: 'p2', card: 'operation-git-rebase', sudo: false },
     { id: 2, type: 'discarded', player: 'p2', card: 'operation-git-rebase', reason: 'effect' },
   ] as Event[]
+  // the boards as the projection answers them: while the pending stands the
+  // operation is at the centre and out of the heap, once it is answered it is in
+  // the heap and nowhere else
+  const filedHeap = {
+    ...preDiscard.decks,
+    discardCount: 1,
+    discardHeap: [{ uid: 'd2', card: card('operation-git-rebase'), ...scatterAt(2) }],
+  }
   const pending = {
     ...preDiscard,
-    decks: {
-      ...preDiscard.decks,
-      discardCount: 1,
-      discardHeap: [{ uid: 'd2', card: card('operation-git-rebase'), ...scatterAt(2) }],
-    },
+    decks: { ...preDiscard.decks, discardCount: 0, discardHeap: [] },
     pending: { kind: 'reorderTop', player: 'p2', source: 'operation-git-rebase' },
-  } as BoardState
+    centreOperation: {
+      card: 'operation-git-rebase',
+      sudo: false,
+      spent: [{ eventId: 2, card: 'operation-git-rebase' }],
+    },
+  } as unknown as BoardState
+  const answered = { ...preDiscard, decks: filedHeap, pending: null } as BoardState
   const restoredIntro: IntroBeat = {
     key: 'restored-match',
     shadow: pending,
@@ -927,7 +919,9 @@ it.each([
     })
     return (
       <>
-        <output data-testid="standing-operation">{String(beats.operationStanding)}</output>
+        <output data-testid="standing-operation">
+          {String(Boolean((beats.shadow ?? live).centreOperation))}
+        </output>
         <output data-testid="operation-heap">
           {(beats.shadow ?? live).decks.discardHeap?.map((c) => c.uid).join(',')}
         </output>
@@ -946,53 +940,148 @@ it.each([
     })
   expect(view.getByTestId('standing-operation').textContent).toBe('true')
   expect(view.getByTestId('operation-heap').textContent).toBe('')
-  view.rerender(<OperationProbe live={{ ...pending, pending: null }} feed={events} />)
+  view.rerender(<OperationProbe live={answered} feed={events} />)
   for (let i = 0; i < 50; i++)
     await act(async () => {
       await vi.advanceTimersByTimeAsync(20)
     })
   expect(view.getByTestId('standing-operation').textContent).toBe('false')
+  expect(view.getByTestId('operation-heap').textContent).toBe('d2')
 })
 
-it.each([
-  'operation-git-rebase',
-  'operation-system-upgrade',
-])('keeps %s out of the heap under reduced motion until its pending resolves', (source) => {
-  motion.reduced = true
-  const events = [
-    { id: 1, type: 'operationPlayed', player: 'p2', card: source, sudo: true },
-    { id: 2, type: 'discarded', player: 'p2', card: source, reason: 'effect' },
-    { id: 3, type: 'discarded', player: 'p2', card: 'support-sudo', reason: 'effect' },
-  ] as Event[]
-  const pending = {
+// INSIDE'S PICK IS PLAYED BY THE GRID, and what stood behind it still leaves.
+// Inside lays its pick out on Cherry-pick's surface, so the surface's own
+// handoff plays the taken card and the rest — and the AI card and its trigger,
+// standing at the centre since the reveal, used to have no road at all: Inside
+// vanished and the trigger dropped into the heap the moment the queue drained
+// (owner's recording, 04.10). They leave by the AI runner's own road, after the
+// grid is done.
+it('sends the AI card and its trigger on their way after the grid has played the pick', async () => {
+  motion.reduced = false
+  sent.calls = []
+  const trigger = card('trigger-ai')
+  const before = {
     ...preDiscard,
-    pending:
-      source === 'operation-git-rebase'
-        ? { kind: 'reorderTop', player: 'p2', source }
-        : { kind: 'systemUpgrade', actor: 'p2', source, sudo: true },
     decks: {
       ...preDiscard.decks,
-      discardCount: 2,
-      discardHeap: [
-        { uid: 'd2', card: card(source), ...scatterAt(2) },
-        { uid: 'd3', card: card('support-sudo'), ...scatterAt(3) },
-      ],
+      discard: trigger,
+      discardCount: 1,
+      discardHeap: [{ uid: 'd3', card: trigger, ...scatterAt(3) }],
     },
-  } as BoardState
-  function ReducedProbe({ live }: { live: BoardState }) {
-    const beats = useBeats({ live, events, anchors: stub, enabled: true })
-    return (
-      <>
-        <output data-testid="reduced-heap">{(beats.shadow ?? live).decks.discardCount}</output>
-        <output data-testid="reduced-running">{String(beats.running)}</output>
-        {beats.overlays}
-      </>
-    )
+    aiCause: { card: 'trigger-ai', eventId: 3 },
+    pending: {
+      kind: 'pickFromDiscard',
+      raisedAt: 1,
+      picks: 1,
+      player: 'p1',
+      options: [],
+      source: 'ai-inside',
+    },
+  } as unknown as BoardState
+  const after = {
+    ...before,
+    pending: null,
+    aiCause: undefined,
+    you: {
+      ...before.you,
+      hand: [...before.you.hand, { uid: 'r1', card: card('release-frontend') }],
+    },
+  } as unknown as BoardState
+  const taken = {
+    id: 5,
+    type: 'takenFromDiscard',
+    player: 'p1',
+    card: 'release-frontend',
+    to: 'hand',
+  } as Event
+  const grid = vi.fn(async () => {})
+  const discardPick = { current: { card: 'release-frontend', run: grid } }
+  const placed = {
+    ...stub,
+    cause: { current: node() },
+    effect: { current: node() },
+    eventsBox: { current: node() },
+  } as unknown as BoardAnchors
+  function PickProbe({ live, feed }: { live: BoardState; feed: Event[] }) {
+    const beats = useBeats({ live, events: feed, anchors: placed, enabled: true, discardPick })
+    return <>{beats.overlays}</>
   }
-  const view = render(<ReducedProbe live={pending} />)
-  expect(view.getByTestId('reduced-heap').textContent).toBe('0')
-  expect(view.getByTestId('reduced-running').textContent).toBe('false')
-  expect(view.container.querySelector('[data-public-operation]')).toBeNull()
-  view.rerender(<ReducedProbe live={{ ...pending, pending: null }} />)
-  expect(view.getByTestId('reduced-heap').textContent).toBe('2')
+  vi.useFakeTimers()
+  try {
+    const view = render(<PickProbe live={before} feed={[]} />)
+    view.rerender(<PickProbe live={after} feed={[taken]} />)
+    for (let i = 0; i < 150; i++)
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(20)
+      })
+    // the grid played the pick…
+    expect(grid).toHaveBeenCalledTimes(1)
+    // …and the trigger flew to the heap after it, by the AI runner's own exit
+    expect(sent.calls.flat()).toEqual([expect.objectContaining({ key: 'd3' })])
+  } finally {
+    motion.reduced = true
+  }
+})
+
+// AN AI ERROR 503 REFUSED: the sweep flies the player's table, and the AI card
+// standing behind the prompt and its trigger leave beside it by the AI runner's
+// own road. They used to have none: the trigger was in the heap and the AI card
+// gone the frame the sweep ended (owner's recording, 04.10).
+it('sends the AI card and its trigger on their way beside the sweep of a refused AI 503', async () => {
+  motion.reduced = false
+  sent.calls = []
+  const trigger = card('trigger-ai')
+  const before = {
+    ...preDiscard,
+    decks: {
+      ...preDiscard.decks,
+      discard: trigger,
+      discardCount: 1,
+      discardHeap: [{ uid: 'd3', card: trigger, ...scatterAt(3) }],
+    },
+    aiCause: { card: 'trigger-ai', eventId: 3 },
+    pending: {
+      kind: 'neutralize503',
+      player: 'p1',
+      card: 'ai-error-503',
+      methods: ['debugger'],
+      source: 'ai-error-503',
+    },
+  } as unknown as BoardState
+  const after = {
+    ...before,
+    pending: null,
+    aiCause: undefined,
+    you: { ...before.you, hand: [] },
+    decks: { ...before.decks, discardCount: 2 },
+  } as unknown as BoardState
+  const batch = [
+    { id: 5, type: 'eliminated', player: 'p1' },
+    { id: 6, type: 'discarded', player: 'p1', card: 'attack-bug', reason: 'effect', parent: 5 },
+  ] as Event[]
+  const placed = {
+    ...stub,
+    cause: { current: node() },
+    effect: { current: node() },
+    eventsBox: { current: node() },
+  } as unknown as BoardAnchors
+  function SweepProbe({ live, feed }: { live: BoardState; feed: Event[] }) {
+    const beats = useBeats({ live, events: feed, anchors: placed, enabled: true })
+    return <>{beats.overlays}</>
+  }
+  vi.useFakeTimers()
+  try {
+    const view = render(<SweepProbe live={before} feed={[]} />)
+    view.rerender(<SweepProbe live={after} feed={batch} />)
+    for (let i = 0; i < 250; i++)
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(20)
+      })
+    // the trigger leaves beside the sweep, by the AI runner's own exit (the
+    // swept hand itself has no slot to be measured in this probe's page)
+    const keys = (sent.calls.flat() as { key: string }[]).map((c) => c.key)
+    expect(keys).toContain('d3')
+  } finally {
+    motion.reduced = true
+  }
 })

@@ -25,7 +25,7 @@ const exits = vi.hoisted(() => ({ items: [] as Leaving[] }))
 // release (`drop('draw')`). Both are wrapped below so the standing-trigger
 // test can assert the publish happened first — the whole point of I2's
 // "publish first, drop second" comment in drawBeat.tsx.
-const order = vi.hoisted(() => ({ log: [] as string[] }))
+const order = vi.hoisted(() => ({ log: [] as string[], frames: false }))
 vi.mock('@release/ui/animations', async (importOriginal) => {
   const real = await importOriginal<typeof import('@release/ui/animations')>()
   return {
@@ -33,6 +33,12 @@ vi.mock('@release/ui/animations', async (importOriginal) => {
     wait: (ms: number) => {
       played.waits.push(ms)
       return real.wait(ms)
+    },
+    // logged only where a test asks (`order.frames`): every other test pins its
+    // log exactly, and frames waited elsewhere would read as noise there
+    nextFrames: () => {
+      if (order.frames) order.log.push('nextFrames')
+      return real.nextFrames()
     },
     play: (name: string) => {
       played.names.push(name)
@@ -142,7 +148,10 @@ function run(draws: PlannedDraw[], after?: BoardState) {
     // what the fan is showing, kept from what the beat publishes — the board's
     // own arrangement in miniature
     const [fan, setFan] = useState<string[]>(base.you.hand.map((c) => c.uid))
-    const beat = useDrawBeat(anchors, (_order, uid, at) => commits.push({ uid, at }))
+    const beat = useDrawBeat(anchors, (_order, uid, at) => {
+      commits.push({ uid, at })
+      order.log.push('landed')
+    })
     start = () =>
       beat.run(
         { kind: 'draw', key: 'draw:4', draws },
@@ -210,6 +219,17 @@ it('takes my own card to the centre, turns it over, and sits it in the fan', asy
   expect(played.names).toContain('drawToCenter')
   // The hand it publishes is the fan the NEXT card of the batch must aim at.
   expect(published.at(-1)?.you.hand.map((h) => h.card.id)).toEqual(['attack-bug'])
+})
+
+// ONE CARD, ONE PLACE (#168). The drawn card is handed to the fan AS the carrier
+// standing at the centre, and that carrier comes down once the card has landed.
+// Dropped before the landing was asked for, a card queued behind another
+// arrival was nowhere until its own flight began.
+it('keeps the drawn card’s carrier up until the card has landed in the fan', async () => {
+  order.log = []
+  const { go } = run([draw()])
+  await go()
+  expect(order.log).toEqual(['landed', 'drop:draw'])
 })
 
 it('sends an opponent’s card to their seat, face down', async () => {
@@ -334,4 +354,36 @@ it('raises the unanswered 503 alarm as soon as the flip settles', async () => {
   await go()
   expect(published.at(-1)?.pending?.kind).toBe('neutralize503')
   expect(played.waits).not.toContain(TABLE_HOLD)
+})
+
+// …IN ONE COMMIT: the carrier comes down in the commit the alarm stands in, with
+// no frames waited between — two of them drew the alarm standing AND on its
+// carrier (owner's recordings, #168)
+it('takes the standing 503’s carrier down in the commit it stands in', async () => {
+  order.log = []
+  order.frames = true
+  try {
+    const { go } = run([draw({ card: undefined, reveal: { card: 'trigger-error-503' } })])
+    await go()
+  } finally {
+    order.frames = false
+  }
+  const stood = order.log.indexOf('publish:pending')
+  const dropped = order.log.indexOf('drop:draw')
+  expect(stood).toBeGreaterThanOrEqual(0)
+  expect(dropped).toBeGreaterThan(stood)
+  expect(order.log.slice(stood, dropped)).not.toContain('nextFrames')
+})
+
+// A trigger that goes straight to the discard is IN the heap as its carrier
+// comes down, filed by this beat like every other exit's (#168): dropped with
+// nothing filed, it was nowhere until the projection caught up.
+it('files a trigger that goes straight to the discard as its carrier comes down', async () => {
+  exits.items = []
+  const { published, go } = run([
+    draw({ card: undefined, reveal: { card: 'trigger-error-503', discardId: 6 } }),
+  ])
+  await go()
+  const filed = published.find((s) => s.decks.discardHeap?.some((c) => c.uid === 'd6'))
+  expect(filed?.decks.discardCount).toBe(1)
 })

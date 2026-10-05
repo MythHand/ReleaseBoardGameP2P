@@ -8,9 +8,9 @@
 // file's header for why.
 
 import type { Event } from '@release/engine'
-import type { CardData, TableActions, TableTarget, TableWindow } from '@release/ui'
+import type { CardData, TableActions, TablePending, TableTarget, TableWindow } from '@release/ui'
 import { cardById } from '@release/ui'
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
 // same reach, for the return-flight step's own overlay node — pins that a
 // merged cancel carries BOTH halves as one flight, not one arriving node with
@@ -19,8 +19,10 @@ import handArrivalStyles from '@/animations/useHandArrival.module.css'
 // Arrow's CSS Module classnames are not part of `@release/ui`'s public barrel
 // — reached into the same way `boardComponent.test.tsx` does.
 import arrowStyles from '@/primitives/Arrow/Arrow.module.css'
+import { type ShownCard, useBoardAnchors } from '~/entities/game/board'
 import { mockReducedMotion } from '~/test/reducedMotion'
 import Board from '../_Board'
+import { useBoardStaging } from '../_useBoardStaging'
 import { makeBoardProps } from './fixture'
 
 // biome-ignore lint/style/noNonNullAssertion: both ids are known catalogue entries
@@ -47,13 +49,14 @@ const BUG_TARGETS: Record<string, TableTarget[]> = {
 }
 
 function boardWith(
-  overrides: { targets?: Record<string, TableTarget[]> },
+  overrides: { targets?: Record<string, TableTarget[]>; shown?: ShownCard[] },
   actions: TableActions = {},
-  // the feed `useBoardStaging` watches for a `rejected` reply — Board only
-  // hands events through via `intro.events`, so a `rejected` test routes them
-  // that way. `view: null` keeps `gameKey` (_Board.tsx) null, so the opening
-  // itself never arms and this stays a plain events channel.
+  // the feed — Board only hands events through via `intro.events`. `view:
+  // null` keeps `gameKey` (_Board.tsx) null, so the opening itself never arms
+  // and this stays a plain events channel.
   events: Event[] = [],
+  // this player's own refusals, on their own list as the page hands them over
+  rejections: Event[] = [],
 ) {
   const base = makeBoardProps()
   const props = makeBoardProps({
@@ -64,9 +67,11 @@ function boardWith(
       hasDrawn: true,
       playable: HAND.map((c) => c.uid),
       targets: overrides.targets ?? {},
+      shown: overrides.shown ?? [],
     },
     actions,
     intro: events.length > 0 ? { gameId: null, view: null, events, onDone: () => {} } : undefined,
+    rejections,
   })
   return <Board {...props} />
 }
@@ -235,23 +240,19 @@ it('a rejected action returns the staged card', async () => {
   await pullCardFromFan('attack-bug#0')
   await pressSeat('p2')
   expect(onPlay).toHaveBeenCalledWith('attack-bug#0', { kind: 'player', player: 'p2' }, undefined)
-  // the engine answers with a rejection in the feed; the projection itself is
-  // unchanged (the fixture's HAND never actually loses the card) — this pins
-  // the hook's own `dispatchedRef.current = false` write ahead of `cancel()`
-  // in the rejected watcher: without it, `cancel()`'s own guard reads the
-  // stale `true` and refuses the very return it was just called to perform.
-  rerender(boardWith({ targets: BUG_TARGETS }, { onPlay }, [rejectedEvent('attack-bug#0')]))
+  // the engine answers with a refusal; the projection itself is unchanged (the
+  // fixture's HAND never actually loses the card) — this pins the phase moved
+  // off 'dispatched' ahead of `cancel()`: without it, `cancel()`'s own guard
+  // refuses the very return it was just called to perform.
+  rerender(boardWith({ targets: BUG_TARGETS }, { onPlay }, [], [rejectedEvent('attack-bug#0')]))
   await waitFor(() => expect(fanUids()).toContain('attack-bug#0'))
 })
 
 // Backported from #117's bdf037f (#116 review, point 3): `useGame` accumulates
-// events for the whole match (never trims), so an unwatermarked scan of the
-// whole feed keeps finding a card's OWN past rejection forever. A fresh
-// re-dispatch of the same card must not read that stale entry as ITS OWN
-// rejection the moment anything else lands in the feed — the watermark
-// discipline `useBeats` already applies to this same array (there keyed by
-// event id across the whole match; here by length, captured fresh at every
-// dispatch).
+// a player's refusals for the whole match (never trims), so a scan of the whole
+// list keeps finding a card's OWN past refusal forever. A fresh re-dispatch of
+// the same card must not read that stale entry as ITS OWN refusal the moment
+// anything else lands — each refusal is read once, as it arrives (#168).
 it('a stale rejection for a returned card does not cancel its fresh re-dispatch', async () => {
   const onPlay = vi.fn()
   const { rerender } = render(boardWith({ targets: BUG_TARGETS }, { onPlay }))
@@ -259,7 +260,8 @@ it('a stale rejection for a returned card does not cancel its fresh re-dispatch'
   await pressSeat('p2')
   expect(onPlay).toHaveBeenCalledTimes(1)
   // first attempt rejected — the card returns to the fan (as above)
-  rerender(boardWith({ targets: BUG_TARGETS }, { onPlay }, [rejectedEvent('attack-bug#0')]))
+  const first = [rejectedEvent('attack-bug#0')]
+  rerender(boardWith({ targets: BUG_TARGETS }, { onPlay }, [], first))
   await waitFor(() => expect(fanUids()).toContain('attack-bug#0'))
 
   // a second, legitimate dispatch of the SAME card
@@ -268,14 +270,16 @@ it('a stale rejection for a returned card does not cancel its fresh re-dispatch'
   expect(onPlay).toHaveBeenCalledTimes(2)
 
   // an unrelated event lands (any sync between this dispatch and its
-  // acceptance) — the feed still carries the FIRST attempt's own rejection,
-  // since it only ever grows. Without a watermark this would be misread as
-  // THIS dispatch's own rejection and cancel it right back to the fan.
+  // acceptance) — the list still carries the FIRST attempt's own refusal,
+  // since it only ever grows. Read again, it would be misread as THIS
+  // dispatch's own and cancel it right back to the fan.
   rerender(
-    boardWith({ targets: BUG_TARGETS }, { onPlay }, [
-      rejectedEvent('attack-bug#0'),
-      { id: 2, type: 'turnEnded', player: 'p2' },
-    ]),
+    boardWith(
+      { targets: BUG_TARGETS },
+      { onPlay },
+      [{ id: 2, type: 'turnEnded', player: 'p2' }],
+      [...first],
+    ),
   )
   await act(async () => {
     await new Promise((r) => setTimeout(r, 700))
@@ -917,4 +921,219 @@ it('folds a sudo and the attack it enhances into a stack at the middle', async (
   // and the assembling row is over — neither half stands in it any more
   expect(document.querySelector('[data-stage-slot="0"]')).toBeFalsy()
   expect(document.querySelector('[data-testid="board-centre-partner"]')).toBeFalsy()
+})
+
+// ===== a rebuilt board picks the step back up (#168) =====
+//
+// A reload — or the stand's viewer switch — rebuilds the board with nothing in
+// the gesture, while the table still shows our cards out at the centre
+// (resolution.md §1). The gesture takes up the step it would be at had nothing
+// been rebuilt, and every road after it is the ordinary one.
+
+const mine = (uid: string): ShownCard => {
+  const held = COMBO_HAND.find((c) => c.uid === uid)
+  if (!held) throw new Error(`not in the combo hand: ${uid}`)
+  return { player: 'you', uid, card: held.card }
+}
+
+function rebuiltState(over: {
+  shown: string[]
+  targets?: Record<string, TableTarget[]>
+  comboOptions?: Record<string, string[]>
+  pending?: TablePending | null
+}) {
+  const base = makeBoardProps()
+  return {
+    ...base.state,
+    you: { ...base.state.you, hand: COMBO_HAND },
+    turn: base.state.selfId,
+    hasDrawn: true,
+    playable: COMBO_HAND.map((c) => c.uid),
+    targets: over.targets ?? {},
+    comboOptions: over.comboOptions ?? {},
+    shown: over.shown.map(mine),
+    pending: over.pending ?? null,
+  }
+}
+
+function rebuiltBoard(over: Parameters<typeof rebuiltState>[0], actions: TableActions = {}) {
+  return <Board {...makeBoardProps({ state: rebuiltState(over), actions })} />
+}
+
+const settle = () =>
+  act(async () => {
+    await new Promise((r) => setTimeout(r, 700))
+  })
+
+const SUDO_WAITING = {
+  shown: ['support-sudo#0'],
+  comboOptions: { 'support-sudo#0': ['attack-bug#0'] },
+}
+
+it('picks a waiting Sudo back up: its partners light, and Escape takes it back', () => {
+  const onTakeBack = vi.fn()
+  comboOut = ['support-sudo#0']
+  render(rebuiltBoard(SUDO_WAITING, { onTakeBack }))
+  expect(fanUids()).not.toContain('support-sudo#0')
+  expect(comboAccentOf('attack-bug#0')).toBe('var(--cat-support)')
+  fireEvent.keyDown(window, { key: 'Escape' })
+  expect(onTakeBack).toHaveBeenCalledTimes(1)
+})
+
+it('does not pick the Sudo up again while the take-back is on its way', async () => {
+  const onTakeBack = vi.fn()
+  comboOut = ['support-sudo#0']
+  const { rerender } = render(rebuiltBoard(SUDO_WAITING, { onTakeBack }))
+  fireEvent.keyDown(window, { key: 'Escape' })
+  await settle()
+  // the table has not answered yet: it still shows the Sudo out
+  rerender(rebuiltBoard(SUDO_WAITING, { onTakeBack }))
+  await settle()
+  expect(onTakeBack).toHaveBeenCalledTimes(1)
+  expect(comboAccentOf('attack-bug#0')).toBeNull()
+})
+
+it('picks an aiming card back up: a press on its target plays it', async () => {
+  const onPlay = vi.fn()
+  render(rebuiltBoard({ shown: ['attack-bug#0'], targets: BUG_SEAT_TARGET }, { onPlay }))
+  await pressSeat('p2')
+  expect(onPlay).toHaveBeenCalledWith('attack-bug#0', { kind: 'player', player: 'p2' }, undefined)
+})
+
+it('picks a Sudo beside its git operation back up, the operation choosing its pile', () => {
+  const onTakeBack = vi.fn()
+  render(
+    rebuiltBoard(
+      {
+        shown: ['support-sudo#0', 'operation-git-cherry-pick#0'],
+        targets: { 'operation-git-cherry-pick#0': [{ kind: 'pile', pile: 0 }] },
+      },
+      { onTakeBack },
+    ),
+  )
+  // both stand in the row, unfolded, and neither is in the fan
+  expect(screen.getByTestId('board-centre-partner')).toBeTruthy()
+  expect(fanUids()).not.toContain('support-sudo#0')
+  expect(fanUids()).not.toContain('operation-git-cherry-pick#0')
+  fireEvent.keyDown(window, { key: 'Escape' })
+  expect(onTakeBack).toHaveBeenCalledTimes(1)
+})
+
+it('picks a Sudo under its attack back up as the pair, and a press on the target plays both', async () => {
+  const onPlay = vi.fn()
+  render(
+    rebuiltBoard(
+      { shown: ['support-sudo#0', 'attack-bug#0'], targets: BUG_SEAT_TARGET },
+      { onPlay },
+    ),
+  )
+  await settle()
+  expect(document.querySelectorAll('[data-main]').length).toBe(1)
+  await pressSeat('p2')
+  expect(onPlay).toHaveBeenCalledWith(
+    'attack-bug#0',
+    { kind: 'player', player: 'p2' },
+    'support-sudo#0',
+  )
+})
+
+it('picks a Code Review riding its release back up while the cost is owed, and a press on the table cancels it', async () => {
+  const onResolve = vi.fn()
+  render(
+    rebuiltBoard(
+      {
+        shown: ['support-code-review#0', 'release-frontend#0'],
+        pending: {
+          kind: 'discardForRelease',
+          player: 'you',
+          release: 'release-frontend#0',
+          options: ['attack-bug#0'],
+        },
+      },
+      { onResolve },
+    ),
+  )
+  await settle()
+  expect(document.querySelectorAll('[data-main]').length).toBe(1)
+  // the cancel a combo release's cost step has always had: a press on the
+  // table, away from anything lit (boardRelease.test.tsx, Fix C finding 2)
+  fireEvent.mouseDown(document.querySelector('[data-board-centre]')?.parentElement as HTMLElement)
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 60)) // well inside the flight (480ms)
+  })
+  expect(onResolve).toHaveBeenCalledWith({ kind: 'cancelRelease' })
+  // both halves go home — not the release alone, the Code Review left behind
+  expect(document.querySelectorAll('[class*="arriving"] [data-card]').length).toBe(2)
+})
+
+it('sends a card with nothing left to choose home', () => {
+  const onTakeBack = vi.fn()
+  // the card was on its way out: no target to aim it at any more
+  render(rebuiltBoard({ shown: ['attack-bug#0'] }, { onTakeBack }))
+  expect(onTakeBack).toHaveBeenCalledTimes(1)
+})
+
+it('leaves the step alone while a beat runs on the table from before', () => {
+  const state = rebuiltState(SUDO_WAITING)
+  const { result, rerender } = renderHook(
+    ({ running }: { running: boolean }) =>
+      useBoardStaging({
+        state,
+        anchors: useBoardAnchors(),
+        events: [],
+        enabled: true,
+        beatsRunning: running,
+      }),
+    { initialProps: { running: true } },
+  )
+  expect(result.current.staged).toBeNull()
+  rerender({ running: false })
+  expect(result.current.staged?.phase).toBe('partner')
+})
+
+// ===== a take-back the keeper has not answered yet (#168) =====
+//
+// A guest's cancel can land before the keeper's confirmation of the put-out
+// has come back. The take-back goes at once, and until the keeper answers it
+// the card is home for the player, whatever the table says of it meanwhile.
+
+const bugOut = (): ShownCard => ({ player: 'you', uid: 'attack-bug#0', card: bug })
+const bugTakenBack: Event = { id: 50, type: 'takenBack', player: 'you', cards: ['attack-bug'] }
+
+it('asks the card back even before the table has confirmed it out', async () => {
+  const onTakeBack = vi.fn()
+  // the table never shows it out: the keeper has not answered the put-out yet
+  render(boardWith({ targets: BUG_TARGETS }, { onTakeBack }))
+  await pullCardFromFan('attack-bug#0')
+  fireEvent.keyDown(window, { key: 'Escape' })
+  expect(onTakeBack).toHaveBeenCalledTimes(1)
+})
+
+it('keeps a card asked back home when the late confirmation of its put-out arrives', async () => {
+  const onTakeBack = vi.fn()
+  const { rerender } = render(boardWith({ targets: BUG_TARGETS }, { onTakeBack }))
+  await pullCardFromFan('attack-bug#0')
+  fireEvent.keyDown(window, { key: 'Escape' })
+  await settle()
+  // the keeper's confirmation of the put-out, late: the table shows the card out
+  rerender(boardWith({ targets: BUG_TARGETS, shown: [bugOut()] }, { onTakeBack }))
+  await settle()
+  expect(fanUids()).toContain('attack-bug#0')
+  expect(screen.queryByTestId('board-centre-shown')).toBeNull()
+  expect(screen.queryByTestId('board-centre-staged')).toBeNull()
+  // not picked up and sent home a second time
+  expect(onTakeBack).toHaveBeenCalledTimes(1)
+})
+
+it('takes the table’s word again once the keeper has answered the take-back', async () => {
+  const { rerender } = render(boardWith({ targets: BUG_TARGETS }))
+  await pullCardFromFan('attack-bug#0')
+  fireEvent.keyDown(window, { key: 'Escape' })
+  await settle()
+  // the answer: our cards taken back
+  rerender(boardWith({ targets: BUG_TARGETS }, {}, [bugTakenBack]))
+  // a card of ours out on the table now is the table's word again: the centre
+  // draws it from the table, no longer hidden as a card on its way home
+  rerender(boardWith({ targets: BUG_TARGETS, shown: [bugOut()] }, {}, [bugTakenBack]))
+  expect(screen.getByTestId('board-centre-shown')).toBeTruthy()
 })

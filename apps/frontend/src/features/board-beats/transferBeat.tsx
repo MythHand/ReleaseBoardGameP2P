@@ -7,6 +7,7 @@ import type { RefObject } from 'react'
 import { useCallback, useRef, useState } from 'react'
 import type { BeatRun, BoardAnchors, BoardState } from '~/entities/game/board'
 import type { RequestPickHandoff } from '~/entities/game/board/types'
+import { liftOff } from './cardPlace'
 import type { BeatPlan } from './planBeats'
 import { seatCardBox } from './seat'
 import { useToHand } from './toHand'
@@ -139,21 +140,16 @@ export function useTransferBeat(
   const latest = useRef({ anchors, land, requestPick })
   latest.current = { anchors, land, requestPick }
 
-  // The donor is one card lighter the moment it leaves them. Published as its
-  // own step rather than folded into the landing, because the two ends of a
+  // The donor is one card lighter the moment it leaves them — in the commit its
+  // carrier goes up, off their seat through the shared place (`cardPlace`).
+  // Its own step rather than folded into the landing, because the two ends of a
   // transfer are two different players and the flight is long enough to see
-  // both — and because a watcher's flight has this end and no other.
+  // both — and because a watcher's flight has this end and no other. It used
+  // to run once the card had reached the centre, so the seat counted it for
+  // the whole crossing (#168).
   const dropFromDonor = useCallback((player: string) => {
     const c = ctx.current
-    if (!c) return
-    const next: BoardState = {
-      ...c.base,
-      opponents: c.base.opponents.map((o) =>
-        o.id === player ? { ...o, handCount: Math.max(0, o.handCount - 1) } : o,
-      ),
-    }
-    c.base = next
-    c.publish(next)
+    if (c) liftOff(c, [{ kind: 'seat', player }])
   }, [])
 
   // The recipient is one card heavier the moment the flight lands on them.
@@ -386,7 +382,7 @@ export function useTransferBeat(
               els.map(async (b, i) => {
                 if (!b) return
                 await wait(i * OFFER_STEP)
-                const anim = play('takeFromSeat', b, { from, to: poses[i] })
+                const anim = play('takeFromSeat', b, { to: poses[i] })
                 if (anim) await anim.finished
               }),
             )
@@ -395,9 +391,9 @@ export function useTransferBeat(
             // flies on its own below, out of the same seat, so the offer is
             // cleared whole rather than one card short.
             await Promise.all(
-              els.map(async (b, i) => {
+              els.map(async (b) => {
                 if (!b) return
-                const anim = play('dealToSeat', b, { from: poses[i], to: from })
+                const anim = play('dealToSeat', b, { to: from })
                 if (anim) await anim.finished
               }),
             )
@@ -412,27 +408,27 @@ export function useTransferBeat(
           // `_Board.tsx`'s static `giveCard` render doubling this same card
           // at the centre while the flyer is still crossing to it.
           clearPending()
+          dropFromDonor(plan.from)
           const [el] = await raised
           if (el) {
             const anim = play('takeFromSeat', el, {
-              from,
               to: held,
               rotateFrom: offerBox ? OFFER_TURN : 0,
             })
             if (anim) await anim.finished
             pin(KEY, held) // I4 — it IS at the centre now
           }
-          dropFromDonor(plan.from)
           patch(KEY, { faceDown: false }) // Card plays its own flipCard
           await wait(REVEAL_HOLD)
-          const at = rectOf(elOf(KEY))
-          drop(KEY)
           // A card taken off somebody's hand ARRIVES — the shared movement puts
           // it in the middle of the fan and keeps it there, the same as every
           // reference scene, `PickOpponentCardStory` (this very play) included.
+          // Handed over as the element, and its carrier down once it has landed
+          // (`drawBeat`'s own landing says why).
           const c = ctx.current
-          if (at && c)
-            await latest.current.land(c, { card, from: at, fallbackKey: `t${plan.eventId}` })
+          if (c)
+            await latest.current.land(c, { card, el: elOf(KEY), fallbackKey: `t${plan.eventId}` })
+          drop(KEY)
           return
         }
         if (plan.role === 'victim') {
@@ -479,7 +475,7 @@ export function useTransferBeat(
           }
           const [el] = await raised
           if (el) {
-            const anim = play('playToCenter', el, { from: slot, to: centre })
+            const anim = play('playToCenter', el, { to: centre })
             if (anim) await anim.finished
             pin(KEY, centre)
           }
@@ -490,7 +486,7 @@ export function useTransferBeat(
           const to = seatCardBox(seat)
           const held = elOf(KEY)
           if (held) {
-            const anim = play('dealToSeat', held, { from: centre, to })
+            const anim = play('dealToSeat', held, { to })
             if (anim) await anim.finished
           }
           drop(KEY)
@@ -510,7 +506,7 @@ export function useTransferBeat(
         const from = seatCardBox(fromSeat)
         const to = seatCardBox(toSeat)
         const publicCard = plan.card ? cardById(plan.card) : null
-        const [el] = await raise([
+        const raised = raise([
           { key: KEY, card: publicCard ?? COVER, at: from, faceDown: !publicCard },
         ])
         // TAKEOFF, watcher leg: the `giveCard` pending is public even to a
@@ -519,16 +515,19 @@ export function useTransferBeat(
         // static centre render as everyone else's until this fires. Our own
         // cover flyer above now carries the crossing, so it stops here.
         clearPending()
+        // …in the commit that flyer goes up, as the taker's leg does: awaited
+        // first, the card stood at the centre AND on its flyer for two frames
+        dropFromDonor(plan.from)
+        const [el] = await raised
         if (el) {
-          const out = play('takeFromSeat', el, { from, to: centre })
+          const out = play('takeFromSeat', el, { to: centre })
           if (out) await out.finished
           pin(KEY, centre)
-          dropFromDonor(plan.from)
           if (publicCard) {
             await wait(REVEAL_HOLD)
             patch(KEY, { faceDown: true })
           }
-          const home = play('dealToSeat', el, { from: centre, to })
+          const home = play('dealToSeat', el, { to })
           if (home) await home.finished
         }
         drop(KEY)

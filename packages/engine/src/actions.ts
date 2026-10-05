@@ -36,9 +36,8 @@ export type Choice =
   // them the pick.
   | { kind: 'upgradeDiscard'; card: CardUid }
   | { kind: 'upgradeTake'; card: CardUid }
-  // Taking a staged release back before its cost is paid. The `release` action
-  // emits nothing until the cost lands, so no peer ever saw the play — which is
-  // why this carries no card and emits no event either.
+  // Taking a release back before its cost is paid. The release stood at the
+  // centre in everyone's view, so taking it back is seen too (`takenBack`).
   | { kind: 'cancelRelease' }
 
 export type Action =
@@ -54,11 +53,20 @@ export type Action =
   | { type: 'PUSH'; player: PlayerId; at: number }
   | { type: 'ATTACK'; player: PlayerId; card: CardUid; combo?: CardUid; at: number }
   | { type: 'PASS'; player: PlayerId; at: number }
+  // A pass taken back while the time to attack a fresh release still runs: a
+  // pass is only a mark (owner, 04.10), so it can be withdrawn
+  | { type: 'UNPASS'; player: PlayerId; at: number }
   | { type: 'WINDOW_EXPIRED'; at: number }
   // Keeper-only, like WINDOW_EXPIRED: starts the turn's inactivity clock when
   // no committed action has stamped one — in practice exactly once, for the
   // first turn, because createGame carries no timestamp to stamp it from.
   | { type: 'CLOCK_STARTED'; at: number }
   | { type: 'RESOLVE'; player: PlayerId; choice: Choice; at: number }
+  // What the table sees while a play is being made (resolution.md §1): a card
+  // of one's own hand put out at the centre, and everything put out taken back.
+  // Neither is a move — the card stays in the hand and the play is still the
+  // PLAY/ATTACK/RESOLVE that completes it.
+  | { type: 'SHOW'; player: PlayerId; card: CardUid; at: number }
+  | { type: 'TAKE_BACK'; player: PlayerId; at: number }
 
 export type ActionType = Action['type']

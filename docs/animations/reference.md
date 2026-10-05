@@ -47,7 +47,7 @@ letting it flash in place first).
 | `takeFromSeat` | `duration` ?? **460** | EASE | — | `{ from, to, duration?, rotateFrom? }` | a card comes out of a player seat — or out of a closed fan held out to you, `rotateFrom: 180` — to the center (pair of `dealToSeat`) |
 | `returnToDeck` | `duration` ?? **480** | EASE | — | `{ from, to, duration? }` | a card returns center → deck (pair of `drawToCenter`) |
 | `foldIntoPair` | `dur` ?? **620** | EASE, **LAND** with `snap` | — | `{ from, box, pose?, dur?, snap? }` | one HALF of a pair travels into its pose inside the pair. Called once per half; the pair itself does not move |
-| `landInPose` | `dur` ?? **480** | EASE, **LAND** with `snap` | — | `{ from, box, pose?, dur?, snap? }` | a card ARRIVES ON THE TABLE and lands already in its rest pose — the tilt travels with it rather than appearing a frame after it stops. Same FLIP math as `foldIntoPair` (the element is already in place; its entry is what moves), different move: `pose` here is the card's own pose on the table, not a half's pose inside a pair |
+| `landInPose` | `dur` ?? **480** | EASE, **LAND** with `snap` | — | `{ from, box, pose?, dur?, snap?, rotateFrom? }` | a card ARRIVES ON THE TABLE and lands already in its rest pose — the tilt travels with it rather than appearing a frame after it stops. Same FLIP math as `foldIntoPair` (the element is already in place; its entry is what moves), different move: `pose` here is the card's own pose on the table, not a half's pose inside a pair. `rotateFrom` is the tilt the card LIES at in `from` (a card dealt out of the discard heap at its scatter angle); without it every keyframe is what it was |
 | `rollOut` | `dur` ?? **220** | EASE | — | `{ dur? }` | a slot's content fades out — first half of a swap. No movement: the slot is fixed |
 | `rollIn` | `dur` ?? **300** | EASE | — | `{ dur?, delay? }` | the new content fades in — second half. `delay` waits out the outgoing one |
 | `popIn` | 260 | **SNAP** | — | — | a small element appears in a reserved slot (fade + scale), neighbours do not shift |
@@ -69,7 +69,7 @@ letting it flash in place first).
 | Name | File | Signature | What it does |
 |---|---|---|---|
 | `move` **(internal)** | `presets.ts` | `move(el, { from, to, rotate=0, rotateFrom=0, dx=0, dy=0, fade=false }, duration=460, easing=EASE)` | the travel base under every "flight" preset: translate-by-centers + scale-by-width + rotate/dx/dy (+ optional fade). `rotateFrom` is the angle the flight STARTS at, for a card that is already lying turned and straightens on the way — a carrier's own `pose` cannot do it, because the animation's first frame overrides the node's inline transform. **Not exported** — listed so the presets are readable, not so you can call it: a flight goes through a named preset, never through the base. Its `duration=460` default is never hit — every preset passes an explicit duration. |
-| `enterPose` | `presets.ts` | `enterPose(from, box)` → `string` | the transform that makes an element sitting in `box` LOOK like it sits in `from` (offset by centers + scale by width). The entry pose of a FLIP flight: paint the first frame with it before starting, or the element flashes in its final place. `foldIntoPair` uses the same call inside. |
+| `enterPose` | `presets.ts` | `enterPose(from, box, rotateFrom = 0)` → `string` | the transform that makes an element sitting in `box` LOOK like it sits in `from` (offset by centers + scale by width, turned by `rotateFrom` when the card lies tilted there). The entry pose of a FLIP flight: paint the first frame with it before starting, or the element flashes in its final place. `foldIntoPair` uses the same call inside. |
 | `durationOf` **(internal)** | `presets.ts` | `durationOf(p, fallback=520)` | reads `p.duration`, else the fallback. The `520` default is the fallback for the variable-time presets. Not exported either. |
 | `SHAKE_SHAPES` | `presets.ts` | `{ settle, spring }` → `number[]` | the CHARACTER of a shake as fractions of the swing per frame — `settle` (a jolt and a calm-down) and `spring` (two full swings, then two smaller). Fractions, not px, so a character reads the same at any `amp`. `ShakeShape` is the key type. |
 | `SHAKE_FLINCH` | `presets.ts` | `{ amp: 9, dur: 460, shape: 'spring' }` | the flinch of a WHOLE element — a fan or a seat answering "no such card" — rather than the 7px `settle` default sized for an input. Pass it as `play('shake', el, SHAKE_FLINCH)`; the Security Bug miss plays it on the board and in its scene. |
@@ -219,6 +219,21 @@ for the sequences; the classification table for `piles` is written out there, no
 **One scatter, two readers.** A discard flies on `scatterAt(eventId)` and the heap
 (`toBoardState.toDiscardHeap`) rests it on `scatterAt(eventId)` — the same call on the same id, which
 is what makes the handover invisible (**I7**) across a boundary neither side can see.
+
+**Where a card is drawn — `cardPlace`** (`features/board-beats/cardPlace.ts`, **I12**). A `Place` is
+every spot the board can draw a card in: `hand`, `shown` (a card out at the centre), `seat` (an
+opponent's hand count), `centre`, `zone` (a release or Monitoring slot), `upgrade` (System Upgrade's
+row), `heap` (by event id or by card), `pile`, `events`, and the whole `discard`. A `Landing` is the
+same list seen from the arriving side; `heap` lands with the `filed` entries the projection will
+fold. Two calls, both inside the beat's run:
+
+| Call | Signature | When |
+|---|---|---|
+| `liftOff` | `liftOff(run, from: Place[], gesture?)` → `BoardState` | as the carrier goes up: the places give the card up, the gesture that held it lets go, one publish |
+| `setDown` | `setDown(run, to: Landing[], drop?)` → `BoardState` | as the carrier comes down: the places have the card, then `drop()` takes the carrier down, one publish |
+
+Nothing is awaited inside either, so the frame the carrier appears or goes is the frame the place
+changes. `withoutCard` / `withCard` are the pure halves, for a base that is built rather than run.
 
 ---
 
