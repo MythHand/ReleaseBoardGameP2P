@@ -2349,7 +2349,6 @@ function BoardView({
                 {code && (
                   <SettingsField label={copy.table.codeTitle}>
                     <LobbyCode
-                      onCopy={room.onCopy}
                       code={code}
                       copy={copy.lobbyCode}
                       align="start"

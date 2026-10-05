@@ -2,7 +2,6 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { vi } from 'vitest'
 import { MAX_RECONNECT_ATTEMPTS, type UseLobby } from '~/entities/lobby'
-import { createFakeVoiceFacade } from '~/network/voice/testing/fakeVoiceFacade'
 import InviteScreen from '../_InviteScreen'
 
 vi.mock('@release/translation', () => ({
@@ -50,7 +49,6 @@ function base(): UseLobby {
     lobbyActionError: null,
     setMaxSpectators: vi.fn(),
     setParticipantRole: vi.fn(),
-    voice: createFakeVoiceFacade(),
     chat: { entries: [], notificationEntryIds: [], selfMemberId: null, send: vi.fn() },
     createRoom: vi.fn(),
     joinRoom: vi.fn(),

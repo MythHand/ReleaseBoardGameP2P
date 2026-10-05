@@ -6,7 +6,6 @@ import { type Lang, pick, useLang } from '../../Playground/lang'
 import HoverSelect from '../controls/HoverSelect'
 import TechBar from '../controls/TechBar'
 import { TechField, TechLabel, TechSwitch } from '../controls/TechControls'
-import { copyText } from '../copyText'
 import styles from './TableStory.module.css'
 
 type GameOverCondition = 'release' | 'lastStanding'
@@ -303,7 +302,6 @@ export default function TableStory() {
               : storyState
           }
           room={{
-            onCopy: copyText,
             role,
             code: '4F2A-9K',
             participants: base.participants,

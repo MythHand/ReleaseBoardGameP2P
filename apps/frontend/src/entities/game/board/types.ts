@@ -155,7 +155,6 @@ export function isPlayerBoard(state: BoardState): state is PlayerBoardState {
 // Everything the session/P2P layer answers. The engine has no concept of a
 // spectator, a room code, or a pause.
 export interface BoardRoom {
-  onCopy?: (text: string) => Promise<boolean>
   role?: 'host' | 'guest'
   code?: string
   participants: Participant[]

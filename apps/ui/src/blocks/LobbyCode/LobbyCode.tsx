@@ -16,7 +16,6 @@ export interface LobbyCodeCopy {
 
 interface LobbyCodeProps {
   code: string
-  onCopy?: (text: string) => Promise<boolean>
   copy: LobbyCodeCopy
   // Полная ссылка-приглашение. Когда задана — рядом с копированием кода
   // появляется вторая кнопка «ссылка» (копирует именно её).
@@ -38,7 +37,6 @@ interface LobbyCodeProps {
 // «код» (только код комнаты) — чтобы к одному значению дать оба копирования.
 export default function LobbyCode({
   code,
-  onCopy,
   copy,
   link,
   showLabel = true,
@@ -53,7 +51,6 @@ export default function LobbyCode({
       <div className={`${styles.box} ${align === 'start' ? styles.start : ''}`}>
         {showLabel && <span className={styles.label}>{copy.label}</span>}
         <CopyButton
-          onCopy={onCopy}
           variant="bare"
           copyValue={code}
           copiedChildren={
@@ -71,13 +68,13 @@ export default function LobbyCode({
   }
 
   const codeBtn = (
-    <CopyButton onCopy={onCopy} variant="tech" copyValue={code} copiedChildren={copy.copied}>
+    <CopyButton variant="tech" copyValue={code} copiedChildren={copy.copied}>
       {link ? (copy.copyCode ?? copy.copy) : copy.copy}
     </CopyButton>
   )
   const buttons = link ? (
     <div className={styles.actions}>
-      <CopyButton onCopy={onCopy} variant="tech" copyValue={link} copiedChildren={copy.copied}>
+      <CopyButton variant="tech" copyValue={link} copiedChildren={copy.copied}>
         {copy.copyLink ?? copy.copy}
       </CopyButton>
       {codeBtn}

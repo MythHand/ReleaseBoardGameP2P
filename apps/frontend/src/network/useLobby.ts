@@ -84,7 +84,6 @@ import type {
   Where,
   WireMessage,
 } from './types'
-import { type RoomVoiceFacade, useRoomVoice } from './voice/useRoomVoice'
 
 const toChatRole = (role: PeerInfo['role']): ChatRole => (role === 'guest' ? 'spectator' : role)
 
@@ -473,7 +472,6 @@ export interface UseLobby {
   error: string | null
   errorKind: ErrorKind
   chat: RoomChatState
-  voice: RoomVoiceFacade
   createRoom(name: string, maxPlayers: number, setup?: Setup): Promise<string>
   joinRoom(code: string, name: string, requestedRole?: JoinRole): Promise<string>
   joinAvailability: JoinAvailability | null
@@ -521,8 +519,6 @@ export interface UseLobby {
 
 export function useLobby(): UseLobby {
   const chatSession = useChatSession()
-  const { runtime: voiceRuntime, view: voice } = useRoomVoice()
-  const voiceIdentityRef = useRef<string | null>(null)
   const clearChatRoom = chatSession.clearRoom
   const [state, setState] = useState<LobbyState | null>(null)
   const [status, setStatus] = useState<LobbyStatus>('idle')
@@ -677,38 +673,10 @@ export function useLobby(): UseLobby {
     setStatus('error')
   }, [])
 
-  const refreshVoice = useCallback(
-    (admittedOverride?: boolean) => {
-      const current = stateRef.current
-      const transport = transportRef.current
-      const self = current?.peers[current.selfId]
-      if (!current || !transport || !self) return
-      voiceRuntime.updateRoom({
-        roomCode: formatRoomCode(current.hostId),
-        roomGeneration: sessionEpochRef.current,
-        transportGeneration: transportGenerationRef.current,
-        transport,
-        selfPeerId: current.selfId,
-        selfMemberId: self.memberId,
-        hostPeerId: current.hostId,
-        peers: current.peers,
-        admitted:
-          admittedOverride ??
-          (isHostRef.current ||
-            (hostConnectedRef.current && voiceIdentityRef.current === self.memberId)),
-      })
-    },
-    [voiceRuntime],
-  )
-
-  const commit = useCallback(
-    (next: LobbyState) => {
-      stateRef.current = next
-      setState(next)
-      refreshVoice()
-    },
-    [refreshVoice],
-  )
+  const commit = useCallback((next: LobbyState) => {
+    stateRef.current = next
+    setState(next)
+  }, [])
 
   // The only way the seating is ever written. The page reads the state and the
   // message handler reads the ref, so setting one without the other is a bug
@@ -809,8 +777,6 @@ export function useLobby(): UseLobby {
 
   const teardownSession = useCallback(
     (flushMs?: number) => {
-      voiceRuntime.updateRoom(null)
-      voiceIdentityRef.current = null
       const transport = transportRef.current
       transportGenerationRef.current += 1
       sessionEpochRef.current += 1
@@ -854,22 +820,17 @@ export function useLobby(): UseLobby {
       if (flushMs) setTimeout(() => transport.close(), flushMs)
       else transport.close()
     },
-    [applySeats, clearChatRoom, forgetStored, resetRemoteLink, voiceRuntime],
+    [applySeats, clearChatRoom, forgetStored, resetRemoteLink],
   )
 
-  const dispatch = useCallback(
-    (outgoing: Outgoing[]) => {
-      const t = transportRef.current
-      if (!t) return
-      for (const o of outgoing) {
-        if (o.to === 'broadcast') t.broadcast(o.message)
-        else t.send(o.to, o.message)
-      }
-      // Admission frames establish the receiver's identity before the voice snapshot.
-      if (outgoing.some((o) => o.message.type === 'CHAT_HISTORY')) refreshVoice()
-    },
-    [refreshVoice],
-  )
+  const dispatch = useCallback((outgoing: Outgoing[]) => {
+    const t = transportRef.current
+    if (!t) return
+    for (const o of outgoing) {
+      if (o.to === 'broadcast') t.broadcast(o.message)
+      else t.send(o.to, o.message)
+    }
+  }, [])
 
   const broadcastChatEntries = useCallback(
     (entries: ChatEntry[]) => {
@@ -918,7 +879,6 @@ export function useLobby(): UseLobby {
         dispatch([{ to: 'broadcast', message: { type: 'PLAYER_KICKED', payload: { peerId } } }])
         if (entry) broadcastChatEntries([entry])
       } else if (peerId === current.hostId) {
-        refreshVoice(false)
         // The guest can't proceed without the host. Only call it "host left" if
         // we were actually connected; a channel that never opened means the
         // connection failed (ICE/negotiation) — keep that more specific error.
@@ -955,14 +915,13 @@ export function useLobby(): UseLobby {
         commit(applyPeerLeft(current, peerId))
       }
     },
-    [broadcastChatEntries, chatSession, commit, dispatch, refreshVoice],
+    [broadcastChatEntries, chatSession, commit, dispatch],
   )
 
   const onMessage = useCallback(
     (msg: WireMessage) => {
       const current = stateRef.current
       if (!current) return
-      if (voiceRuntime.handleMessage(msg)) return
       if (isHostRef.current) {
         if (msg.type === 'JOIN_REQUEST') {
           const liveGameId = gameIdRef.current
@@ -1256,8 +1215,6 @@ export function useLobby(): UseLobby {
         case 'CHAT_HISTORY':
           if (fromHost) {
             chatSession.receiveHistory(msg.payload.entries, msg.payload.selfMemberId)
-            voiceIdentityRef.current = msg.payload.selfMemberId
-            refreshVoice()
           }
           break
         case 'CHAT_ENTRY':
@@ -1333,17 +1290,7 @@ export function useLobby(): UseLobby {
           break
       }
     },
-    [
-      chatSession,
-      commit,
-      dispatch,
-      applySeats,
-      teardownSession,
-      rememberGame,
-      captureGameSync,
-      voiceRuntime,
-      refreshVoice,
-    ],
+    [chatSession, commit, dispatch, applySeats, teardownSession, rememberGame, captureGameSync],
   )
 
   const createRoom = useCallback(
@@ -1444,8 +1391,6 @@ export function useLobby(): UseLobby {
     async (code: string, name: string, options: DialOptions) => {
       const { requestedRole, resume, onDialOutcome, preserveSession = false } = options
       if (preserveSession) {
-        refreshVoice(false)
-        voiceIdentityRef.current = null
         transportGenerationRef.current += 1
         resetRemoteLink()
         const previousTransport = transportRef.current
@@ -1477,8 +1422,6 @@ export function useLobby(): UseLobby {
               msg.type === 'JOIN_REJECTED' &&
               msg.payload?.reason === 'room-full'
             ) {
-              voiceRuntime.updateRoom(null)
-              voiceIdentityRef.current = null
               transportGenerationRef.current += 1
               transportRef.current = null
               hostConnectedRef.current = false
@@ -1504,7 +1447,6 @@ export function useLobby(): UseLobby {
                 return
               onMessage(msg)
               hostConnectedRef.current = true
-              refreshVoice()
               setStatus('in-lobby')
               onDialOutcome?.({ ok: true })
               return
@@ -1608,17 +1550,7 @@ export function useLobby(): UseLobby {
         throw err
       }
     },
-    [
-      onMessage,
-      onError,
-      onDisconnect,
-      commit,
-      resetRemoteLink,
-      surfaceSetupError,
-      teardownSession,
-      voiceRuntime,
-      refreshVoice,
-    ],
+    [onMessage, onError, onDisconnect, commit, resetRemoteLink, surfaceSetupError, teardownSession],
   )
 
   const joinRoom = useCallback(
@@ -2559,7 +2491,6 @@ export function useLobby(): UseLobby {
       errorKind,
       joinAvailability,
       lobbyActionError,
-      voice,
       chat: {
         entries: chatSession.entries,
         notificationEntryIds: chatSession.notificationEntryIds,
@@ -2604,7 +2535,6 @@ export function useLobby(): UseLobby {
       errorKind,
       joinAvailability,
       lobbyActionError,
-      voice,
       chatSession.entries,
       chatSession.notificationEntryIds,
       chatSession.selfMemberId,

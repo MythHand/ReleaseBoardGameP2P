@@ -4,7 +4,6 @@ import { createMemoryRouter, RouterProvider } from 'react-router'
 import { vi } from 'vitest'
 import type { UseLobby } from '~/entities/lobby'
 import { MAX_RECONNECT_ATTEMPTS } from '~/entities/lobby'
-import { createFakeVoiceFacade } from '~/network/voice/testing/fakeVoiceFacade'
 import BoardPage from '../index'
 
 // Same opening-collapse mock board.test.tsx uses, for the same reason: this
@@ -26,7 +25,6 @@ function session(overrides: Partial<UseLobby> = {}): UseLobby {
     roomCode: 'YTG-N2Q',
     isHost: true,
     seats: [],
-    voice: createFakeVoiceFacade(),
     chat: {
       entries: [],
       notificationEntryIds: [],

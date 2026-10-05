@@ -214,15 +214,3 @@
   justify-content: flex-end;
   margin-block-start: auto;
 }
-
-.voiceLine {
-  display: flex;
-  flex: none;
-  gap: 12px;
-  align-items: center;
-  margin-block-end: 28px;
-}
-
-.hInline {
-  margin: 0;
-}

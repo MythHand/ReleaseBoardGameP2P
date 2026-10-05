@@ -4,7 +4,6 @@ import Lobby from '@/screens/Lobby'
 import { useLang } from '../../Playground/lang'
 import TechBar from '../controls/TechBar'
 import { TechSwitch } from '../controls/TechControls'
-import { copyText } from '../copyText'
 import styles from './LobbyStory.module.css'
 
 export default function LobbyStory() {
@@ -37,7 +36,6 @@ export default function LobbyStory() {
           языка плейграунда из шапки */}
       <div className={styles.stage}>
         <Lobby
-          onCopy={copyText}
           key={lang}
           role={role}
           initialLang={lang}

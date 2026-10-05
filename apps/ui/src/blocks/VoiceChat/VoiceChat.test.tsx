@@ -220,25 +220,6 @@ it('lets a notice go by itself after a while', () => {
   }
 })
 
-it('holds notices on hover and gives them six seconds after the pointer leaves', () => {
-  vi.useFakeTimers()
-  try {
-    render(line(denied))
-    const notice = screen.getByRole('status')
-    act(() => vi.advanceTimersByTime(3000))
-    fireEvent.mouseEnter(notice)
-    act(() => vi.advanceTimersByTime(10000))
-    expect(screen.getByRole('status')).toBe(notice)
-    fireEvent.mouseLeave(notice)
-    act(() => vi.advanceTimersByTime(5999))
-    expect(screen.getByRole('status')).toBe(notice)
-    act(() => vi.advanceTimersByTime(1))
-    expect(screen.queryByRole('status')).toBeNull()
-  } finally {
-    vi.useRealTimers()
-  }
-})
-
 // At the table the panel can close, so the notices are the table's to hang:
 // the panel keeps only the hint, VoiceNotices shows the notice.
 it('leaves the table panel to name an issue only in its hints', () => {

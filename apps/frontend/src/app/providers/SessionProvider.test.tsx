@@ -1,11 +1,9 @@
 import { render, screen } from '@testing-library/react'
 import { vi } from 'vitest'
-import { createFakeVoiceFacade } from '~/network/voice/testing/fakeVoiceFacade'
 import { SessionProvider, useSession } from './SessionProvider'
 
 vi.mock('~/network', () => ({
   useLobby: () => ({
-    voice: createFakeVoiceFacade(),
     state: null,
     status: 'idle' as const,
     roomCode: 'ABC-123',

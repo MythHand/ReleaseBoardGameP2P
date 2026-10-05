@@ -3,7 +3,6 @@ import { createFakeEngine, FAKE_DECK, FAKE_EVENTS, runUntilIdle } from '@release
 import { render, screen } from '@testing-library/react'
 import { vi } from 'vitest'
 import type { PeerInfo, Seat } from '~/network'
-import { createFakeVoiceFacade } from '~/network/voice/testing/fakeVoiceFacade'
 import StatsPage from '../stats'
 
 // The rest of this branch's page tests drive the screen from hand-written
@@ -41,7 +40,6 @@ vi.mock('~/app/providers/SessionProvider', () => ({
     state: { selfId, peers, hostId: 'peer-a' },
     roomCode: 'ROOM',
     seats,
-    voice: createFakeVoiceFacade(),
     chat: {
       entries: [],
       notificationEntryIds: [],
