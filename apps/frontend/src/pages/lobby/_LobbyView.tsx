@@ -18,8 +18,10 @@ import { useEffect, useState } from 'react'
 import { useSession } from '~/app/providers/SessionProvider'
 import { useNavigate } from '~/app/router'
 import { RoomChat, useRoomChatView } from '~/features/chat/RoomChat'
+import { copyText } from '~/features/copy/copyText'
 import { botNames } from '~/features/start-game/botNames'
 import { useStartGame } from '~/features/start-game/useStartGame'
+import { RoomVoice, useRoomVoiceView } from '~/features/voice-chat/RoomVoice'
 import { effectiveBots } from '~/network'
 import type { PeerInfo } from '~/network/types'
 import { BASE_URL } from '~/shared/config'
@@ -31,6 +33,7 @@ export default function LobbyView() {
   const { t, i18n } = useTranslation()
   const session = useSession()
   const chat = useRoomChatView()
+  const voice = useRoomVoiceView()
   const startGame = useStartGame()
   const navigate = useNavigate()
   // Rules reuse the app-wide `?modal=` router rather than a second local modal,
@@ -178,6 +181,7 @@ export default function LobbyView() {
         <BugRunner label={t('lobbyScreen.bugRunner')} className={styles.runner} />
         <div className={styles.headRight}>
           <LobbyCode
+            onCopy={copyText}
             code={session.roomCode ?? ''}
             link={shareUrl}
             copy={t('lobbyCode', { returnObjects: true })}
@@ -349,6 +353,12 @@ export default function LobbyView() {
         </section>
 
         <section className={styles.chatCol}>
+          <div className={styles.voiceLine}>
+            <Typography variant="sectionTitle" className={styles.hInline}>
+              {t('lobbyScreen.voiceChat')}
+            </Typography>
+            <RoomVoice view={voice} />
+          </div>
           <Typography variant="sectionTitle" className={styles.h}>
             {t('lobbyScreen.chat')}
           </Typography>

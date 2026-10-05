@@ -29,6 +29,7 @@ interface Spectator {
 }
 interface LobbyProps {
   code?: string
+  onCopy?: (text: string) => Promise<boolean>
   initialCapacity?: number
   initialPlayers?: Player[]
   role?: 'host' | 'guest'
@@ -130,6 +131,7 @@ function specColorFor(n: number) {
 
 export default function Lobby({
   code = '4F2A-9K',
+  onCopy,
   link,
   initialCapacity = 5,
   initialPlayers = MOCK_PLAYERS,
@@ -251,7 +253,7 @@ export default function Lobby({
         {/* the room between the two sides of the header is the mini-game's */}
         <BugRunner label={copy.bugRunner} className={styles.runner} />
         <div className={styles.headRight}>
-          <LobbyCode code={code} link={shareLink} copy={codeCopy} />
+          <LobbyCode onCopy={onCopy} code={code} link={shareLink} copy={codeCopy} />
           <LangSwitcher value={lang} onChange={setLang} label={copy.language} />
         </div>
       </header>
