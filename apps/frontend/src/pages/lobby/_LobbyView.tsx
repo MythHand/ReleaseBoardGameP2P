@@ -10,6 +10,7 @@ import {
   LobbyCode,
   Modal,
   PlayerSlot,
+  ScrollArea,
   Slider,
   Toggle,
   Typography,
@@ -133,9 +134,7 @@ export default function LobbyView() {
           running
             ? 'lobbyScreen.errors.match-running'
             : full
-              ? toSpectator
-                ? 'lobbyScreen.errors.spectators-full'
-                : 'lobbyScreen.errors.players-full'
+              ? 'lobbyScreen.noSlot'
               : 'lobbyScreen.errors.invalid-target',
         ),
         onClick: () => session.setParticipantRole(peer.id, toSpectator ? 'spectator' : 'player'),
@@ -216,7 +215,7 @@ export default function LobbyView() {
 
         {/* Right — players, spectators, lobby controls */}
         <section className={styles.players}>
-          <div className={styles.scrollArea}>
+          <ScrollArea className={styles.scrollArea}>
             <Typography variant="sectionTitle" className={styles.h}>
               {t('lobbyScreen.players')}
               <Typography base="mono-md" tk="tk-10" as="span" className={styles.count}>
@@ -337,7 +336,7 @@ export default function LobbyView() {
               ))}
               {spectators.length === 0 && <EmptySlot>{t('lobbyScreen.noSpectators')}</EmptySlot>}
             </div>
-          </div>
+          </ScrollArea>
 
           {/* [ READY ] repeats the toggle in my own row — same action, same state,
               green while on; the host's [ START ] goes under it. A spectator has
