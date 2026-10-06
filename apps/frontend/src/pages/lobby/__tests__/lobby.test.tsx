@@ -561,7 +561,7 @@ it('explains a full spectator quota without changing a role', () => {
   renderInRouter(<LobbyView />)
   fireEvent.click(screen.getByRole('button', { name: 'lobbyScreen.actions' }))
   fireEvent.click(screen.getByText('lobbyScreen.makeSpectator'))
-  expect(screen.getByText('lobbyScreen.errors.spectators-full')).toBeTruthy()
+  expect(screen.getByText('lobbyScreen.noSlot')).toBeTruthy()
   expect(sessionValue.setParticipantRole).not.toHaveBeenCalled()
 })
 

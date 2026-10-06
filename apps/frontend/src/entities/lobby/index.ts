@@ -10,4 +10,4 @@ export type {
   Role,
   UseLobby,
 } from '~/network'
-export { MAX_RECONNECT_ATTEMPTS, useLobby } from '~/network'
+export { MAX_RECONNECT_ATTEMPTS, parseRoomCode, useLobby } from '~/network'

@@ -32,7 +32,11 @@ import {
 } from '~/shared/lib/persistence'
 import { normalizeChatText } from './chat/journal'
 import { type RoomChatState, useChatSession } from './chat/useChatSession'
-import { parseJoinRequestPayload, resolveJoinAdmission } from './lobby/admission'
+import {
+  getJoinAvailability,
+  parseJoinRequestPayload,
+  resolveJoinAdmission,
+} from './lobby/admission'
 import {
   canStart as canStartFn,
   disbandLobby as disbandLobbyFn,
@@ -923,6 +927,16 @@ export function useLobby(): UseLobby {
       const current = stateRef.current
       if (!current) return
       if (isHostRef.current) {
+        // A code check is read-only: it grants no membership or private sync.
+        if (msg.type === 'ROOM_CHECK') {
+          transportRef.current?.send(msg.from, {
+            type: 'ROOM_AVAILABILITY',
+            payload: getJoinAvailability(current, msg.from, {
+              matchRunning: Boolean(gameIdRef.current),
+            }),
+          })
+          return
+        }
         if (msg.type === 'JOIN_REQUEST') {
           const liveGameId = gameIdRef.current
           const payload = parseJoinRequestPayload((msg as { payload?: unknown }).payload)

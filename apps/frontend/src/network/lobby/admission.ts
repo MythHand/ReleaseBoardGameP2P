@@ -52,18 +52,26 @@ export function resolveJoinAdmission(
 ): JoinAdmission {
   if (options.returningSeat)
     return { accepted: true, role: fromId === state.hostId ? 'host' : 'player' }
-  const others = Object.values(state.peers).filter(
-    (peer) => peer.id !== fromId && peer.id !== options.returningLobbyPeer?.id,
-  )
-  const availability = {
-    player:
-      !options.matchRunning &&
-      others.filter((peer) => peer.role !== 'guest').length < state.maxPlayers,
-    spectator: others.filter((peer) => peer.role === 'guest').length < state.maxSpectators,
-  }
+  const availability = getJoinAvailability(state, fromId, options)
   const wantsSpectator =
     options.requestedRole === 'spectator' || options.returningLobbyPeer?.role === 'guest'
   if (!wantsSpectator && availability.player) return { accepted: true, role: 'player' }
   if (availability.spectator) return { accepted: true, role: 'guest' }
   return { accepted: false, reason: 'room-full', availability }
+}
+
+export function getJoinAvailability(
+  state: LobbyState,
+  fromId: string,
+  options: Pick<JoinOptions, 'matchRunning' | 'returningLobbyPeer'>,
+): JoinAvailability {
+  const others = Object.values(state.peers).filter(
+    (peer) => peer.id !== fromId && peer.id !== options.returningLobbyPeer?.id,
+  )
+  return {
+    player:
+      !options.matchRunning &&
+      others.filter((peer) => peer.role !== 'guest').length < state.maxPlayers,
+    spectator: others.filter((peer) => peer.role === 'guest').length < state.maxSpectators,
+  }
 }
