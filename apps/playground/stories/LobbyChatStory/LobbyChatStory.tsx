@@ -7,6 +7,7 @@ import Lobby from '@/screens/Lobby'
 import { pick, useLang } from '../../Playground/lang'
 import TechBar from '../controls/TechBar'
 import { TechSwitch } from '../controls/TechControls'
+import { copyText } from '../copyText'
 import { useVoiceDemo, VoiceDemoControls, voiceIssueView } from '../voiceDemo'
 import styles from './LobbyChatStory.module.css'
 
@@ -63,6 +64,7 @@ export default function LobbyChatStory() {
           языка плейграунда из шапки */}
       <div className={styles.stage}>
         <Lobby
+          onCopy={copyText}
           key={lang}
           role={role}
           initialLang={lang}

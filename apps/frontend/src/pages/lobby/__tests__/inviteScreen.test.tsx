@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes } from 'react-router'
 import { vi } from 'vitest'
 import { MAX_RECONNECT_ATTEMPTS, type UseLobby } from '~/entities/lobby'
 import { checkRoom } from '~/network/lobby/checkRoom'
+import { createFakeVoiceFacade } from '~/network/voice/testing/fakeVoiceFacade'
 import InviteScreen from '../_InviteScreen'
 
 vi.mock('~/network/lobby/checkRoom', () => ({ checkRoom: vi.fn() }))
@@ -52,6 +53,7 @@ function base(): UseLobby {
     lobbyActionError: null,
     setMaxSpectators: vi.fn(),
     setParticipantRole: vi.fn(),
+    voice: createFakeVoiceFacade(),
     chat: { entries: [], notificationEntryIds: [], selfMemberId: null, send: vi.fn() },
     createRoom: vi.fn(),
     joinRoom: vi.fn(),

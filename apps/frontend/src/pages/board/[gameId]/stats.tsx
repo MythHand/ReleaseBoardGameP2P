@@ -7,6 +7,7 @@ import { seatsFor } from '~/entities/game/seats'
 import { toStatPlayers } from '~/entities/game/stats'
 import { RoomChat, useRoomChatView } from '~/features/chat/RoomChat'
 import { useGame } from '~/features/play-game/useGame'
+import { RoomVoice, useRoomVoiceView } from '~/features/voice-chat/RoomVoice'
 import styles from './stats.module.css'
 
 export default function StatsPage() {
@@ -15,6 +16,7 @@ export default function StatsPage() {
   const game = useGame()
   const leaveMatch = useLeaveMatch()
   const chat = useRoomChatView()
+  const voice = useRoomVoiceView()
 
   // Tell the table where this peer went, so everyone else's results table can
   // say so. Announced once per mount; the host ignores a repeat of what it
@@ -58,6 +60,7 @@ export default function StatsPage() {
 
   const copy: StatsCopy = {
     title: t('stats.title'),
+    voiceChat: t('stats.voiceChat'),
     subtitle: t('stats.subtitle'),
     winnerLabel: t('stats.winnerLabel'),
     winnerTag: t('stats.winnerTag'),
@@ -94,6 +97,7 @@ export default function StatsPage() {
   return (
     <div className={styles.page} data-testid="stats-page">
       <Stats
+        voice={<RoomVoice view={voice} />}
         chat={<RoomChat view={chat} />}
         winnerId={winnerId}
         selfId={selfId}

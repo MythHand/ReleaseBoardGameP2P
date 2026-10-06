@@ -1,5 +1,6 @@
 import type { Action, Event, GameState, GameView, PlayerId, Setup } from '@release/engine'
 import type { ChatEntry, MemberId } from '~/shared/chat/types'
+import type { VoiceMessage } from './voice/types'
 
 // A plain Omit over a union collapses it to its common members, so it has to
 // distribute. `player` and `at` are stripped because the keeper decides both:
@@ -65,6 +66,7 @@ export interface Seat {
 
 // Discriminated union of every protocol message ({ type, payload }).
 export type Message =
+  | VoiceMessage
   // --- Lobby ---
   | { type: 'ROOM_CHECK'; payload: Record<string, never> }
   | { type: 'ROOM_AVAILABILITY'; payload: JoinAvailability }

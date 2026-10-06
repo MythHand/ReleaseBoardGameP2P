@@ -87,6 +87,7 @@ export function isPlayerTable(state: TableState): state is PlayerTableState {
 // Everything the session/P2P layer answers. The engine has no concept of a
 // spectator, a room code, or a pause.
 export interface TableRoom {
+  onCopy?: (text: string) => Promise<boolean>
   role?: 'host' | 'guest'
   code?: string
   participants: Participant[]

@@ -11,8 +11,11 @@ import {
 } from '~/shared/config'
 import { createEnvelope, nextSeq, parseEnvelope } from '../envelope'
 import type { Message, WireMessage } from '../types'
+import { createMediaPort } from './media'
+import type { VoiceMediaPort } from './mediaTypes'
 
 export interface Transport {
+  media?: VoiceMediaPort
   id: string
   connectTo(peerId: string): void
   authenticate(peerId: string): void
@@ -92,10 +95,20 @@ export function createTransport(args: {
     const connections = new Map<string, ConnectionGeneration>()
     let opened = false
     let closed = false
+    const dataDialPeers = new Set<string>()
+    const dataDials = new Map<string, DataConnection>()
+    const clearDataDial = (conn: DataConnection) => {
+      if (dataDials.get(conn.peer) !== conn) return
+      dataDials.delete(conn.peer)
+      dataDialPeers.delete(conn.peer)
+    }
+    const media = createMediaPort(peer, dataDialPeers)
+
     const close = () => {
       if (closed) return
       closed = true
       args.signal?.removeEventListener('abort', abort)
+      media.close()
       peer.destroy()
     }
     const abort = () => {
@@ -111,6 +124,7 @@ export function createTransport(args: {
       }
       const generation: ConnectionGeneration = { connection: conn, authenticated, retired: false }
       conn.on('open', () => {
+        clearDataDial(conn)
         if (closed) return
         const previous = connections.get(conn.peer)
         if (previous?.connection === conn) return
@@ -144,12 +158,14 @@ export function createTransport(args: {
         }
       })
       conn.on('close', () => {
+        clearDataDial(conn)
         if (closed || connections.get(conn.peer) !== generation) return
         generation.retired = true
         connections.delete(conn.peer)
         args.onDisconnect?.(conn.peer)
       })
       conn.on('error', (e) => {
+        clearDataDial(conn)
         if (closed || generation.retired) return
         const active = connections.get(conn.peer)
         if (active && active !== generation) return
@@ -161,9 +177,11 @@ export function createTransport(args: {
     peer.on('error', (err) => {
       if (closed) return
       const e = err as { type?: string; message: string }
+      if (media.handlePeerError(e)) return
       // Before the peer opens, an error means setup failed — reject the promise.
       // After it opens, surface the error instead of discarding it silently.
-      if (opened) args.onError?.({ type: e.type, message: e.message })
+      if (opened)
+        args.onError?.({ type: e.type === 'webrtc' ? 'connection' : e.type, message: e.message })
       else {
         close()
         reject(err)
@@ -174,6 +192,7 @@ export function createTransport(args: {
       opened = true
       args.onPeerOpen?.(id as string)
       resolve({
+        media,
         id: id as string,
         connectTo(peerId) {
           // ORDERED (#168). Without `reliable`, PeerJS opens the channel with
@@ -183,7 +202,10 @@ export function createTransport(args: {
           // table the player had taken it off. The keeper runs a player's
           // intents one by one; this makes them arrive in the order made — and
           // the keeper's own syncs back in the order sent.
-          wire(peer.connect(peerId, { reliable: true }), true)
+          dataDialPeers.add(peerId)
+          const connection = peer.connect(peerId, { reliable: true })
+          dataDials.set(peerId, connection)
+          wire(connection, true)
         },
         authenticate(peerId) {
           const generation = connections.get(peerId)

@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router'
 import { vi } from 'vitest'
 import { MAX_RECONNECT_ATTEMPTS, type UseLobby } from '~/entities/lobby'
 import { botNames } from '~/features/start-game/botNames'
+import { createFakeVoiceFacade } from '~/network/voice/testing/fakeVoiceFacade'
 import LobbyView from '../_LobbyView'
 import LobbyPage from '../[lobbyId]'
 
@@ -67,6 +68,7 @@ function base(): UseLobby {
     lobbyActionError: null,
     setMaxSpectators: vi.fn(),
     setParticipantRole: vi.fn(),
+    voice: createFakeVoiceFacade(),
     chat: { entries: [], notificationEntryIds: [], selfMemberId: null, send: vi.fn() },
     createRoom: vi.fn(),
     joinRoom: vi.fn(),
@@ -151,6 +153,7 @@ function inSession(): UseLobby {
     status: 'in-lobby',
     roomCode: 'ABC-23D',
     isHost: true,
+    voice: createFakeVoiceFacade(),
     chat: { entries: [], notificationEntryIds: [], selfMemberId: 'member-h', send: sendChat },
     state: {
       selfId: 'h',
@@ -569,6 +572,18 @@ it('shows the host the reason a quota or role change was refused', () => {
   sessionValue = { ...inSession(), lobbyActionError: 'spectators-full' }
   renderInRouter(<LobbyView />)
   expect(screen.getByRole('alert').textContent).toBe('lobbyScreen.errors.spectators-full')
+})
+
+it('shows voice above chat and joins through the session facade', () => {
+  sessionValue = inSession()
+  renderInRouter(<LobbyView />)
+  const voiceTitle = screen.getByText('lobbyScreen.voiceChat')
+  const chatTitle = screen.getByText('lobbyScreen.chat')
+  expect(
+    voiceTitle.compareDocumentPosition(chatTitle) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'voiceChat.connect' }))
+  expect(sessionValue.voice.connect).toHaveBeenCalledOnce()
 })
 
 it('keeps spectator admission adjustable below occupancy and player capacity above occupancy', () => {

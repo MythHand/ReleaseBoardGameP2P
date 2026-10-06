@@ -520,7 +520,13 @@ function TableView({
                     <SettingsField label={copy.table.codeTitle} inline>
                       {/* копирует клик по самому коду — отдельной кнопке в
                           строке настроек делать нечего */}
-                      <LobbyCode code={code} copy={copy.lobbyCode} copyOnCode showLabel={false} />
+                      <LobbyCode
+                        onCopy={room.onCopy}
+                        code={code}
+                        copy={copy.lobbyCode}
+                        copyOnCode
+                        showLabel={false}
+                      />
                     </SettingsField>
                   )}
                   {onParallaxChange && copy.table.parallax && (
