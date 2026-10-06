@@ -165,6 +165,8 @@ export interface BoardRoom {
   onKickSpectator?: (id: string) => void
   lang?: SwitchLang
   onLangChange?: (lang: SwitchLang) => void
+  parallax?: boolean
+  onParallaxChange?: (on: boolean) => void
   chatToasts?: boolean
   onChatToastsChange?: (on: boolean) => void
   paused?: boolean
@@ -239,6 +241,10 @@ export interface BoardChromeCopy {
   upgradeTakePrompt: string
   // поле паузы (опционально — рендерится только вместе с обработчиком паузы):
   // подпись поля, состояние тумблера (вкл / выкл) и строка-пояснение
+  parallax?: string
+  parallaxOn?: string
+  parallaxOff?: string
+  parallaxHint?: string
   pauseGame?: string
   pauseOn?: string
   pauseOff?: string

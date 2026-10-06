@@ -59,6 +59,7 @@ export type { Card as CardData, CardTag, Category, CategoryId } from './cards/ty
 export type { GameMode, GameModeCopy, GameModesCopy, Setup } from './game/modes'
 export { DEFAULT_SETUP, GAME_MODES } from './game/modes'
 export { NICKNAMES, randomNickname, sanitizeNickname } from './game/nicknames'
+export { MAX_SPECTATORS, spectatorLimitColor } from './game/spectatorLimit'
 export { default as GearIcon } from './icons/GearIcon'
 export type { Point } from './primitives/Arrow'
 export { centerOf, default as Arrow, useArrow } from './primitives/Arrow'

@@ -168,7 +168,6 @@
   flex: 1;
   min-block-size: 0;
   padding-inline-end: 8px;
-  overflow-y: auto;
 }
 
 .hSpectators {

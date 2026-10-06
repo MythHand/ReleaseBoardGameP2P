@@ -3,6 +3,7 @@ import {
   HudBackground,
   LangSwitcher,
   PhysicalEdition,
+  ScrollArea,
   type SwitchLang,
   Typography,
 } from '@release/ui'
@@ -46,6 +47,7 @@ export default function ScreenShell({
 }: ScreenShellProps) {
   const { t } = useTranslation()
   const compact = density === 'compact'
+  const Content = compact ? ScrollArea : 'div'
   return (
     <div className={`${styles.root} ${compact ? styles.compact : ''}`}>
       <div className={styles.bg} />
@@ -62,22 +64,24 @@ export default function ScreenShell({
         </>
       )}
 
-      <div className={styles.content}>
-        <div className={styles.col}>
-          <AppLogo className={styles.logo} />
-          <div className={styles.tags}>
-            {tags.map((tag) => (
-              <Typography key={tag} variant="tag">
-                {tag}
-              </Typography>
-            ))}
+      <Content className={styles.content}>
+        <div className={styles.contentFlow}>
+          <div className={styles.col}>
+            <AppLogo className={styles.logo} />
+            <div className={styles.tags}>
+              {tags.map((tag) => (
+                <Typography key={tag} variant="tag">
+                  {tag}
+                </Typography>
+              ))}
+            </div>
+            <Typography base={compact ? 'body' : 'body-lg'} as="p" className={styles.desc}>
+              {description}
+            </Typography>
+            {children}
           </div>
-          <Typography base={compact ? 'body' : 'body-lg'} as="p" className={styles.desc}>
-            {description}
-          </Typography>
-          {children}
         </div>
-      </div>
+      </Content>
 
       {corners}
 

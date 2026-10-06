@@ -7,6 +7,7 @@ import PlayerSlot, { EmptySlot } from '@/blocks/PlayerSlot'
 import Rules, { type RulesCopy } from '@/blocks/Rules'
 import ReleaseLogo from '@/brand/ReleaseLogo'
 import { DEFAULT_SETUP, type GameModesCopy, type Setup } from '@/game/modes'
+import { MAX_SPECTATORS, spectatorLimitColor } from '@/game/spectatorLimit'
 import Badge from '@/primitives/Badge'
 import Button from '@/primitives/Button'
 import HudBackground, { type HudBackgroundTone } from '@/primitives/HudBackground'
@@ -121,14 +122,6 @@ const MOCK_SPECTATORS: Spectator[] = [
   { id: 102, name: 'cypher' },
 ]
 
-// светофор для лимита зрителей: 0–8 зелёный, 9–18 жёлтый, 19–28 красный
-const SPEC_MAX = 28
-function specColorFor(n: number) {
-  if (n <= 8) return 'var(--mint)'
-  if (n <= 18) return 'var(--gold)'
-  return 'var(--coral)'
-}
-
 export default function Lobby({
   code = '4F2A-9K',
   onCopy,
@@ -168,7 +161,7 @@ export default function Lobby({
   const shareLink = link ?? `release.game/lobby/${code}`
   const rulesCopy = rulesBlockCopy[lang]
 
-  const specColor = specColorFor(specCapacity)
+  const specColor = spectatorLimitColor(specCapacity)
 
   const setMode = (key: string, value: string) => setSetup((s) => ({ ...s, [key]: value }))
   const me = players.find((p) => p.id === meId)
@@ -374,9 +367,9 @@ export default function Lobby({
                 label={copy.specLimit}
                 value={specCapacity}
                 min={0}
-                max={SPEC_MAX}
+                max={MAX_SPECTATORS}
                 onChange={(n) => {
-                  if (Number.isInteger(n) && n >= 0 && n <= SPEC_MAX) setSpecCapacity(n)
+                  if (Number.isInteger(n) && n >= 0 && n <= MAX_SPECTATORS) setSpecCapacity(n)
                 }}
                 color={specColor}
                 fill

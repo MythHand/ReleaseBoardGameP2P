@@ -2,8 +2,11 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { vi } from 'vitest'
 import { MAX_RECONNECT_ATTEMPTS, type UseLobby } from '~/entities/lobby'
+import { checkRoom } from '~/network/lobby/checkRoom'
 import { createFakeVoiceFacade } from '~/network/voice/testing/fakeVoiceFacade'
 import InviteScreen from '../_InviteScreen'
+
+vi.mock('~/network/lobby/checkRoom', () => ({ checkRoom: vi.fn() }))
 
 vi.mock('@release/translation', () => ({
   useTranslation: () => ({
@@ -103,6 +106,7 @@ const renderAtLobby = (code: string, nickname?: string) =>
 
 beforeEach(() => {
   navigateMock.mockClear()
+  vi.mocked(checkRoom).mockReset()
 })
 
 it('shows the form when there is no session', () => {
@@ -264,6 +268,7 @@ it('joins as a spectator and keeps the role when retrying a full room', async ()
     ...sessionValue,
     status: 'error',
     errorKind: 'room-full',
+    roomCode: 'F96-NMT',
     joinAvailability: { player: true, spectator: false },
   }
   rerender(
@@ -278,4 +283,100 @@ it('joins as a spectator and keeps the role when retrying a full room', async ()
   await waitFor(() =>
     expect(sessionValue.joinRoom).toHaveBeenLastCalledWith('F96-NMT', 'Ann', 'spectator'),
   )
+})
+
+it('switches to spectator when only spectator admission is available', () => {
+  sessionValue = {
+    ...base(),
+    roomCode: 'F96-NMT',
+    joinAvailability: { player: false, spectator: true },
+    joinRoom: vi.fn().mockResolvedValue('F96-NMT'),
+  }
+  renderAtLobby('F96-NMT', 'Ann')
+  expect(screen.getByText('invite.rolePlayer').closest('button')?.disabled).toBe(true)
+  expect(screen.getByText('invite.spectatorOnlyNote')).toBeTruthy()
+  fireEvent.click(screen.getByText('invite.joinCta'))
+  expect(sessionValue.joinRoom).toHaveBeenCalledWith('F96-NMT', 'Ann', 'spectator')
+})
+
+it('shows closed admission without allowing either role', () => {
+  sessionValue = {
+    ...base(),
+    status: 'error',
+    errorKind: 'room-full',
+    roomCode: 'F96-NMT',
+    joinAvailability: { player: false, spectator: false },
+  }
+  renderAtLobby('F96-NMT', 'Ann')
+  expect(screen.getByText('invite.rolePlayer').closest('button')?.disabled).toBe(true)
+  expect(screen.getByText('invite.roleSpectator').closest('button')?.disabled).toBe(true)
+  expect(screen.getByText('invite.noSlotsNote')).toBeTruthy()
+  expect(screen.getByText('invite.checkSlots')).toBeTruthy()
+})
+
+it('uses a newer join refusal instead of the previous successful code check', async () => {
+  sessionValue = { ...base(), joinRoom: vi.fn().mockResolvedValue('F96-NMT') }
+  vi.mocked(checkRoom).mockResolvedValue({ player: false, spectator: true })
+  const { rerender } = renderAtLobby('F96-NMT', 'Ann')
+  fireEvent.click(screen.getByRole('button', { name: 'invite.checkCode' }))
+  await screen.findByText('invite.spectatorOnlyNote')
+  fireEvent.click(screen.getByText('invite.joinCta'))
+  await waitFor(() =>
+    expect(sessionValue.joinRoom).toHaveBeenCalledWith('F96-NMT', 'Ann', 'spectator'),
+  )
+  sessionValue = {
+    ...sessionValue,
+    status: 'error',
+    errorKind: 'room-full',
+    roomCode: 'F96-NMT',
+    joinAvailability: { player: false, spectator: false },
+  }
+  rerender(
+    <MemoryRouter initialEntries={['/lobby/F96-NMT']}>
+      <Routes>
+        <Route path="/lobby/:lobbyId" element={<InviteScreen />} />
+      </Routes>
+    </MemoryRouter>,
+  )
+  expect(screen.getByText('invite.noSlotsNote')).toBeTruthy()
+  expect(screen.getByText('invite.checkSlots')).toBeTruthy()
+  expect(screen.getByText('invite.roleSpectator').closest('button')?.disabled).toBe(true)
+})
+
+it('applies the refusal for an edited code before the invitation route changes', async () => {
+  sessionValue = { ...base(), joinRoom: vi.fn().mockResolvedValue('BBB-234') }
+  const { rerender } = renderAtLobby('AAA-234', 'Ann')
+  fireEvent.change(screen.getByLabelText('invite.codeLabel'), { target: { value: 'bbb 234' } })
+  fireEvent.click(screen.getByText('invite.joinCta'))
+  await waitFor(() =>
+    expect(sessionValue.joinRoom).toHaveBeenCalledWith('bbb 234', 'Ann', 'player'),
+  )
+  sessionValue = {
+    ...sessionValue,
+    status: 'error',
+    errorKind: 'room-full',
+    roomCode: 'BBB-234',
+    joinAvailability: { player: false, spectator: false },
+  }
+  rerender(
+    <MemoryRouter initialEntries={['/lobby/AAA-234']}>
+      <Routes>
+        <Route path="/lobby/:lobbyId" element={<InviteScreen />} />
+      </Routes>
+    </MemoryRouter>,
+  )
+  expect(screen.getByText('invite.noSlotsNote')).toBeTruthy()
+  expect(screen.getByText('invite.checkSlots')).toBeTruthy()
+})
+
+it('does not apply a previous room refusal to a different invitation', () => {
+  sessionValue = {
+    ...base(),
+    roomCode: 'AAA-234',
+    joinAvailability: { player: false, spectator: false },
+  }
+  renderAtLobby('BBB-234', 'Ann')
+  expect(screen.getByText('invite.rolePlayer').closest('button')?.disabled).toBe(false)
+  expect(screen.getByText('invite.roleSpectator').closest('button')?.disabled).toBe(false)
+  expect(screen.queryByText('invite.noSlotsNote')).toBeNull()
 })

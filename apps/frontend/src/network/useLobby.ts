@@ -32,7 +32,11 @@ import {
 } from '~/shared/lib/persistence'
 import { normalizeChatText } from './chat/journal'
 import { type RoomChatState, useChatSession } from './chat/useChatSession'
-import { parseJoinRequestPayload, resolveJoinAdmission } from './lobby/admission'
+import {
+  getJoinAvailability,
+  parseJoinRequestPayload,
+  resolveJoinAdmission,
+} from './lobby/admission'
 import {
   canStart as canStartFn,
   disbandLobby as disbandLobbyFn,
@@ -964,6 +968,16 @@ export function useLobby(): UseLobby {
       if (!current) return
       if (voiceRuntime.handleMessage(msg)) return
       if (isHostRef.current) {
+        // A code check is read-only: it grants no membership or private sync.
+        if (msg.type === 'ROOM_CHECK') {
+          transportRef.current?.send(msg.from, {
+            type: 'ROOM_AVAILABILITY',
+            payload: getJoinAvailability(current, msg.from, {
+              matchRunning: Boolean(gameIdRef.current),
+            }),
+          })
+          return
+        }
         if (msg.type === 'JOIN_REQUEST') {
           const liveGameId = gameIdRef.current
           const payload = parseJoinRequestPayload((msg as { payload?: unknown }).payload)
@@ -1546,8 +1560,7 @@ export function useLobby(): UseLobby {
         owner = t
         // Torn down mid-await (Cancel/Home bumped the epoch and reset to idle):
         // discard the freshly-opened peer instead of committing it, or the
-        // cancelled attempt resurrects — leaking a live peer and re-arming the
-        // /start "continue game" button for a session the user just left.
+        // cancelled attempt resurrects and leaks a live peer after the user left.
         if (sessionEpochRef.current !== epoch || transportGenerationRef.current !== generation) {
           t.close()
           throw new Error('join cancelled')

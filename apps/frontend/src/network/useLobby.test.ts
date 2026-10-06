@@ -2154,8 +2154,7 @@ it('cannot let a pending snapshot land after the room is left', async () => {
       vi.advanceTimersByTime(1000)
     })
 
-    // A trailing write firing after clearKeeper() would put the abandoned match
-    // straight back — and /start would offer to resume it.
+    // A trailing write after clearKeeper() must not restore the abandoned snapshot.
     expect(sessionStorage.getItem(KEEPER_KEY)).toBeNull()
   } finally {
     vi.useRealTimers()
@@ -4939,4 +4938,21 @@ it('delivers repeated keeper refusals through the session to useGame without log
   } finally {
     game.unmount()
   }
+})
+
+it('answers availability checks without admitting or announcing the visitor', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => result.current.createRoom('Ann', 4))
+  const state = result.current.state
+  const entries = result.current.chat.entries
+  transports[0].broadcast.mockClear()
+  act(() => transports[0].onMessage?.({ type: 'ROOM_CHECK', payload: {}, from: 'visitor', seq: 1 }))
+  expect(transports[0].send).toHaveBeenCalledWith('visitor', {
+    type: 'ROOM_AVAILABILITY',
+    payload: { player: true, spectator: true },
+  })
+  expect(result.current.state).toBe(state)
+  expect(result.current.chat.entries).toBe(entries)
+  expect(transports[0].authenticate).not.toHaveBeenCalled()
+  expect(transports[0].broadcast).not.toHaveBeenCalled()
 })

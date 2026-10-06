@@ -1,15 +1,8 @@
+import { MAX_SPECTATORS, spectatorLimitColor } from '@release/ui'
 import { useState } from 'react'
 import Slider from '@/primitives/Slider'
 import { useLang } from '../../Playground/lang'
 import { KitPage, KitSection } from './KitShell'
-
-const SPEC_MAX = 28
-// traffic light: 0–8 green, 9–18 yellow, 19–28 red
-function specColorFor(n: number) {
-  if (n <= 8) return '#8fd9b0'
-  if (n <= 18) return '#e3b341'
-  return '#ff6b81'
-}
 
 const COPY = {
   ru: {
@@ -47,9 +40,9 @@ export default function SlidersKit() {
             label={t.limit}
             value={spec}
             min={0}
-            max={SPEC_MAX}
+            max={MAX_SPECTATORS}
             onChange={setSpec}
-            color={specColorFor(spec)}
+            color={spectatorLimitColor(spec)}
             fill
           />
         </div>

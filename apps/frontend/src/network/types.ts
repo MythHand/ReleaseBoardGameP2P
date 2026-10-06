@@ -68,6 +68,8 @@ export interface Seat {
 export type Message =
   | VoiceMessage
   // --- Lobby ---
+  | { type: 'ROOM_CHECK'; payload: Record<string, never> }
+  | { type: 'ROOM_AVAILABILITY'; payload: JoinAvailability }
   | { type: 'JOIN_REQUEST'; payload: JoinRequestPayload }
   | { type: 'JOIN_REJECTED'; payload: { reason: 'room-full'; availability: JoinAvailability } }
   | { type: 'PEER_LIST'; payload: { peers: PeerInfo[]; yourRole: Role } }

@@ -7,9 +7,3 @@
   inline-size: 300px;
   margin-inline-start: -11px;
 }
-
-/* reserved continue-session slot, hidden without a session */
-.hiddenSlot {
-  visibility: hidden;
-  pointer-events: none;
-}

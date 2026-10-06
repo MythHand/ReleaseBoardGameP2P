@@ -5,6 +5,7 @@ import LangSwitcher from '@/blocks/LangSwitcher'
 import LobbyCode from '@/blocks/LobbyCode'
 import Rules from '@/blocks/Rules'
 import { CardMotionProvider } from '@/cards/cardMotion'
+import { MAX_SPECTATORS, spectatorLimitColor } from '@/game/spectatorLimit'
 import GearIcon from '@/icons/GearIcon'
 import HeadphonesIcon from '@/icons/HeadphonesIcon'
 import Arrow, { centerOf, useArrow } from '@/primitives/Arrow'
@@ -35,15 +36,6 @@ import { PILE_WIDTH } from './piles'
 import styles from './Table.module.css'
 import type { Panel, TableProps } from './types'
 import { useTableInteractions } from './useTableInteractions'
-
-// светофор для лимита зрителей (зеркало палитры из экрана Lobby):
-// 0–8 зелёный, 9–18 жёлтый, 19–28 красный
-const SPEC_MAX = 28
-function specColorFor(n: number) {
-  if (n <= 8) return 'var(--mint)'
-  if (n <= 18) return 'var(--gold)'
-  return 'var(--coral)'
-}
 
 // Ширина выезжающей панели зависит от типа контента вкладки.
 const DRAWER_WIDTH: Record<Panel, number> = {
@@ -580,9 +572,9 @@ function TableView({
                         <Slider
                           value={spectatorLimit ?? 0}
                           min={0}
-                          max={SPEC_MAX}
+                          max={MAX_SPECTATORS}
                           onChange={(n) => onSpectatorLimitChange?.(n)}
-                          color={specColorFor(spectatorLimit ?? 0)}
+                          color={spectatorLimitColor(spectatorLimit ?? 0)}
                           fill
                           className={styles.sliderFull}
                         />
