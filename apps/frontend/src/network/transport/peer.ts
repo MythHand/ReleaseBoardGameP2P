@@ -66,6 +66,7 @@ function peerOptions() {
 
 export function createTransport(args: {
   peerId?: string
+  signal?: AbortSignal
   onMessage: (msg: WireMessage) => void
   onPeerOpen?: (id: string) => void
   onConnection?: (peerId: string) => void
@@ -76,6 +77,10 @@ export function createTransport(args: {
   onError?: (err: { type?: string; message: string }) => void
 }): Promise<Transport> {
   return new Promise((resolve, reject) => {
+    if (args.signal?.aborted) {
+      reject(new DOMException('Request aborted', 'AbortError'))
+      return
+    }
     const peer = args.peerId
       ? new Peer(args.peerId, peerOptions())
       : new Peer(undefined as never, peerOptions())
@@ -86,10 +91,27 @@ export function createTransport(args: {
     }
     const connections = new Map<string, ConnectionGeneration>()
     let opened = false
+    let closed = false
+    const close = () => {
+      if (closed) return
+      closed = true
+      args.signal?.removeEventListener('abort', abort)
+      peer.destroy()
+    }
+    const abort = () => {
+      close()
+      if (!opened) reject(new DOMException('Request aborted', 'AbortError'))
+    }
+    args.signal?.addEventListener('abort', abort, { once: true })
 
     const wire = (conn: DataConnection, authenticated = false) => {
+      if (closed) {
+        conn.close()
+        return
+      }
       const generation: ConnectionGeneration = { connection: conn, authenticated, retired: false }
       conn.on('open', () => {
+        if (closed) return
         const previous = connections.get(conn.peer)
         if (previous?.connection === conn) return
         connections.set(conn.peer, generation)
@@ -101,10 +123,15 @@ export function createTransport(args: {
         args.onConnection?.(conn.peer)
       })
       conn.on('data', (data) => {
-        if (connections.get(conn.peer) !== generation) return
+        if (closed || connections.get(conn.peer) !== generation) return
         try {
           const frame = parseEnvelope(typeof data === 'string' ? data : JSON.stringify(data))
-          if (!generation.authenticated && frame.type !== 'JOIN_REQUEST') return
+          if (
+            !generation.authenticated &&
+            frame.type !== 'JOIN_REQUEST' &&
+            frame.type !== 'ROOM_CHECK'
+          )
+            return
           // `from` is overwritten with the connection it arrived on, never read
           // from the payload: the sender wrote that field and could write any
           // peer id into it, and the keeper resolves a seat from it. The
@@ -117,13 +144,13 @@ export function createTransport(args: {
         }
       })
       conn.on('close', () => {
-        if (connections.get(conn.peer) !== generation) return
+        if (closed || connections.get(conn.peer) !== generation) return
         generation.retired = true
         connections.delete(conn.peer)
         args.onDisconnect?.(conn.peer)
       })
       conn.on('error', (e) => {
-        if (generation.retired) return
+        if (closed || generation.retired) return
         const active = connections.get(conn.peer)
         if (active && active !== generation) return
         args.onError?.({ type: 'connection', message: (e as Error)?.message ?? String(e) })
@@ -132,13 +159,18 @@ export function createTransport(args: {
 
     peer.on('connection', wire)
     peer.on('error', (err) => {
+      if (closed) return
       const e = err as { type?: string; message: string }
       // Before the peer opens, an error means setup failed — reject the promise.
       // After it opens, surface the error instead of discarding it silently.
       if (opened) args.onError?.({ type: e.type, message: e.message })
-      else reject(err)
+      else {
+        close()
+        reject(err)
+      }
     })
     peer.on('open', (id) => {
+      if (closed) return
       opened = true
       args.onPeerOpen?.(id as string)
       resolve({
@@ -195,9 +227,7 @@ export function createTransport(args: {
         connectedIds() {
           return [...connections.keys()]
         },
-        close() {
-          peer.destroy()
-        },
+        close,
       })
     })
   })

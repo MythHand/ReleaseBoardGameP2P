@@ -33,6 +33,7 @@ const connectOptions = new Map<string, unknown>()
 // The most recently constructed peer, so a test can play the broker and push
 // an inbound connection at the transport.
 let lastPeer: FakePeer | null = null
+let openImmediately = true
 
 class FakePeer {
   id: string
@@ -44,7 +45,7 @@ class FakePeer {
   on(event: string, cb: (arg: unknown) => void) {
     if (!this.handlers[event]) this.handlers[event] = []
     this.handlers[event].push(cb)
-    if (event === 'open') cb(this.id)
+    if (event === 'open' && openImmediately) cb(this.id)
   }
   emit(event: string, arg?: unknown) {
     for (const cb of this.handlers[event] ?? []) cb(arg)
@@ -70,6 +71,7 @@ afterEach(() => {
   outboundConns.clear()
   connectOptions.clear()
   lastPeer = null
+  openImmediately = true
 })
 
 it('resolves with an id when the peer opens', async () => {
@@ -318,4 +320,64 @@ it('closes once even when the final send fails', async () => {
   connection.emit('close')
   expect(close).toHaveBeenCalledTimes(1)
   expect(disconnected).toHaveBeenCalledTimes(1)
+})
+
+it('permits an unauthenticated availability check without permitting broadcasts', async () => {
+  const received: WireMessage[] = []
+  const transport = await createTransport({ onMessage: (message) => received.push(message) })
+  const connection = new FakeConn('visitor')
+  lastPeer?.emit('connection', connection)
+  connection.emit('open')
+  connection.emit(
+    'data',
+    JSON.stringify({ type: 'ROOM_CHECK', payload: {}, from: 'visitor', seq: 1 }),
+  )
+  expect(received.map((message) => message.type)).toEqual(['ROOM_CHECK'])
+  transport.broadcast({ type: 'PLAYER_READY', payload: {} })
+  expect(connection.sent).toEqual([])
+})
+
+it('destroys a temporary peer when its request is aborted', async () => {
+  const destroy = vi.spyOn(FakePeer.prototype, 'destroy')
+  const controller = new AbortController()
+  await createTransport({ onMessage: () => {}, signal: controller.signal })
+  controller.abort()
+  expect(destroy).toHaveBeenCalledOnce()
+  destroy.mockRestore()
+})
+
+it('ignores queued data after an aborted temporary transport is destroyed', async () => {
+  const received: WireMessage[] = []
+  const controller = new AbortController()
+  const transport = await createTransport({
+    signal: controller.signal,
+    onMessage: (message) => received.push(message),
+  })
+  const connection = new FakeConn('host')
+  lastPeer?.emit('connection', connection)
+  connection.emit('open')
+  transport.authenticate('host')
+  controller.abort()
+  connection.emit(
+    'data',
+    JSON.stringify({
+      type: 'ROOM_AVAILABILITY',
+      payload: { player: true, spectator: true },
+      from: 'host',
+      seq: 1,
+    }),
+  )
+  expect(received).toEqual([])
+})
+
+it('aborts before signaling opens and ignores a late open event', async () => {
+  openImmediately = false
+  const controller = new AbortController()
+  const onPeerOpen = vi.fn()
+  const pending = createTransport({ signal: controller.signal, onMessage: () => {}, onPeerOpen })
+  const rejection = expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+  controller.abort()
+  await rejection
+  lastPeer?.emit('open', 'visitor')
+  expect(onPeerOpen).not.toHaveBeenCalled()
 })

@@ -1,13 +1,15 @@
 import { useTranslation } from '@release/translation'
 import { Button, randomNickname, Spinner, sanitizeNickname, Typography } from '@release/ui'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation, useParams } from 'react-router'
 import DiceIcon from '@/icons/DiceIcon'
+import RefreshIcon from '@/icons/RefreshIcon'
 import { useGoToLobby } from '~/app/lib/lobbyNavigation'
 import { useSession } from '~/app/providers/SessionProvider'
 import { useNavigate } from '~/app/router'
-import type { JoinRole } from '~/entities/lobby'
+import { type JoinRole, parseRoomCode } from '~/entities/lobby'
 import { useJoinLobby } from '~/features/join-lobby/useJoinLobby'
+import { useRoomAvailability } from '~/features/join-lobby/useRoomAvailability'
 import Form, { FormField } from '~/shared/ui/Form'
 import ScreenShell from '~/shared/ui/ScreenShell'
 import styles from './_InviteScreen.module.css'
@@ -30,6 +32,18 @@ export default function InviteScreen() {
   const [name, setName] = useState((location.state as { nickname?: string } | null)?.nickname ?? '')
 
   const [role, setRole] = useState<JoinRole>('player')
+  const [code, setCode] = useState(lobbyId ?? '')
+  useEffect(() => setCode(lobbyId ?? ''), [lobbyId])
+  const roomCheck = useRoomAvailability(code)
+  const availability =
+    roomCheck.availability ??
+    (session.roomCode && parseRoomCode(code) === parseRoomCode(session.roomCode)
+      ? session.joinAvailability
+      : null)
+  const spectatorOnly = availability?.player === false && availability.spectator
+  const noSlots = availability?.player === false && availability.spectator === false
+  const effectiveRole: JoinRole = spectatorOnly ? 'spectator' : role
+  const canJoin = name.trim().length > 0 && code.trim().length > 0
 
   // Connected, but the host's PEER_LIST hasn't landed yet: joinRoom seeds
   // `peers` with only the joiner, and applyPeerList swaps in the full roster
@@ -56,9 +70,9 @@ export default function InviteScreen() {
 
   return (
     <ScreenShell
-      tags={[t('start.tagOpenP2P'), t('start.tagBoardCard')]}
-      description={t('start.description')}
-      // the form is 513px tall — the hero rhythm would push its CTA below the fold
+      tags={[t('start.tagOpenP2P'), t('invite.tagBoardCard')]}
+      description={t('invite.description')}
+      // The compact rhythm keeps the invitation action within the scrollable column.
       density="compact"
       lang={lang}
       onLangChange={(next) => i18n.changeLanguage(next)}
@@ -69,12 +83,18 @@ export default function InviteScreen() {
         onSubmit={async (data) => {
           if (busy) return
           const nickname = sanitizeNickname(data.name ?? '').trim()
-          const code = data.code ?? ''
-          if (!nickname || !code.trim()) return
+          const submittedCode = data.code ?? ''
+          if (noSlots) {
+            await roomCheck.check()
+            return
+          }
+          if (!nickname || !submittedCode.trim()) return
+          // The real admission response must supersede this earlier capacity probe.
+          roomCheck.reset()
           try {
             // A setup failure rejects here and surfaces through
             // session.error/errorKind, so only navigate on success.
-            const formatted = await joinLobby(code, nickname, role)
+            const formatted = await joinLobby(submittedCode, nickname, effectiveRole)
             goToLobby(formatted)
           } catch {
             // Already surfaced as failed / notFound; stay on the screen.
@@ -86,6 +106,47 @@ export default function InviteScreen() {
         </Typography>
 
         <div className={styles.fields}>
+          <div className={styles.fieldWrap}>
+            <FormField
+              name="code"
+              label={t('invite.codeLabel')}
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              required
+              error=""
+              disabled={busy}
+              trailing={
+                <Button
+                  variant="icon"
+                  onClick={() => roomCheck.check()}
+                  aria-label={t('invite.checkCode')}
+                  title={t('invite.checkCode')}
+                  disabled={busy}
+                >
+                  <RefreshIcon />
+                </Button>
+              }
+            />
+            <div className={styles.codeStatus} data-state={roomCheck.codeState}>
+              {roomCheck.codeState === 'checking' && (
+                <>
+                  <Typography as="span" base="mono-xs">
+                    {t('invite.codeChecking')}
+                  </Typography>
+                  <span className={styles.dots} aria-hidden="true">
+                    <i />
+                    <i />
+                    <i />
+                  </span>
+                </>
+              )}
+              {roomCheck.codeState === 'error' && (
+                <Typography as="span" base="mono-xs">
+                  {t('invite.codeError')}
+                </Typography>
+              )}
+            </div>
+          </div>
           <div className={styles.role}>
             <Typography base="label-sm" tk="tk-16" as="span" className={styles.roleLabel}>
               {t('invite.roleTitle')}
@@ -93,10 +154,10 @@ export default function InviteScreen() {
             <div className={styles.roleOptions}>
               <button
                 type="button"
-                disabled={busy}
-                aria-pressed={role === 'player'}
+                disabled={busy || availability?.player === false}
+                aria-pressed={effectiveRole === 'player'}
                 onClick={() => setRole('player')}
-                className={`${styles.roleOpt} ${role === 'player' ? styles.roleOptOn : ''}`}
+                className={`${styles.roleOpt} ${!noSlots && effectiveRole === 'player' ? styles.roleOptOn : ''}`}
               >
                 <Typography base="label-md" tk="tk-12">
                   {t('invite.rolePlayer')}
@@ -104,22 +165,28 @@ export default function InviteScreen() {
               </button>
               <button
                 type="button"
-                disabled={busy}
-                aria-pressed={role === 'spectator'}
+                disabled={busy || availability?.spectator === false}
+                aria-pressed={effectiveRole === 'spectator'}
                 onClick={() => setRole('spectator')}
-                className={`${styles.roleOpt} ${role === 'spectator' ? styles.roleOptOn : ''}`}
+                className={`${styles.roleOpt} ${!noSlots && effectiveRole === 'spectator' ? styles.roleOptOn : ''}`}
               >
                 <Typography base="label-md" tk="tk-12">
                   {t('invite.roleSpectator')}
                 </Typography>
               </button>
             </div>
+            {(spectatorOnly || noSlots) && (
+              <Typography as="span" base="mono-xs" className={styles.note}>
+                {noSlots ? t('invite.noSlotsNote') : t('invite.spectatorOnlyNote')}
+              </Typography>
+            )}
           </div>
 
           <FormField
             name="name"
             label={t('invite.nicknameLabel')}
             placeholder={t('invite.nicknamePlaceholder')}
+            error=""
             maxLength={20}
             required
             plain
@@ -136,18 +203,6 @@ export default function InviteScreen() {
                 <DiceIcon />
               </Button>
             }
-          />
-          <FormField
-            // key on lobbyId so following a second invite link (client-side
-            // nav swaps :lobbyId without remounting this screen) remounts the
-            // field and re-seeds defaultValue — an uncontrolled field keeps its
-            // first mount's value otherwise and would submit the stale code.
-            key={lobbyId ?? ''}
-            name="code"
-            label={t('invite.codeLabel')}
-            defaultValue={lobbyId ?? ''}
-            required
-            disabled={busy}
           />
         </div>
 
@@ -174,7 +229,13 @@ export default function InviteScreen() {
               </Typography>
             ) : (
               // Retry is the same submit — only the label changes.
-              <Button type="submit">{status ? t('invite.retry') : t('invite.joinCta')}</Button>
+              <Button type="submit" className={canJoin ? undefined : styles.joinIdle}>
+                {noSlots
+                  ? t('invite.checkSlots')
+                  : status
+                    ? t('invite.retry')
+                    : t('invite.joinCta')}
+              </Button>
             )}
           </div>
         </div>
