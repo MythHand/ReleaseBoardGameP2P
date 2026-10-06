@@ -1,10 +1,10 @@
 import { deriveDock, isCounting } from './dock'
 import type { TablePending, TableWindow } from './intents'
-import type { TableState } from './types'
+import type { PlayerTableState } from './types'
 
-// `base` covers every TableState field except `turn` / `hasDrawn`, which each
+// `base` covers every PlayerTableState field except `turn` / `hasDrawn`, which each
 // test sets explicitly — that's the axis under test.
-const base: Omit<TableState, 'turn' | 'hasDrawn'> = {
+const base: Omit<PlayerTableState, 'turn' | 'hasDrawn'> = {
   you: { name: 'you', hand: [], release: {} },
   opponents: [{ id: 'p2', name: 'kernel_panic', handCount: 5, release: {} }],
   decks: { main: [40], events: 12, discardCount: 0 },
@@ -169,7 +169,7 @@ it('leaves an eliminated seat out of the dots, so a full row means the window is
   // The row fills exactly as the window runs out — the engine closes it early
   // when every LIVING responder has passed, so a dead seat must not hold a dot
   // that can never light.
-  const state: TableState = {
+  const state: PlayerTableState = {
     ...base,
     turn: 'you',
     hasDrawn: true,
@@ -207,8 +207,10 @@ it('tells the attack phase that this seat has already passed', () => {
 // dots and no PASS for anyone. Its attacker keeps the attack's phase with no
 // key; everyone else, the release's owner included, waits on the attacker.
 describe('while an attack is out at the centre', () => {
-  const card = { id: 'attack-bug' } as unknown as NonNullable<TableState['shown']>[number]['card']
-  const opponents: TableState['opponents'] = [
+  const card = { id: 'attack-bug' } as unknown as NonNullable<
+    PlayerTableState['shown']
+  >[number]['card']
+  const opponents: PlayerTableState['opponents'] = [
     ...base.opponents,
     { id: 'p3', name: 'segfault', handCount: 3, release: {} },
   ]
@@ -216,7 +218,7 @@ describe('while an attack is out at the centre', () => {
   it('shows its attacker the attack with their own name, no key and the clock', () => {
     const window: TableWindow = { ...windowOnYou, player: 'p2', passed: [] }
     const shown = [{ player: 'you', uid: 'a', card }]
-    const state: TableState = { ...base, opponents, turn: 'p2', window, shown }
+    const state: PlayerTableState = { ...base, opponents, turn: 'p2', window, shown }
     const d = deriveDock(state, 'you', 6_000)
     expect(d.state).toBe('attacking')
     expect(d.activePlayer).toBe('you')
@@ -228,7 +230,7 @@ describe('while an attack is out at the centre', () => {
   it('shows another opponent the attacker’s turn, with no clock of theirs', () => {
     const window: TableWindow = { ...windowOnYou, player: 'p2', passed: [] }
     const shown = [{ player: 'p3', uid: 'a', card }]
-    const state: TableState = { ...base, opponents, turn: 'p2', window, shown }
+    const state: PlayerTableState = { ...base, opponents, turn: 'p2', window, shown }
     const d = deriveDock(state, 'you', 6_000)
     expect(d.state).toBe('waiting')
     expect(d.activePlayer).toBe('segfault')
@@ -238,7 +240,7 @@ describe('while an attack is out at the centre', () => {
 
   it('shows the release’s owner the attacker’s turn', () => {
     const shown = [{ player: 'p2', uid: 'a', card }]
-    const state: TableState = {
+    const state: PlayerTableState = {
       ...base,
       opponents,
       turn: 'you',
@@ -255,7 +257,7 @@ describe('while an attack is out at the centre', () => {
 
 it('keeps an eliminated viewer at `waiting` even while a window runs', () => {
   const window: TableWindow = { ...windowOnYou, player: 'p2' }
-  const state: TableState = {
+  const state: PlayerTableState = {
     ...base,
     you: { ...base.you, eliminated: true },
     turn: 'p2',

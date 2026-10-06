@@ -31,7 +31,7 @@ import { useUpgradeBeat } from './upgradeBeat'
 // A board a beat starts from or publishes, as the stand's recorder writes it
 // down (#168): the hand, what is out at the centre, what is pending.
 const glance = (b: BoardState) => ({
-  hand: b.you.hand.map((c) => `${c.card.name} ${c.uid}`),
+  hand: b.you?.hand.map((c) => `${c.card.name} ${c.uid}`) ?? [],
   shown: (b.shown ?? []).map((s) => `${s.player}:${s.card.name}`),
   pending: b.pending?.kind ?? null,
   centreAttack: b.centreAttack?.card ?? null,
@@ -645,6 +645,7 @@ export function useBeats(args: {
   // it has to fly from is on the previous one, which is what is still on
   // screen (I1).
   const settled = useRef(live)
+  const openingCaptured = useRef(false)
 
   // A new match: the feed starts over, so the watermark, the base and the queue
   // must too. Declared BEFORE the arm effect, and the order is load-bearing:
@@ -665,6 +666,7 @@ export function useBeats(args: {
     playing.current = key
     seen.current = 0
     settled.current = live
+    openingCaptured.current = false
     queue.current = []
     // A new match cancels what is in the air. The wipe just above takes the
     // RECORD of the work still queued — it does nothing for a beat already
@@ -762,17 +764,15 @@ export function useBeats(args: {
     // restored as of THIS render.
     if ((restoredThrough ?? 0) > seen.current) seen.current = restoredThrough ?? 0
 
-    // FIRST, before the running-beat guard: nothing here is to be animated, so
-    // the watermark keeps pace with the feed and `settled` with the projection.
-    // Order matters — the opening is an exclusive beat that occupies the queue
-    // for its whole run, so a guard placed above this would freeze both for the
-    // length of the opening, and the moment it drained the board would plan the
-    // entire accumulated feed against a pre-game table. That is exactly what
-    // this branch exists to prevent, and the start gate's cap makes it reachable
-    // rather than theoretical: a slow peer is released while still watching.
+    // Consume only the initial snapshot: those events belong to the deal.
+    // Later events must wait behind it, including when players skip ahead or
+    // the gate's timeout opens the match while a spectator is still watching.
     if (!enabled) {
-      seen.current = events.at(-1)?.id ?? seen.current
-      settled.current = live
+      if (!openingCaptured.current) {
+        openingCaptured.current = true
+        seen.current = Math.max(seen.current, events.at(-1)?.id ?? 0)
+        settled.current = live
+      }
       return
     }
     // A beat is up: the board is its shadow, and a batch arriving now waits its

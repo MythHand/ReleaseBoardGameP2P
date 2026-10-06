@@ -2298,6 +2298,16 @@ on rematch or a newer hand projection. The payment regressions now use pulls.
 падает на старом коде и проходит на новом. Тесты #193 шли с reduced motion и потому эту причину
 не видели.
 
+### 2026-09-29 — публичный просмотр партии (#58)
+
+Добавлена отдельная nullable identity наблюдателя в Board и Table. Старое
+предположение, что зрителю не приходит projection, больше не действует:
+keeper отдаёт публичный snapshot и события. Ранее описанные player paths
+сохраняются; публичные раздача, полёты и pending используют те же модули.
+Поздний вход и resync пропускают историю через `restoredThrough`.
+Эталоны 2–6 мест: TableStory, TableChatStory; результаты: StatsChatStory.
+Решение о хлопушках только для победителя остаётся действующим.
+
 ## 2026-10-04 — #168: найдено при отладке на стенде, не в этом PR
 
 ### При открытии AI-карты триггер и релиз меняются слоями — открыто
@@ -2349,3 +2359,12 @@ on rematch or a newer hand projection. The payment regressions now use pulls.
 **Что закроет.** Слои вуали, веера, TurnDock и мест соперников как одно решение вместе с полётами в
 них. Владелец 04.10: не в #168.
 **Статус.** `открыто`.
+
+
+### Spectator layout - owner clarification 2026-10-05
+
+[PR #214 comment](https://github.com/MythHand/ReleaseBoardGameP2P/pull/214#issuecomment-5998127154)
+supersedes the earlier rows of three: 2-5 seats share the upper row; six seats split three
+above and three in the vacant hand area. Four/five seats adapt their real card dimensions
+to the available row width. Flight anchors measure those dimensions without CSS scaling.
+With six seats, the piles occupy the gap between rows.

@@ -400,7 +400,7 @@ export function useAiBeat(
           const slot = plan.tail.slot as ZoneSlot
           const mine = plan.player === beat.base.selfId
           const uid =
-            mine && beat.after?.you.releaseEvent?.[slot] === plan.eventCard
+            mine && beat.after?.you?.releaseEvent?.[slot] === plan.eventCard
               ? beat.after.you.releaseUid?.[slot]
               : undefined
           setDown(

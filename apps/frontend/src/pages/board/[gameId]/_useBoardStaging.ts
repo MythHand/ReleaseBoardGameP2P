@@ -501,13 +501,13 @@ export function useBoardStaging({
     costCarrier.drop('cost')
   }, [costCarrier.drop])
   useLayoutEffect(() => {
-    if (!costGone || state.you.hand.some((card) => card.uid === costGone)) return
+    if (!costGone || (state.you?.hand ?? EMPTY_HAND).some((card) => card.uid === costGone)) return
     if (paying) resetCostPayment()
     else {
       costPayment.current = null
       setCostGone(null)
     }
-  }, [costGone, paying, state.you.hand, resetCostPayment])
+  }, [costGone, paying, state.you?.hand, resetCostPayment])
 
   // WHAT IS NOT IN THE FAN RIGHT NOW — the staged halves, and the release held
   // at the centre while its cost is owed. Exported rather than kept private,
@@ -558,8 +558,11 @@ export function useBoardStaging({
   )
 
   const handItems = useMemo(
-    () => (handOut.size === 0 ? state.you.hand : state.you.hand.filter((c) => !handOut.has(c.uid))),
-    [state.you.hand, handOut],
+    () =>
+      handOut.size === 0
+        ? (state.you?.hand ?? EMPTY_HAND)
+        : (state.you?.hand ?? EMPTY_HAND).filter((c) => !handOut.has(c.uid)),
+    [state.you?.hand, handOut],
   )
 
   // THE ARROW LEAVES THE CARD THAT IS ASKING, not the middle of the table. The
@@ -738,7 +741,7 @@ export function useBoardStaging({
       // the stage slot. It is still in `you.hand` — the engine never took it
       // out (only `placeRelease` filters the hand, and that runs after the
       // cost is paid) — so it is found there by the uid the pending names.
-      const held = state.you.hand.find((c) => c.uid === cost.release)
+      const held = (state.you?.hand ?? EMPTY_HAND).find((c) => c.uid === cost.release)
       const from = anchors.stage.current?.getBoundingClientRect()
       if (!reduced && from && held) {
         // `state.pending` is a network round trip away from clearing —
@@ -824,7 +827,7 @@ export function useBoardStaging({
     anchors.stage,
     arrowCtl.stop,
     cost,
-    state.you.hand,
+    state.you?.hand,
     state.shown,
     state.selfId,
     actions,
@@ -1114,8 +1117,8 @@ export function useBoardStaging({
     (uid: string, drop: HandPlayDrop): boolean => {
       trace('input', { pull: uid, enabled, holding: stagedRef.current?.phase ?? null })
       if (!enabled || stagedRef.current) return false
-      const index = state.you.hand.findIndex((c) => c.uid === uid)
-      const item = state.you.hand[index]
+      const index = (state.you?.hand ?? EMPTY_HAND).findIndex((c) => c.uid === uid)
+      const item = (state.you?.hand ?? EMPTY_HAND)[index]
       if (!item) return false
       const hasTarget = (state.targets?.[uid] ?? []).length > 0
       const partners = state.comboOptions?.[uid] ?? []
@@ -1158,7 +1161,7 @@ export function useBoardStaging({
     },
     [
       enabled,
-      state.you.hand,
+      state.you?.hand,
       state.targets,
       state.comboOptions,
       state.playable,
@@ -1305,7 +1308,7 @@ export function useBoardStaging({
       const cRect = anchors.centre.current?.getBoundingClientRect()
       if (!cRect) return true
       arrowCtl.stop() // the choice is made — nothing is pointed at while the pair folds
-      const mainIndex = state.you.hand.findIndex((c) => c.uid === item.uid)
+      const mainIndex = (state.you?.hand ?? EMPTY_HAND).findIndex((c) => c.uid === item.uid)
       const main: StagedCard = { uid: item.uid, card: item.card, index: mainIndex }
       // HOW THE TWO STAND IS THE SITUATION'S, not one rule for both yellows. A
       // Code Review RIDES the release it pays for: they lie one on the other, as
@@ -1492,7 +1495,7 @@ export function useBoardStaging({
       state.window,
       state.targets,
       state.playable,
-      state.you.hand,
+      state.you?.hand,
       reduced,
       slotBox,
       arrowCtl.stop,
@@ -1559,8 +1562,8 @@ export function useBoardStaging({
       pending.source === s.main.card.id &&
       ('actor' in pending ? pending.actor : pending.player) === state.selfId
     if (adoptedByABeat) return
-    if (!state.you.hand.some((c) => c.uid === s.main?.uid)) commitStaged(null)
-  }, [state.you.hand, state.pending, state.selfId, reduced])
+    if (!(state.you?.hand ?? EMPTY_HAND).some((c) => c.uid === s.main?.uid)) commitStaged(null)
+  }, [state.you?.hand, state.pending, state.selfId, reduced])
 
   // A solo release's own projection catch-up: `discardForRelease` pauses on a
   // decision rather than removing anything, so the hand never loses the card
@@ -1945,3 +1948,5 @@ export function useBoardStaging({
     takeStagedRelease,
   }
 }
+
+const EMPTY_HAND: NonNullable<BoardState['you']>['hand'] = []

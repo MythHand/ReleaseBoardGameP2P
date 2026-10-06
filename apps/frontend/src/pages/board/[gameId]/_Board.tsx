@@ -26,6 +26,7 @@ import {
   HudBackground,
   LangSwitcher,
   LobbyCode,
+  MAX_SPECTATORS,
   MoveHistory,
   Participants,
   PauseGame,
@@ -41,6 +42,7 @@ import {
   ScrollArea,
   Seat,
   Slider,
+  spectatorLimitColor,
   type TableActions,
   TabRail,
   type TabRailItem,
@@ -60,6 +62,7 @@ import {
   useRef,
   useState,
 } from 'react'
+import { CardMotionProvider } from '@/cards/cardMotion'
 // The screen's geometry is the KIT's stylesheet, imported rather than copied:
 // where every block sits, how big it is, what it overlaps. The board is a fork
 // of @release/ui's Table and the playground is where this screen is designed
@@ -98,15 +101,6 @@ import { useRebaseStaging } from './_useRebaseStaging'
 import { useRequestStaging } from './_useRequestStaging'
 import { useUpgradeStaging } from './_useUpgradeStaging'
 
-// светофор для лимита зрителей (зеркало палитры из экрана Lobby):
-// 0–8 зелёный, 9–18 жёлтый, 19–28 красный
-const SPEC_MAX = 28
-function specColorFor(n: number) {
-  if (n <= 8) return '#8fd9b0'
-  if (n <= 18) return '#e3b341'
-  return '#ff6b81'
-}
-
 // Ширина выезжающей панели зависит от типа контента вкладки.
 const DRAWER_WIDTH: Record<Panel, number> = {
   settings: 320, // настройки — узкая
@@ -114,6 +108,7 @@ const DRAWER_WIDTH: Record<Panel, number> = {
   participants: 420, // участники — как история
   modes: 680, // режимы — как правила
   rules: 680, // правила — сильно шире
+  voice: 420,
   chat: 420, // чат — как история
 }
 
@@ -147,38 +142,67 @@ function SettingsGroup({ title, children }: { title?: string; children: ReactNod
   )
 }
 
-// One settings unit — the single pattern shared by every control: a caption on
-// top, the control, and an optional hint below. The control owns its own width
-// (the spectator slider fills via .sliderFull).
+// Compact controls sit beside the caption and hint; the spectator slider
+// takes the full width below its caption, matching the playground.
 function SettingsField({
   label,
   hint,
+  inline = false,
   children,
 }: {
   label?: string
   hint?: string
+  inline?: boolean
   children: ReactNode
 }) {
+  const labelEl = label && (
+    <Typography as="div" variant="metaLabel" className={kit.fieldLabel}>
+      {label}
+    </Typography>
+  )
+  const hintEl = hint && (
+    <Typography as="div" base="mono-xs" className={kit.fieldHint}>
+      {hint}
+    </Typography>
+  )
+
+  // Compact controls sit beside their caption and hint.
+  if (inline) {
+    return (
+      <div className={kit.fieldInline}>
+        <div className={kit.fieldText}>
+          {labelEl}
+          {hintEl}
+        </div>
+        {children}
+      </div>
+    )
+  }
+
+  // Full-width controls retain the vertical arrangement.
   return (
     <div className={kit.field}>
-      {label && (
-        <Typography as="div" variant="metaLabel" className={kit.fieldLabel}>
-          {label}
-        </Typography>
-      )}
+      {labelEl}
       {children}
-      {hint && (
-        <Typography as="div" base="mono-xs" className={kit.fieldHint}>
-          {hint}
-        </Typography>
-      )}
+      {hintEl}
     </div>
   )
 }
 
 // Стол = активное состояние игры. Каждый блок позиционируется независимо
 // (абсолютно), без жёсткой сетки. Заполняет экран без скролла.
-export default function Board({
+export default function Board(props: BoardProps) {
+  return (
+    <CardMotionProvider value={props.room.parallax ?? true}>
+      <BoardView
+        key={`${props.intro?.gameId ?? ''}:${props.state.selfId ?? 'spectator'}`}
+        {...props}
+      />
+    </CardMotionProvider>
+  )
+}
+
+function BoardView({
   state: liveRaw,
   room,
   copy,
@@ -190,6 +214,7 @@ export default function Board({
   panel: panelProp,
   onPanelChange,
   intro,
+  playback,
   pickPreview,
   onPickPreview,
   rejections,
@@ -218,15 +243,19 @@ export default function Board({
   // over — not merely while it is `active`. `hudIn` only holds a block down
   // once its own animation exists, and the last of them is armed seconds in.
   const [introOver, setIntroOver] = useState(false)
+  // BoardView is keyed by match and viewer. The deal ends on this snapshot;
+  // subsequent moves belong to the beat queue and must not leak into its shadow.
+  const [openingLive] = useState(live)
   const onIntroDone = useCallback(() => {
     setIntroOver(true)
     intro?.onDone()
   }, [intro?.onDone])
   const deal = useDealIntro({
-    live,
+    live: openingLive,
     gameId: intro?.gameId ?? null,
     view: intro?.view ?? null,
-    events: intro?.events ?? [],
+    restoredThrough: playback?.restoredThrough ?? intro?.restoredThrough,
+    events: playback?.events ?? intro?.events ?? [],
     refs: anchors,
     onDone: onIntroDone,
   })
@@ -285,11 +314,11 @@ export default function Board({
     live,
     discardPick: discardPickRef,
     requestPick: requestPickRef,
-    events: intro?.events ?? [],
+    events: playback?.events ?? intro?.events ?? [],
     anchors,
     enabled: introOver || intro == null,
     intro: deal.beat,
-    restoredThrough: intro?.restoredThrough,
+    restoredThrough: playback?.restoredThrough ?? intro?.restoredThrough,
     staging: handoffRef,
     handLimit: handLimitRef,
     clearPaidCost: clearPaidCostRef,
@@ -339,6 +368,8 @@ export default function Board({
     onKickSpectator,
     lang,
     onLangChange,
+    parallax = true,
+    onParallaxChange,
     chatToasts = true,
     onChatToastsChange,
     paused = false,
@@ -362,10 +393,10 @@ export default function Board({
     state,
     anchors,
     actions,
-    events: intro?.events ?? [],
+    events: playback?.events ?? intro?.events ?? [],
     rejections,
-    enabled: !(deal.active || beats.exclusive),
     beatsRunning: beats.running,
+    enabled: state.you !== null && !(deal.active || beats.exclusive),
     onHandArrival: (order) => handOrder.place(order),
 
     // the match boundary (#101, Fix C, finding 3) — `<Board>` is not remounted
@@ -391,7 +422,7 @@ export default function Board({
   // never waits for the host — and one we have asked back is home already.
   const stagedOut = staging.staged?.main ?? staging.staged?.support
   const shownForDock =
-    state.window && stagedOut
+    state.window && state.selfId !== null && stagedOut
       ? [...(state.shown ?? []), { player: state.selfId, uid: stagedOut.uid, card: stagedOut.card }]
       : (state.shown ?? []).filter(
           (s) => s.player !== state.selfId || !staging.returning.has(s.uid),
@@ -401,7 +432,9 @@ export default function Board({
   // and names the moment where it would name a player.
   const dockView: DockView = deal.active
     ? { state: 'waiting', danger: false, seconds: 0, progress: 0, activePlayer: undefined }
-    : { ...derived, ...dock }
+    : state.you
+      ? { ...derived, ...dock }
+      : derived
 
   // a `defend` pending owed to us means the defence hook owns the fan instead
   // of the turn hook — the two never run at once (the engine suspends normal
@@ -417,8 +450,8 @@ export default function Board({
     state,
     anchors,
     actions,
-    events: intro?.events ?? [],
-    enabled: !(deal.active || beats.exclusive),
+    events: playback?.events ?? intro?.events ?? [],
+    enabled: state.you !== null && !(deal.active || beats.exclusive),
     matchKey: intro?.gameId ?? null,
     onHandArrival: (order) => handOrder.place(order),
   })
@@ -434,8 +467,8 @@ export default function Board({
     state,
     anchors,
     actions,
-    events: intro?.events ?? [],
-    enabled: !(deal.active || beats.exclusive),
+    events: playback?.events ?? intro?.events ?? [],
+    enabled: state.you !== null && !(deal.active || beats.exclusive),
     matchKey: intro?.gameId ?? null,
     onHandArrival: (order) => handOrder.place(order),
   })
@@ -486,7 +519,7 @@ export default function Board({
     state,
     anchors,
     actions,
-    events: intro?.events ?? [],
+    events: playback?.events ?? intro?.events ?? [],
     enabled: alarmMineOpen && !(deal.active || beats.exclusive),
     matchKey: intro?.gameId ?? null,
     onHandArrival: (order) => handOrder.place(order),
@@ -496,7 +529,7 @@ export default function Board({
   // `requestCard`; a successful name transfers the first matching copy automatically.
   const requesting = useRequestStaging({
     state,
-    events: intro?.events ?? [],
+    events: playback?.events ?? intro?.events ?? [],
     actions,
     copy: {
       prompt: copy.pending.requestCard.prompt,
@@ -516,7 +549,7 @@ export default function Board({
   const cherry = useCherryPickStaging({
     handoff: discardPickRef,
     state,
-    events: intro?.events ?? [],
+    events: playback?.events ?? intro?.events ?? [],
     anchors,
     actions,
     onHandArrival: (order) => handOrder.place(order),
@@ -538,7 +571,7 @@ export default function Board({
   // table. Its content is private by projection, not by anything done here.
   const rebase = useRebaseStaging({
     state,
-    events: intro?.events ?? [],
+    events: playback?.events ?? intro?.events ?? [],
     anchors,
     actions,
     // the row's cards stand small to be reordered, and small is not readable —
@@ -559,7 +592,7 @@ export default function Board({
   const upgrade = useUpgradeStaging({
     anchors,
     state,
-    events: intro?.events ?? [],
+    events: playback?.events ?? intro?.events ?? [],
     actions,
     copy: {
       prompt: copy.table.upgradePrompt,
@@ -899,7 +932,7 @@ export default function Board({
   )
 
   const stagedRelease = staging.stageStanding
-    ? ((costPending ? you.hand.find((c) => c.uid === costPending.release) : undefined) ??
+    ? ((costPending ? you?.hand.find((c) => c.uid === costPending.release) : undefined) ??
       stagedReleaseLocal)
     : undefined
   // whichever release is standing at the stage slot — ours, or another player's
@@ -944,7 +977,7 @@ export default function Board({
       },
       shown: (state.shown ?? []).map((s) => `${s.player}:${s.card.name}`),
       zones: Object.fromEntries([
-        [state.selfId, zone(state.you.release, state.you.support)],
+        ...(state.you ? [[state.selfId, zone(state.you.release, state.you.support)]] : []),
         ...state.opponents.map((o) => [o.id, zone(o.release, o.support)]),
       ]),
       hands: Object.fromEntries(state.opponents.map((o) => [o.id, o.handCount])),
@@ -1013,7 +1046,8 @@ export default function Board({
       const nz = neutralizing.staged
       handoffRef.current = nz
         ? {
-            mainUid: nz.home.kind === 'hand' ? nz.home.uid : (you.releaseUid?.[nz.home.slot] ?? ''),
+            mainUid:
+              nz.home.kind === 'hand' ? nz.home.uid : (you?.releaseUid?.[nz.home.slot] ?? ''),
             el: coverStagedRef.current,
             release: neutralizing.release,
             whenLanded: neutralizing.whenLanded,
@@ -1053,7 +1087,7 @@ export default function Board({
   // stay out of the fan until the pending itself clears.
   useLayoutEffect(() => {
     handLimitRef.current =
-      handLimit.dispatched && handLimit.placed.length > 0
+      state.selfId !== null && handLimit.dispatched && handLimit.placed.length > 0
         ? {
             player: state.selfId,
             cards: handLimit.placed,
@@ -1257,8 +1291,13 @@ export default function Board({
   const canPause = isHost && Boolean(onPauseChange) && Boolean(copy.table.pauseGame)
   const hostControls = canLimitSpectators || canPause
   const hasChat = Boolean(slots?.chat) && Boolean(copy.table.tabChat)
+  const hasVoice = Boolean(slots?.voice) && Boolean(copy.table.tabVoice)
   const canChatToasts = hasChat && Boolean(onChatToastsChange) && Boolean(copy.table.chatToasts)
-  const hasUpperSettings = Boolean(lang && onLangChange) || Boolean(code) || canChatToasts
+  const hasUpperSettings =
+    Boolean(lang && onLangChange) ||
+    Boolean(code) ||
+    Boolean(onParallaxChange && copy.table.parallax) ||
+    canChatToasts
 
   // текстовые вкладки рейла (порядок = сверху вниз), подписи — по языку
   const textTabs: TabRailItem[] = [
@@ -1266,16 +1305,18 @@ export default function Board({
     { id: 'participants', label: copy.table.tabParticipants },
     { id: 'rules', label: copy.table.tabRules },
     { id: 'modes', label: copy.table.tabModes },
-    ...(hasChat ? [{ id: 'chat', label: copy.table.tabChat ?? '' }] : []),
   ]
 
   // квадратная вкладка «настройки» (шестерёнка) — когда есть что показать
   // (свитчер языка и/или код игры); служебный слот под визуальные опции
   const hasSettings =
     Boolean(onLangChange) || Boolean(code) || canChatToasts || Boolean(hostControls)
-  const railItems: TabRailItem[] = hasSettings
-    ? [{ id: 'settings', label: copy.table.settings, icon: <GearIcon /> }, ...textTabs]
-    : textTabs
+  const railItems: TabRailItem[] = [
+    ...(hasSettings ? [{ id: 'settings', label: copy.table.settings, icon: <GearIcon /> }] : []),
+    ...(hasVoice ? [{ id: 'voice', label: copy.table.tabVoice ?? '', icon: slots?.voiceTab }] : []),
+    ...(hasChat ? [{ id: 'chat', label: copy.table.tabChat ?? '' }] : []),
+    ...textTabs,
+  ]
 
   // завершение партии — оверлей поверх стола (триггерится извне)
   // The end is announced once the board has finished SHOWING how it was reached
@@ -1291,7 +1332,7 @@ export default function Board({
   // gets.
   const overShown = over && !beats.running && !deal.active
   const overWinner = overShown ? participants.find((p) => p.id === over.winnerId) : null
-  const youEliminated = Boolean(you.eliminated)
+  const youEliminated = Boolean(you?.eliminated)
   const disconnectedIds = new Set(room.disconnected ?? [])
 
   const toggle = (p: Panel) => {
@@ -1323,6 +1364,8 @@ export default function Board({
     // biome-ignore lint/a11y/noStaticElementInteractions: click-anywhere-skips-the-opening AND click-anywhere-cancels-staging (handleTableClick owns both); the accessible affordance for each is its own Escape handler above
     <div
       className={kit.table}
+      data-spectator={you === null || undefined}
+      data-seats={opponents.length}
       ref={tableRef}
       onClick={handleTableClick}
       role="presentation"
@@ -1353,6 +1396,7 @@ export default function Board({
 
       {slots?.banner && <div className={kit.banner}>{slots.banner}</div>}
       {slots?.corner && <div className={kit.corner}>{slots.corner}</div>}
+      {slots?.voiceNotices && <div className={kit.voiceNotices}>{slots.voiceNotices}</div>}
 
       {/* the seats: each in its own wrapper, so the opening can drop them in one
           after another and the deal can aim a card at the seat it belongs to */}
@@ -1412,7 +1456,7 @@ export default function Board({
                   label={copy.table.deck}
                   deck="base"
                   count={count}
-                  width={pileWidthFor(decks.main.length)}
+                  width={you === null ? 80 : pileWidthFor(decks.main.length)}
                   countPos="tl"
                   boxRef={(el) => anchors.bindPile(i, el)}
                   // A PILE ANSWERS THE ARROW THE WAY A CARD DOES. `pickable`
@@ -1449,7 +1493,7 @@ export default function Board({
                 label={copy.table.events}
                 deck="ai"
                 count={decks.events}
-                width={150}
+                width={you === null ? 80 : 150}
                 countPos="tl"
                 boxRef={anchors.eventsBox}
               />
@@ -1492,7 +1536,7 @@ export default function Board({
             // The one case where the number is carried rather than shown.
             showCount={!beats.discardOut}
             gathered={beats.discardOut === 'gathering' || undefined}
-            width={116}
+            width={you === null ? 80 : 116}
             boxRef={anchors.discardBox}
           />
         </div>
@@ -1925,225 +1969,227 @@ export default function Board({
         data-testid={glowStrong ? 'board-glow-strong' : undefined}
       />
 
-      <div className={kit.you} data-testid="board-you">
-        {youEliminated ? (
-          <Badge size="lg" className={kit.youBadge}>
-            {copy.table.youEliminated}
-          </Badge>
-        ) : (
-          <>
-            {/* the zone is the last thing to arrive: it is yours, and it comes
+      {you && state.selfId !== null && (
+        <div className={kit.you} data-testid="board-you">
+          {youEliminated ? (
+            <Badge size="lg" className={kit.youBadge}>
+              {copy.table.youEliminated}
+            </Badge>
+          ) : (
+            <>
+              {/* the zone is the last thing to arrive: it is yours, and it comes
                 once you have a hand to play from */}
-            <div className={enter} ref={anchors.zone}>
-              <ReleaseZone
-                release={you.release}
-                support={you.support}
-                size="100px"
-                player={state.selfId}
-                slotRef={(key, el) => anchors.bindReleaseSlot(state.selfId, key, el)}
-                onPick={(t) => staging.onTargetPick(t)}
-                targets={staging.targets}
-                // the zone's own half of the 503 gesture (#102, Task 9). What
-                // lights is exactly what may be taken — `pending.methods` is
-                // the only authority — and a slot whose card is elsewhere
-                // (carried by the drag, or standing at the cover slot as the
-                // answer) shows its empty place rather than a second copy.
-                accentAt={(key) => neutralizing.accentAt(key)}
-                liftedAt={(key) => neutralizing.liftedAt(key)}
-                onSlotDown={(key, e) => neutralizing.onSlotDown(key, e)}
-              />
-            </div>
-            {/* biome-ignore lint/a11y/noStaticElementInteractions: pointer-only guard so a press in the fan is never read as "pointed at nothing" while a pair stands merged; the Hand owns the real interaction (ComboStory's own hand wrapper carries the same guard) */}
-            <div
-              className={kit.handWrap}
-              ref={anchors.hand}
-              // the pair assembles and then waits at the CENTRE — the hand's
-              // zoom preview rises into exactly that space and would cover it
-              // (ComboStory's own reason). So while a pair stands merged the
-              // fan goes inert, and a press inside it must not read as the
-              // miss `handleTableClick` cancels on.
-              //
-              // UNLESS a cost is owed (#101, Fix C, finding 1 — the blocker
-              // this round exists for). A Code Review combo that ships a
-              // release raises the ordinary `discardForRelease` pending, and
-              // the pair stays merged for the whole of it, because `staged` is
-              // the only thing that knows the pair (`pendingView` carries
-              // `release` but not `codeReview`). The fan is that step's ONLY
-              // picker — the panel is suppressed for this pending on purpose,
-              // two blocks down, and `Hand` offers no keyboard path — so an
-              // inert fan made the cost unpayable by any input at all, while
-              // the ask line under the centre asked for it. #100 added this
-              // guard and #101 suppressed the panel; neither could see the
-              // other. The guard yields to the step that is waiting on the fan,
-              // which is the narrower of the two and the one that can be
-              // deadlocked.
-              //
-              // WHAT YIELDING COSTS, on the record rather than left to be
-              // rediscovered (#101, Fix D, finding 9): the hover zoom is back
-              // over the standing pair for the whole cost step, which is the
-              // occlusion #100's guard was added for — and `Hand`'s `.zoom` is
-              // `pointer-events: none`, so a press that lands on that preview
-              // falls THROUGH to whatever is beneath it, misses every
-              // `[data-hand-slot]`, and the cost listener above reads it as a
-              // miss and cancels the release. Reading a card can therefore
-              // undo the play. Not fixable from this side: exempting the
-              // preview needs it to be a pointer target, and giving it pointer
-              // events makes it steal the hover that raised it. Recorded in
-              // `docs/animations/backlog.md` and the audit register with the
-              // shape that would close it; the deadlock this guard yields for
-              // is the worse of the two, which is why it still yields.
-              // …said as a STATE, not as a style: this wrapper is deliberately
-              // transparent to the cursor and hands pointer events to its own
-              // child, so a `pointer-events: none` written here was turned
-              // straight back on one level down and the fan stayed live under
-              // every surface (owner, 22.09). The wrapper owns both rules and
-              // reconciles them itself — see `.handWrap[data-inert]`.
-              data-inert={handInert || undefined}
-              data-upgrade-discard={upgrade.asked || undefined}
-              onMouseDown={handInert ? (e) => e.stopPropagation() : undefined}
-            >
-              <Hand
-                // Keep the same owner for items and index-based handlers,
-                // including the exit after the defense prompt closes.
-                items={fanItems}
-                // the fan opens room for the arriving heap while it travels —
-                // the deal wins the tie against every other beat the same way
-                // it already wins the shadow's, and the staging gesture's own
-                // return-flight gap is last: it opens only once nothing else
-                // owns the fan.
-                gapAt={
-                  deal.gapAt ??
-                  (discarding ? handLimit.gapAt : null) ??
-                  beats.gapAt ??
-                  cherry.gapAt ??
-                  liveGapAt
-                }
-                gapSize={
-                  deal.gapAt == null
-                    ? discarding && handLimit.gapAt != null
-                      ? handLimit.gapSize
-                      : beats.gapAt == null
-                        ? cherry.gapAt == null
-                          ? liveGapSize
-                          : cherry.gapSize
-                        : beats.gapSize
-                    : deal.gapSize
-                }
-                carrying={discarding && handLimit.carrying}
-                // What lights, and in what hue — from whichever hook owns the
-                // fan (#101, Fix B). `stateAt` is what says a card is
-                // AVAILABLE; `accentAt` only says what colour, and without
-                // the pair of them the fan could never light for a step that
-                // is not a combo partner pick — which is every step this
-                // scene is about. Both hooks keep the one rule: lit only
-                // while a step is waiting on a choice from the fan, and only
-                // on the cards that answer it.
-                stateAt={
-                  upgradeOwnsHand
-                    ? upgrade.stateAt
-                    : discarding
-                      ? handLimit.stateAt
-                      : defenseOwnsHand
-                        ? defenseStaging.stateAt
-                        : neutralizeOwnsHand
-                          ? neutralizing.stateAt
-                          : staging.stateAt
-                }
-                // no fan accent while a 503 is open: `neutralizing.accentAt`
-                // answers for a ZONE slot, and the fan's own lighting is
-                // entirely `stateAt`'s (the Debugger, or nothing).
-                accentAt={
-                  upgradeOwnsHand
-                    ? upgrade.accentAt
-                    : discarding
-                      ? handLimit.accentAt
-                      : defenseOwnsHand
-                        ? defenseStaging.accentAt
-                        : neutralizeOwnsHand
-                          ? undefined
-                          : staging.accentAt
-                }
-                // while the deal runs the hand is held: no clicks reach either
-                // gesture machine, and the cards that travelled closed stay
-                // closed until the flip. Both are gone the moment it ends, so
-                // the released hand is the plain one this board always drew.
-                // A partner pick is a click too, not a pull — so is a release's
-                // cost, and so is a release itself (#101, Fix D, finding 1).
-                // WHICH of those a given click is, is the staging gesture's own
-                // question: it takes the click and says so, or declines and the
-                // plain click gesture — which owns the window's attack
-                // affordance — gets it. Deciding it here instead is what hid the
-                // release's own case: the condition named the two steps anyone
-                // had thought of (`phase === 'partner'`, a cost owed), a release
-                // played at rest was neither, and it went to a gesture that
-                // dispatches the play and never tells the stage machine, so the
-                // card stood nowhere for the whole step that followed.
-                onCardClick={
-                  deal.active || discarding || upgrade.asked
-                    ? undefined
-                    : defenseOwnsHand
-                      ? (i) => defenseStaging.onCardClick(i)
-                      : neutralizeOwnsHand
-                        ? // a 503 is answered by a PULL, never by a click —
-                          // one gesture per step, the same discipline the
-                          // defence's partner-selection gesture records
-                          undefined
-                        : staging.onCardClick
-                }
-                // drag-mode: a card that needs a target — or a legal defence
-                // answering an open `defend` pending — is pulled out of the
-                // fan, not clicked. Off during the deal, same as the click
-                // gesture above.
-                onPlay={
-                  deal.active || (discarding && handLimit.carrying)
-                    ? undefined
-                    : upgrade.asked
-                      ? upgrade.onHandPlay
+              <div className={enter} ref={anchors.zone}>
+                <ReleaseZone
+                  release={you.release}
+                  support={you.support}
+                  size="100px"
+                  player={state.selfId}
+                  slotRef={(key, el) => anchors.bindReleaseSlot(state.selfId, key, el)}
+                  onPick={(t) => staging.onTargetPick(t)}
+                  targets={staging.targets}
+                  // the zone's own half of the 503 gesture (#102, Task 9). What
+                  // lights is exactly what may be taken — `pending.methods` is
+                  // the only authority — and a slot whose card is elsewhere
+                  // (carried by the drag, or standing at the cover slot as the
+                  // answer) shows its empty place rather than a second copy.
+                  accentAt={(key) => neutralizing.accentAt(key)}
+                  liftedAt={(key) => neutralizing.liftedAt(key)}
+                  onSlotDown={(key, e) => neutralizing.onSlotDown(key, e)}
+                />
+              </div>
+              {/* biome-ignore lint/a11y/noStaticElementInteractions: pointer-only guard so a press in the fan is never read as "pointed at nothing" while a pair stands merged; the Hand owns the real interaction (ComboStory's own hand wrapper carries the same guard) */}
+              <div
+                className={kit.handWrap}
+                ref={anchors.hand}
+                // the pair assembles and then waits at the CENTRE — the hand's
+                // zoom preview rises into exactly that space and would cover it
+                // (ComboStory's own reason). So while a pair stands merged the
+                // fan goes inert, and a press inside it must not read as the
+                // miss `handleTableClick` cancels on.
+                //
+                // UNLESS a cost is owed (#101, Fix C, finding 1 — the blocker
+                // this round exists for). A Code Review combo that ships a
+                // release raises the ordinary `discardForRelease` pending, and
+                // the pair stays merged for the whole of it, because `staged` is
+                // the only thing that knows the pair (`pendingView` carries
+                // `release` but not `codeReview`). The fan is that step's ONLY
+                // picker — the panel is suppressed for this pending on purpose,
+                // two blocks down, and `Hand` offers no keyboard path — so an
+                // inert fan made the cost unpayable by any input at all, while
+                // the ask line under the centre asked for it. #100 added this
+                // guard and #101 suppressed the panel; neither could see the
+                // other. The guard yields to the step that is waiting on the fan,
+                // which is the narrower of the two and the one that can be
+                // deadlocked.
+                //
+                // WHAT YIELDING COSTS, on the record rather than left to be
+                // rediscovered (#101, Fix D, finding 9): the hover zoom is back
+                // over the standing pair for the whole cost step, which is the
+                // occlusion #100's guard was added for — and `Hand`'s `.zoom` is
+                // `pointer-events: none`, so a press that lands on that preview
+                // falls THROUGH to whatever is beneath it, misses every
+                // `[data-hand-slot]`, and the cost listener above reads it as a
+                // miss and cancels the release. Reading a card can therefore
+                // undo the play. Not fixable from this side: exempting the
+                // preview needs it to be a pointer target, and giving it pointer
+                // events makes it steal the hover that raised it. Recorded in
+                // `docs/animations/backlog.md` and the audit register with the
+                // shape that would close it; the deadlock this guard yields for
+                // is the worse of the two, which is why it still yields.
+                // …said as a STATE, not as a style: this wrapper is deliberately
+                // transparent to the cursor and hands pointer events to its own
+                // child, so a `pointer-events: none` written here was turned
+                // straight back on one level down and the fan stayed live under
+                // every surface (owner, 22.09). The wrapper owns both rules and
+                // reconciles them itself — see `.handWrap[data-inert]`.
+                data-inert={handInert || undefined}
+                data-upgrade-discard={upgrade.asked || undefined}
+                onMouseDown={handInert ? (e) => e.stopPropagation() : undefined}
+              >
+                <Hand
+                  // Keep the same owner for items and index-based handlers,
+                  // including the exit after the defense prompt closes.
+                  items={fanItems}
+                  // the fan opens room for the arriving heap while it travels —
+                  // the deal wins the tie against every other beat the same way
+                  // it already wins the shadow's, and the staging gesture's own
+                  // return-flight gap is last: it opens only once nothing else
+                  // owns the fan.
+                  gapAt={
+                    deal.gapAt ??
+                    (discarding ? handLimit.gapAt : null) ??
+                    beats.gapAt ??
+                    cherry.gapAt ??
+                    liveGapAt
+                  }
+                  gapSize={
+                    deal.gapAt == null
+                      ? discarding && handLimit.gapAt != null
+                        ? handLimit.gapSize
+                        : beats.gapAt == null
+                          ? cherry.gapAt == null
+                            ? liveGapSize
+                            : cherry.gapSize
+                          : beats.gapSize
+                      : deal.gapSize
+                  }
+                  carrying={discarding && handLimit.carrying}
+                  // What lights, and in what hue — from whichever hook owns the
+                  // fan (#101, Fix B). `stateAt` is what says a card is
+                  // AVAILABLE; `accentAt` only says what colour, and without
+                  // the pair of them the fan could never light for a step that
+                  // is not a combo partner pick — which is every step this
+                  // scene is about. Both hooks keep the one rule: lit only
+                  // while a step is waiting on a choice from the fan, and only
+                  // on the cards that answer it.
+                  stateAt={
+                    upgradeOwnsHand
+                      ? upgrade.stateAt
                       : discarding
-                        ? handLimit.onHandPlay
+                        ? handLimit.stateAt
                         : defenseOwnsHand
-                          ? defenseStaging.onHandPlay
+                          ? defenseStaging.stateAt
                           : neutralizeOwnsHand
-                            ? neutralizing.onHandPlay
-                            : // A release's own cost is PULLED out of the fan,
-                              // the same gesture every other step that asks for
-                              // a card from the hand takes — one gesture per
-                              // step, the discipline the 503's line above keeps.
-                              // While one is owed the fan can do nothing else,
-                              // so the pull is the cost's for that whole step.
-                              costPending
-                              ? staging.onCostPlay
-                              : staging.onHandPlay
-                }
-                // the reorder gesture's commit — without it the kit settles the
-                // card into its new slot and the next projection render snaps
-                // it back. `to` indexes the fan AS RENDERED (minus any staged
-                // card), which is exactly what the commit expects.
-                onReorder={
-                  deal.active || (discarding && handLimit.carrying)
-                    ? undefined
-                    : (uid, to) => handOrder.commit(you.hand, fanItems, uid, to)
-                }
-                renderFace={
-                  deal.active
-                    ? (item, ctx) => (
-                        <Card
-                          card={item.card}
-                          faceDown={deal.faceDown(item.uid)}
-                          interactive={false}
-                          tilt={ctx.tilt}
-                          width={ctx.width}
-                          state={ctx.state}
-                          accent={ctx.accent}
-                        />
-                      )
-                    : undefined
-                }
-              />
-            </div>
-          </>
-        )}
-      </div>
+                            ? neutralizing.stateAt
+                            : staging.stateAt
+                  }
+                  // no fan accent while a 503 is open: `neutralizing.accentAt`
+                  // answers for a ZONE slot, and the fan's own lighting is
+                  // entirely `stateAt`'s (the Debugger, or nothing).
+                  accentAt={
+                    upgradeOwnsHand
+                      ? upgrade.accentAt
+                      : discarding
+                        ? handLimit.accentAt
+                        : defenseOwnsHand
+                          ? defenseStaging.accentAt
+                          : neutralizeOwnsHand
+                            ? undefined
+                            : staging.accentAt
+                  }
+                  // while the deal runs the hand is held: no clicks reach either
+                  // gesture machine, and the cards that travelled closed stay
+                  // closed until the flip. Both are gone the moment it ends, so
+                  // the released hand is the plain one this board always drew.
+                  // A partner pick is a click too, not a pull — so is a release's
+                  // cost, and so is a release itself (#101, Fix D, finding 1).
+                  // WHICH of those a given click is, is the staging gesture's own
+                  // question: it takes the click and says so, or declines and the
+                  // plain click gesture — which owns the window's attack
+                  // affordance — gets it. Deciding it here instead is what hid the
+                  // release's own case: the condition named the two steps anyone
+                  // had thought of (`phase === 'partner'`, a cost owed), a release
+                  // played at rest was neither, and it went to a gesture that
+                  // dispatches the play and never tells the stage machine, so the
+                  // card stood nowhere for the whole step that followed.
+                  onCardClick={
+                    deal.active || discarding || upgrade.asked
+                      ? undefined
+                      : defenseOwnsHand
+                        ? (i) => defenseStaging.onCardClick(i)
+                        : neutralizeOwnsHand
+                          ? // a 503 is answered by a PULL, never by a click —
+                            // one gesture per step, the same discipline the
+                            // defence's partner-selection gesture records
+                            undefined
+                          : staging.onCardClick
+                  }
+                  // drag-mode: a card that needs a target — or a legal defence
+                  // answering an open `defend` pending — is pulled out of the
+                  // fan, not clicked. Off during the deal, same as the click
+                  // gesture above.
+                  onPlay={
+                    deal.active || (discarding && handLimit.carrying)
+                      ? undefined
+                      : upgrade.asked
+                        ? upgrade.onHandPlay
+                        : discarding
+                          ? handLimit.onHandPlay
+                          : defenseOwnsHand
+                            ? defenseStaging.onHandPlay
+                            : neutralizeOwnsHand
+                              ? neutralizing.onHandPlay
+                              : // A release's own cost is PULLED out of the fan,
+                                // the same gesture every other step that asks for
+                                // a card from the hand takes — one gesture per
+                                // step, the discipline the 503's line above keeps.
+                                // While one is owed the fan can do nothing else,
+                                // so the pull is the cost's for that whole step.
+                                costPending
+                                ? staging.onCostPlay
+                                : staging.onHandPlay
+                  }
+                  // the reorder gesture's commit — without it the kit settles the
+                  // card into its new slot and the next projection render snaps
+                  // it back. `to` indexes the fan AS RENDERED (minus any staged
+                  // card), which is exactly what the commit expects.
+                  onReorder={
+                    deal.active || (discarding && handLimit.carrying)
+                      ? undefined
+                      : (uid, to) => handOrder.commit(you.hand, fanItems, uid, to)
+                  }
+                  renderFace={
+                    deal.active
+                      ? (item, ctx) => (
+                          <Card
+                            card={item.card}
+                            faceDown={deal.faceDown(item.uid)}
+                            interactive={false}
+                            tilt={ctx.tilt}
+                            width={ctx.width}
+                            state={ctx.state}
+                            accent={ctx.accent}
+                          />
+                        )
+                      : undefined
+                  }
+                />
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* SOMEONE ELSE's alarm — weak, and AFTER the hand so it lies over it.
           `pointer-events: none` is already on the primitive for both
@@ -2157,6 +2203,7 @@ export default function Board({
       <div className={kit.turnDock}>
         <div className={enter} ref={anchors.dock}>
           <TurnDock
+            spectatorLabel={you === null ? copy.participants.spectator : undefined}
             state={dockView.state}
             danger={dockView.danger}
             seconds={dockView.seconds}
@@ -2191,7 +2238,8 @@ export default function Board({
           flying to or from the cover slot (a carrier at `--z-flight`, 250)
           vanished the instant it landed. What only the panel could do —
           decline — belongs to the TurnDock Pass key. */}
-      {state.pending &&
+      {you &&
+        state.pending &&
         // "owed to you" is a predicate now, not a comparison: a `systemUpgrade`
         // is owed to every seat on its roster at once while it is discarding,
         // and to the actor alone once it is picking — `pendingOwesSelf` is the
@@ -2309,7 +2357,7 @@ export default function Board({
             {hasUpperSettings && (
               <SettingsGroup title={isHost ? copy.table.generalTitle : undefined}>
                 {lang && onLangChange && (
-                  <SettingsField label={copy.table.langTitle}>
+                  <SettingsField label={copy.table.langTitle} inline>
                     <LangSwitcher
                       value={lang}
                       onChange={onLangChange}
@@ -2319,19 +2367,29 @@ export default function Board({
                   </SettingsField>
                 )}
                 {code && (
-                  <SettingsField label={copy.table.codeTitle}>
-                    <LobbyCode
-                      code={code}
-                      copy={copy.lobbyCode}
-                      align="start"
-                      reverse
-                      showLabel={false}
-                    />
+                  <SettingsField label={copy.table.codeTitle} inline>
+                    <LobbyCode code={code} copy={copy.lobbyCode} copyOnCode showLabel={false} />
+                  </SettingsField>
+                )}
+                {onParallaxChange && copy.table.parallax && (
+                  <SettingsField label={copy.table.parallax} hint={copy.table.parallaxHint} inline>
+                    <Toggle on={parallax} onChange={onParallaxChange} className={kit.settingToggle}>
+                      {(parallax ? copy.table.parallaxOn : copy.table.parallaxOff) ??
+                        copy.table.parallax}
+                    </Toggle>
                   </SettingsField>
                 )}
                 {canChatToasts && (
-                  <SettingsField label={copy.table.chatToasts} hint={copy.table.chatToastsHint}>
-                    <Toggle on={chatToasts} onChange={(on) => onChatToastsChange?.(on)}>
+                  <SettingsField
+                    label={copy.table.chatToasts}
+                    hint={copy.table.chatToastsHint}
+                    inline
+                  >
+                    <Toggle
+                      on={chatToasts}
+                      onChange={(on) => onChatToastsChange?.(on)}
+                      className={kit.settingToggle}
+                    >
                       {(chatToasts ? copy.table.chatToastsOn : copy.table.chatToastsOff) ??
                         copy.table.chatToasts}
                     </Toggle>
@@ -2348,17 +2406,21 @@ export default function Board({
                       <Slider
                         value={spectatorLimit ?? 0}
                         min={0}
-                        max={SPEC_MAX}
+                        max={MAX_SPECTATORS}
                         onChange={(n) => onSpectatorLimitChange?.(n)}
-                        color={specColorFor(spectatorLimit ?? 0)}
+                        color={spectatorLimitColor(spectatorLimit ?? 0)}
                         fill
                         className={kit.sliderFull}
                       />
                     </SettingsField>
                   )}
                   {canPause && (
-                    <SettingsField label={copy.table.pauseGame} hint={copy.table.pauseHint}>
-                      <Toggle on={paused} onChange={(on) => onPauseChange?.(on)}>
+                    <SettingsField label={copy.table.pauseGame} hint={copy.table.pauseHint} inline>
+                      <Toggle
+                        on={paused}
+                        onChange={(on) => onPauseChange?.(on)}
+                        className={kit.settingToggle}
+                      >
                         {(paused ? copy.table.pauseOn : copy.table.pauseOff) ??
                           copy.table.pauseGame}
                       </Toggle>
@@ -2384,6 +2446,7 @@ export default function Board({
           />
         )}
         {panel === 'modes' && <GameModes setup={setup} copy={copy.modes} />}
+        {panel === 'voice' && <div className={kit.panelFill}>{slots?.voice}</div>}
         {panel === 'chat' && <div className={kit.chatPanel}>{slots?.chat}</div>}
       </Drawer>
 
@@ -2408,6 +2471,7 @@ export default function Board({
           attempt={room.reconnect?.attempt ?? 1}
           maxAttempts={room.reconnect?.maxAttempts ?? 5}
           status={room.reconnect?.status ?? 'trying'}
+          reason={room.reconnect?.reason}
           onRetry={room.onReconnectRetry ?? (() => {})}
           onLeave={room.onReconnectLeave ?? (() => {})}
         />

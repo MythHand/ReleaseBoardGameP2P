@@ -6,7 +6,7 @@
 // two will drift, and contract.test-d.ts is what makes the drift a compile
 // error instead of a misrender.
 
-import type { Event, PlayerView } from '@release/engine'
+import type { Event, GameView } from '@release/engine'
 import type {
   CardData,
   DockView,
@@ -38,7 +38,7 @@ import type {
 } from '@release/ui'
 import type { ReactNode } from 'react'
 
-export type Panel = 'settings' | 'history' | 'participants' | 'rules' | 'modes' | 'chat'
+export type Panel = 'settings' | 'history' | 'participants' | 'rules' | 'modes' | 'voice' | 'chat'
 
 export interface BoardOpponent {
   id: string
@@ -64,7 +64,7 @@ export interface CentreOperation {
 
 // Everything the engine's projection can answer. Assembled by the consumer's
 // adapter; nothing here is room- or session-shaped.
-export interface BoardState {
+interface BoardPayload {
   // Visual ownership only: an answered attack waits for its discard beat.
   centreAttack?: { card: string; sudo: boolean }
   // …and the defence lying over it, when a Works on my Machine turned the hit
@@ -80,27 +80,6 @@ export interface BoardState {
   // Every card put out at the centre while its play is being made — face up,
   // whoever put it there (resolution.md §1). The projection's own list.
   shown?: { player: string; uid: string; card: CardData }[]
-  you: {
-    name: string
-    hand: HandItem[]
-    release: ReleaseSlots
-    releaseId?: Partial<Record<keyof ReleaseSlots, string>>
-    // A played Code Review lying under the release it protects.
-    support?: ReleaseSupport
-    eliminated?: boolean
-    // The uid of whatever stands in each slot. The kit's `ReleaseSlots` carries
-    // card DATA and no identity — it is domain-free by design — but a choice
-    // the engine has to act on names a uid (`neutralize503`'s sacrifice), so
-    // the adapter keeps them here rather than widening the kit's own type.
-    releaseUid?: Partial<Record<'frontend' | 'backend' | 'database' | 'monitoring', string>>
-    // Which of this player's release slots is a standing AI card wearing an
-    // ordinary id (`release-<slot>`), keyed to the events-deck id it actually
-    // goes home as. Same reasoning as `releaseUid`: the kit's `ReleaseSlots` is
-    // domain-free and has no member for it, so the adapter keeps it beside the
-    // slot rather than widening the kit's own type. Absent slot means an
-    // ordinary card.
-    releaseEvent?: Partial<Record<'frontend' | 'backend' | 'database' | 'monitoring', string>>
-  }
   opponents: BoardOpponent[]
   decks: {
     // One entry per draw pile, in the engine's own pile order — Git Branch
@@ -125,7 +104,6 @@ export interface BoardState {
   // first turn's clock.
   turnClock?: { openedAt: number; deadline: number } | null
   // the local player's id, as the projection names it (`PlayerView.self.id`)
-  selfId: string
   history: HistoryEntry[]
   setup: Setup
   playable: string[]
@@ -145,6 +123,35 @@ export interface BoardState {
   introPhase?: 'setup' | 'dealing' | 'settling'
 }
 
+export interface PlayerHud {
+  name: string
+  hand: HandItem[]
+  release: ReleaseSlots
+  releaseId?: Partial<Record<keyof ReleaseSlots, string>>
+  // A played Code Review lying under the release it protects.
+  support?: ReleaseSupport
+  eliminated?: boolean
+  // The uid of whatever stands in each slot. The kit's `ReleaseSlots` carries
+  // card DATA and no identity — it is domain-free by design — but a choice
+  // the engine has to act on names a uid (`neutralize503`'s sacrifice), so
+  // the adapter keeps them here rather than widening the kit's own type.
+  releaseUid?: Partial<Record<'frontend' | 'backend' | 'database' | 'monitoring', string>>
+  // Which of this player's release slots is a standing AI card wearing an
+  // ordinary id (`release-<slot>`), keyed to the events-deck id it actually
+  // goes home as. Same reasoning as `releaseUid`: the kit's `ReleaseSlots` is
+  // domain-free and has no member for it, so the adapter keeps it beside the
+  // slot rather than widening the kit's own type. Absent slot means an
+  // ordinary card.
+  releaseEvent?: Partial<Record<'frontend' | 'backend' | 'database' | 'monitoring', string>>
+}
+
+export type PlayerBoardState = BoardPayload & { selfId: string; you: PlayerHud }
+export type SpectatorBoardState = BoardPayload & { selfId: null; you: null }
+export type BoardState = PlayerBoardState | SpectatorBoardState
+export function isPlayerBoard(state: BoardState): state is PlayerBoardState {
+  return state.selfId !== null
+}
+
 // Everything the session/P2P layer answers. The engine has no concept of a
 // spectator, a room code, or a pause.
 export interface BoardRoom {
@@ -157,6 +164,8 @@ export interface BoardRoom {
   onKickSpectator?: (id: string) => void
   lang?: SwitchLang
   onLangChange?: (lang: SwitchLang) => void
+  parallax?: boolean
+  onParallaxChange?: (on: boolean) => void
   chatToasts?: boolean
   onChatToastsChange?: (on: boolean) => void
   paused?: boolean
@@ -171,7 +180,12 @@ export interface BoardRoom {
   // Present only while `connection` is 'reconnecting'. Absent, the overlay
   // still renders, on attempt 1 of 5 — a caller that knows it is dialing but
   // not how far along should not be forced to invent numbers.
-  reconnect?: { attempt: number; maxAttempts: number; status: 'trying' | 'failed' }
+  reconnect?: {
+    attempt: number
+    maxAttempts: number
+    status: 'trying' | 'failed'
+    reason?: 'room-full'
+  }
   onReconnectRetry?: () => void
   onReconnectLeave?: () => void
   disconnected?: string[]
@@ -226,6 +240,10 @@ export interface BoardChromeCopy {
   upgradeTakePrompt: string
   // поле паузы (опционально — рендерится только вместе с обработчиком паузы):
   // подпись поля, состояние тумблера (вкл / выкл) и строка-пояснение
+  parallax?: string
+  parallaxOn?: string
+  parallaxOff?: string
+  parallaxHint?: string
   pauseGame?: string
   pauseOn?: string
   pauseOff?: string
@@ -239,6 +257,7 @@ export interface BoardChromeCopy {
   tabParticipants: string
   tabRules: string
   tabModes: string
+  tabVoice?: string
   tabChat?: string
 }
 
@@ -366,6 +385,9 @@ export interface BoardSlots {
   // match, and the consumer's non-fatal error notice.
   corner?: ReactNode
   banner?: ReactNode
+  voice?: ReactNode
+  voiceTab?: ReactNode
+  voiceNotices?: ReactNode
   chat?: ReactNode
   toasts?: ReactNode
 }
@@ -377,6 +399,7 @@ export interface BoardOver {
 
 export interface BoardProps {
   state: BoardState
+  playback?: { events: Event[]; restoredThrough: number }
   room: BoardRoom
   copy: BoardCopyBundle
   slots?: BoardSlots
@@ -418,7 +441,7 @@ export interface BoardProps {
     // Which match this is, so the opening plays once per game rather than once
     // per peer — a PlayerView carries no game identity, and the route does.
     gameId: string | null
-    view: PlayerView | null
+    view: GameView | null
     events: Event[]
     // The highest event id already reflected in the projection this peer
     // started from (`Game.restoredThrough`) — everything up to it was restored,

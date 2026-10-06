@@ -9,7 +9,11 @@ import type { Message, WireMessage } from '../types'
 export function createMemoryNetwork(peerIds: string[]) {
   const inboxes = new Map<string, (frame: WireMessage) => void>()
 
+  const closedLinks = new Set<string>()
+  const link = (a: string, b: string) => [a, b].sort().join('\0')
+
   const deliver = (to: string, frame: WireMessage) => {
+    if (closedLinks.has(link(frame.from, to))) return
     const inbox = inboxes.get(to)
     if (inbox) inbox(JSON.parse(JSON.stringify(frame)) as WireMessage)
   }
@@ -24,7 +28,9 @@ export function createMemoryNetwork(peerIds: string[]) {
     transport(self: string): Transport {
       return {
         id: self,
-        connectTo() {},
+        connectTo(peerId) {
+          closedLinks.delete(link(self, peerId))
+        },
         authenticate() {},
         send(to: string, message: Message) {
           // A peer holds no connection to itself, so PeerJS's `send` resolves
@@ -42,8 +48,20 @@ export function createMemoryNetwork(peerIds: string[]) {
         relay(toIds: string[], frame: WireMessage) {
           for (const to of toIds) deliver(to, frame)
         },
+        disconnectPeer(peerId, finalMessage) {
+          const key = link(self, peerId)
+          if (closedLinks.has(key)) return Promise.resolve()
+          closedLinks.add(key)
+          if (finalMessage)
+            inboxes.get(peerId)?.(
+              JSON.parse(
+                JSON.stringify(createEnvelope(finalMessage, self, nextSeq())),
+              ) as WireMessage,
+            )
+          return Promise.resolve()
+        },
         connectedIds() {
-          return peerIds.filter((id) => id !== self)
+          return peerIds.filter((id) => id !== self && !closedLinks.has(link(self, id)))
         },
         close() {},
       }

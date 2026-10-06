@@ -2960,3 +2960,18 @@ commit as the drag. Publishing afterwards makes the runner see a remote play and
 start a duplicate hand-to-centre flight. Refresh on every commit, including the
 landing that binds the standing node. Other viewers, who have no local gesture,
 still animate the incoming card. Result animations continue for every viewer.
+
+## Публичный стол зрителя (#58)
+
+Эталоны: `TableStory` и `TableChatStory`, отдельный переключатель участия
+`player/spectator`, всего 2–6 мест. Для зрителя `you/selfId` равны `null`,
+каждый участник расположен в публичном месте. До трёх мест — один ряд;
+четыре–шесть — два ряда, центр под ними. Снимки с позднего входа и после
+восстановления показываются сразу, без проигрывания предыдущих ходов.
+
+Живая раздача использует `useDealIntro`: только полёты к местам, открыты
+лишь карты из `dealt.open`. Последующие добор, передача, релиз, защита,
+AI и System Upgrade используют существующие `features/board-beats`.
+Public pending остаются видимыми, но не предлагают зрителю ответа.
+`StatsChatStory` показывает результаты без отметки собственного игрока.
+Правило хлопушек не меняется: они появляются только у победителя.

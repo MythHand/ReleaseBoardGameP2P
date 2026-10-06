@@ -214,8 +214,9 @@ function Harness({ live, events }: { live: BoardState; events: Event[] }) {
       ? staging.staged.main
       : undefined
   const stagedRelease = staging.stageStanding
-    ? ((costPending ? state.you.hand.find((c) => c.uid === costPending.release) : undefined) ??
-      stagedReleaseLocal)
+    ? ((costPending
+        ? (state.you?.hand ?? []).find((c) => c.uid === costPending.release)
+        : undefined) ?? stagedReleaseLocal)
     : undefined
 
   return (
@@ -292,10 +293,12 @@ function Harness({ live, events }: { live: BoardState; events: Event[] }) {
         ))}
       </div>
       <ReleaseZone
-        release={state.you.release}
-        support={state.you.support}
-        player={state.selfId}
-        slotRef={(key, el) => anchors.bindReleaseSlot(state.selfId, key, el)}
+        release={state.you?.release ?? {}}
+        support={state.you?.support}
+        player={state.selfId ?? undefined}
+        slotRef={(key, el) => {
+          if (state.selfId !== null) anchors.bindReleaseSlot(state.selfId, key, el)
+        }}
       />
       {/* the pair rides in `staging.overlay` below — the fold step owns its own
           node now (`usePairFold`), exactly as `_Board.tsx` renders it */}

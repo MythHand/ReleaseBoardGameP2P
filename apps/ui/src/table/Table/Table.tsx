@@ -5,6 +5,7 @@ import LangSwitcher from '@/blocks/LangSwitcher'
 import LobbyCode from '@/blocks/LobbyCode'
 import Rules from '@/blocks/Rules'
 import { CardMotionProvider } from '@/cards/cardMotion'
+import { MAX_SPECTATORS, spectatorLimitColor } from '@/game/spectatorLimit'
 import GearIcon from '@/icons/GearIcon'
 import HeadphonesIcon from '@/icons/HeadphonesIcon'
 import Arrow, { centerOf, useArrow } from '@/primitives/Arrow'
@@ -35,15 +36,6 @@ import { PILE_WIDTH } from './piles'
 import styles from './Table.module.css'
 import type { Panel, TableProps } from './types'
 import { useTableInteractions } from './useTableInteractions'
-
-// светофор для лимита зрителей (зеркало палитры из экрана Lobby):
-// 0–8 зелёный, 9–18 жёлтый, 19–28 красный
-const SPEC_MAX = 28
-function specColorFor(n: number) {
-  if (n <= 8) return '#8fd9b0'
-  if (n <= 18) return '#e3b341'
-  return '#ff6b81'
-}
 
 // Ширина выезжающей панели зависит от типа контента вкладки.
 const DRAWER_WIDTH: Record<Panel, number> = {
@@ -134,7 +126,11 @@ function SettingsField({
 
 // Стол = активное состояние игры. Каждый блок позиционируется независимо
 // (абсолютно), без жёсткой сетки. Заполняет экран без скролла.
-export default function Table({
+export default function Table(props: TableProps) {
+  return <TableView key={props.state.selfId ?? 'spectator'} {...props} />
+}
+
+function TableView({
   state,
   room,
   copy,
@@ -148,7 +144,7 @@ export default function Table({
 }: TableProps) {
   const { you, opponents, decks, turn, history, setup } = state
   const derived = deriveDock(state, state.selfId, now, room.timers ?? true)
-  const dockView = { ...derived, ...dock }
+  const dockView = state.you ? { ...derived, ...dock } : derived
   const {
     role = 'guest',
     code,
@@ -215,7 +211,9 @@ export default function Table({
       arrow.stop()
       return
     }
-    const index = gestures.selected ? you.hand.findIndex((c) => c.uid === gestures.selected) : -1
+    const index = gestures.selected
+      ? (you?.hand.findIndex((c) => c.uid === gestures.selected) ?? -1)
+      : -1
     const slotEl =
       index >= 0
         ? handRef.current?.querySelectorAll<HTMLElement>('[data-hand-slot]')[index]
@@ -301,7 +299,7 @@ export default function Table({
 
   // завершение партии — оверлей поверх стола (триггерится извне)
   const overWinner = over ? participants.find((p) => p.id === over.winnerId) : null
-  const youEliminated = Boolean(you.eliminated)
+  const youEliminated = Boolean(you?.eliminated)
   const disconnectedIds = new Set(room.disconnected ?? [])
 
   const toggle = (p: Panel) => {
@@ -332,7 +330,13 @@ export default function Table({
   return (
     <CardMotionProvider value={parallax}>
       {/* biome-ignore lint/a11y/noStaticElementInteractions: backdrop click-to-cancel for an in-flight target selection; the accessible affordance is the Escape handler above */}
-      <div className={styles.table} onClick={handleTableClick} role="presentation">
+      <div
+        className={styles.table}
+        data-spectator={you === null || undefined}
+        data-seats={opponents.length}
+        onClick={handleTableClick}
+        role="presentation"
+      >
         <HudBackground tone="neutral" className={styles.bgLayer} />
         <Arrow from={arrow.from} to={arrow.to} />
 
@@ -369,7 +373,7 @@ export default function Table({
                 label={copy.table.deck}
                 deck="base"
                 count={count}
-                width={PILE_WIDTH}
+                width={you === null ? 80 : PILE_WIDTH}
                 countPos="tl"
               />
             ))}
@@ -379,7 +383,7 @@ export default function Table({
                   label={copy.table.events}
                   deck="ai"
                   count={decks.events}
-                  width={150}
+                  width={you === null ? 80 : 150}
                   countPos="tl"
                 />
               </div>
@@ -396,38 +400,41 @@ export default function Table({
             heapShow={HEAP_SHOW}
             topCard={decks.discard}
             count={decks.discardCount}
-            width={116}
+            width={you === null ? 80 : 116}
           />
         </div>
 
-        <div className={styles.you}>
-          {youEliminated ? (
-            <Badge size="lg" className={styles.youBadge}>
-              {copy.table.youEliminated}
-            </Badge>
-          ) : (
-            <>
-              <ReleaseZone
-                release={you.release}
-                size="100px"
-                player={state.selfId}
-                onPick={(target) => gestures.onTargetPick(target)}
-                targets={gestures.targets}
-              />
-              <div className={styles.handWrap} ref={handRef}>
-                <Hand
-                  items={you.hand}
-                  onCardClick={(i) => gestures.onCardClick(i)}
-                  accentAt={gestures.accentAt}
+        {you && state.selfId !== null && (
+          <div className={styles.you}>
+            {youEliminated ? (
+              <Badge size="lg" className={styles.youBadge}>
+                {copy.table.youEliminated}
+              </Badge>
+            ) : (
+              <>
+                <ReleaseZone
+                  release={you.release}
+                  size="100px"
+                  player={state.selfId}
+                  onPick={(target) => gestures.onTargetPick(target)}
+                  targets={gestures.targets}
                 />
-              </div>
-            </>
-          )}
-        </div>
+                <div className={styles.handWrap} ref={handRef}>
+                  <Hand
+                    items={you.hand}
+                    onCardClick={(i) => gestures.onCardClick(i)}
+                    accentAt={gestures.accentAt}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        )}
 
         {/* служебный док хода — низ слева, под колодами, слева от руки */}
         <div className={styles.turnDock}>
           <TurnDock
+            spectatorLabel={you === null ? copy.participants.spectator : undefined}
             state={dockView.state}
             danger={dockView.danger}
             seconds={dockView.seconds}
@@ -451,7 +458,7 @@ export default function Table({
             panel while it is discarding, and the actor sees it once it is
             picking — a comparison against one `player` could show it to at
             most one of them */}
-        {state.pending && pendingOwesSelf(state.pending, state.selfId) && (
+        {you && state.pending && pendingOwesSelf(state.pending, state.selfId) && (
           <PendingPrompt
             pending={state.pending}
             hand={you.hand}
@@ -559,9 +566,9 @@ export default function Table({
                         <Slider
                           value={spectatorLimit ?? 0}
                           min={0}
-                          max={SPEC_MAX}
+                          max={MAX_SPECTATORS}
                           onChange={(n) => onSpectatorLimitChange?.(n)}
-                          color={specColorFor(spectatorLimit ?? 0)}
+                          color={spectatorLimitColor(spectatorLimit ?? 0)}
                           fill
                           className={styles.sliderFull}
                         />
@@ -640,6 +647,7 @@ export default function Table({
             attempt={room.reconnect?.attempt ?? 1}
             maxAttempts={room.reconnect?.maxAttempts ?? 5}
             status={room.reconnect?.status ?? 'trying'}
+            reason={room.reconnect?.reason}
             onRetry={room.onReconnectRetry ?? (() => {})}
             onLeave={room.onReconnectLeave ?? (() => {})}
           />

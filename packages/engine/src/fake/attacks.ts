@@ -439,7 +439,7 @@ const coverView = (
 
 // A pending decision is projected to its owner in full; everyone else learns only
 // that the table is waiting on someone.
-export function pendingView(state: GameState, viewerId: PlayerId): PendingView | null {
+export function pendingView(state: GameState, viewerId: PlayerId | null): PendingView | null {
   const p = state.pending
   if (!p) return null
   // Whether this viewer is the one being asked — the gate on every private
@@ -448,7 +448,7 @@ export function pendingView(state: GameState, viewerId: PlayerId): PendingView |
   // that case (its own branch has no private field at all), but the question
   // asked here is "is the engine waiting on you", and there is one answer to
   // that question in this codebase.
-  const mine = pendingOwes(p, viewerId)
+  const mine = viewerId !== null && pendingOwes(p, viewerId)
   switch (p.kind) {
     case 'defend':
       return {
@@ -526,7 +526,7 @@ export function pendingView(state: GameState, viewerId: PlayerId): PendingView |
         // public: the rules oblige the drawer to show it to everyone. null for
         // the ai-error-503 mimic, which has no card standing anywhere.
         card: p.card ? p.card.id : null,
-        methods: [...p.methods],
+        methods: viewerId === null ? [] : [...p.methods],
         ...(p.source ? { source: p.source } : {}),
       }
     case 'crush':
@@ -534,7 +534,7 @@ export function pendingView(state: GameState, viewerId: PlayerId): PendingView |
         kind: 'crush',
         player: p.player,
         slot: p.slot,
-        methods: [...p.methods],
+        methods: viewerId === null ? [] : [...p.methods],
         ...(p.source ? { source: p.source } : {}),
       }
     case 'pickFromDiscard':

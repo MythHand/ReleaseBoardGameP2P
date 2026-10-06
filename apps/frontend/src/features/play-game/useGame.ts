@@ -1,4 +1,4 @@
-import type { Choice, Event, PlayerView, Target } from '@release/engine'
+import type { Choice, Event, GameView, Target } from '@release/engine'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSession } from '~/app/providers/SessionProvider'
 import type { Intent } from '~/network'
@@ -6,9 +6,8 @@ import { clearLog, readLog, writeLog } from '~/shared/lib/persistence'
 import { mergeEvents } from './mergeEvents'
 
 export interface Game {
-  // Null before the first projection arrives, and for a spectator, who holds no
-  // seat to be projected to.
-  view: PlayerView | null
+  // Null until the first private or public projection arrives.
+  view: GameView | null
   events: Event[]
   // The highest event id already reflected in the projection this peer starts
   // from — everything up to it was restored, not played, so the animation
@@ -112,7 +111,10 @@ export function useGame(): Game {
     if (syncEvents.length === 0) return
     // A resend is what this peer already ought to know. It belongs in the feed
     // and in the heap, and it belongs nowhere near the beat queue.
-    if (sync.resync) restoredThrough.current = syncEvents.at(-1)?.id ?? restoredThrough.current
+    restoredThrough.current = Math.max(
+      restoredThrough.current,
+      sync.restoredThrough ?? (sync.resync ? (syncEvents.at(-1)?.id ?? 0) : 0),
+    )
     setEvents((prev) => mergeEvents(prev, syncEvents))
   }, [sync])
 
@@ -130,7 +132,10 @@ export function useGame(): Game {
 
   // An intent carries neither player nor clock — the referee stamps both from
   // the connection it arrived on, so a peer cannot act for another seat.
-  const submit = (intent: Intent) => link?.submit(intent)
+  const submit = (intent: Intent) => {
+    if (sync?.view.self === null) return
+    link?.submit(intent)
+  }
 
   // `events` is one commit behind `view`: the effect above folds a sync into the
   // running feed only after the render that first saw it. The board's deal intro
@@ -160,18 +165,22 @@ export function useGame(): Game {
   // `pending` — and so in the `events` returned below — on THIS render. The ref
   // only advances inside that effect, which runs strictly after this render's
   // layout effects, so reading just `restoredThrough.current` here would lag
-  // the very feed it is supposed to cover. Mirror the effect's own rule
-  // (`events.at(-1)?.id ?? restoredThrough.current`) directly in the
-  // return expression, the same way `pending`/`carried` mirror it for `events`.
+  // the very feed it is supposed to cover. The session retains the exact
+  // catch-up boundary even when live events arrived in the same React batch.
+  // Plain link snapshots can still derive it from their resync flag.
   const restoredBase = sameGame ? restoredThrough.current : (incomingEvents.at(-1)?.id ?? 0)
-  const restoredNow =
-    pending.length > 0 && sync?.resync ? (pending.at(-1)?.id ?? restoredBase) : restoredBase
+  const restoredNow = Math.max(
+    restoredBase,
+    sync?.restoredThrough ?? (sync?.resync ? (pending.at(-1)?.id ?? 0) : 0),
+  )
 
   return {
     view: sync?.view ?? null,
     events: pending.length > 0 ? mergeEvents(carried, pending) : carried,
     restoredThrough: restoredNow,
-    rejections: pendingRefused.length > 0 ? [...rejections, ...pendingRefused] : rejections,
+    rejections:
+      sync?.rejections ??
+      (pendingRefused.length > 0 ? [...rejections, ...pendingRefused] : rejections),
     play: (card, target, combo) => submit({ type: 'PLAY', card, target, combo }),
     draw: (pile) => submit({ type: 'DRAW', pile }),
     push: () => submit({ type: 'PUSH' }),

@@ -16,7 +16,7 @@ it.each([
 ] as const)('positions the %s flight anchor through its named centre place', (name, dx, z) => {
   const { container } = render(<Board {...makeBoardProps()} />)
   const slot = container.querySelector<HTMLElement>(`[data-centre-slot="${name}"]`)
-  expect(slot?.style.insetBlockStart).toBe('42%')
+  expect(slot?.style.insetBlockStart).toBe('var(--table-centre-top, 42%)')
   expect(slot?.style.insetInlineStart).toBe('50%')
   expect(slot?.style.inlineSize).toBe('150px')
   expect(slot?.style.transform).toBe(

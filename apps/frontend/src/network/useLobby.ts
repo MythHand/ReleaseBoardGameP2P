@@ -33,16 +33,24 @@ import {
 import { normalizeChatText } from './chat/journal'
 import { type RoomChatState, useChatSession } from './chat/useChatSession'
 import {
+  getJoinAvailability,
+  parseJoinRequestPayload,
+  resolveJoinAdmission,
+} from './lobby/admission'
+import {
   canStart as canStartFn,
   disbandLobby as disbandLobbyFn,
   handleJoinRequest,
   handleReady,
   handleWhereabouts,
   kick as kickFn,
+  type LobbyActionError,
   MAX_BOTS,
   type Outgoing,
   setBots as setBotsFn,
   setMaxPlayers as setMaxPlayersFn,
+  setMaxSpectators as setMaxSpectatorsFn,
+  setParticipantRole as setParticipantRoleFn,
   transferHost as transferHostFn,
 } from './lobby/host'
 import {
@@ -53,6 +61,7 @@ import {
   createLobbyState,
   effectiveBots,
   type LobbyState,
+  validSpectatorLimit,
 } from './lobby/state'
 import type { GameLink, Sync } from './session/link'
 import { backoffMs, MAX_RECONNECT_ATTEMPTS, type ReconnectEvent } from './session/reconnect'
@@ -67,8 +76,18 @@ import { isRelayable, relayTargets } from './session/relay'
 import { attachKeeper, createRemoteLink } from './session/remoteLink'
 import { restoreSeats } from './session/restore'
 import { createStartGate, type StartGate } from './session/startGate'
+import { accumulateSync, type SyncSnapshot } from './session/syncSnapshot'
 import { createTransport, type Transport } from './transport/peer'
-import type { PeerInfo, Seat, Setup, Where, WireMessage } from './types'
+import type {
+  JoinAvailability,
+  JoinRequestPayload,
+  JoinRole,
+  PeerInfo,
+  Seat,
+  Setup,
+  Where,
+  WireMessage,
+} from './types'
 
 const toChatRole = (role: PeerInfo['role']): ChatRole => (role === 'guest' ? 'spectator' : role)
 
@@ -154,7 +173,7 @@ export type LobbyStatus = 'idle' | 'connecting' | 'in-lobby' | 'kicked' | 'disba
 // copy instead of the raw English PeerJS string. 'not-found' is specifically
 // "no host answers to this code" (PeerJS `peer-unavailable`); everything else
 // is a connection problem.
-export type ErrorKind = 'not-found' | 'connection' | null
+export type ErrorKind = 'not-found' | 'connection' | 'room-full' | null
 
 function classify(type?: string): Exclude<ErrorKind, null> {
   return type === 'peer-unavailable' ? 'not-found' : 'connection'
@@ -162,13 +181,6 @@ function classify(type?: string): Exclude<ErrorKind, null> {
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0
-}
-
-function parseJoinRequestPayload(value: unknown): { name: string; resumeToken: string } | null {
-  if (typeof value !== 'object' || value === null) return null
-  const { name, resumeToken } = value as { name?: unknown; resumeToken?: unknown }
-  if (!isNonEmptyString(name) || !isNonEmptyString(resumeToken)) return null
-  return { name, resumeToken }
 }
 
 function normalizePrivateSeats(value: unknown): PrivateSeat[] | null {
@@ -234,6 +246,7 @@ function normalizeRefereeSeats(value: unknown): RefereeSeat[] | null {
 }
 
 interface NormalizedLobbyConfig {
+  maxSpectators: number
   maxPlayers: number
   setup: Setup
   bots: number
@@ -241,7 +254,8 @@ interface NormalizedLobbyConfig {
 
 function normalizeLobbyConfig(value: unknown): NormalizedLobbyConfig | null {
   if (typeof value !== 'object' || value === null) return null
-  const { maxPlayers, setup, bots } = value as {
+  const { maxPlayers, maxSpectators, setup, bots } = value as {
+    maxSpectators?: unknown
     maxPlayers?: unknown
     setup?: unknown
     bots?: unknown
@@ -260,10 +274,16 @@ function normalizeLobbyConfig(value: unknown): NormalizedLobbyConfig | null {
   ) {
     return null
   }
+  if (maxSpectators !== undefined && !validSpectatorLimit(maxSpectators)) return null
   if (typeof setup !== 'object' || setup === null || Array.isArray(setup)) return null
   const entries = Object.entries(setup)
   if (!entries.every(([, option]) => typeof option === 'string')) return null
-  return { maxPlayers, setup: Object.fromEntries(entries), bots: bots ?? 0 }
+  return {
+    maxPlayers,
+    maxSpectators: maxSpectators ?? 8,
+    setup: Object.fromEntries(entries),
+    bots: bots ?? 0,
+  }
 }
 
 interface NormalizedKeeperSnapshot {
@@ -408,6 +428,13 @@ export interface ReconnectState {
   retry(): void
 }
 
+interface DialOptions {
+  requestedRole: JoinRole
+  resume?: JoinRequestPayload['resume']
+  onDialOutcome?: (outcome: DialOutcome) => void
+  preserveSession?: boolean
+}
+
 export interface UseLobby {
   state: LobbyState | null
   status: LobbyStatus
@@ -432,15 +459,13 @@ export interface UseLobby {
   gameId: string | null
   // The seam the page holds, and nothing else — it cannot tell a bot-driven
   // seat from a remote one, which is what keeps bot play and networked play on
-  // the same code path. Null until a game starts, and for a spectator, who has
-  // no seat to submit from.
+  // the same code path. Null until a game starts; a spectator subscribes to
+  // public updates but has no seat to submit from.
   gameLink: GameLink | null
-  // The most recent projection this peer received. Held here rather than
-  // subscribed to by the page, because the link is born inside the message
-  // handler and the page only mounts after navigating — a SYNC arriving in that
-  // gap would reach an empty listener set and be lost, leaving the player
-  // staring at an empty table until someone else moved.
-  gameSync: Sync | null
+  // Latest projection plus accumulated events and the catch-up watermark.
+  // The session outlives page navigation, so even several SYNCs before Board
+  // mounts (or before React commits) remain available to its history and beats.
+  gameSync: SyncSnapshot | null
   // The seating this match was dealt with, frozen at the deal and held until the
   // match is left. It is NOT derived from `state.peers`: the roster is live and
   // `applyPeerLeft` prunes a peer the instant its channel drops, so seats
@@ -452,7 +477,11 @@ export interface UseLobby {
   errorKind: ErrorKind
   chat: RoomChatState
   createRoom(name: string, maxPlayers: number, setup?: Setup): Promise<string>
-  joinRoom(code: string, name: string): Promise<string>
+  joinRoom(code: string, name: string, requestedRole?: JoinRole): Promise<string>
+  joinAvailability: JoinAvailability | null
+  lobbyActionError: LobbyActionError | null
+  setMaxSpectators(n: number): void
+  setParticipantRole(peerId: string, role: JoinRole): void
   ready(): void
   // Where this peer now is. The host applies its own move locally; a guest sends
   // it and learns the result from the broadcast that comes back — the same split
@@ -515,9 +544,14 @@ export function useLobby(): UseLobby {
   } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [errorKind, setErrorKind] = useState<ErrorKind>(null)
+  const [joinAvailability, setJoinAvailability] = useState<JoinAvailability | null>(null)
+  const [lobbyActionError, setLobbyActionError] = useState<LobbyActionError | null>(null)
   const [gameId, setGameId] = useState<string | null>(null)
   const [gameLink, setGameLink] = useState<GameLink | null>(null)
-  const [gameSync, setGameSync] = useState<Sync | null>(null)
+  const [gameSync, setGameSync] = useState<SyncSnapshot | null>(null)
+  const captureGameSync = useCallback((sync: Sync) => {
+    setGameSync((previous) => accumulateSync(previous, sync))
+  }, [])
   const [seats, setSeats] = useState<Seat[]>([])
   const transportRef = useRef<Transport | null>(null)
   const transportGenerationRef = useRef(0)
@@ -685,7 +719,12 @@ export function useLobby(): UseLobby {
       log: session.log,
       savedAt: Date.now(),
       lobbyConfig: lobby
-        ? { maxPlayers: lobby.maxPlayers, setup: lobby.setup, bots: lobby.bots }
+        ? {
+            maxPlayers: lobby.maxPlayers,
+            maxSpectators: lobby.maxSpectators,
+            setup: lobby.setup,
+            bots: lobby.bots,
+          }
         : undefined,
     }
     if (keeperSaveTimerRef.current !== null) return
@@ -711,11 +750,12 @@ export function useLobby(): UseLobby {
   }, [])
 
   const rememberLobbyConfig = useCallback(
-    (lobby: Pick<LobbyState, 'maxPlayers' | 'setup' | 'bots'>) => {
+    (lobby: Pick<LobbyState, 'maxPlayers' | 'maxSpectators' | 'setup' | 'bots'>) => {
       const stored = readSession()
       if (stored?.role !== 'host') return
       const lobbyConfig: StoredLobbyConfig = {
         maxPlayers: lobby.maxPlayers,
+        maxSpectators: lobby.maxSpectators,
         setup: lobby.setup,
         bots: lobby.bots,
       }
@@ -763,6 +803,8 @@ export function useLobby(): UseLobby {
       setRoomCode(null)
       setError(null)
       setErrorKind(null)
+      setJoinAvailability(null)
+      setLobbyActionError(null)
       setIsHost(false)
       setGameId(null)
       gateRef.current?.cancel()
@@ -885,6 +927,16 @@ export function useLobby(): UseLobby {
       const current = stateRef.current
       if (!current) return
       if (isHostRef.current) {
+        // A code check is read-only: it grants no membership or private sync.
+        if (msg.type === 'ROOM_CHECK') {
+          transportRef.current?.send(msg.from, {
+            type: 'ROOM_AVAILABILITY',
+            payload: getJoinAvailability(current, msg.from, {
+              matchRunning: Boolean(gameIdRef.current),
+            }),
+          })
+          return
+        }
         if (msg.type === 'JOIN_REQUEST') {
           const liveGameId = gameIdRef.current
           const payload = parseJoinRequestPayload((msg as { payload?: unknown }).payload)
@@ -905,32 +957,58 @@ export function useLobby(): UseLobby {
             ? privateSeatsRef.current.find(({ resumeToken }) => resumeToken === payload.resumeToken)
             : undefined
           if (liveGameId && !privateSeat) keeperRef.current?.peerLeft(msg.from)
-          let joinState = current
-          let replacedLobbyPeer: PeerInfo | undefined
-          if (!liveGameId) {
-            const liveCredentialPeer = [...resumeTokensRef.current].find(
-              ([peerId, resumeToken]) => peerId !== msg.from && resumeToken === payload.resumeToken,
-            )
-            if (liveCredentialPeer) {
-              const existing = current.peers[liveCredentialPeer[0]]
-              if (!existing || existing.name !== payload.name) return
-              replacedLobbyPeer = existing
-              joinState = applyPeerLeft(current, existing.id)
-              resumeTokensRef.current.delete(existing.id)
-            }
-            resumeTokensRef.current.set(msg.from, payload.resumeToken)
+          const priorId =
+            privateSeat?.seat.peerId ??
+            [...resumeTokensRef.current].find(
+              ([peerId, token]) => peerId !== msg.from && token === payload.resumeToken,
+            )?.[0]
+          const replacedLobbyPeer =
+            priorId && priorId !== msg.from ? current.peers[priorId] : undefined
+          if (replacedLobbyPeer && !privateSeat && replacedLobbyPeer.name !== payload.name) return
+          const joinState = replacedLobbyPeer
+            ? applyPeerLeft(current, replacedLobbyPeer.id)
+            : current
+          const options = {
+            matchRunning: Boolean(liveGameId),
+            returningSeat: privateSeat?.seat,
+            returningLobbyPeer: replacedLobbyPeer,
+            requestedRole: payload.requestedRole,
           }
+          const decision = resolveJoinAdmission(joinState, msg.from, options)
+          if (!decision.accepted) {
+            void transportRef.current?.disconnectPeer(msg.from, {
+              type: 'JOIN_REJECTED',
+              payload: { reason: decision.reason, availability: decision.availability },
+            })
+            return
+          }
+          // Retire the old address before authenticating or publishing the replacement.
+          // Removing its roster row first makes the synchronous disconnect callback inert.
+          if (priorId && priorId !== msg.from) {
+            commit(joinState)
+            resumeTokensRef.current.delete(priorId)
+            keeperRef.current?.peerLeft(priorId)
+            void transportRef.current?.disconnectPeer(priorId, {
+              type: 'PLAYER_KICKED',
+              payload: { peerId: priorId },
+            })
+          }
+          resumeTokensRef.current.set(msg.from, payload.resumeToken)
           const admission = chatSession.admit(payload.resumeToken)
           const previousRole = replacedLobbyPeer
             ? toChatRole(replacedLobbyPeer.role)
             : privateSeat
               ? 'player'
               : lastKnownChatRole(chatSession.history(), admission.memberId)
-          const r = handleJoinRequest(joinState, msg.from, admission.memberId, payload.name, {
-            matchRunning: Boolean(liveGameId),
-            returningSeat: privateSeat?.seat,
-            returningLobbyPeer: replacedLobbyPeer,
-          })
+          const r = handleJoinRequest(
+            joinState,
+            msg.from,
+            admission.memberId,
+            payload.name,
+            options,
+          )
+          if (!r.accepted) return
+          transportRef.current?.authenticate(msg.from)
           const admittedPeer = r.state.peers[msg.from]
           const nextRole = toChatRole(admittedPeer.role)
           const chatEntries = [
@@ -1035,12 +1113,30 @@ export function useLobby(): UseLobby {
             // peer builds the remote link the projection needs to arrive on.
             keeperRef.current?.peerReturned(seat.playerId, msg.from)
           }
-          if (!liveGameId || seat) transportRef.current?.authenticate(msg.from)
+          if (
+            !seat &&
+            liveGameId &&
+            !(payload.resume?.where === 'lobby' && payload.resume.lastGameId === liveGameId)
+          ) {
+            dispatch([
+              {
+                to: msg.from,
+                message: {
+                  type: 'GAME_STARTING',
+                  payload: { gameId: liveGameId, seats: seatsRef.current },
+                },
+              },
+            ])
+            keeperRef.current?.watch(msg.from)
+          }
         } else if (msg.type === 'PLAYER_READY') {
           const r = handleReady(current, msg.from)
           commit(r.state)
           dispatch(r.outgoing)
         } else if (msg.type === 'WHEREABOUTS') {
+          if (!['lobby', 'game', 'stats'].includes(msg.payload?.where)) return
+          if (msg.payload.where === 'lobby' && current.peers[msg.from]?.role === 'guest')
+            keeperRef.current?.unwatch(msg.from)
           const r = handleWhereabouts(current, msg.from, msg.payload.where)
           commit(r.state)
           dispatch(r.outgoing)
@@ -1065,7 +1161,18 @@ export function useLobby(): UseLobby {
           // The host is a SEAT as well as the relay: a frame everybody watches
           // has to reach its own board too, and it still goes on to the others
           // below rather than stopping here.
-          if (msg.type === 'PICK_PREVIEW') setPickPreview(msg.payload)
+          if (msg.type === 'PICK_PREVIEW') {
+            const seat = seatsRef.current.find(
+              (candidate) => candidate.peerId === msg.from && !candidate.bot,
+            )
+            if (
+              !seat ||
+              msg.payload.gameId !== gameIdRef.current ||
+              msg.payload.player !== seat.playerId
+            )
+              return
+            setPickPreview(msg.payload)
+          }
           // Star topology: the host forwards any other peer-originated message
           // to every other connected peer (never back to the sender or itself),
           // preserving the original sender via relay() rather than re-stamping.
@@ -1091,12 +1198,29 @@ export function useLobby(): UseLobby {
           setPickPreview(msg.payload)
           break
         case 'PEER_LIST':
-          if (fromHost) commit(applyPeerList(current, msg.payload.peers))
+          if (fromHost) {
+            commit(applyPeerList(current, msg.payload.peers))
+            const stored = readSession()
+            if (stored)
+              writeSession({
+                ...stored,
+                participantRole: msg.payload.yourRole === 'guest' ? 'spectator' : 'player',
+              })
+          }
           break
         case 'PEER_JOINED': {
           if (!fromHost) break
           const peer: PeerInfo = { ...msg.payload }
           commit(applyPeerJoined(current, peer))
+          if (peer.id === current.selfId) {
+            const stored = readSession()
+            if (stored)
+              writeSession({
+                ...stored,
+                participantRole: peer.role === 'guest' ? 'spectator' : 'player',
+                where: peer.where,
+              })
+          }
           break
         }
         case 'LOBBY_CONFIG_UPDATED':
@@ -1129,7 +1253,7 @@ export function useLobby(): UseLobby {
             // to be kept by hand (session/remoteLink.ts:34).
             const remote = createRemoteLink({ transport: t, keeperPeerId: current.hostId })
             remoteRef.current = remote
-            remote.link.subscribe(setGameSync)
+            remote.link.subscribe(captureGameSync)
             setGameLink(() => remote.link)
           }
           // A rematch arrives as two separate DataChannel events — this frame,
@@ -1180,7 +1304,7 @@ export function useLobby(): UseLobby {
           break
       }
     },
-    [chatSession, commit, dispatch, applySeats, teardownSession, rememberGame],
+    [chatSession, commit, dispatch, applySeats, teardownSession, rememberGame, captureGameSync],
   )
 
   const createRoom = useCallback(
@@ -1252,6 +1376,7 @@ export function useLobby(): UseLobby {
           joinedAt: Date.now(),
           lobbyConfig: {
             maxPlayers: initial.maxPlayers,
+            maxSpectators: initial.maxSpectators,
             setup: initial.setup,
             bots: initial.bots,
           },
@@ -1276,19 +1401,9 @@ export function useLobby(): UseLobby {
     [chatSession, onMessage, onError, onDisconnect, commit, surfaceSetupError, teardownSession],
   )
 
-  const joinRoom = useCallback(
-    async (
-      code: string,
-      name: string,
-      // Reports this specific dial's connection outcome — never read from a
-      // ref, called directly from the per-call closures below the moment
-      // the outcome is known. Only the guest reconnect loop passes one (its
-      // own `settleAttempt`, one fresh instance per attempt); an ordinary,
-      // player-initiated join passes nothing, so every call below is a
-      // plain no-op for it.
-      onDialOutcome?: (outcome: DialOutcome) => void,
-      preserveSession = false,
-    ) => {
+  const dialRoom = useCallback(
+    async (code: string, name: string, options: DialOptions) => {
+      const { requestedRole, resume, onDialOutcome, preserveSession = false } = options
       if (preserveSession) {
         transportGenerationRef.current += 1
         resetRemoteLink()
@@ -1302,6 +1417,7 @@ export function useLobby(): UseLobby {
       setStatus('connecting')
       setError(null)
       setErrorKind(null)
+      setJoinAvailability(null)
       hostConnectedRef.current = false
       const hostId = parseRoomCode(code)
       const nextRoomCode = formatRoomCode(hostId)
@@ -1314,7 +1430,42 @@ export function useLobby(): UseLobby {
           transportGenerationRef.current === generation && transportRef.current === owner
         const t = await createTransport({
           onMessage: (msg) => {
-            if (ownsTransport()) onMessage(msg)
+            if (!ownsTransport()) return
+            if (
+              msg.from === hostId &&
+              msg.type === 'JOIN_REJECTED' &&
+              msg.payload?.reason === 'room-full'
+            ) {
+              transportGenerationRef.current += 1
+              transportRef.current = null
+              hostConnectedRef.current = false
+              owner?.close()
+              if (!preserveSession) {
+                clearSession()
+                stateRef.current = null
+                setState(null)
+              }
+              setError('room-full')
+              setErrorKind('room-full')
+              setJoinAvailability(msg.payload.availability)
+              setStatus('error')
+              onDialOutcome?.({ ok: false, error: { type: 'room-full' } })
+              return
+            }
+            if (msg.type === 'PEER_LIST') {
+              if (
+                msg.from !== hostId ||
+                !Array.isArray(msg.payload?.peers) ||
+                !msg.payload.peers.some((peer) => peer.id === owner?.id)
+              )
+                return
+              onMessage(msg)
+              hostConnectedRef.current = true
+              setStatus('in-lobby')
+              onDialOutcome?.({ ok: true })
+              return
+            }
+            onMessage(msg)
           },
           onError: (err) => {
             if (!ownsTransport()) return
@@ -1333,25 +1484,25 @@ export function useLobby(): UseLobby {
             if (!ownsTransport()) return
             // Send JOIN_REQUEST exactly when the host DataChannel opens — a
             // setTimeout(0) is not sufficient over real WebRTC because the channel
-            // may not be open after a single macrotask. Only now is the join
-            // confirmed, so flip to 'in-lobby' here rather than optimistically:
-            // a bad/expired code never opens and surfaces as a PeerJS error.
+            // may not be open after a single macrotask. Admission remains pending
+            // until the host confirms this participant in PEER_LIST.
             if (peerId === hostId) {
-              hostConnectedRef.current = true
               owner?.send(hostId, {
                 type: 'JOIN_REQUEST',
-                payload: { name, resumeToken: getResumeToken(nextRoomCode) },
+                payload: {
+                  name,
+                  resumeToken: getResumeToken(nextRoomCode),
+                  requestedRole,
+                  ...(resume ? { resume } : {}),
+                },
               })
-              setStatus('in-lobby')
-              onDialOutcome?.({ ok: true })
             }
           },
         })
         owner = t
         // Torn down mid-await (Cancel/Home bumped the epoch and reset to idle):
         // discard the freshly-opened peer instead of committing it, or the
-        // cancelled attempt resurrects — leaking a live peer and re-arming the
-        // /start "continue game" button for a session the user just left.
+        // cancelled attempt resurrects and leaks a live peer after the user left.
         if (sessionEpochRef.current !== epoch || transportGenerationRef.current !== generation) {
           t.close()
           throw new Error('join cancelled')
@@ -1384,6 +1535,13 @@ export function useLobby(): UseLobby {
           roomCode: nextRoomCode,
           name,
           role: 'guest',
+          participantRole: requestedRole,
+          ...(resume
+            ? {
+                where: resume.where,
+                ...(resume.lastGameId ? { lastGameId: resume.lastGameId } : {}),
+              }
+            : {}),
           gameId: preserveSession ? (gameIdRef.current ?? readSession()?.gameId ?? null) : null,
           joinedAt: Date.now(),
         })
@@ -1406,6 +1564,12 @@ export function useLobby(): UseLobby {
       }
     },
     [onMessage, onError, onDisconnect, commit, resetRemoteLink, surfaceSetupError, teardownSession],
+  )
+
+  const joinRoom = useCallback(
+    (code: string, name: string, requestedRole: JoinRole = 'player') =>
+      dialRoom(code, name, { requestedRole }),
+    [dialRoom],
   )
 
   // Runs once on mount, before anything else can create a transport. A stored
@@ -1510,6 +1674,7 @@ export function useLobby(): UseLobby {
           selfId: t.id,
           hostId: t.id,
           maxPlayers: lobbyConfig?.maxPlayers ?? 6,
+          maxSpectators: lobbyConfig?.maxSpectators ?? 8,
           bots: lobbyConfig?.bots ?? 0,
           setup: lobbyConfig?.setup ?? DEFAULT_SETUP,
           peers: [
@@ -1577,7 +1742,8 @@ export function useLobby(): UseLobby {
         onCommit: persistKeeper,
       })
       keeperRef.current = keeper
-      keeper.link.subscribe(setGameSync)
+      setGameSync(null)
+      keeper.link.subscribe(captureGameSync)
       setGameLink(() => keeper.link)
 
       // Only the host is here; everyone else re-dials. Their JOIN_REQUEST
@@ -1588,6 +1754,7 @@ export function useLobby(): UseLobby {
           selfId: t.id,
           hostId: t.id,
           maxPlayers: lobbyConfig?.maxPlayers ?? 6,
+          maxSpectators: lobbyConfig?.maxSpectators ?? 8,
           bots: lobbyConfig?.bots ?? 0,
           setup: (lobbyConfig?.setup as Setup | undefined) ?? normalized.state.setup,
           peers: [
@@ -1634,6 +1801,7 @@ export function useLobby(): UseLobby {
     persistKeeper,
     rememberLobbyConfig,
     surfaceSetupError,
+    captureGameSync,
   ])
 
   const pushReconnectEvent = useCallback((kind: ReconnectEvent['kind'], attempt: number) => {
@@ -1681,6 +1849,7 @@ export function useLobby(): UseLobby {
       // other attempt, past or future, has any way to reach it. The
       // `alreadySettled` guard is what gives it Promise-like "first call
       // wins" semantics without actually needing a Promise for the plumbing.
+      let terminal = false
       let alreadySettled = false
       let resolveAttempt: (() => void) | undefined
       let rejectAttempt: ((err: unknown) => void) | undefined
@@ -1692,7 +1861,10 @@ export function useLobby(): UseLobby {
         if (alreadySettled) return
         alreadySettled = true
         if (outcome.ok) resolveAttempt?.()
-        else rejectAttempt?.(outcome.error)
+        else {
+          terminal = (outcome.error as { type?: string })?.type === 'room-full'
+          rejectAttempt?.(outcome.error)
+        }
       }
       // The one place this attempt's handle becomes reachable from outside
       // this closure — installed so leaveSession (a different function
@@ -1705,7 +1877,19 @@ export function useLobby(): UseLobby {
 
       let connected = false
       try {
-        await joinRoom(stored.roomCode, stored.name, settleAttempt, true)
+        await dialRoom(stored.roomCode, stored.name, {
+          requestedRole: stored.participantRole === 'spectator' ? 'spectator' : 'player',
+          ...(stored.where
+            ? {
+                resume: {
+                  where: stored.where,
+                  lastGameId: stored.gameId ?? stored.lastGameId ?? null,
+                },
+              }
+            : {}),
+          onDialOutcome: settleAttempt,
+          preserveSession: true,
+        })
         if (reconnectEpochRef.current === runEpoch && sessionEpochRef.current === sessionEpoch) {
           await settled
           connected = true
@@ -1745,7 +1929,7 @@ export function useLobby(): UseLobby {
         return
       }
 
-      if (attempt === MAX_RECONNECT_ATTEMPTS) {
+      if (terminal || attempt === MAX_RECONNECT_ATTEMPTS) {
         pushReconnectEvent('failed', attempt)
         setReconnectStatus('failed')
         return
@@ -1753,7 +1937,7 @@ export function useLobby(): UseLobby {
       pushReconnectEvent('backoff', attempt)
       await new Promise((resolve) => setTimeout(resolve, backoffMs(attempt)))
     }
-  }, [joinRoom, pushReconnectEvent])
+  }, [dialRoom, pushReconnectEvent])
 
   // Starts a fresh run from attempt 1. Guarded to only actually start one
   // while the previous run is 'trying' or 'failed' — the overlay's retry
@@ -1836,6 +2020,8 @@ export function useLobby(): UseLobby {
       const t = transportRef.current
       const current = stateRef.current
       if (!t || !current) return
+      const stored = readSession()
+      if (stored) writeSession({ ...stored, where })
       if (isHostRef.current) {
         const r = handleWhereabouts(current, current.selfId, where)
         commit(r.state)
@@ -1860,7 +2046,12 @@ export function useLobby(): UseLobby {
         memberId: peer.memberId,
         name: peer.name,
       })
+      keeperRef.current?.peerLeft(peerId)
       commit(r.state)
+      void transportRef.current?.disconnectPeer(peerId, {
+        type: 'PLAYER_KICKED',
+        payload: { peerId },
+      })
       dispatch(r.outgoing)
       broadcastChatEntries([entry])
     },
@@ -1871,7 +2062,12 @@ export function useLobby(): UseLobby {
     (n: number) => {
       const current = stateRef.current
       if (!current || !isHostRef.current) return
+      if (gameIdRef.current) {
+        setLobbyActionError('match-running')
+        return
+      }
       const r = setMaxPlayersFn(current, n)
+      setLobbyActionError(r.error ?? null)
       const changedMembers = new Set<string>()
       const entries = Object.values(r.state.peers).flatMap((peer) => {
         if (changedMembers.has(peer.memberId)) return []
@@ -1895,6 +2091,45 @@ export function useLobby(): UseLobby {
       broadcastChatEntries(entries)
     },
     [broadcastChatEntries, chatSession, commit, dispatch, rememberLobbyConfig],
+  )
+
+  const setMaxSpectators = useCallback(
+    (n: number) => {
+      const current = stateRef.current
+      if (!current || !isHostRef.current) return
+      const r = setMaxSpectatorsFn(current, n)
+      setLobbyActionError(r.error ?? null)
+      commit(r.state)
+      rememberLobbyConfig(r.state)
+      dispatch(r.outgoing)
+      if (gameIdRef.current && sessionRef.current) {
+        lastSavedRef.current = null
+        persistKeeper(sessionRef.current.current)
+      }
+    },
+    [commit, dispatch, rememberLobbyConfig, persistKeeper],
+  )
+
+  const setParticipantRole = useCallback(
+    (peerId: string, role: JoinRole) => {
+      const current = stateRef.current
+      if (!current || !isHostRef.current) return
+      const r = setParticipantRoleFn(current, peerId, role, Boolean(gameIdRef.current))
+      setLobbyActionError(r.error ?? null)
+      if (r.state === current) return
+      commit(r.state)
+      dispatch(r.outgoing)
+      const peer = r.state.peers[peerId]
+      broadcastChatEntries([
+        chatSession.appendSystem({
+          kind: 'roleChanged',
+          memberId: peer.memberId,
+          name: peer.name,
+          role: toChatRole(peer.role),
+        }),
+      ])
+    },
+    [commit, dispatch, broadcastChatEntries, chatSession],
   )
 
   const setBots = useCallback(
@@ -1973,6 +2208,7 @@ export function useLobby(): UseLobby {
   // a finished game, so its commits are reference-identical and never queue a
   // write.
   const leaveGame = useCallback(() => {
+    setWhere('lobby')
     gameIdRef.current = null
     setGameId(null)
     cancelKeeperSave()
@@ -1980,7 +2216,7 @@ export function useLobby(): UseLobby {
     // A room outlives the match played in it, so walking the record back to
     // `gameId: null` keeps it restorable.
     rememberGame(null)
-  }, [cancelKeeperSave, rememberGame])
+  }, [cancelKeeperSave, rememberGame, setWhere])
 
   const setSetup = useCallback(
     (setup: Setup) => {
@@ -2046,6 +2282,9 @@ export function useLobby(): UseLobby {
         engine,
         seed,
         players,
+        spectators: Object.values(stateRef.current?.peers ?? {})
+          .filter((peer) => peer.role === 'guest')
+          .map((peer) => peer.id),
         setup,
         deck: FAKE_DECK,
         events: FAKE_EVENTS,
@@ -2064,12 +2303,13 @@ export function useLobby(): UseLobby {
         onCommit: persistKeeper,
       })
       keeperRef.current = keeper
-      keeper.link.subscribe(setGameSync)
+      setGameSync(null)
+      keeper.link.subscribe(captureGameSync)
       setGameLink(() => keeper.link)
 
       return { engine, session, keeper }
     },
-    [persistKeeper],
+    [persistKeeper, captureGameSync],
   )
 
   // Host-only: tell the table to follow, then move. The board route is keyed by
@@ -2181,7 +2421,12 @@ export function useLobby(): UseLobby {
     const id = gameIdRef.current
     const current = stateRef.current
     // No game means nothing to report into: send nothing, touch nothing.
-    if (!id || !current) return
+    if (
+      !id ||
+      !current ||
+      !seatsRef.current.some((seat) => seat.peerId === current.selfId && !seat.bot)
+    )
+      return
     if (isHostRef.current) {
       const t = transportRef.current
       if (t) keeperRef.current?.introReady(t.id)
@@ -2197,7 +2442,14 @@ export function useLobby(): UseLobby {
     (player: PlayerId, card: string | null) => {
       const id = gameIdRef.current
       const current = stateRef.current
-      if (!id || !current) return
+      if (
+        !id ||
+        !current ||
+        !seatsRef.current.some(
+          (seat) => seat.peerId === current.selfId && seat.playerId === player && !seat.bot,
+        )
+      )
+        return
       const message = { type: 'PICK_PREVIEW' as const, payload: { gameId: id, player, card } }
       dispatch([{ to: isHostRef.current ? 'broadcast' : current.hostId, message }])
     },
@@ -2250,6 +2502,8 @@ export function useLobby(): UseLobby {
       seats,
       error,
       errorKind,
+      joinAvailability,
+      lobbyActionError,
       chat: {
         entries: chatSession.entries,
         notificationEntryIds: chatSession.notificationEntryIds,
@@ -2262,6 +2516,8 @@ export function useLobby(): UseLobby {
       setWhere,
       kick,
       setMaxPlayers,
+      setMaxSpectators,
+      setParticipantRole,
       setBots,
       transferHost,
       setSetup,
@@ -2290,6 +2546,8 @@ export function useLobby(): UseLobby {
       seats,
       error,
       errorKind,
+      joinAvailability,
+      lobbyActionError,
       chatSession.entries,
       chatSession.notificationEntryIds,
       chatSession.selfMemberId,
@@ -2300,6 +2558,8 @@ export function useLobby(): UseLobby {
       setWhere,
       kick,
       setMaxPlayers,
+      setMaxSpectators,
+      setParticipantRole,
       setBots,
       transferHost,
       setSetup,

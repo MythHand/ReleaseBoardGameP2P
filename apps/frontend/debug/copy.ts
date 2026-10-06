@@ -12,6 +12,7 @@ const en = {
   // game has the cards it has.
   cardsOff: 'cards do not add up',
   noAction: 'No action yet',
+  viewerSpectator: 'View: guest spectator',
   viewerYou: 'View: attacker',
   viewerOpponent: 'View: opponent',
   viewerObserver: 'View: observer',
@@ -92,6 +93,7 @@ const ru: Record<keyof typeof en, string> = {
   trace: 'Последнее действие и события движка',
   cardsOff: 'карты не сходятся',
   noAction: 'Действий пока нет',
+  viewerSpectator: 'Вид: гость-зритель',
   viewerYou: 'Вид: атакующий',
   viewerOpponent: 'Вид: соперник',
   viewerObserver: 'Вид: наблюдатель',

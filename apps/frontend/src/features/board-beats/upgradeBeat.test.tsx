@@ -371,7 +371,7 @@ it.each([
   expect(result.pending).toBeNull()
   if (player === 'p1') {
     expect(timeline.arrivals).toHaveBeenCalledWith([expect.objectContaining({ key: 'chosen' })], 0)
-    expect(result.you.hand.map((c) => c.uid)).toEqual(['chosen'])
+    expect(result.you?.hand.map((c) => c.uid)).toEqual(['chosen'])
     expect(timeline.motions).not.toContain('dealToSeat')
   } else {
     expect(timeline.arrivals).not.toHaveBeenCalled()

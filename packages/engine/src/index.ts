@@ -41,11 +41,13 @@ export { aiCardsPresent, cardsPresent, pendingOwes, seatOwing } from './state'
 export type { PlayerTally, Tallies } from './tally'
 export { emptyTally, foldTally, seedTally } from './tally'
 export type {
+  GameView,
   OpponentView,
   PendingView,
   PlayerView,
   ReleasedView,
   ReleaseView,
   ShownView,
+  SpectatorView,
   WindowView,
 } from './view'

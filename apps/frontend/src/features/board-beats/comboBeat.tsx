@@ -112,7 +112,9 @@ export function useComboBeat(
       // By id, first match — two copies of one card in hand fold from the
       // FIRST slot (the same simplification `sourceOf` makes). Invisible on
       // screen; noted so it is not rediscovered as a bug.
-      const handIndex = mine ? ctx.base.you.hand.findIndex((h) => h.card.id === cardId) : -1
+      const handIndex = mine
+        ? (ctx.base.you?.hand.findIndex((h) => h.card.id === cardId) ?? -1)
+        : -1
       // Put out at the centre first (resolution.md §1): the play starts where
       // its cards stand, and their standing render goes down in the same commit
       // the carrier taking them over goes up.
@@ -121,10 +123,10 @@ export function useComboBeat(
       // same commit: our fan on a rejoin, or the count of theirs. Left to the
       // projection, the seat counted the card for the whole flight to the
       // centre and on to the zone (#168).
-      const held = handIndex >= 0 ? ctx.base.you.hand[handIndex] : undefined
+      const held = handIndex >= 0 ? ctx.base.you?.hand[handIndex] : undefined
       const heldAux =
         held && auxId
-          ? ctx.base.you.hand.find((h, i) => i !== handIndex && h.card.id === auxId)
+          ? ctx.base.you?.hand.find((h, i) => i !== handIndex && h.card.id === auxId)
           : undefined
       const takeOver = () => {
         if (shown) {
@@ -324,7 +326,7 @@ export function useComboBeat(
         await wait(SHOW_HOLD)
         // Hand back the staged node and remove the spent instances from the
         // shadow in the same commit as the discard carrier takes over.
-        if (mine) {
+        if (mine && ctx.base.you) {
           const hand = [...ctx.base.you.hand]
           for (const spent of plan.spent) {
             const uid = spent.card === plan.card ? handoff?.mainUid : handoff?.supportUid
@@ -703,7 +705,7 @@ export function useComboBeat(
       // stood empty from the landing until the queue handed over (#168).
       const slot = plan.slot as ZoneSlot
       const inZone = (): Landing[] => {
-        const uid = plan.player === ctx.base.selfId ? ctx.after?.you.releaseUid?.[slot] : undefined
+        const uid = plan.player === ctx.base.selfId ? ctx.after?.you?.releaseUid?.[slot] : undefined
         return [
           {
             kind: 'zone',

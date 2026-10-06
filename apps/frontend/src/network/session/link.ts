@@ -1,4 +1,4 @@
-import type { Event, PlayerId, PlayerView } from '@release/engine'
+import type { Event, GameView, PlayerId } from '@release/engine'
 import type { Intent } from '../types'
 import {
   advanceSession,
@@ -10,7 +10,7 @@ import {
 } from './referee'
 
 export interface Sync {
-  view: PlayerView
+  view: GameView
   events: Event[]
   resync?: boolean
 }

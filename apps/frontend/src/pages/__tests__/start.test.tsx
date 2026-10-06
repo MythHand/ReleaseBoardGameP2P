@@ -4,12 +4,11 @@ import { beforeEach, vi } from 'vitest'
 import type { UseLobby } from '~/entities/lobby'
 import { clearSession } from '~/shared/lib/persistence'
 import StartPage from '../start'
-import styles from '../start.module.css'
 
 vi.mock('@release/translation', () => ({
   useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'ru' } }),
 }))
-// сетевые хуки — заглушки (логика сессии не нужна для рендера экрана)
+// Network hooks are stubbed: the menu must not start a connection.
 vi.mock('~/features/create-lobby/useCreateLobby', () => ({ useCreateLobby: () => vi.fn() }))
 vi.mock('~/features/join-lobby/useJoinLobby', () => ({ useJoinLobby: () => vi.fn() }))
 
@@ -27,8 +26,6 @@ beforeEach(() => {
   clearSession()
 })
 
-// Стартовая страница теперь рендерит полированный <Start> из @release/ui (наш дизайн):
-// создание/вход — через кнопки-модалки + колбэки в сессию, без ссылок на /lobby.
 it('renders the start screen with create and join actions', () => {
   sessionValue = { status: 'idle', state: null, roomCode: null }
   render(
@@ -40,13 +37,14 @@ it('renders the start screen with create and join actions', () => {
   expect(screen.getByText('start.joinGame')).toBeTruthy()
 })
 
-it('shows an interactive continue session button when session is active', () => {
+it('does not offer an active session on the start screen', () => {
   sessionValue = {
     status: 'in-lobby',
     state: {
       selfId: 'h',
       hostId: 'h',
       maxPlayers: 4,
+      maxSpectators: 8,
       bots: 0,
       setup: {},
       peers: {
@@ -67,27 +65,22 @@ it('shows an interactive continue session button when session is active', () => 
       <StartPage />
     </MemoryRouter>,
   )
-  const btn = screen.getByText('start.continueSession').closest('button')
-  expect(btn?.className ?? '').not.toContain(styles.hiddenSlot)
-  expect(btn?.disabled).toBe(false)
+  expect(screen.queryByText('start.continueSession')).toBeNull()
+  expect(screen.getByRole('menuitem', { name: '[start.createGame]' })).toBeTruthy()
+  expect(screen.getByRole('menuitem', { name: '[start.joinGame]' })).toBeTruthy()
 })
 
-// The button stays mounted (just hidden + inert) so toggling a session never
-// reflows the vertically-centred menu column — see start.tsx.
-it('keeps the continue session slot reserved but hidden when no session', () => {
+it('has no reserved session action when idle', () => {
   sessionValue = { status: 'idle', state: null, roomCode: null }
   render(
     <MemoryRouter>
       <StartPage />
     </MemoryRouter>,
   )
-  const btn = screen.getByText('start.continueSession').closest('button')
-  expect(btn?.className ?? '').toContain(styles.hiddenSlot)
-  expect(btn?.disabled).toBe(true)
-  expect(btn?.getAttribute('aria-hidden')).toBe('true')
+  expect(screen.queryByText('start.continueSession')).toBeNull()
 })
 
-it('offers to continue a stored session after a reload, with no live session', () => {
+it('does not offer a stored session on the start screen', () => {
   sessionStorage.setItem(
     'release:session',
     JSON.stringify({
@@ -105,6 +98,7 @@ it('offers to continue a stored session after a reload, with no live session', (
       <StartPage />
     </MemoryRouter>,
   )
-  const btn = screen.getByText('start.continueSession').closest('button')
-  expect(btn?.hasAttribute('disabled')).toBe(false)
+  expect(screen.queryByText('start.continueSession')).toBeNull()
+  expect(screen.getByRole('menuitem', { name: '[start.createGame]' })).toBeTruthy()
+  expect(screen.getByRole('menuitem', { name: '[start.joinGame]' })).toBeTruthy()
 })

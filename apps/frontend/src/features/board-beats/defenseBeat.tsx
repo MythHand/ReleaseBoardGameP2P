@@ -138,7 +138,9 @@ export function useDefenseBeat(
         // destination is the honest answer to "it is here and I cannot say
         // where it came from": the card stands, in its own pose, and the
         // exchange leaves from something real.
-        const handIndex = mine ? ctx.base.you.hand.findIndex((h) => h.card.id === plan.card) : -1
+        const handIndex = mine
+          ? (ctx.base.you?.hand.findIndex((h) => h.card.id === plan.card) ?? -1)
+          : -1
         const seat = a.seatBox(plan.defender)
         const from = (handIndex >= 0 ? rectOf(a.handSlotAt(handIndex)) : null) ?? seat ?? coverBox
         const raised = flyer.raise([
@@ -151,7 +153,7 @@ export function useDefenseBeat(
         ])
         // …and the place it left stops drawing it in the commit its carrier goes
         // up: our fan, or the count of the hand it came out of (`cardPlace.ts`)
-        const held = handIndex >= 0 ? ctx.base.you.hand[handIndex] : undefined
+        const held = handIndex >= 0 ? ctx.base.you?.hand[handIndex] : undefined
         liftOff(
           ctx,
           held
@@ -369,7 +371,7 @@ export function useDefenseBeat(
             ? rectOf(a.releaseSlot(plan.player, plan.slot))
             : null
         const handIndex = mine
-          ? ctx.base.you.hand.findIndex((h) => h.card.id === plan.spent[0]?.card)
+          ? (ctx.base.you?.hand.findIndex((h) => h.card.id === plan.spent[0]?.card) ?? -1)
           : -1
         const from =
           fromSlot ??
@@ -387,7 +389,7 @@ export function useDefenseBeat(
         // …and the place it left stops drawing it in the commit its carrier goes
         // up, as `runCovered`'s does: the sacrificed release's zone (its Code
         // Review with it), our fan, or the count of the hand it came out of
-        const held = handIndex >= 0 ? ctx.base.you.hand[handIndex] : undefined
+        const held = handIndex >= 0 ? ctx.base.you?.hand[handIndex] : undefined
         liftOff(
           ctx,
           plan.method === 'sacrifice' && plan.slot
@@ -614,7 +616,7 @@ export function useDefenseBeat(
         })
       }
       await play('playToCenter', el, { to })?.finished
-      const uid = plan.to === ctx.base.selfId ? ctx.after?.you.releaseUid?.[slot] : undefined
+      const uid = plan.to === ctx.base.selfId ? ctx.after?.you?.releaseUid?.[slot] : undefined
       setDown(
         ctx,
         [{ kind: 'zone', player: plan.to, slot, card: plan.card, ...(uid ? { uid } : {}) }],

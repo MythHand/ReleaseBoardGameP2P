@@ -1,9 +1,11 @@
+import { MAX_SPECTATORS } from '@release/ui'
 import type { PeerInfo, Setup } from '../types'
 
 export interface LobbyState {
   selfId: string
   hostId: string
   maxPlayers: number
+  maxSpectators: number
   // How many bots the host has ASKED for — a ceiling, not a reservation. What
   // the table can actually seat is `effectiveBots` below, which shrinks as
   // people take the seats and grows back when they leave. Storing the request
@@ -18,6 +20,7 @@ export function createLobbyState(args: {
   selfId: string
   hostId: string
   maxPlayers: number
+  maxSpectators?: number
   bots?: number
   setup?: Setup
   peers: PeerInfo[]
@@ -28,6 +31,7 @@ export function createLobbyState(args: {
     selfId: args.selfId,
     hostId: args.hostId,
     maxPlayers: args.maxPlayers,
+    maxSpectators: validSpectatorLimit(args.maxSpectators) ? args.maxSpectators : 8,
     bots: args.bots ?? 0,
     setup: args.setup ?? {},
     peers,
@@ -57,6 +61,7 @@ export function applyPeerList(state: LobbyState, peers: PeerInfo[]): LobbyState 
     selfId: state.selfId,
     hostId: state.hostId,
     maxPlayers: state.maxPlayers,
+    maxSpectators: state.maxSpectators,
     // Forwarded like every other field here: rebuilding through
     // createLobbyState without it would silently reset a guest's bot count
     // to the `?? 0` default on every PEER_LIST, undoing whatever
@@ -79,12 +84,23 @@ export function applyPeerLeft(state: LobbyState, peerId: string): LobbyState {
 
 export function applyConfig(
   state: LobbyState,
-  patch: { maxPlayers?: number; setup?: Setup; bots?: number },
+  patch: { maxSpectators?: number; maxPlayers?: number; setup?: Setup; bots?: number },
 ): LobbyState {
   return {
     ...state,
+    ...(validSpectatorLimit(patch.maxSpectators) && { maxSpectators: patch.maxSpectators }),
     ...(patch.maxPlayers !== undefined && { maxPlayers: patch.maxPlayers }),
     ...(patch.setup !== undefined && { setup: patch.setup }),
     ...(patch.bots !== undefined && { bots: patch.bots }),
   }
+}
+
+export function validSpectatorLimit(value: unknown): value is number {
+  return (
+    typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= MAX_SPECTATORS
+  )
+}
+
+export function spectatorCount(state: LobbyState): number {
+  return Object.values(state.peers).filter((peer) => peer.role === 'guest').length
 }

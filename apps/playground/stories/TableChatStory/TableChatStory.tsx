@@ -4,7 +4,7 @@ import Chat, { type ChatMessage, type ChatRole } from '@/blocks/Chat'
 import { ToastStack } from '@/blocks/Toast'
 import { VoiceNotices, VoicePanel, VoiceTabIcon } from '@/blocks/VoiceChat'
 import { CHAT_SELF, makeChat } from '@/mocks/chat'
-import { makeTable } from '@/mocks/table'
+import { makeSpectatorTable, makeTable } from '@/mocks/table'
 import Message from '@/primitives/Message'
 import Table from '@/table/Table'
 import type { Panel } from '@/table/Table/types'
@@ -99,6 +99,8 @@ export default function TableChatStory() {
   const [opps, setOpps] = useState(3)
   const [end, setEnd] = useState<string | null>(null)
   const [view, setView] = useState<ViewState | null>(null)
+  const [viewer, setViewer] = useState<'player' | 'spectator'>('player')
+  const [entry, setEntry] = useState<'live' | 'late' | 'reconnect' | 'results'>('live')
   const [role, setRole] = useState<'host' | 'guest'>('host')
   const [dock, setDock] = useState<DockDemo>('push')
   const [specLimit, setSpecLimit] = useState(8)
@@ -271,6 +273,26 @@ export default function TableChatStory() {
     <div className={styles.root}>
       <TechBar>
         <TechSwitch
+          label={pick(lang, { ru: 'участие', en: 'viewer' })}
+          options={[
+            { value: 'player', label: pick(lang, { ru: 'игрок', en: 'player' }) },
+            { value: 'spectator', label: pick(lang, { ru: 'зритель', en: 'spectator' }) },
+          ]}
+          value={viewer}
+          onChange={setViewer}
+        />
+        <TechSwitch
+          label={pick(lang, { ru: 'вход', en: 'entry' })}
+          options={[
+            { value: 'live', label: 'live' },
+            { value: 'late', label: 'late join' },
+            { value: 'reconnect', label: 'reconnect' },
+            { value: 'results', label: 'results' },
+          ]}
+          value={entry}
+          onChange={setEntry}
+        />
+        <TechSwitch
           options={[
             { value: 'host', label: 'host' },
             { value: 'guest', label: 'guest' },
@@ -325,7 +347,11 @@ export default function TableChatStory() {
       </TechBar>
       <div className={styles.stage}>
         <Table
-          state={storyState}
+          state={
+            viewer === 'spectator'
+              ? makeSpectatorTable(([2, 3, 4, 5, 6] as const).find((n) => n === opps + 1) ?? 2)
+              : storyState
+          }
           room={{
             role,
             code: '4F2A-9K',
@@ -348,7 +374,8 @@ export default function TableChatStory() {
             pauseSelfId: 'you',
             pauseHostId,
             onPauseToggleReady: toggleSelfReady,
-            connection: view === 'youDisconnect' ? 'reconnecting' : 'online',
+            connection:
+              view === 'youDisconnect' || entry === 'reconnect' ? 'reconnecting' : 'online',
             disconnected,
           }}
           copy={{
@@ -398,7 +425,8 @@ export default function TableChatStory() {
                     {
                       id: `local-${prev.length}`,
                       who: CHAT_SELF,
-                      role: role === 'host' ? 'host' : 'player',
+                      role:
+                        viewer === 'spectator' ? 'spectator' : role === 'host' ? 'host' : 'player',
                       text,
                       time: '20:41',
                     },
@@ -431,7 +459,13 @@ export default function TableChatStory() {
           }}
           panel={panel}
           onPanelChange={setPanel}
-          over={variant ? { winnerId: variant.winnerId, condition: variant.condition } : null}
+          over={
+            entry === 'results'
+              ? { winnerId: 'p2', condition: 'release' }
+              : variant
+                ? { winnerId: variant.winnerId, condition: variant.condition }
+                : null
+          }
           actions={{ onOverContinue: () => setEnd(null) }}
           now={now}
           dock={{

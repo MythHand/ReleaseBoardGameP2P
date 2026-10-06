@@ -8,9 +8,12 @@ import {
   HudBackground,
   LangSwitcher,
   LobbyCode,
+  MAX_SPECTATORS,
   Modal,
   PlayerSlot,
+  ScrollArea,
   Slider,
+  spectatorLimitColor,
   Toggle,
   Typography,
 } from '@release/ui'
@@ -119,11 +122,28 @@ export default function LobbyView() {
     )
   }
 
-  // Kick is the only moderation action the protocol backs today — role changes
-  // (make spectator/player) have no wire message, so the menu carries just this.
-  const kickItems = (id: string) => [
-    { label: t('lobbyScreen.kick'), danger: true, onClick: () => session.kick(id) },
-  ]
+  const moderationItems = (peer: PeerInfo) => {
+    const toSpectator = peer.role !== 'guest'
+    const full = toSpectator
+      ? spectators.length >= state.maxSpectators
+      : players.length >= state.maxPlayers
+    const running = session.gameId !== null
+    return [
+      {
+        label: t(toSpectator ? 'lobbyScreen.makeSpectator' : 'lobbyScreen.makePlayer'),
+        disabled: full || running || peer.where !== 'lobby',
+        hint: t(
+          running
+            ? 'lobbyScreen.errors.match-running'
+            : full
+              ? 'lobbyScreen.noSlot'
+              : 'lobbyScreen.errors.invalid-target',
+        ),
+        onClick: () => session.setParticipantRole(peer.id, toSpectator ? 'spectator' : 'player'),
+      },
+      { label: t('lobbyScreen.kick'), danger: true, onClick: () => session.kick(peer.id) },
+    ]
+  }
 
   return (
     <div className={styles.lobby}>
@@ -197,7 +217,7 @@ export default function LobbyView() {
 
         {/* Right — players, spectators, lobby controls */}
         <section className={styles.players}>
-          <div className={styles.scrollArea}>
+          <ScrollArea className={styles.scrollArea}>
             <Typography variant="sectionTitle" className={styles.h}>
               {t('lobbyScreen.players')}
               <Typography base="mono-md" tk="tk-10" as="span" className={styles.count}>
@@ -233,7 +253,7 @@ export default function LobbyView() {
                     }
                     status={renderStatus(p)}
                     dropdownLabel={t('lobbyScreen.actions')}
-                    dropdown={isHost && p.id !== state.selfId ? kickItems(p.id) : undefined}
+                    dropdown={isHost && p.id !== state.selfId ? moderationItems(p) : undefined}
                   />
                 ) : bot ? (
                   // Removal goes through the same ⋯ menu that kicks a person, and
@@ -276,9 +296,27 @@ export default function LobbyView() {
             <Typography variant="sectionTitle" className={`${styles.h} ${styles.hSpectators}`}>
               {t('lobbyScreen.spectators')}
               <Typography base="mono-md" tk="tk-10" as="span" className={styles.count}>
-                {spectators.length}
+                {spectators.length} / {state.maxSpectators}
               </Typography>
             </Typography>
+
+            {isHost && (
+              <Slider
+                className={styles.capRow}
+                label={t('lobbyScreen.specLimit')}
+                value={state.maxSpectators}
+                min={0}
+                max={MAX_SPECTATORS}
+                color={spectatorLimitColor(state.maxSpectators)}
+                fill
+                onChange={session.setMaxSpectators}
+              />
+            )}
+            {isHost && session.lobbyActionError && (
+              <Typography as="div" base="body" role="alert">
+                {t(`lobbyScreen.errors.${session.lobbyActionError}`)}
+              </Typography>
+            )}
 
             <div className={styles.list}>
               {spectators.map((s) => (
@@ -289,12 +327,12 @@ export default function LobbyView() {
                   youLabel={t('lobbyScreen.you')}
                   status={<Badge tone="muted">{t('lobbyScreen.roleGuest')}</Badge>}
                   dropdownLabel={t('lobbyScreen.actions')}
-                  dropdown={isHost ? kickItems(s.id) : undefined}
+                  dropdown={isHost ? moderationItems(s) : undefined}
                 />
               ))}
               {spectators.length === 0 && <EmptySlot>{t('lobbyScreen.noSpectators')}</EmptySlot>}
             </div>
-          </div>
+          </ScrollArea>
 
           {/* [ READY ] repeats the toggle in my own row — same action, same state,
               green while on; the host's [ START ] goes under it. A spectator has

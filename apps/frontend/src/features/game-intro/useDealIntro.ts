@@ -1,4 +1,4 @@
-import type { Event, PlayerView } from '@release/engine'
+import type { Event, GameView } from '@release/engine'
 import type { CardData, HandItem } from '@release/ui'
 // CARD_W is the fan's own width, taken from the kit rather than restated here:
 // the sibling arrival step already imports it, and a second copy would let the
@@ -113,7 +113,8 @@ export function useDealIntro(args: {
   // Which match this is. The intro plays once per game, and this is what says
   // "per game" — see `gameKey` below for why the projection cannot answer it.
   gameId: string | null
-  view: PlayerView | null
+  view: GameView | null
+  restoredThrough?: number
   events: Event[]
   refs: BoardAnchors
   onDone: () => void
@@ -145,8 +146,24 @@ export function useDealIntro(args: {
 
   // Everything the long-running sequence reads is taken through a ref: it is
   // started once and must not resume against a stale render's values.
-  const latest = useRef({ live, view, plan, refs, home, onDone: args.onDone })
-  latest.current = { live, view, plan, refs, home, onDone: args.onDone }
+  const latest = useRef({
+    live,
+    view,
+    plan,
+    refs,
+    home,
+    restoredThrough: args.restoredThrough,
+    onDone: args.onDone,
+  })
+  latest.current = {
+    live,
+    view,
+    plan,
+    refs,
+    home,
+    restoredThrough: args.restoredThrough,
+    onDone: args.onDone,
+  }
 
   // Bumped to invalidate the running sequence. Every await in the run checks it,
   // so a cancelled run stops at its next beat and never touches state again.
@@ -195,7 +212,7 @@ export function useDealIntro(args: {
   // anything off the projection: `view.self.id` is this peer's own seat, which
   // is the SAME across every game it plays, so keying on it meant "once per
   // peer" — a rematch without a remount would never deal again. There is no game
-  // identity in a PlayerView to fall back on; the route knows it, so the route
+  // identity in a GameView to fall back on; the route knows it, so the route
   // passes it.
   //
   // The queue arms this key once (`armed` in useBeats), which is also what makes
@@ -239,7 +256,13 @@ export function useDealIntro(args: {
 
     const { view: v, plan: p } = latest.current
     // Not an opening, or no deal to replay: hand over at once, and say so.
-    if (!v || !isOpening(v) || !p || p.flights.length === 0) {
+    if (
+      (latest.current.restoredThrough ?? 0) > 0 ||
+      !v ||
+      !isOpening(v) ||
+      !p ||
+      p.flights.length === 0
+    ) {
       finishRef.current()
       return
     }
@@ -410,6 +433,12 @@ export function useDealIntro(args: {
       setDealtTo(Object.fromEntries(l.opponents.map((o) => [o.id, o.handCount])))
       setClosed(travelledClosed)
 
+      if (l.you === null) {
+        setPhase('settling')
+        finishRef.current()
+        return
+      }
+
       // the finished heap stands open for a beat, then the whole of it goes into
       // the fan at once — still closed
       await wait(HEAP_HOLD)
@@ -472,7 +501,12 @@ export function useDealIntro(args: {
   const shadow: BoardState | null = active
     ? {
         ...live,
-        you: { ...live.you, hand: landed, release: zoneIn ? live.you.release : {} },
+        ...(live.you
+          ? {
+              selfId: live.selfId,
+              you: { ...live.you, hand: landed, release: zoneIn ? live.you.release : {} },
+            }
+          : { selfId: null, you: null }),
         opponents: live.opponents.map((o) => ({ ...o, handCount: dealtTo[o.id] ?? 0 })),
         // The starting-pile setting splits the remainder after the deal. Show
         // one pile until the cards have landed, then expose both halves together.

@@ -90,7 +90,7 @@ function ScenarioRun({
   // machine would — and the recorder writes both down right there, between the
   // board's own lines, rather than a render later.
   const runRef = useRef(run)
-  const [viewer, setViewer] = useState('you')
+  const [viewer, setViewer] = useState<string | null>('you')
   // HOW MANY CARDS THIS GAME HAS, counted once at the scene's own start. The
   // count itself is the engine's — the same census its conformance check is
   // built on, which knows every place a card can be, the air between a hand and
@@ -115,7 +115,10 @@ function ScenarioRun({
     setReady(true)
     send({ type: 'CLOCK_STARTED' })
   }, [send])
-  const view = useMemo(() => engine.project(run.state, viewer), [run.state, viewer])
+  const view = useMemo(
+    () => (viewer === null ? engine.spectate(run.state) : engine.project(run.state, viewer)),
+    [run.state, viewer],
+  )
   const events = useMemo(() => forViewer(run.events, viewer), [run.events, viewer])
   // the viewer's own refusals, sent to that seat alone, as the keeper sends them
   const rejections = useMemo(
@@ -245,6 +248,9 @@ function ScenarioRun({
               {debug('nextBot')}
             </Button>
           )}
+          <Button variant="tech" aria-pressed={viewer === null} onClick={() => setViewer(null)}>
+            {debug('viewerSpectator')}
+          </Button>
           {run.state.seating.map((id) => (
             <Button
               key={id}
@@ -336,7 +342,7 @@ function ScenarioRun({
       </div>
       <div className={styles.board} data-debug-game-id={gameId}>
         <Board
-          key={viewer}
+          key={viewer ?? 'spectator'}
           state={board}
           over={toBoardOver(view)}
           now={now}
@@ -373,18 +379,22 @@ function ScenarioRun({
             turnDock: t('turnDock', { returnObjects: true }),
             pending: t('pending', { returnObjects: true }),
           }}
-          actions={{
-            onPlay: (card, target, combo) =>
-              send({ type: 'PLAY', player: viewer, card, target, combo }),
-            onResolve: (choice) => send({ type: 'RESOLVE', player: viewer, choice }),
-            onDraw: (pile) => send({ type: 'DRAW', player: viewer, pile }),
-            onPush: () => send({ type: 'PUSH', player: viewer }),
-            onAttack: (card, combo) => send({ type: 'ATTACK', player: viewer, card, combo }),
-            onPass: () => send({ type: 'PASS', player: viewer }),
-            onUnpass: () => send({ type: 'UNPASS', player: viewer }),
-            onShow: (card) => send({ type: 'SHOW', player: viewer, card }),
-            onTakeBack: () => send({ type: 'TAKE_BACK', player: viewer }),
-          }}
+          actions={
+            viewer === null
+              ? {}
+              : {
+                  onPlay: (card, target, combo) =>
+                    send({ type: 'PLAY', player: viewer, card, target, combo }),
+                  onResolve: (choice) => send({ type: 'RESOLVE', player: viewer, choice }),
+                  onDraw: (pile) => send({ type: 'DRAW', player: viewer, pile }),
+                  onPush: () => send({ type: 'PUSH', player: viewer }),
+                  onAttack: (card, combo) => send({ type: 'ATTACK', player: viewer, card, combo }),
+                  onPass: () => send({ type: 'PASS', player: viewer }),
+                  onUnpass: () => send({ type: 'UNPASS', player: viewer }),
+                  onShow: (card) => send({ type: 'SHOW', player: viewer, card }),
+                  onTakeBack: () => send({ type: 'TAKE_BACK', player: viewer }),
+                }
+          }
         />
       </div>
     </>

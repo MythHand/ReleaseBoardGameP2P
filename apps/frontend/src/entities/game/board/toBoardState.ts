@@ -1,10 +1,10 @@
-import type { Event, PlayerView, ReleaseView } from '@release/engine'
+import type { Event, GameView, PlayerView, ReleaseView, SpectatorView } from '@release/engine'
 import type { HeapCard, HistoryEntry, ReleaseSupport } from '@release/ui'
 import { type CardData, COVERS, cardById } from '@release/ui'
 import type { Scatter } from '@release/ui/animations'
 import { scatterAt } from '@release/ui/animations'
 import { standingOperation } from './standingOperation'
-import type { BoardState } from './types'
+import type { BoardState, PlayerBoardState, SpectatorBoardState } from './types'
 
 // One label per member of the engine's Event union — the adapter maps event
 // types to translated text, replacing the mock's free-form `kind` literals.
@@ -48,7 +48,9 @@ function toReleaseSlots(release: ReleaseView) {
 }
 
 // Animation events name the rules id even when the visible card is from AI.
-function toReleaseIds(release: ReleaseView): NonNullable<BoardState['you']['releaseId']> {
+function toReleaseIds(
+  release: ReleaseView,
+): NonNullable<NonNullable<BoardState['you']>['releaseId']> {
   return Object.fromEntries(
     Object.entries(release)
       .filter(([, card]) => card != null)
@@ -60,8 +62,10 @@ function toReleaseIds(release: ReleaseView): NonNullable<BoardState['you']['rele
 // own `ReleasedView` (uid + card id, + codeReview for the three release slots)
 // — uniform, so `.uid` sits at the same depth for `monitoring` as for the
 // others; there is no separate instance shape to unwrap here.
-function toReleaseUids(release: ReleaseView): NonNullable<BoardState['you']['releaseUid']> {
-  const out: NonNullable<BoardState['you']['releaseUid']> = {}
+function toReleaseUids(
+  release: ReleaseView,
+): NonNullable<NonNullable<BoardState['you']>['releaseUid']> {
+  const out: NonNullable<NonNullable<BoardState['you']>['releaseUid']> = {}
   if (release.frontend) out.frontend = release.frontend.uid
   if (release.backend) out.backend = release.backend.uid
   if (release.database) out.database = release.database.uid
@@ -656,12 +660,25 @@ function historyEvents(events: Event[]): HistoryEvent[] {
 // clock, no randomness. Total — an unknown card id renders a placeholder
 // rather than throwing (`assetUrl` throws; `cardById` does not, and this
 // function never calls `assetUrl` directly).
-export function toBoardState(view: PlayerView, log: Event[], labels: HistoryLabels): BoardState {
-  const visible = log.filter((e) => !e.visibleTo || e.visibleTo.includes(view.self.id))
+export function toBoardState(
+  view: PlayerView,
+  log: Event[],
+  labels: HistoryLabels,
+): PlayerBoardState
+export function toBoardState(
+  view: SpectatorView,
+  log: Event[],
+  labels: HistoryLabels,
+): SpectatorBoardState
+export function toBoardState(view: GameView, log: Event[], labels: HistoryLabels): BoardState
+export function toBoardState(view: GameView, log: Event[], labels: HistoryLabels): BoardState {
+  const visible = log.filter(
+    (e) => !e.visibleTo || (view.self !== null && e.visibleTo.includes(view.self.id)),
+  )
   // Seat id -> display name, for resolving a target (or an attacker, Task 7)
   // to a name rather than printing the raw id.
   const nameOf = new Map<string, string>([
-    [view.self.id, view.self.name],
+    ...(view.self ? [[view.self.id, view.self.name] as const] : []),
     ...view.opponents.map((o) => [o.id, o.name] as const),
   ])
   // The visible log by id. Only what THIS viewer can see: a tail resolved through
@@ -700,16 +717,21 @@ export function toBoardState(view: PlayerView, log: Event[], labels: HistoryLabe
   const lifted = fullHeap.length - discardHeap.length
 
   return {
-    you: {
-      name: view.self.name,
-      eliminated: view.self.eliminated,
-      hand: view.self.hand.map((c) => ({ uid: c.uid, card: cardOrPlaceholder(c.id) })),
-      release: toReleaseSlots(view.self.release),
-      releaseId: toReleaseIds(view.self.release),
-      support: toReleaseSupport(view.self.release),
-      releaseUid: toReleaseUids(view.self.release),
-      releaseEvent: toReleaseEvents(view.self.release),
-    },
+    ...(view.self
+      ? {
+          selfId: view.self.id,
+          you: {
+            name: view.self.name,
+            eliminated: view.self.eliminated,
+            hand: view.self.hand.map((c) => ({ uid: c.uid, card: cardOrPlaceholder(c.id) })),
+            release: toReleaseSlots(view.self.release),
+            releaseId: toReleaseIds(view.self.release),
+            support: toReleaseSupport(view.self.release),
+            releaseUid: toReleaseUids(view.self.release),
+            releaseEvent: toReleaseEvents(view.self.release),
+          },
+        }
+      : { selfId: null, you: null }),
     opponents: view.opponents.map((o) => ({
       id: o.id,
       name: o.name,
@@ -737,14 +759,13 @@ export function toBoardState(view: PlayerView, log: Event[], labels: HistoryLabe
       view.turn.openedAt !== undefined && view.turn.deadline !== undefined
         ? { openedAt: view.turn.openedAt, deadline: view.turn.deadline }
         : null,
-    selfId: view.self.id,
     history,
     setup: view.setup,
-    playable: view.self.playable,
-    frozen: view.self.frozen,
+    playable: view.self?.playable ?? [],
+    frozen: view.self?.frozen ?? [],
     // Structural passthrough — Target and TableTarget are one shape; licensed
     // the same way `pending`/`window` are by contract.test-d.ts.
-    targets: view.self.targets as BoardState['targets'],
+    targets: view.self?.targets ?? {},
     // Structural passthrough — licensed by the Exact<> assertions in
     // contract.test-d.ts. Both carry openedAt alongside deadline already.
     pending: view.pending,
@@ -759,6 +780,6 @@ export function toBoardState(view: PlayerView, log: Event[], labels: HistoryLabe
     // Structural passthrough — the engine's own answer to which pairs a
     // support may start. participants/spectators are room facts and are
     // never produced here (Decision 7 / the constraint on this task).
-    comboOptions: view.self.combos,
+    comboOptions: view.self?.combos ?? {},
   }
 }

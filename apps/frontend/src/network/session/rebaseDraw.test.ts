@@ -121,12 +121,12 @@ describe.each(['base', 'strategic'] as const)('Rebase over the %s Branch session
 
       const expectedHand = gitBranch === 'base' ? [MAIN[0][sudo ? 1 : 0], MAIN[1][2]] : [MAIN[1][2]]
       expect(ref.current.state.players[actor].hand).toEqual(expectedHand)
-      expect(actorSyncs[2].view.self.hand).toEqual(expectedHand)
+      expect(actorSyncs[2].view.self?.hand).toEqual(expectedHand)
       expect(actorSyncs[2].events).toMatchObject(
         expectedHand.map((card) => ({ type: 'drawn', player: actor, card: card.id })),
       )
       expect(ref.current.state.decks.main[1]).toEqual([MAIN[1][0], MAIN[1][1], MAIN[1][3]])
-      expect(otherSyncs[2].view.self.hand).toEqual([])
+      expect(otherSyncs[2].view.self?.hand).toEqual([])
       for (const card of expectedHand) {
         expect(JSON.stringify(otherSyncs[2])).not.toContain(`"${card.uid}"`)
       }
