@@ -60,6 +60,7 @@ import {
   useRef,
   useState,
 } from 'react'
+import { CardMotionProvider } from '@/cards/cardMotion'
 // The screen's geometry is the KIT's stylesheet, imported rather than copied:
 // where every block sits, how big it is, what it overlaps. The board is a fork
 // of @release/ui's Table and the playground is where this screen is designed
@@ -102,9 +103,9 @@ import { useUpgradeStaging } from './_useUpgradeStaging'
 // 0–8 зелёный, 9–18 жёлтый, 19–28 красный
 const SPEC_MAX = 28
 function specColorFor(n: number) {
-  if (n <= 8) return '#8fd9b0'
-  if (n <= 18) return '#e3b341'
-  return '#ff6b81'
+  if (n <= 8) return 'var(--mint)'
+  if (n <= 18) return 'var(--gold)'
+  return 'var(--coral)'
 }
 
 // Ширина выезжающей панели зависит от типа контента вкладки.
@@ -148,31 +149,49 @@ function SettingsGroup({ title, children }: { title?: string; children: ReactNod
   )
 }
 
-// One settings unit — the single pattern shared by every control: a caption on
-// top, the control, and an optional hint below. The control owns its own width
-// (the spectator slider fills via .sliderFull).
+// Compact controls sit beside the caption and hint; the spectator slider
+// takes the full width below its caption, matching the playground.
 function SettingsField({
   label,
   hint,
+  inline = false,
   children,
 }: {
   label?: string
   hint?: string
+  inline?: boolean
   children: ReactNode
 }) {
+  const labelEl = label && (
+    <Typography as="div" variant="metaLabel" className={kit.fieldLabel}>
+      {label}
+    </Typography>
+  )
+  const hintEl = hint && (
+    <Typography as="div" base="mono-xs" className={kit.fieldHint}>
+      {hint}
+    </Typography>
+  )
+
+  // Compact controls sit beside their caption and hint.
+  if (inline) {
+    return (
+      <div className={kit.fieldInline}>
+        <div className={kit.fieldText}>
+          {labelEl}
+          {hintEl}
+        </div>
+        {children}
+      </div>
+    )
+  }
+
+  // Full-width controls retain the vertical arrangement.
   return (
     <div className={kit.field}>
-      {label && (
-        <Typography as="div" variant="metaLabel" className={kit.fieldLabel}>
-          {label}
-        </Typography>
-      )}
+      {labelEl}
       {children}
-      {hint && (
-        <Typography as="div" base="mono-xs" className={kit.fieldHint}>
-          {hint}
-        </Typography>
-      )}
+      {hintEl}
     </div>
   )
 }
@@ -181,10 +200,12 @@ function SettingsField({
 // (абсолютно), без жёсткой сетки. Заполняет экран без скролла.
 export default function Board(props: BoardProps) {
   return (
-    <BoardView
-      key={`${props.intro?.gameId ?? ''}:${props.state.selfId ?? 'spectator'}`}
-      {...props}
-    />
+    <CardMotionProvider value={props.room.parallax ?? true}>
+      <BoardView
+        key={`${props.intro?.gameId ?? ''}:${props.state.selfId ?? 'spectator'}`}
+        {...props}
+      />
+    </CardMotionProvider>
   )
 }
 
@@ -354,6 +375,8 @@ function BoardView({
     onKickSpectator,
     lang,
     onLangChange,
+    parallax = true,
+    onParallaxChange,
     chatToasts = true,
     onChatToastsChange,
     paused = false,
@@ -1277,7 +1300,11 @@ function BoardView({
   const hasChat = Boolean(slots?.chat) && Boolean(copy.table.tabChat)
   const hasVoice = Boolean(slots?.voice) && Boolean(copy.table.tabVoice)
   const canChatToasts = hasChat && Boolean(onChatToastsChange) && Boolean(copy.table.chatToasts)
-  const hasUpperSettings = Boolean(lang && onLangChange) || Boolean(code) || canChatToasts
+  const hasUpperSettings =
+    Boolean(lang && onLangChange) ||
+    Boolean(code) ||
+    Boolean(onParallaxChange && copy.table.parallax) ||
+    canChatToasts
 
   // текстовые вкладки рейла (порядок = сверху вниз), подписи — по языку
   const textTabs: TabRailItem[] = [
@@ -2337,7 +2364,7 @@ function BoardView({
             {hasUpperSettings && (
               <SettingsGroup title={isHost ? copy.table.generalTitle : undefined}>
                 {lang && onLangChange && (
-                  <SettingsField label={copy.table.langTitle}>
+                  <SettingsField label={copy.table.langTitle} inline>
                     <LangSwitcher
                       value={lang}
                       onChange={onLangChange}
@@ -2347,19 +2374,29 @@ function BoardView({
                   </SettingsField>
                 )}
                 {code && (
-                  <SettingsField label={copy.table.codeTitle}>
-                    <LobbyCode
-                      code={code}
-                      copy={copy.lobbyCode}
-                      align="start"
-                      reverse
-                      showLabel={false}
-                    />
+                  <SettingsField label={copy.table.codeTitle} inline>
+                    <LobbyCode code={code} copy={copy.lobbyCode} copyOnCode showLabel={false} />
+                  </SettingsField>
+                )}
+                {onParallaxChange && copy.table.parallax && (
+                  <SettingsField label={copy.table.parallax} hint={copy.table.parallaxHint} inline>
+                    <Toggle on={parallax} onChange={onParallaxChange} className={kit.settingToggle}>
+                      {(parallax ? copy.table.parallaxOn : copy.table.parallaxOff) ??
+                        copy.table.parallax}
+                    </Toggle>
                   </SettingsField>
                 )}
                 {canChatToasts && (
-                  <SettingsField label={copy.table.chatToasts} hint={copy.table.chatToastsHint}>
-                    <Toggle on={chatToasts} onChange={(on) => onChatToastsChange?.(on)}>
+                  <SettingsField
+                    label={copy.table.chatToasts}
+                    hint={copy.table.chatToastsHint}
+                    inline
+                  >
+                    <Toggle
+                      on={chatToasts}
+                      onChange={(on) => onChatToastsChange?.(on)}
+                      className={kit.settingToggle}
+                    >
                       {(chatToasts ? copy.table.chatToastsOn : copy.table.chatToastsOff) ??
                         copy.table.chatToasts}
                     </Toggle>
@@ -2375,7 +2412,7 @@ function BoardView({
                     <SettingsField label={copy.table.specLimit}>
                       <Slider
                         value={spectatorLimit ?? 0}
-                        min={spectators.length}
+                        min={0}
                         max={SPEC_MAX}
                         onChange={(n) => onSpectatorLimitChange?.(n)}
                         color={specColorFor(spectatorLimit ?? 0)}
@@ -2385,8 +2422,12 @@ function BoardView({
                     </SettingsField>
                   )}
                   {canPause && (
-                    <SettingsField label={copy.table.pauseGame} hint={copy.table.pauseHint}>
-                      <Toggle on={paused} onChange={(on) => onPauseChange?.(on)}>
+                    <SettingsField label={copy.table.pauseGame} hint={copy.table.pauseHint} inline>
+                      <Toggle
+                        on={paused}
+                        onChange={(on) => onPauseChange?.(on)}
+                        className={kit.settingToggle}
+                      >
                         {(paused ? copy.table.pauseOn : copy.table.pauseOff) ??
                           copy.table.pauseGame}
                       </Toggle>

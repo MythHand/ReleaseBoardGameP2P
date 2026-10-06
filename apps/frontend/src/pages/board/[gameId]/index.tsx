@@ -23,6 +23,7 @@ export default function BoardPage() {
   const { gameId } = useParams()
   const [panel, setPanel] = useState<Panel | null>(null)
   const [chatToasts, setChatToasts] = useState(true)
+  const [parallax, setParallax] = useState(true)
   // `returnObjects` builds a fresh object on every call; the rules are the
   // heaviest block the board holds (built ahead in the side panel), so their
   // copy keeps one identity until the language changes and the board can skip
@@ -211,6 +212,8 @@ export default function BoardPage() {
           onLangChange: (lang) => {
             void i18n.changeLanguage(lang)
           },
+          parallax,
+          onParallaxChange: setParallax,
           chatToasts,
           onChatToastsChange: setChatToasts,
         }}

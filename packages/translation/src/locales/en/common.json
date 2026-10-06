@@ -46,10 +46,18 @@
     "connected": "connected",
     "cancel": "cancel",
     "retry": "retry",
-    "connectError": "couldn't connect",
+    "connectError": "couldn’t connect",
     "notFoundStatus": "game not found",
     "homePage": "home page",
-    "fullStatus": "No free places for this role"
+    "fullStatus": "no free slots",
+    "tagBoardCard": "Based on the tabletop card game",
+    "description": "A strategy card game about the real grind of software development. Bugs, sudden events, rival attacks — power through it all and ship your release first.",
+    "checkCode": "check the code",
+    "codeChecking": "checking",
+    "codeError": "couldn’t connect",
+    "checkSlots": "check slots",
+    "spectatorOnlyNote": "no player slots left — you can only join as a spectator",
+    "noSlotsNote": "no slots available"
   },
   "stats": {
     "title": "Match results",
@@ -359,7 +367,11 @@
     "chatToastsOn": "On",
     "chatToastsOff": "Off",
     "chatToastsHint": "new messages surface in the corner while the chat is closed",
-    "stealCard": "drag a card from the closed hand"
+    "stealCard": "drag a card from the closed hand",
+    "parallax": "card parallax",
+    "parallaxOn": "On",
+    "parallaxOff": "Off",
+    "parallaxHint": "the card face follows the cursor"
   },
   "lobbyCode": {
     "label": "game code",
