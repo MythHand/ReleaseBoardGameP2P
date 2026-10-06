@@ -8,10 +8,12 @@ import {
   HudBackground,
   LangSwitcher,
   LobbyCode,
+  MAX_SPECTATORS,
   Modal,
   PlayerSlot,
   ScrollArea,
   Slider,
+  spectatorLimitColor,
   Toggle,
   Typography,
 } from '@release/ui'
@@ -304,14 +306,8 @@ export default function LobbyView() {
                 label={t('lobbyScreen.specLimit')}
                 value={state.maxSpectators}
                 min={0}
-                max={28}
-                color={
-                  state.maxSpectators <= 8
-                    ? 'var(--mint)'
-                    : state.maxSpectators <= 18
-                      ? 'var(--gold)'
-                      : 'var(--coral)'
-                }
+                max={MAX_SPECTATORS}
+                color={spectatorLimitColor(state.maxSpectators)}
                 fill
                 onChange={session.setMaxSpectators}
               />

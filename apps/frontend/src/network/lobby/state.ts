@@ -1,3 +1,4 @@
+import { MAX_SPECTATORS } from '@release/ui'
 import type { PeerInfo, Setup } from '../types'
 
 export interface LobbyState {
@@ -95,7 +96,9 @@ export function applyConfig(
 }
 
 export function validSpectatorLimit(value: unknown): value is number {
-  return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 28
+  return (
+    typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= MAX_SPECTATORS
+  )
 }
 
 export function spectatorCount(state: LobbyState): number {
