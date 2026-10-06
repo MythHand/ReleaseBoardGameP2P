@@ -1502,8 +1502,7 @@ export function useLobby(): UseLobby {
         owner = t
         // Torn down mid-await (Cancel/Home bumped the epoch and reset to idle):
         // discard the freshly-opened peer instead of committing it, or the
-        // cancelled attempt resurrects — leaking a live peer and re-arming the
-        // /start "continue game" button for a session the user just left.
+        // cancelled attempt resurrects and leaks a live peer after the user left.
         if (sessionEpochRef.current !== epoch || transportGenerationRef.current !== generation) {
           t.close()
           throw new Error('join cancelled')

@@ -113,8 +113,7 @@ Three keys in `localStorage`, prefixed `release:`.
 | `release:keeper` | `{ gameId, keeperId, state, seats, savedAt }` | From `commit()` in `referee.ts`, throttled | Match end, TTL expiry, superseded match |
 
 The 12h TTL governs `release:session` and `release:keeper` alike, measured from
-`joinedAt`/`savedAt`. Expiring only the snapshot would leave `/start` offering to
-resume a room whose match record had already been discarded.
+`joinedAt`/`savedAt`. Session and snapshot expiry must stay consistent.
 
 `clientId` is deliberately **not** cleared by leaving a room: it is the thing that
 outlives the tab, and a player who leaves and comes back to the same room should be
@@ -266,12 +265,6 @@ the actual dial cadence. `Reconnect.module.css` already carries a
 `prefers-reduced-motion` block covering the overlay entrance and cursor blink, and
 nothing here uses the `play()` vocabulary, so this incurs no `docs/animations`
 obligations.
-
-**`/start` continue-session.** Today it is gated on `status === 'in-lobby' &&
-!!session.state` — an in-memory session, so after a reload it is always hidden. It
-switches to the persisted session, routing to the board when the stored session
-carries a `gameId` and to the lobby otherwise. The dead slot becomes the rejoin
-affordance with no new UI.
 
 **Playground.** `TableStory` drives the new prop shape from a canned event sequence,
 so both `trying` and `failed` stay demonstrable. `apps/ui/src/screens/` is the

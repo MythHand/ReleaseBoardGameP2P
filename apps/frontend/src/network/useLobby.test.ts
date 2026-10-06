@@ -2154,8 +2154,7 @@ it('cannot let a pending snapshot land after the room is left', async () => {
       vi.advanceTimersByTime(1000)
     })
 
-    // A trailing write firing after clearKeeper() would put the abandoned match
-    // straight back — and /start would offer to resume it.
+    // A trailing write after clearKeeper() must not restore the abandoned snapshot.
     expect(sessionStorage.getItem(KEEPER_KEY)).toBeNull()
   } finally {
     vi.useRealTimers()

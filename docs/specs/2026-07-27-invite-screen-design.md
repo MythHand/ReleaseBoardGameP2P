@@ -76,8 +76,7 @@ renders `.bg`, `.blur` and `.scrim` but **no `HudBackground`**, so the frontend'
 9. **`/start` does not adopt `@release/ui`'s `Start` screen.** That screen owns its three
    modals with local `useState`, plus its own nickname/code/setup state and its own
    create and join forms. The frontend routes modals through `?modal=` (`useModalRoute`
-   → `AppModals` → `ModalRouter`) and has a fourth menu item — the continue-session
-   button — that `Start`'s hard-coded menu has no slot for. Adopting it would mean losing
+   → `AppModals` → `ModalRouter`). Adopting it would mean losing
    routed modals or growing `Start` a controlled-modal API, and would orphan
    `CreateLobbyForm` / `JoinLobbyForm` along with the `~/shared/ui/Form` validation rule
    they exist to satisfy. `Start`'s component is not exported from `apps/ui/src/index.ts`
@@ -193,7 +192,7 @@ form rather than a stale error.
 ### `pages/start.tsx` + `start.module.css`
 
 Compose `ScreenShell`; delete the ported chrome from the module CSS. The HUD grid returns.
-The menu, the routed modals and the continue-session button are untouched.
+The menu and the routed modals are untouched.
 
 `_app.tsx` is not touched: it renders the global `LanguageSwitch` only on `/start`, and
 the shell draws its own corner switcher on the invite route.

@@ -29,8 +29,7 @@
     "randomNick": "random name",
     "authorDesign": "Game & Design:",
     "authorDev": "Development:",
-    "required": "Required",
-    "continueSession": "continue game"
+    "required": "Required"
   },
   "invite": {
     "formTitle": "Game invite",

@@ -632,11 +632,6 @@ Style source: `apps/ui/src/screens/Start/Start.module.css`. This intentionally c
   margin-inline-start: -11px;
 }
 
-/* reserved continue-session slot, hidden without a session */
-.hiddenSlot {
-  pointer-events: none;
-  visibility: hidden;
-}
 ```
 
 - [ ] **Step 2: Update `start.tsx`**
@@ -664,37 +659,18 @@ Style source: `apps/ui/src/screens/Start/Start.module.css`. This intentionally c
 
       <Menu className={styles.menu}>
         …
-        <MenuButton
-          aria-hidden={!hasSession}
-          disabled={!hasSession}
-          className={hasSession ? undefined : styles.hiddenSlot}
-          …
+        <MenuButton autoFocus value="create" onClick={handleMenuClick}>
+          {t('start.createGame')}
+        </MenuButton>
+        …
 ```
 
 (The extra scrim/blur divs collapse from three utility divs to the same three divs with module classes; the `start-blur-mask` / `start-scrim` `@utility` blocks in `index.css` become unused — removed in Task 8.)
 
-- [ ] **Step 3: Update `start.test.tsx`**
-
-The two assertions on the Tailwind `invisible` class must use the module class. Add at the top:
-
-```tsx
-import styles from '../start.module.css'
-```
-
-and replace:
-
-```tsx
-expect(btn?.className ?? '').not.toContain(styles.hiddenSlot)
-…
-expect(btn?.className ?? '').toContain(styles.hiddenSlot)
-```
-
-(Vitest's default CSS-module handling returns stable class names, so this works without extra config.)
-
-- [ ] **Step 4: Verify + commit**
+- [ ] **Step 3: Verify + commit**
 
 Run: `pnpm --filter @release/web typecheck && pnpm --filter @release/web stylelint && pnpm --filter @release/web test`
-Expected: pass, including the two updated start assertions. In `pnpm dev:all`, compare `/start` against the playground `StartStory`: top-left content block, tag colors, description width, menu width must match. Known intentional gaps vs the story: no HUD grid layer, no credits, no PhysicalEdition plate (out of scope, see Global Constraints).
+Expected: pass, including the start-screen menu tests. In `pnpm dev:all`, compare `/start` against the playground `StartStory`: top-left content block, tag colors, description width, menu width must match. Known intentional gaps vs the story: no HUD grid layer, no credits, no PhysicalEdition plate (out of scope, see Global Constraints).
 
 ```bash
 git add apps/frontend/src/pages/start* apps/frontend/src/pages/__tests__/start.test.tsx
