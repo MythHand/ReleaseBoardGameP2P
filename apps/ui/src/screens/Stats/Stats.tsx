@@ -36,6 +36,8 @@ export interface StatPlayer {
   name: string
   // preset avatar id; without it, the name's initial (a bot has none)
   avatar?: string
+  // speaking in the voice chat — the ring around the avatar
+  speaking?: boolean
   location: Location
   attack: number
   defense: number
@@ -296,9 +298,9 @@ export default function Stats({
             <li key={p.id} className={`${styles.row} ${p.id === winnerId ? styles.rowWin : ''}`}>
               <span className={styles.colName}>
                 {p.avatar ? (
-                  <PresetAvatar id={p.avatar} size={30} />
+                  <PresetAvatar id={p.avatar} size={30} speaking={p.speaking} />
                 ) : (
-                  <Avatar name={p.name} size={30} />
+                  <Avatar name={p.name} size={30} speaking={p.speaking} />
                 )}
                 <span className={styles.name}>{p.name}</span>
                 {selfMark(p.id)}

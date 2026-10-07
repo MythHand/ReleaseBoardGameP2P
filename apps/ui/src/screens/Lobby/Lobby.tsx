@@ -20,7 +20,7 @@ import Slider from '@/primitives/Slider'
 import Toggle from '@/primitives/Toggle'
 import styles from './Lobby.module.css'
 
-interface Player {
+export interface LobbyPlayer {
   id: number
   name: string
   host: boolean
@@ -29,15 +29,18 @@ interface Player {
   // preset avatar id (PRESET_AVATARS)
   avatar?: string
 }
-interface Spectator {
+export interface LobbySpectator {
   id: number
   name: string
 }
+type Player = LobbyPlayer
+type Spectator = LobbySpectator
 interface LobbyProps {
   code?: string
   onCopy?: (text: string) => Promise<boolean>
   initialCapacity?: number
   initialPlayers?: Player[]
+  initialSpectators?: Spectator[]
   role?: 'host' | 'guest'
   initialSetup?: Setup
   initialLang?: SwitchLang
@@ -70,6 +73,9 @@ interface LobbyProps {
   // My nickname changed — said once, when the settings modal closes. The chat
   // is a slot this screen does not own, so the consumer posts the line there.
   onRename?: (from: string, to: string) => void
+  // Nicknames speaking in the voice chat right now, as I am allowed to see them
+  // (on the line, not muted by me) — the consumer decides; a ring on the avatar.
+  speaking?: string[]
 }
 
 // Весь видимый текст лобби приходит из набора по языку — экран сам переключает
@@ -147,6 +153,7 @@ export default function Lobby({
   link,
   initialCapacity = 5,
   initialPlayers = MOCK_PLAYERS,
+  initialSpectators = MOCK_SPECTATORS,
   role = 'host',
   initialSetup = DEFAULT_SETUP,
   initialLang = 'ru',
@@ -160,6 +167,7 @@ export default function Lobby({
   voice,
   meSpectator = false,
   onRename,
+  speaking = [],
 }: LobbyProps) {
   const isHost = role === 'host'
   const meId = isHost ? 1 : meSpectator ? 101 : 2 // кто «я» в этой сцене (мок)
@@ -168,7 +176,7 @@ export default function Lobby({
   const [players, setPlayers] = useState<Player[]>(initialPlayers)
   const [capacity, setCapacity] = useState(initialCapacity)
   const [bots, setBots] = useState(0)
-  const [spectators, setSpectators] = useState<Spectator[]>(MOCK_SPECTATORS)
+  const [spectators, setSpectators] = useState<Spectator[]>(initialSpectators)
   const [specCapacity, setSpecCapacity] = useState(8)
   const [disbandOpen, setDisbandOpen] = useState(false)
   const [leaveOpen, setLeaveOpen] = useState(false)
@@ -373,6 +381,7 @@ export default function Lobby({
                     key={p.id}
                     name={p.name}
                     avatar={p.avatar}
+                    speaking={speaking.includes(p.name)}
                     me={p.id === meId}
                     youLabel={copy.you}
                     onEdit={p.id === meId ? openSettings : undefined}
@@ -459,6 +468,7 @@ export default function Lobby({
                 <PlayerSlot
                   key={s.id}
                   name={s.name}
+                  speaking={speaking.includes(s.name)}
                   me={s.id === meId}
                   youLabel={copy.you}
                   onEdit={s.id === meId ? openSettings : undefined}

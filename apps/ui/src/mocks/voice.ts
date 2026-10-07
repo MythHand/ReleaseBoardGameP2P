@@ -33,12 +33,9 @@ const FOUR: VoiceParticipant[] = [
   person('null_ptr', 'spectator'),
   { ...person('segfault', 'player'), micOff: true },
   person('TabsOverSpaces', 'host'),
-  {
-    ...person('kernel_panic_at_the_disco', 'player'),
-    name: 'kernel_panic_at_the_disco_since_1991',
-    // the table's kernel_panic, under the long name the list must wrap
-    avatar: mockAvatar('kernel_panic', 'player'),
-  },
+  // the table's and the lobby's kernel_panic, under the long name the list must
+  // wrap — the id stays the short one, so "who speaks" finds them everywhere
+  { ...person('kernel_panic', 'player'), name: 'kernel_panic_at_the_disco_since_1991' },
 ]
 
 // what the sixteen add to the four: two more players and ten more spectators

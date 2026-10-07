@@ -39,6 +39,9 @@ export interface VoiceParticipant {
   role: VoiceRole
   // preset avatar id — a player has one, a spectator does not
   avatar?: string
+  // speaking — the ring around the avatar. Whether I see it (I am on the line,
+  // I have not muted them) is the consumer's to decide.
+  speaking?: boolean
   // this participant's volume for me, 0–200
   volume: number
   // I muted them, for me alone. Kept apart from the volume, so unmuting brings
@@ -456,9 +459,9 @@ function VoiceList({
             return (
               <li key={p.id} className={styles.person}>
                 {p.avatar ? (
-                  <PresetAvatar id={p.avatar} size={24} />
+                  <PresetAvatar id={p.avatar} size={24} speaking={p.speaking} />
                 ) : (
-                  <Avatar name={p.name} size={24} />
+                  <Avatar name={p.name} size={24} speaking={p.speaking} />
                 )}
                 <Typography
                   base="mono-md"

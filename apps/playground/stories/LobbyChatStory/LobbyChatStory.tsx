@@ -2,14 +2,53 @@ import { en as enCommon, ru as ruCommon } from '@release/translation/catalog'
 import { useState } from 'react'
 import Chat, { type ChatMessage, type ChatRole } from '@/blocks/Chat'
 import VoiceChat from '@/blocks/VoiceChat'
-import { CHAT_SELF, makeChat, withMockAvatars } from '@/mocks/chat'
-import Lobby from '@/screens/Lobby'
+import { CHAT_SELF, makeChat, mockAvatar, withMockAvatars } from '@/mocks/chat'
+import Lobby, { type LobbyPlayer, type LobbySpectator } from '@/screens/Lobby'
 import { pick, useLang } from '../../Playground/lang'
 import TechBar from '../controls/TechBar'
 import { TechSwitch } from '../controls/TechControls'
 import { copyText } from '../copyText'
 import { useVoiceDemo, VoiceDemoControls, voiceIssueView } from '../voiceDemo'
 import styles from './LobbyChatStory.module.css'
+
+// The lobby on this page seats the people of the chat and the voice, so a name
+// in one column is the same person in the others — and whoever speaks in the
+// voice rings in the lobby too. I am the chat's own `deadlock` whatever the
+// switches: the host when hosting; otherwise TabsOverSpaces hosts, and I sit
+// with the players or, as a spectator, with the spectators.
+function lobbyCast(
+  role: 'host' | 'guest',
+  me: 'player' | 'spectator',
+): { players: LobbyPlayer[]; spectators: LobbySpectator[] } {
+  const player = (id: number, name: string, host = false, ready = true): LobbyPlayer => ({
+    id,
+    name,
+    host,
+    ready,
+    online: true,
+    avatar: mockAvatar(name, 'player'),
+  })
+  const rest = [player(3, 'segfault'), player(4, 'kernel_panic', false, false)]
+  const watching: LobbySpectator[] = [
+    { id: 102, name: 'null_ptr' },
+    { id: 103, name: 'oracle' },
+  ]
+  // the screen's own ids for "me": 1 as the host, 2 as a guest player, 101 as a spectator
+  if (role === 'host') {
+    return {
+      players: [player(1, CHAT_SELF, true), player(2, 'TabsOverSpaces'), ...rest],
+      spectators: watching,
+    }
+  }
+  const theirHost = player(1, 'TabsOverSpaces', true)
+  if (me === 'spectator') {
+    return {
+      players: [theirHost, ...rest],
+      spectators: [{ id: 101, name: CHAT_SELF }, ...watching],
+    }
+  }
+  return { players: [theirHost, player(2, CHAT_SELF), ...rest], spectators: watching }
+}
 
 export default function LobbyChatStory() {
   const { lang } = useLang()
@@ -43,6 +82,7 @@ export default function LobbyChatStory() {
     ])
   // who "me" is as a guest in the lobby — the host is always a player
   const [me, setMe] = useState<'player' | 'spectator'>('player')
+  const cast = lobbyCast(role, me)
   const voice = useVoiceDemo()
   return (
     <div className={styles.root}>
@@ -89,12 +129,15 @@ export default function LobbyChatStory() {
       </TechBar>
       {/* стартовый язык лобби берём из языка плейграунда; дальше им управляет
           встроенный в лобби свитчер. key переинициализирует экран при смене
-          языка плейграунда из шапки */}
+          языка плейграунда из шапки — и при смене состава (host/guest, me) */}
       <div className={styles.stage}>
         <Lobby
           onCopy={copyText}
-          key={lang}
+          key={`${lang}-${role}-${me}`}
           role={role}
+          initialPlayers={cast.players}
+          initialSpectators={cast.spectators}
+          speaking={voice.speaking}
           initialLang={lang}
           bgTone={bg}
           lobbyCodeCopy={{ ru: ruCommon.lobbyCode, en: enCommon.lobbyCode }}

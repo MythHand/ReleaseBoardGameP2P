@@ -125,6 +125,8 @@ export default function StatsChatStory() {
   const swap = NAMES[names]
   const players = data.players.map((p, i) => ({
     ...p,
+    // who speaks is matched by the player's own nickname, before a set swaps it
+    speaking: voice.speaking.includes(p.name),
     ...(swap ? { name: swap[i] ?? p.name } : null),
     ...(ties ? TIES[p.id] : null),
   }))

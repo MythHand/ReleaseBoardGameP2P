@@ -10,6 +10,8 @@ interface PlayerSlotProps {
   // preset avatar id (PRESET_AVATARS); without it the avatar is the name's initial
   avatar?: string
   avatarSize?: number
+  // speaking in the voice chat — the ring around the avatar
+  speaking?: boolean
   // подсветка строки + пометка «(вы)»
   me?: boolean
   youLabel?: string
@@ -33,6 +35,7 @@ export default function PlayerSlot({
   name,
   avatar: avatarId,
   avatarSize = 34,
+  speaking = false,
   me = false,
   youLabel = 'вы',
   offline = false,
@@ -43,9 +46,9 @@ export default function PlayerSlot({
   onEdit,
 }: PlayerSlotProps) {
   const avatar = avatarId ? (
-    <PresetAvatar id={avatarId} size={avatarSize} muted={offline} />
+    <PresetAvatar id={avatarId} size={avatarSize} muted={offline} speaking={speaking} />
   ) : (
-    <Avatar name={name} size={avatarSize} muted={offline} />
+    <Avatar name={name} size={avatarSize} muted={offline} speaking={speaking} />
   )
   const label = (
     <span className={styles.name}>
