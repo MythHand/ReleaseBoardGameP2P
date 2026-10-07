@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Chat, { type ChatMessage, type ChatRole } from '@/blocks/Chat'
 import { ToastStack } from '@/blocks/Toast'
 import { VoiceNotices, VoicePanel, VoiceTabIcon } from '@/blocks/VoiceChat'
-import { CHAT_SELF, makeChat } from '@/mocks/chat'
+import { CHAT_SELF, makeChat, mockAvatar, withMockAvatars } from '@/mocks/chat'
 import { makeSpectatorTable, makeTable } from '@/mocks/table'
 import Message from '@/primitives/Message'
 import Table from '@/table/Table'
@@ -118,7 +118,15 @@ export default function TableChatStory() {
         .filter((m) => !m.system && m.who && m.who !== CHAT_SELF)
         .map((m) => ({
           id: m.id,
-          node: <Message text={m.text} who={m.who} time={m.time} authorRole={m.role} />,
+          node: (
+            <Message
+              text={m.text}
+              who={m.who}
+              avatar={mockAvatar(m.who, m.role)}
+              time={m.time}
+              authorRole={m.role}
+            />
+          ),
         })),
     [messages],
   )
@@ -416,7 +424,7 @@ export default function TableChatStory() {
           slots={{
             chat: (
               <Chat
-                messages={messages}
+                messages={withMockAvatars(messages)}
                 copy={pick(lang, { ru: ruCommon.chat, en: enCommon.chat })}
                 selfName={CHAT_SELF}
                 // отправка локальная: стол переписку не ведёт, он даёт ей место.

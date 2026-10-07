@@ -3,7 +3,7 @@ import ruCommon from '@release/translation/locales/ru/common.json'
 import { useState } from 'react'
 import Chat, { type ChatMessage } from '@/blocks/Chat'
 import VoiceChat from '@/blocks/VoiceChat'
-import { CHAT_SELF, makeChat } from '@/mocks/chat'
+import { CHAT_SELF, makeChat, withMockAvatars } from '@/mocks/chat'
 import { makeStats } from '@/mocks/stats'
 import Stats, { type StatPlayer } from '@/screens/Stats'
 import type { StatsCopy } from '@/screens/Stats/Stats'
@@ -165,7 +165,7 @@ export default function StatsChatStory() {
           bgTone={spectator ? 'neutral' : bg}
           chat={
             <Chat
-              messages={messages}
+              messages={withMockAvatars(messages)}
               copy={pick(lang, { ru: ruCommon.chat, en: enCommon.chat })}
               selfName={CHAT_SELF}
               onSend={send}

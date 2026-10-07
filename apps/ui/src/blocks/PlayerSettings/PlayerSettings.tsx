@@ -26,13 +26,19 @@ export interface PlayerSettingsAvatar {
   label: string
 }
 
-interface PlayerSettingsProps {
-  avatars: PlayerSettingsAvatar[]
+export interface PlayerSettingsAvatars {
+  items: PlayerSettingsAvatar[]
   // the avatar this player has picked
-  avatar: string | null
+  selected: string | null
   // avatars picked by other players — shown, but cannot be picked
   taken?: string[]
-  onAvatarChange: (id: string) => void
+  onChange: (id: string) => void
+}
+
+interface PlayerSettingsProps {
+  // A player's avatar grid. A spectator has no avatar: without it the block is
+  // the nickname alone.
+  avatars?: PlayerSettingsAvatars
   nickname: string
   onNicknameChange: (nickname: string) => void
   // the typed nickname is already someone else's — the consumer decides
@@ -45,20 +51,52 @@ interface PlayerSettingsProps {
 // hold and the nickname all come from the consumer.
 export default function PlayerSettings({
   avatars,
-  avatar,
-  taken = [],
-  onAvatarChange,
   nickname,
   onNicknameChange,
   nicknameTaken = false,
   copy,
 }: PlayerSettingsProps) {
+  const field = (
+    <>
+      <Input
+        label={copy.nicknameLabel}
+        value={nickname}
+        onChange={(e) => onNicknameChange(sanitizeNickname(e.target.value))}
+        placeholder={copy.nicknamePlaceholder}
+        maxLength={20}
+        plain
+        error={nicknameTaken ? copy.nicknameTaken : undefined}
+        trailing={
+          <Button
+            variant="icon"
+            onClick={() => onNicknameChange(randomNickname())}
+            aria-label={copy.randomNick}
+            title={copy.randomNick}
+          >
+            <DiceIcon />
+          </Button>
+        }
+      />
+      {/* a slot of fixed height, so the error does not move what is below */}
+      <div className={styles.nicknameStatus} aria-live="polite">
+        {nicknameTaken && (
+          <Typography as="span" base="mono-xs">
+            {copy.nicknameTaken}
+          </Typography>
+        )}
+      </div>
+    </>
+  )
+
+  if (!avatars) return <div>{field}</div>
+
+  const taken = avatars.taken ?? []
   return (
     <div className={styles.grid}>
       <fieldset className={styles.avatars} aria-label={copy.avatars}>
-        {avatars.map(({ id, label }) => {
+        {avatars.items.map(({ id, label }) => {
           const locked = taken.includes(id)
-          const selected = id === avatar
+          const selected = id === avatars.selected
           return (
             <button
               key={id}
@@ -67,7 +105,7 @@ export default function PlayerSettings({
               aria-label={label}
               aria-pressed={selected}
               disabled={locked}
-              onClick={() => onAvatarChange(id)}
+              onClick={() => avatars.onChange(id)}
             >
               <PresetAvatar id={id} size={AVATAR_SIZE} muted={locked} />
             </button>
@@ -75,35 +113,7 @@ export default function PlayerSettings({
         })}
       </fieldset>
 
-      <div className={styles.nickname}>
-        <Input
-          label={copy.nicknameLabel}
-          value={nickname}
-          onChange={(e) => onNicknameChange(sanitizeNickname(e.target.value))}
-          placeholder={copy.nicknamePlaceholder}
-          maxLength={20}
-          plain
-          error={nicknameTaken ? copy.nicknameTaken : undefined}
-          trailing={
-            <Button
-              variant="icon"
-              onClick={() => onNicknameChange(randomNickname())}
-              aria-label={copy.randomNick}
-              title={copy.randomNick}
-            >
-              <DiceIcon />
-            </Button>
-          }
-        />
-        {/* a slot of fixed height, so the error does not move what is below */}
-        <div className={styles.nicknameStatus} aria-live="polite">
-          {nicknameTaken && (
-            <Typography as="span" base="mono-xs">
-              {copy.nicknameTaken}
-            </Typography>
-          )}
-        </div>
-      </div>
+      <div className={styles.nickname}>{field}</div>
     </div>
   )
 }

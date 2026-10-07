@@ -20,6 +20,8 @@ export interface ChatMessage {
   // ник автора — реплика подписана так же, как игрок назван на любом экране.
   // У технической записи автора нет: её пишет не человек.
   who?: string
+  // the author's preset avatar id — a player has one, a spectator does not
+  avatar?: string
   text: string
   // время в готовом виде: форматирование — забота консьюмера, не кита
   time?: string
@@ -117,6 +119,7 @@ export default function Chat({
               key={m.id}
               text={m.text}
               who={m.who}
+              avatar={m.avatar}
               time={m.time}
               authorRole={m.role}
               self={self}

@@ -1,3 +1,4 @@
+import PresetAvatar from '@/avatars/PresetAvatar'
 import Avatar from '@/primitives/Avatar'
 import Badge, { type BadgeTone } from '@/primitives/Badge'
 import Dropdown from '@/primitives/Dropdown'
@@ -7,6 +8,8 @@ import styles from './Participants.module.css'
 export interface Participant {
   id: string
   name: string
+  // preset avatar id — a player's; without it, the name's initial
+  avatar?: string
   eliminated?: boolean
   connected?: boolean
 }
@@ -62,7 +65,11 @@ export default function Participants({
               const text = lost ? copy.connectionLost : p.eliminated ? copy.eliminated : copy.inGame
               return (
                 <li key={p.id} className={styles.row}>
-                  <Avatar name={p.name} size={28} />
+                  {p.avatar ? (
+                    <PresetAvatar id={p.avatar} size={28} />
+                  ) : (
+                    <Avatar name={p.name} size={28} />
+                  )}
                   <span className={styles.name}>{p.name}</span>
                   <Badge tone={tone} className={styles.pushEnd}>
                     {text}

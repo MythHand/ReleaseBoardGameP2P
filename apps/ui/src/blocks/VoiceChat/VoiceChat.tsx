@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { play } from '@/animations/play'
+import PresetAvatar from '@/avatars/PresetAvatar'
 import { useAppear } from '@/blocks/Toast/useAppear'
 import HeadphonesIcon from '@/icons/HeadphonesIcon'
 import MicrophoneSlashIcon from '@/icons/MicrophoneSlashIcon'
@@ -36,6 +37,8 @@ export interface VoiceParticipant {
   id: string
   name: string
   role: VoiceRole
+  // preset avatar id — a player has one, a spectator does not
+  avatar?: string
   // this participant's volume for me, 0–200
   volume: number
   // I muted them, for me alone. Kept apart from the volume, so unmuting brings
@@ -452,7 +455,11 @@ function VoiceList({
             const muteLabel = `${p.muted ? copy.unmute : copy.mute} ${p.name}`
             return (
               <li key={p.id} className={styles.person}>
-                <Avatar name={p.name} size={24} />
+                {p.avatar ? (
+                  <PresetAvatar id={p.avatar} size={24} />
+                ) : (
+                  <Avatar name={p.name} size={24} />
+                )}
                 <Typography
                   base="mono-md"
                   tk="tk-04"

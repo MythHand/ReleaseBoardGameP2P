@@ -25,7 +25,11 @@ export { default as LobbyCode } from './blocks/LobbyCode'
 export { default as Menu, MenuButton, MenuGroup } from './blocks/Menu'
 export type { PhysicalEditionCopy } from './blocks/PhysicalEdition'
 export { default as PhysicalEdition } from './blocks/PhysicalEdition'
-export type { PlayerSettingsAvatar, PlayerSettingsCopy } from './blocks/PlayerSettings'
+export type {
+  PlayerSettingsAvatar,
+  PlayerSettingsAvatars,
+  PlayerSettingsCopy,
+} from './blocks/PlayerSettings'
 export { default as PlayerSettings } from './blocks/PlayerSettings'
 export { default as PlayerSlot, EmptySlot } from './blocks/PlayerSlot'
 export type { RulesCopy, RulesProps, RulesSection } from './blocks/Rules'

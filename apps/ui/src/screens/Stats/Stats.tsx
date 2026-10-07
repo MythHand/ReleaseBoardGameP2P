@@ -1,4 +1,5 @@
 import { type ReactNode, useLayoutEffect, useRef, useState } from 'react'
+import PresetAvatar from '@/avatars/PresetAvatar'
 import LangSwitcher, { type SwitchLang } from '@/blocks/LangSwitcher'
 import { cardById } from '@/cards'
 import Avatar from '@/primitives/Avatar'
@@ -25,6 +26,8 @@ type MetricKey = 'ddos' | 'ai' | 'err503' | 'cherryPick' | 'attackedInto'
 export interface StatPlayer {
   id: string
   name: string
+  // preset avatar id; without it, the name's initial (a bot has none)
+  avatar?: string
   location: Location
   attack: number
   defense: number
@@ -259,7 +262,11 @@ export default function Stats({
           {players.map((p) => (
             <li key={p.id} className={`${styles.row} ${p.id === winnerId ? styles.rowWin : ''}`}>
               <span className={styles.colName}>
-                <Avatar name={p.name} size={30} />
+                {p.avatar ? (
+                  <PresetAvatar id={p.avatar} size={30} />
+                ) : (
+                  <Avatar name={p.name} size={30} />
+                )}
                 <span className={styles.name}>{p.name}</span>
                 {selfMark(p.id)}
                 {p.id === winnerId && (

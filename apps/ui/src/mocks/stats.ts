@@ -1,4 +1,5 @@
 import type { StatPlayer } from '@/screens/Stats'
+import { mockAvatar } from './chat'
 
 export interface StatsData {
   winnerId: string
@@ -13,11 +14,16 @@ export interface StatsData {
 // Длины ников РАЗНЫЕ намеренно: 8 / 14 / 20 символов при пределе поля в 20.
 // Лидеры показателей — you, p2 и p3, поэтому каждый из трёх шагов кегля имени
 // попадает на свою плашку ачивки, и раскладка видна на одном экране.
+// Each player carries the avatar the chat mock gives them — attached here, by the
+// original nickname, so a story that swaps the names keeps the avatars.
+const withAvatars = (players: StatPlayer[]): StatPlayer[] =>
+  players.map((p) => ({ ...p, avatar: mockAvatar(p.name, 'player') }))
+
 export function makeStats(): StatsData {
   return {
     winnerId: 'you',
     selfId: 'you',
-    players: [
+    players: withAvatars([
       // attack — сыграно атакующих (красные); defense — защитных (синие+фиолетовые)
       {
         id: 'you',
@@ -67,6 +73,6 @@ export function makeStats(): StatsData {
         err503: 1,
         cherryPick: 2,
       },
-    ],
+    ]),
   }
 }

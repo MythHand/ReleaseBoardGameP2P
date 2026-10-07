@@ -2,7 +2,7 @@ import { en as enCommon, ru as ruCommon } from '@release/translation/catalog'
 import { useState } from 'react'
 import Chat, { type ChatMessage, type ChatRole } from '@/blocks/Chat'
 import VoiceChat from '@/blocks/VoiceChat'
-import { CHAT_SELF, makeChat } from '@/mocks/chat'
+import { CHAT_SELF, makeChat, withMockAvatars } from '@/mocks/chat'
 import Lobby from '@/screens/Lobby'
 import { pick, useLang } from '../../Playground/lang'
 import TechBar from '../controls/TechBar'
@@ -26,6 +26,23 @@ export default function LobbyChatStory() {
       { id: `local-${prev.length}`, who: CHAT_SELF, role: myRole, text, time: '20:17' },
     ])
   const shown = messages.map((m) => (m.system || m.who !== CHAT_SELF ? m : { ...m, role: myRole }))
+  // a nickname change is announced in the room's chat; an avatar change is not
+  const announceRename = (from: string, to: string) =>
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: `rename-${prev.length}`,
+        system: true,
+        text: pick(lang, {
+          ru: ruCommon.chat.system.memberRenamed,
+          en: enCommon.chat.system.memberRenamed,
+        })
+          .replace('{{from}}', from)
+          .replace('{{to}}', to),
+      },
+    ])
+  // who "me" is as a guest in the lobby — the host is always a player
+  const [me, setMe] = useState<'player' | 'spectator'>('player')
   const voice = useVoiceDemo()
   return (
     <div className={styles.root}>
@@ -47,6 +64,17 @@ export default function LobbyChatStory() {
           value={bg}
           onChange={setBg}
         />
+        {role === 'guest' && (
+          <TechSwitch
+            label="me"
+            options={[
+              { value: 'player', label: 'player' },
+              { value: 'spectator', label: 'spectator' },
+            ]}
+            value={me}
+            onChange={setMe}
+          />
+        )}
         <TechSwitch
           label="my role"
           options={[
@@ -74,9 +102,11 @@ export default function LobbyChatStory() {
           rulesBlockCopy={{ ru: ruCommon.rulesBlock, en: enCommon.rulesBlock }}
           lobbyScreenCopy={{ ru: ruCommon.lobbyScreen, en: enCommon.lobbyScreen }}
           playerSettingsCopy={{ ru: ruCommon.playerSettings, en: enCommon.playerSettings }}
+          meSpectator={me === 'spectator'}
+          onRename={announceRename}
           chat={
             <Chat
-              messages={shown}
+              messages={withMockAvatars(shown)}
               copy={pick(lang, { ru: ruCommon.chat, en: enCommon.chat })}
               selfName={CHAT_SELF}
               onSend={send}

@@ -64,6 +64,12 @@ interface LobbyProps {
   // heading's line, after the title. A slot for the same reason as `chat`;
   // either one alone opens the column.
   voice?: ReactNode
+  // Who "me" is as a guest in this mock: a player (neo) or a spectator (oracle).
+  // The host is always a player.
+  meSpectator?: boolean
+  // My nickname changed — said once, when the settings modal closes. The chat
+  // is a slot this screen does not own, so the consumer posts the line there.
+  onRename?: (from: string, to: string) => void
 }
 
 // Весь видимый текст лобби приходит из набора по языку — экран сам переключает
@@ -152,9 +158,11 @@ export default function Lobby({
   playerSettingsCopy,
   chat,
   voice,
+  meSpectator = false,
+  onRename,
 }: LobbyProps) {
   const isHost = role === 'host'
-  const meId = isHost ? 1 : 2 // кто «я» в этой сцене (мок)
+  const meId = isHost ? 1 : meSpectator ? 101 : 2 // кто «я» в этой сцене (мок)
 
   const [setup, setSetup] = useState<Setup>(initialSetup)
   const [players, setPlayers] = useState<Player[]>(initialPlayers)
@@ -169,6 +177,8 @@ export default function Lobby({
   // the nickname as typed in the settings modal — it reaches my row only while
   // nobody else in the room has it
   const [nicknameDraft, setNicknameDraft] = useState('')
+  // my nickname when the modal opened — what the chat line says I was
+  const [nameAtOpen, setNameAtOpen] = useState('')
   const [lang, setLang] = useState<SwitchLang>(initialLang)
 
   // наборы текста по языку — экран держит оба и выбирает встроенным свитчером
@@ -183,11 +193,18 @@ export default function Lobby({
 
   const setMode = (key: string, value: string) => setSetup((s) => ({ ...s, [key]: value }))
   const me = players.find((p) => p.id === meId)
+  // me as a spectator: no avatar, only the nickname to edit
+  const meAsSpectator = spectators.find((s) => s.id === meId)
+  const myName = me?.name ?? meAsSpectator?.name ?? ''
   const toggleReady = (id: number) =>
     setPlayers((ps) => ps.map((p) => (p.id === id ? { ...p, ready: !p.ready } : p)))
-  // the player settings modal edits my own row
+  // the player settings modal edits my own row, in whichever list it stands
   const updateMe = (patch: Partial<Player>) =>
     setPlayers((ps) => ps.map((p) => (p.id === meId ? { ...p, ...patch } : p)))
+  const renameMe = (name: string) => {
+    updateMe({ name })
+    setSpectators((ss) => ss.map((s) => (s.id === meId ? { ...s, name } : s)))
+  }
   // avatars the other players hold — shown in the modal, but cannot be picked
   const takenAvatars = players.flatMap((p) => (p.id !== meId && p.avatar ? [p.avatar] : []))
 
@@ -203,8 +220,15 @@ export default function Lobby({
   const toPlayer = (id: number) => {
     const s = spectators.find((x) => x.id === id)
     if (!s || players.length >= capacity) return
+    // a new player gets a random avatar that no other player holds
+    const held = new Set(players.flatMap((p) => (p.avatar ? [p.avatar] : [])))
+    const free = PRESET_AVATARS.filter((a) => !held.has(a.id))
+    const avatar = free[Math.floor(Math.random() * free.length)]?.id
     setSpectators((ss) => ss.filter((x) => x.id !== id))
-    setPlayers((ps) => [...ps, { id: s.id, name: s.name, host: false, ready: false, online: true }])
+    setPlayers((ps) => [
+      ...ps,
+      { id: s.id, name: s.name, host: false, ready: false, online: true, avatar },
+    ])
   }
 
   // старт доступен, когда все онлайн-игроки готовы и их ≥2
@@ -233,17 +257,24 @@ export default function Lobby({
     [
       ...players.filter((p) => p.id !== meId).map((p) => p.name),
       ...seatedBotNames,
-      ...spectators.map((s) => s.name),
+      ...spectators.filter((s) => s.id !== meId).map((s) => s.name),
     ].map((n) => n.toLowerCase()),
   )
   const nicknameTaken = otherNames.has(nicknameDraft.toLowerCase())
   const openSettings = () => {
-    setNicknameDraft(me?.name ?? '')
+    setNicknameDraft(myName)
+    setNameAtOpen(myName)
     setSettingsOpen(true)
   }
+  // An empty field or someone else's nickname never reaches the row: it keeps
+  // the last nickname that was allowed.
   const changeNickname = (name: string) => {
     setNicknameDraft(name)
-    if (!otherNames.has(name.toLowerCase())) updateMe({ name })
+    if (name && !otherNames.has(name.toLowerCase())) renameMe(name)
+  }
+  const closeSettings = () => {
+    setSettingsOpen(false)
+    if (myName !== nameAtOpen) onRename?.(nameAtOpen, myName)
   }
 
   // A row is a player, a bot (carrying its number), or an empty seat.
@@ -428,6 +459,9 @@ export default function Lobby({
                 <PlayerSlot
                   key={s.id}
                   name={s.name}
+                  me={s.id === meId}
+                  youLabel={copy.you}
+                  onEdit={s.id === meId ? openSettings : undefined}
                   status={<Badge tone="muted">{copy.roleGuest}</Badge>}
                   dropdownLabel={copy.actions}
                   dropdown={
@@ -511,22 +545,27 @@ export default function Lobby({
 
       <Modal
         open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
+        onClose={closeSettings}
         title={copy.playerSettingsTitle}
-        wide
+        // a player picks an avatar too; a spectator has only the nickname
+        wide={Boolean(me)}
       >
-        {me && (
-          <PlayerSettings
-            avatars={PRESET_AVATARS.map((a) => ({ id: a.id, label: a.label[lang] }))}
-            avatar={me.avatar ?? null}
-            taken={takenAvatars}
-            onAvatarChange={(avatar) => updateMe({ avatar })}
-            nickname={nicknameDraft}
-            onNicknameChange={changeNickname}
-            nicknameTaken={nicknameTaken}
-            copy={playerSettingsCopy[lang]}
-          />
-        )}
+        <PlayerSettings
+          avatars={
+            me
+              ? {
+                  items: PRESET_AVATARS.map((a) => ({ id: a.id, label: a.label[lang] })),
+                  selected: me.avatar ?? null,
+                  taken: takenAvatars,
+                  onChange: (avatar) => updateMe({ avatar }),
+                }
+              : undefined
+          }
+          nickname={nicknameDraft}
+          onNicknameChange={changeNickname}
+          nicknameTaken={nicknameTaken}
+          copy={playerSettingsCopy[lang]}
+        />
       </Modal>
     </div>
   )

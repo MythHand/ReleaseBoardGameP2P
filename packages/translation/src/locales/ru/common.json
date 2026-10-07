@@ -257,6 +257,7 @@
       "memberReconnected": "{{name}} снова на связи",
       "memberKicked": "{{name}} исключён из комнаты",
       "roleChanged": "{{name}} теперь {{role}}",
+      "memberRenamed": "{{from}} сменил ник на {{to}}",
       "modeChanged": "хост изменил {{setting}}: {{value}}",
       "modeChangedUnknown": "хост изменил настройки игры"
     },

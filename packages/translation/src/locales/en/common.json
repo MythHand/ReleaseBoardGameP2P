@@ -257,6 +257,7 @@
       "memberReconnected": "{{name}} reconnected",
       "memberKicked": "{{name}} was removed",
       "roleChanged": "{{name}} is now {{role}}",
+      "memberRenamed": "{{from}} changed their nickname to {{to}}",
       "modeChanged": "host changed {{setting}}: {{value}}",
       "modeChangedUnknown": "host changed the game settings"
     },
