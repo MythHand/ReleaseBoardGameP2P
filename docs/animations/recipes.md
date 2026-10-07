@@ -38,7 +38,8 @@ splitting a pair — lives inside the step and is described there, once.
 > the playground is `Defense Release`.
 >
 > **The engine does not emit this pair.** `placed` is a Monitoring protection landing in the
-> release zone (`fake/release.ts:177`, `fake/triggers.ts:298`) and staying there, and a card spent
+> release zone (`onPlay` in `fake/release.ts` for a Monitoring from the hand, `resolveAiEvent` in
+> `fake/triggers.ts` for an AI Monitoring) and staying there, and a card spent
 > on an attack reaches the discard through `bankToDiscard` with **no event at all**. There is no
 > table centre in `PlayerView` either. This recipe stays as the description of the *movement*,
 > which is real and shown in `CardPlayStory` — what it is **not** is a mapping from engine events.
@@ -2048,7 +2049,7 @@ whole table, then either hands over to the projection (hit) or is followed by th
    publish has committed (**I2**), then `drop`. The beat is only the entrance: `requested` and
    `handTransfer` arrive in **different batches**, so no overlay can span the gap. What carries the card
    across it is `_Board.tsx`'s own centre render of `cardById(pending.requested)`, public to every peer
-   (`fake/attacks.ts:444` projects `giveCard` with no `mine` gate). Publish first and drop second, so
+   (`pendingView` in `fake/attacks.ts` projects `giveCard` with no `mine` gate). Publish first and drop second, so
    the static render is standing before the carrier lets go and the slot is never blank for a frame —
    the same ordering, for the same reason, as `drawBeat`'s standing trigger.
 3. **Miss** — the pending clears outright, so nothing in the projection survives it and the beat has to
@@ -2154,7 +2155,9 @@ The ask is answered in the middle band, not in the panel. `_useRequestStaging.ts
 armed pick, `chosen` after `ConfirmAction` commits it, because naming a card is irreversible — and
 `_Board.tsx` suppresses `PendingPrompt` for `requestCard` and `giveCard` the way it already does for
 `defend`, `discardForRelease` and `neutralize503`. What the catalog offers is the base deck without
-triggers (`docs/rules/cards.md:320`, `:339`) and without the events deck
+triggers (`docs/rules/cards.md`, section «trigger — срабатывают при доборе»: «Обе карты нельзя
+держать в руке»; its Error 503 section: «В руку триггер не попадает ни на мгновение») and without the
+events deck
 (`docs/rules/general.md:189`) — every card that can actually BE in a hand, both exclusions cited; the
 `confirm` handler re-checks membership against that same list, so a stale selection cannot resolve a
 card that is no longer on offer. `giveCard` gets no panel at all: the engine asks the victim which COPY
@@ -2187,7 +2190,7 @@ above plus `Specific opponent card`.
 ## Git Cherry-pick — choose a card out of the whole discard
 
 > **Status: shipped.** The board plays this scene as of #108 — see
-> [the board recipe](#git-cherry-pick-live-board--the-grid-over-a-heap-that-never-emptied) for what it does
+> [the board recipe](#git-cherry-pick-live-board--one-owner-for-the-grid-and-accepted-flight) for what it does
 > differently and why. This recipe transcribes the showcase the board was ported from.
 
 **When to call**

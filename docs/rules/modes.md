@@ -106,7 +106,7 @@ Fast Release снимает ограничение на **количество**
 
 Подробности последовательного добора и остановки на триггере —
 [`resolution.md`](./resolution.md#8-добор-и-триггеры) и
-[решения по Git-операциям](../specs/2026-08-02-git-operations-rules-decisions.md).
+[решения по Git-операциям](./decisions/2026-08-01-git-operations-open-questions.md).
 
 ---
 

@@ -11,7 +11,7 @@ what happens, in what order, under which card id: `general` (frame of a match), 
 with its id, print run, effect, what cancels it), `resolution` (order of resolution — windows,
 priority, when a win is final), `modes` (the five mode axes), `backlog` (disputed and undecided),
 `decisions/` (the questions put to the rules owner and his answers, which the spec is built on —
-moving here from `docs/specs/` in parts; the `*-rules-decisions.md` files are still there).
+each question and its answer in one record).
 Do not "improve" the rules text from the spec; a disagreement means the text wins and the finding
 goes to `docs/rules/backlog.md`.
 

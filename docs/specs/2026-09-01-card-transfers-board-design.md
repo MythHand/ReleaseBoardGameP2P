@@ -73,8 +73,8 @@ rather than a follow-up.
 
 `PendingPrompt`'s `requestCard` branch (`apps/ui/src/table/Table/PendingPrompt/PendingPrompt.tsx:365`)
 builds its options from the whole catalogue — all 37 definitions. The rules text is explicit that two
-of them can never be demanded: `cards.md:320` — «Обе карты **нельзя держать в руке**» — and
-`cards.md:339` — «В руку триггер не попадает ни на мгновение».
+of them can never be demanded: `cards.md`, section «trigger — срабатывают при доборе» — «Обе карты
+**нельзя держать в руке**» — and its Error 503 section — «В руку триггер не попадает ни на мгновение».
 
 The events deck is excluded by the rules just as plainly: `general.md:189` — «общее число её карт в
 игре — 21: каждая **либо в колоде, либо на столе**». Neither exclusion is inferred.
