@@ -216,6 +216,11 @@
 .achievements {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
+
+  /* dense: a plate that fits a hole left beside a wide one moves up into it —
+     with two wide plates in a row of three, the second would otherwise leave an
+     empty cell, and so would any plate nobody won */
+  grid-auto-flow: dense;
   gap: 16px;
 }
 
@@ -233,6 +238,14 @@
 
 .toneOperation {
   --ach: var(--cat-operation);
+}
+
+.toneDefense {
+  --ach: var(--cat-defense);
+}
+
+.toneProtection {
+  --ach: var(--cat-protection);
 }
 
 /* плашка: прямые углы — как таблица и блок победителя выше; скругление

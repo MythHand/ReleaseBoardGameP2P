@@ -7,24 +7,24 @@ export interface StatsData {
   players: StatPlayer[]
 }
 
-// Мок итогов партии. location — где участник сейчас в пост-игровом флоу:
-// 'game' (на столе) | 'stats' (на статистике) | 'lobby' (в лобби) | 'offline' (нет связи).
-// Локальный игрок носит такой же ник, как все — «это ты» несёт отдельная
-// отметка (selfId), а не подменённое имя.
-// Длины ников РАЗНЫЕ намеренно: 8 / 14 / 20 символов при пределе поля в 20.
-// Лидеры показателей — you, p2 и p3, поэтому каждый из трёх шагов кегля имени
-// попадает на свою плашку ачивки, и раскладка видна на одном экране.
 // Each player carries the avatar the chat mock gives them — attached here, by the
 // original nickname, so a story that swaps the names keeps the avatars.
 const withAvatars = (players: StatPlayer[]): StatPlayer[] =>
   players.map((p) => ({ ...p, avatar: mockAvatar(p.name, 'player') }))
 
+// Мок итогов партии. location — где участник сейчас в пост-игровом флоу:
+// 'game' (на столе) | 'stats' (на статистике) | 'lobby' (в лобби) | 'offline' (нет связи).
+// Локальный игрок носит такой же ник, как все — «это ты» несёт отдельная
+// отметка (selfId), а не подменённое имя.
+// Длины ников РАЗНЫЕ намеренно: 8 / 14 / 20 символов при пределе поля в 20.
+// Лидеры показателей — у каждого свой и без ничьих, поэтому до экрана доходят
+// все восемь плашек, и каждый из трёх шагов кегля имени виден на одном экране.
 export function makeStats(): StatsData {
   return {
     winnerId: 'you',
     selfId: 'you',
     players: withAvatars([
-      // attack — сыграно атакующих (красные); defense — защитных (синие+фиолетовые)
+      // attack — сыграно атакующих (красные); defense — сыграно карт обороны (синие)
       {
         id: 'you',
         name: 'deadlock',
@@ -36,6 +36,8 @@ export function makeStats(): StatsData {
         ai: 2,
         err503: 2,
         cherryPick: 3,
+        monitoring: 1,
+        gitBranch: 0,
       },
       {
         id: 'p2',
@@ -48,6 +50,8 @@ export function makeStats(): StatsData {
         ai: 1,
         err503: 0,
         cherryPick: 0,
+        monitoring: 0,
+        gitBranch: 2,
       },
       {
         id: 'p3',
@@ -60,6 +64,8 @@ export function makeStats(): StatsData {
         ai: 3,
         err503: 1,
         cherryPick: 1,
+        monitoring: 3,
+        gitBranch: 1,
       },
       {
         id: 'p4',
@@ -72,6 +78,8 @@ export function makeStats(): StatsData {
         ai: 0,
         err503: 1,
         cherryPick: 2,
+        monitoring: 1,
+        gitBranch: 0,
       },
     ]),
   }

@@ -96,6 +96,18 @@
       "attackedInto": {
         "title": "Забагованный",
         "unit": "атак прилетело"
+      },
+      "defense": {
+        "title": "Решала",
+        "unit": "карт обороны сыграно"
+      },
+      "monitoring": {
+        "title": "Параноик",
+        "unit": "раз поставил Monitoring"
+      },
+      "gitBranch": {
+        "title": "Дровосек",
+        "unit": "раз разделил колоду"
       }
     }
   },

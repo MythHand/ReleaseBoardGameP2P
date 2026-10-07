@@ -96,6 +96,18 @@
       "attackedInto": {
         "title": "Bug Magnet",
         "unit": "attacks against them"
+      },
+      "defense": {
+        "title": "Fixer",
+        "unit": "defense cards played"
+      },
+      "monitoring": {
+        "title": "Paranoid",
+        "unit": "times set up Monitoring"
+      },
+      "gitBranch": {
+        "title": "Woodcutter",
+        "unit": "times split a deck"
       }
     }
   },

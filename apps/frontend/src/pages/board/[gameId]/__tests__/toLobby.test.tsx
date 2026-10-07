@@ -41,7 +41,17 @@ const SEATS: Seat[] = [
   { playerId: 'p1', peerId: 'g', name: 'Bo' },
   { playerId: 'p2', peerId: 'h', name: 'Ann' },
 ]
-const zero = { attack: 0, defense: 0, ddos: 0, ai: 0, err503: 0, cherryPick: 0, attackedInto: 0 }
+const zero = {
+  attack: 0,
+  defense: 0,
+  ddos: 0,
+  ai: 0,
+  err503: 0,
+  cherryPick: 0,
+  attackedInto: 0,
+  monitoring: 0,
+  gitBranch: 0,
+}
 
 let session: UseLobby
 

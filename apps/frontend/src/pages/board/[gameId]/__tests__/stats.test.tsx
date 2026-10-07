@@ -39,7 +39,17 @@ vi.mock('~/app/providers/SessionProvider', () => ({
 }))
 vi.mock('~/features/play-game/useGame', () => ({ useGame: () => ({ view, events: [] }) }))
 
-const zero = { attack: 0, defense: 0, ddos: 0, ai: 0, err503: 0, cherryPick: 0, attackedInto: 0 }
+const zero = {
+  attack: 0,
+  defense: 0,
+  ddos: 0,
+  ai: 0,
+  err503: 0,
+  cherryPick: 0,
+  attackedInto: 0,
+  monitoring: 0,
+  gitBranch: 0,
+}
 
 beforeEach(() => {
   goToLobby.mockClear()
@@ -158,7 +168,9 @@ it('falls back to the roster when the session holds no seating', () => {
 it("shows every seat's counters", () => {
   render(<StatsPage />)
   expect(screen.getByText('5')).toBeTruthy()
-  expect(screen.getByText('3')).toBeTruthy()
+  // Twice: the defence cell in the table, and the counter on the Fixer plate —
+  // that seat played the most defence cards.
+  expect(screen.getAllByText('3')).toHaveLength(2)
 })
 
 it('announces that this peer is on the results screen', () => {
@@ -187,7 +199,8 @@ it('shows public counters to a spectator without marking a player as self', () =
   view = { ...view, self: null }
   render(<StatsPage />)
   expect(screen.getByText('5')).toBeTruthy()
-  expect(screen.getByText('3')).toBeTruthy()
+  // the defence cell and the Fixer plate, as above
+  expect(screen.getAllByText('3')).toHaveLength(2)
   expect(screen.queryByText('stats.selfTag')).toBeNull()
 })
 

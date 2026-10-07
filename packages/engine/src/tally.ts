@@ -13,6 +13,10 @@ export interface PlayerTally {
   cherryPick: number
   // Attacks MADE against this seat, landed or not, plus a 503 out of the deck.
   attackedInto: number
+  // Monitorings set up in this seat's zone — from the hand or off the events deck.
+  monitoring: number
+  // Git Branch played.
+  gitBranch: number
 }
 
 export type Tallies = Record<PlayerId, PlayerTally>
@@ -25,6 +29,8 @@ export const emptyTally = (): PlayerTally => ({
   err503: 0,
   cherryPick: 0,
   attackedInto: 0,
+  monitoring: 0,
+  gitBranch: 0,
 })
 
 export function seedTally(seating: PlayerId[]): Tallies {
@@ -93,6 +99,14 @@ export function foldTally(prev: Tallies, events: Event[]): Tallies {
       // peer could ever verify.
       case 'takenFromDiscard':
         if (e.to === 'hand') bump(e.player, 'cherryPick')
+        break
+      // An AI Monitoring off the events deck is placed under the plain catalogue
+      // id (fake/triggers.ts), so this one check counts both kinds.
+      case 'placed':
+        if (e.card === 'protection-monitoring') bump(e.player, 'monitoring')
+        break
+      case 'operationPlayed':
+        if (e.card === 'operation-git-branch') bump(e.player, 'gitBranch')
         break
       default:
         break
