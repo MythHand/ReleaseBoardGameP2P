@@ -379,6 +379,13 @@
     "copyCode": "code",
     "copied": "copied"
   },
+  "playerSettings": {
+    "avatars": "Avatar",
+    "nicknameLabel": "Your nickname",
+    "nicknamePlaceholder": "E.G. Dimbo",
+    "randomNick": "random name",
+    "nicknameTaken": "This nickname is already taken"
+  },
   "physicalEdition": {
     "title": "Printed edition",
     "lead": "“Release at any cost” has a printed edition — you can support the project and play it for real.",
@@ -439,7 +446,6 @@
   "lobbyScreen": {
     "title": "Lobby",
     "subtitle": "Waiting for players…",
-    "botName": "Bot {{n}}",
     "language": "language",
     "disband": "disband",
     "rules": "rules",
@@ -476,6 +482,7 @@
     "disbandText": "The lobby will be closed and all connected players disconnected. This cannot be undone.",
     "leaveTitle": "Leave the lobby?",
     "leaveText": "You will leave the lobby, and your seat will be freed.",
+    "playerSettingsTitle": "Player settings",
     "bugRunner": "Mini-game: press to make the bug jump",
     "cancel": "cancel",
     "errors": {

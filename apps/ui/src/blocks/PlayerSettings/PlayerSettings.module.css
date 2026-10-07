@@ -1,0 +1,58 @@
+/* two columns, as in the start screen's create-game modal: the avatars at their
+   own width, the nickname takes the rest behind a divider */
+.grid {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: start;
+}
+
+/* a <fieldset>: its default border, padding and margin are cleared */
+.avatars {
+  display: grid;
+  grid-template-columns: repeat(5, max-content);
+  gap: 8px;
+  min-inline-size: 0;
+  padding: 0;
+  padding-inline-end: 36px;
+  margin: 0;
+  border: 0;
+}
+
+/* one avatar: a tight frame around the square — the frame carries the state */
+.cell {
+  display: flex;
+  padding: 4px;
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid transparent;
+}
+
+/* taken by another player — the avatar itself shows it muted */
+.cell:disabled {
+  cursor: not-allowed;
+}
+
+.cell:not(:disabled, .selected):hover {
+  background: var(--white-05);
+}
+
+.selected {
+  background: var(--white-08);
+  border-color: var(--white-22);
+}
+
+.nickname {
+  align-self: stretch;
+  padding-inline-start: 36px;
+  border-inline-start: 1px solid var(--white-08);
+}
+
+/* the error under the field — the same slot as the invite screen's code status */
+.nicknameStatus {
+  display: flex;
+  align-items: center;
+  min-block-size: 18px;
+  margin-block-start: 6px;
+  line-height: 1.5;
+  color: var(--cat-attack);
+}

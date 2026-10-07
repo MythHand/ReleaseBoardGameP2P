@@ -73,6 +73,7 @@ export default function LobbyChatStory() {
           gameModesCopy={{ ru: ruCommon.gameModes, en: enCommon.gameModes }}
           rulesBlockCopy={{ ru: ruCommon.rulesBlock, en: enCommon.rulesBlock }}
           lobbyScreenCopy={{ ru: ruCommon.lobbyScreen, en: enCommon.lobbyScreen }}
+          playerSettingsCopy={{ ru: ruCommon.playerSettings, en: enCommon.playerSettings }}
           chat={
             <Chat
               messages={shown}

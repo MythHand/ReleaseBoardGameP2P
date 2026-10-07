@@ -1,0 +1,5 @@
+/* the block takes the section's full width (a flex item in KitShell's .row
+   would otherwise shrink to its content) */
+.panel {
+  inline-size: 100%;
+}

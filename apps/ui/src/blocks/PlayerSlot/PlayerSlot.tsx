@@ -1,10 +1,14 @@
 import type { ReactNode } from 'react'
+import PresetAvatar from '@/avatars/PresetAvatar'
+import PencilSimpleIcon from '@/icons/PencilSimpleIcon'
 import Avatar from '@/primitives/Avatar'
 import Dropdown, { type DropdownItem } from '@/primitives/Dropdown'
 import styles from './PlayerSlot.module.css'
 
 interface PlayerSlotProps {
   name: string
+  // preset avatar id (PRESET_AVATARS); without it the avatar is the name's initial
+  avatar?: string
   avatarSize?: number
   // подсветка строки + пометка «(вы)»
   me?: boolean
@@ -18,12 +22,16 @@ interface PlayerSlotProps {
   // пункты дропдауна действий «⋯» — рендерятся примитивом Dropdown
   dropdown?: DropdownItem[]
   dropdownLabel?: string
+  // the avatar and the name become one button that edits this player; hovering
+  // or focusing it lays a pencil over the avatar. Without it the row is static.
+  onEdit?: () => void
 }
 
 // Строка участника лобби: аватар + имя (+ «вы») + бейдж роли + правый кластер
 // со статусом и дропдауном действий. Каркас и стили взяты из экрана Lobby.
 export default function PlayerSlot({
   name,
+  avatar: avatarId,
   avatarSize = 34,
   me = false,
   youLabel = 'вы',
@@ -32,14 +40,38 @@ export default function PlayerSlot({
   status,
   dropdown,
   dropdownLabel,
+  onEdit,
 }: PlayerSlotProps) {
+  const avatar = avatarId ? (
+    <PresetAvatar id={avatarId} size={avatarSize} muted={offline} />
+  ) : (
+    <Avatar name={name} size={avatarSize} muted={offline} />
+  )
+  const label = (
+    <span className={styles.name}>
+      {name}
+      {me && <span className={styles.you}> ({youLabel})</span>}
+    </span>
+  )
+
   return (
     <div className={`${styles.slot} ${offline ? styles.slotOff : ''} ${me ? styles.slotMe : ''}`}>
-      <Avatar name={name} size={avatarSize} muted={offline} />
-      <span className={styles.name}>
-        {name}
-        {me && <span className={styles.you}> ({youLabel})</span>}
-      </span>
+      {onEdit ? (
+        <button type="button" className={styles.edit} onClick={onEdit}>
+          <span className={styles.editAvatar}>
+            {avatar}
+            <span className={styles.editMark} aria-hidden="true">
+              <PencilSimpleIcon size={16} />
+            </span>
+          </span>
+          {label}
+        </button>
+      ) : (
+        <>
+          {avatar}
+          {label}
+        </>
+      )}
       {badge}
       {(Boolean(status) || Boolean(dropdown)) && (
         <div className={styles.rowEnd}>

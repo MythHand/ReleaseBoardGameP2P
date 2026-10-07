@@ -1,11 +1,14 @@
 import { type ReactNode, useState } from 'react'
+import { PRESET_AVATARS } from '@/avatars/PresetAvatar'
 import BugRunner from '@/blocks/BugRunner'
 import GameSettings from '@/blocks/GameSettings'
 import LangSwitcher, { type SwitchLang } from '@/blocks/LangSwitcher'
 import LobbyCode, { type LobbyCodeCopy } from '@/blocks/LobbyCode'
+import PlayerSettings, { type PlayerSettingsCopy } from '@/blocks/PlayerSettings'
 import PlayerSlot, { EmptySlot } from '@/blocks/PlayerSlot'
 import Rules, { type RulesCopy } from '@/blocks/Rules'
 import ReleaseLogo from '@/brand/ReleaseLogo'
+import { botNames } from '@/game/botNames'
 import { DEFAULT_SETUP, type GameModesCopy, type Setup } from '@/game/modes'
 import { MAX_SPECTATORS, spectatorLimitColor } from '@/game/spectatorLimit'
 import Badge from '@/primitives/Badge'
@@ -23,6 +26,8 @@ interface Player {
   host: boolean
   ready: boolean
   online: boolean
+  // preset avatar id (PRESET_AVATARS)
+  avatar?: string
 }
 interface Spectator {
   id: number
@@ -49,6 +54,8 @@ interface LobbyProps {
   rulesBlockCopy: { ru: RulesCopy; en: RulesCopy }
   // собственный текст экрана лобби обоими языками — выбирается по внутреннему lang
   lobbyScreenCopy: { ru: LobbyCopy; en: LobbyCopy }
+  // the player settings modal's content, in both languages — picked by the inner lang
+  playerSettingsCopy: { ru: PlayerSettingsCopy; en: PlayerSettingsCopy }
   // чат третьей, самой правой колонкой. Слот, а не данные: экран не знает ни
   // откуда берутся сообщения, ни как они устроены — он только даёт им место.
   // Без слота колонки нет и сетка остаётся из двух, как была.
@@ -74,8 +81,6 @@ export interface LobbyCopy {
   capacity: string
   addBot: string
   removeBot: string
-  // Interpolated with the bot's number, the way the frontend's catalog does it.
-  botName: string
   roleBot: string
   // заголовок колонки чата — сам блок чата своего заголовка не имеет
   chat: string
@@ -104,6 +109,7 @@ export interface LobbyCopy {
   disbandText: string
   leaveTitle: string
   leaveText: string
+  playerSettingsTitle: string
   // the header's mini-game, as a screen reader names it
   bugRunner: string
   cancel: string
@@ -112,10 +118,17 @@ export interface LobbyCopy {
 // ⚠️ Каркас (WIP). Данные — моки. Сетевой/presence-слой придёт от логики;
 // здесь только верстка и интерактив, что уже готов.
 const MOCK_PLAYERS: Player[] = [
-  { id: 1, name: 'dimbo', host: true, ready: true, online: true },
-  { id: 2, name: 'neo', host: false, ready: true, online: true },
-  { id: 3, name: 'trinity', host: false, ready: false, online: true },
-  { id: 4, name: 'morpheus', host: false, ready: false, online: false },
+  { id: 1, name: 'dimbo', host: true, ready: true, online: true, avatar: 'release-frontend' },
+  { id: 2, name: 'neo', host: false, ready: true, online: true, avatar: 'attack-bug' },
+  {
+    id: 3,
+    name: 'trinity',
+    host: false,
+    ready: false,
+    online: true,
+    avatar: 'defense-rubber-ducky',
+  },
+  { id: 4, name: 'morpheus', host: false, ready: false, online: false, avatar: 'support-sudo' },
 ]
 const MOCK_SPECTATORS: Spectator[] = [
   { id: 101, name: 'oracle' },
@@ -136,6 +149,7 @@ export default function Lobby({
   gameModesCopy,
   rulesBlockCopy,
   lobbyScreenCopy,
+  playerSettingsCopy,
   chat,
   voice,
 }: LobbyProps) {
@@ -151,6 +165,10 @@ export default function Lobby({
   const [disbandOpen, setDisbandOpen] = useState(false)
   const [leaveOpen, setLeaveOpen] = useState(false)
   const [rulesOpen, setRulesOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  // the nickname as typed in the settings modal — it reaches my row only while
+  // nobody else in the room has it
+  const [nicknameDraft, setNicknameDraft] = useState('')
   const [lang, setLang] = useState<SwitchLang>(initialLang)
 
   // наборы текста по языку — экран держит оба и выбирает встроенным свитчером
@@ -167,6 +185,11 @@ export default function Lobby({
   const me = players.find((p) => p.id === meId)
   const toggleReady = (id: number) =>
     setPlayers((ps) => ps.map((p) => (p.id === id ? { ...p, ready: !p.ready } : p)))
+  // the player settings modal edits my own row
+  const updateMe = (patch: Partial<Player>) =>
+    setPlayers((ps) => ps.map((p) => (p.id === meId ? { ...p, ...patch } : p)))
+  // avatars the other players hold — shown in the modal, but cannot be picked
+  const takenAvatars = players.flatMap((p) => (p.id !== meId && p.avatar ? [p.avatar] : []))
 
   // модерация (host)
   const kick = (id: number) => setPlayers((ps) => ps.filter((p) => p.id !== id))
@@ -200,6 +223,28 @@ export default function Lobby({
   // no control for the ask, so a click that changed only it would look broken.
   const addBot = () => setBots(shownBots + 1)
   const removeBot = () => setBots(shownBots - 1)
+  // The app's own bot names: the frontend seeds them with the host's id, the
+  // mock with the room code — any id that stays put gives a stable lineup.
+  const seatedBotNames = botNames(code, shownBots)
+
+  // Everyone else in the room — players, bots, spectators — compared without
+  // case, so "Neo" and "neo" count as the same nickname.
+  const otherNames = new Set(
+    [
+      ...players.filter((p) => p.id !== meId).map((p) => p.name),
+      ...seatedBotNames,
+      ...spectators.map((s) => s.name),
+    ].map((n) => n.toLowerCase()),
+  )
+  const nicknameTaken = otherNames.has(nicknameDraft.toLowerCase())
+  const openSettings = () => {
+    setNicknameDraft(me?.name ?? '')
+    setSettingsOpen(true)
+  }
+  const changeNickname = (name: string) => {
+    setNicknameDraft(name)
+    if (!otherNames.has(name.toLowerCase())) updateMe({ name })
+  }
 
   // A row is a player, a bot (carrying its number), or an empty seat.
   const slots: (Player | { bot: number } | null)[] = [
@@ -296,8 +341,10 @@ export default function Lobby({
                   <PlayerSlot
                     key={p.id}
                     name={p.name}
+                    avatar={p.avatar}
                     me={p.id === meId}
                     youLabel={copy.you}
+                    onEdit={p.id === meId ? openSettings : undefined}
                     offline={!p.online}
                     badge={
                       p.host ? (
@@ -325,7 +372,7 @@ export default function Lobby({
                 ) : p && 'bot' in p ? (
                   <PlayerSlot
                     key={`bot-${p.bot}`}
-                    name={copy.botName.replace('{{n}}', String(p.bot))}
+                    name={seatedBotNames[p.bot - 1]}
                     badge={
                       <Badge tone="muted" size="sm" outlined>
                         {copy.roleBot}
@@ -460,6 +507,26 @@ export default function Lobby({
             {copy.leave}
           </Button>
         </div>
+      </Modal>
+
+      <Modal
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        title={copy.playerSettingsTitle}
+        wide
+      >
+        {me && (
+          <PlayerSettings
+            avatars={PRESET_AVATARS.map((a) => ({ id: a.id, label: a.label[lang] }))}
+            avatar={me.avatar ?? null}
+            taken={takenAvatars}
+            onAvatarChange={(avatar) => updateMe({ avatar })}
+            nickname={nicknameDraft}
+            onNicknameChange={changeNickname}
+            nicknameTaken={nicknameTaken}
+            copy={playerSettingsCopy[lang]}
+          />
+        )}
       </Modal>
     </div>
   )
