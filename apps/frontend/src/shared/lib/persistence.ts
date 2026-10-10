@@ -117,6 +117,8 @@ export interface StoredSession {
   roomCode: string
   name: string
   role: 'host' | 'guest'
+  participantRole?: 'player' | 'spectator'
+  where?: 'lobby' | 'game' | 'stats'
   gameId: string | null
   // Retained when returning to the lobby so a reload cannot reuse a match id.
   lastGameId?: string
@@ -184,6 +186,7 @@ export function clearChat(): void {
 // that reads them (the host restore) casts once, where the engine types are
 // already in scope.
 export interface StoredLobbyConfig {
+  maxSpectators?: number
   maxPlayers: number
   setup: unknown
   bots?: number

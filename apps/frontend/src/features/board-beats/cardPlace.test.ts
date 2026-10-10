@@ -68,7 +68,7 @@ describe('withoutCard', () => {
       { kind: 'shown', player: 'p1', uid: 'bug#1' },
     ] as const) {
       const next = withoutCard(board(), from)
-      expect(next.you.hand.map((h) => h.uid)).toEqual(['sudo#1'])
+      expect(next.you?.hand.map((h) => h.uid)).toEqual(['sudo#1'])
       expect(next.shown?.map((s) => s.uid)).toEqual(['oom#2'])
     }
   })
@@ -77,7 +77,7 @@ describe('withoutCard', () => {
     const next = withoutCard(board(), { kind: 'shown', player: 'p2', uid: 'oom#2' })
     expect(next.shown?.map((s) => s.uid)).toEqual(['bug#1'])
     expect(next.opponents[0].handCount).toBe(3)
-    expect(next.you.hand).toHaveLength(2)
+    expect(next.you?.hand).toHaveLength(2)
   })
 
   it('takes an attack off the centre together with the answer it was waiting for', () => {
@@ -153,9 +153,9 @@ describe('withoutCard', () => {
 
   it('empties a zone slot of the card and of what rides under it', () => {
     const next = withoutCard(board(), { kind: 'zone', player: 'p1', slot: 'frontend' })
-    expect(next.you.release.frontend).toBeNull()
-    expect(next.you.support?.frontend).toBeNull()
-    expect(next.you.releaseUid?.frontend).toBeUndefined()
+    expect(next.you?.release.frontend).toBeNull()
+    expect(next.you?.support?.frontend).toBeNull()
+    expect(next.you?.releaseUid?.frontend).toBeUndefined()
     const theirs = withoutCard(board(), { kind: 'zone', player: 'p2', slot: 'backend' })
     expect(theirs.opponents[0].release.backend).toBeNull()
   })
@@ -200,7 +200,8 @@ describe('withCard', () => {
   it('draws the card where it landed: hand, centre, seat, zone, heap, counts', () => {
     const base = board()
     expect(
-      withCard(base, { kind: 'hand', uid: 'hot#3', card: 'defense-hotfix', at: 0 }).you.hand[0].uid,
+      withCard(base, { kind: 'hand', uid: 'hot#3', card: 'defense-hotfix', at: 0 }).you?.hand[0]
+        .uid,
     ).toBe('hot#3')
     expect(withCard(base, { kind: 'seat', player: 'p2', count: 2 }).opponents[0].handCount).toBe(5)
     const zoned = withCard(base, {
@@ -233,9 +234,9 @@ describe('withCard — an AI release', () => {
         ai: { id: 'release-frontend', event: 'ai-release-frontend' },
       })
       const owner = player === 'p1' ? next.you : next.opponents[0]
-      expect(owner.release.frontend?.id).toBe('ai-release-frontend')
-      expect(owner.releaseId?.frontend).toBe('release-frontend')
-      expect(owner.releaseEvent?.frontend).toBe('ai-release-frontend')
+      expect(owner?.release.frontend?.id).toBe('ai-release-frontend')
+      expect(owner?.releaseId?.frontend).toBe('release-frontend')
+      expect(owner?.releaseEvent?.frontend).toBe('ai-release-frontend')
     }
   })
 })
@@ -254,7 +255,7 @@ describe('liftOff / setDown', () => {
       gesture,
     )
     expect(run.publish).toHaveBeenCalledTimes(1)
-    expect(run.base.you.hand.map((h) => h.uid)).toEqual(['sudo#1'])
+    expect(run.base.you?.hand.map((h) => h.uid)).toEqual(['sudo#1'])
     expect(run.base.shown?.map((s) => s.uid)).toEqual(['oom#2'])
     expect(order).toEqual(['publish', 'release'])
   })
@@ -272,4 +273,26 @@ describe('liftOff / setDown', () => {
     expect(run.base.opponents[0].handCount).toBe(4)
     expect(order).toEqual(['publish', 'drop'])
   })
+})
+
+it('moves public cards on a spectator board without creating a private hand', () => {
+  const base = board({ selfId: null, you: null })
+  const lifted = withoutCard(base, { kind: 'shown', player: 'p2', uid: 'oom#2' })
+  expect(lifted.you).toBeNull()
+  expect(lifted.selfId).toBeNull()
+  expect(lifted.shown?.map((item) => item.uid)).toEqual(['bug#1'])
+  expect(withoutCard(base, { kind: 'hand', uid: 'missing' })).toBe(base)
+  expect(withCard(base, { kind: 'hand', uid: 'private', card: 'attack-bug' })).toBe(base)
+  const placed = withCard(lifted, {
+    kind: 'zone',
+    player: 'p2',
+    slot: 'frontend',
+    card: 'release-frontend',
+  })
+  expect(placed.you).toBeNull()
+  expect(placed.opponents[0].release.frontend?.id).toBe('release-frontend')
+  expect(
+    withoutCard(placed, { kind: 'zone', player: 'p2', slot: 'frontend' }).opponents[0].release
+      .frontend,
+  ).toBeNull()
 })

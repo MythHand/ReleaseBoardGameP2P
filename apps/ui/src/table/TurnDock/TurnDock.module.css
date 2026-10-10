@@ -181,3 +181,25 @@
     0 0 24px color-mix(in srgb, var(--btn-accent) 36%, transparent),
     inset 0 0 22px color-mix(in srgb, var(--btn-accent) 22%, transparent);
 }
+
+/* The observer has no action key or private caption. A compact read-only HUD
+   leaves the lower band available for public piles and centre flights. */
+.spectator {
+  block-size: 106px;
+}
+
+.spectator .body {
+  flex: 0;
+}
+
+.spectator .action {
+  align-self: center;
+}
+
+.spectator .actionMain {
+  block-size: 40px;
+}
+
+.spectator .caption {
+  display: none;
+}

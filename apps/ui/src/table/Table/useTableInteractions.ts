@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { TableActions, TableTarget } from './intents'
 import type { TableState } from './types'
 
@@ -56,11 +56,14 @@ export function useTableInteractions({ state, actions, comboOptions }: Options) 
     setAwaitingCombo(false)
   }, [])
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a new viewer cancels the previous viewer's selection
+  useEffect(() => reset(), [state.selfId, reset])
+
   const cancel = useCallback(() => reset(), [reset])
 
   const onCardClick = useCallback(
     (index: number) => {
-      const item = state.you.hand[index]
+      const item = state.you?.hand[index]
       if (!item) return
 
       // The window's attack affordance reuses the hand: while a window is
@@ -113,7 +116,7 @@ export function useTableInteractions({ state, actions, comboOptions }: Options) 
       setCombo(null)
     },
     [
-      state.you.hand,
+      state.you?.hand,
       state.playable,
       state.window,
       actions,
@@ -126,7 +129,7 @@ export function useTableInteractions({ state, actions, comboOptions }: Options) 
 
   const onTargetPick = useCallback(
     (target: TableTarget) => {
-      if (!selected) return
+      if (state.selfId === null || !selected) return
       // A target can only resolve a source that already has its combo
       // decided (or needs none) — while a partner is still outstanding,
       // `targets` may be populated from `selected` but nothing is playable.
@@ -135,12 +138,13 @@ export function useTableInteractions({ state, actions, comboOptions }: Options) 
       actions?.onPlay?.(selected, target, combo ?? undefined)
       reset()
     },
-    [selected, targets, actions, combo, reset, awaitingCombo],
+    [selected, targets, actions, combo, reset, awaitingCombo, state.selfId],
   )
 
   const accentAt = useCallback(
-    (index: number) => (state.you.hand[index]?.uid === selected ? 'var(--turn-accent)' : undefined),
-    [state.you.hand, selected],
+    (index: number) =>
+      state.you?.hand[index]?.uid === selected ? 'var(--turn-accent)' : undefined,
+    [state.you?.hand, selected],
   )
 
   return { phase, selected, comboWith: combo, targets, accentAt, onCardClick, onTargetPick, cancel }

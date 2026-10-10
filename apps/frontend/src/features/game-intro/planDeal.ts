@@ -1,4 +1,4 @@
-import type { Event, PlayerView } from '@release/engine'
+import type { Event, GameView } from '@release/engine'
 
 export interface DealFlight {
   round: number
@@ -25,11 +25,11 @@ export interface DealPlan {
 // The opening, reconstructed. The engine dealt before any peer mounted the
 // board, so this reads the finished projection backwards into the sequence that
 // produced it. Pure: every timing decision belongs to the sequencer.
-export function planDeal(view: PlayerView, events: Event[]): DealPlan | null {
+export function planDeal(view: GameView, events: Event[]): DealPlan | null {
   const deals = events.filter((e): e is Extract<Event, { type: 'dealt' }> => e.type === 'dealt')
   if (deals.length === 0) return null
 
-  const mine = deals.find((d) => d.player === view.self.id)
+  const mine = deals.find((d) => d.player === view.self?.id)
   const others = view.opponents.map((o) => ({
     id: o.id,
     deal: deals.find((d) => d.player === o.id),
@@ -38,13 +38,13 @@ export function planDeal(view: PlayerView, events: Event[]): DealPlan | null {
   const piles = view.decks.piles.reduce((sum, n) => sum + n, 0)
   const out = deals.reduce((sum, d) => sum + d.count, 0)
 
-  const myCount = mine?.count ?? view.self.hand.length
+  const myCount = mine?.count ?? view.self?.hand.length ?? 0
   const rounds = Math.max(myCount, ...others.map((o) => o.deal?.count ?? 0))
 
   const flights: DealFlight[] = []
   for (let round = 0; round < rounds; round += 1) {
     if (round < myCount) {
-      const card = view.self.hand[round]
+      const card = view.self?.hand[round]
       flights.push({
         round,
         to: { kind: 'self', index: round },
@@ -71,6 +71,6 @@ export function planDeal(view: PlayerView, events: Event[]): DealPlan | null {
     deckBefore: piles + out,
     events: view.decks.events,
     flights,
-    hand: view.self.hand.map((c) => ({ uid: c.uid, card: c.id })),
+    hand: view.self?.hand.map((c) => ({ uid: c.uid, card: c.id })) ?? [],
   }
 }

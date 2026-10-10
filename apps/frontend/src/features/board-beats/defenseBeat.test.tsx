@@ -1296,7 +1296,7 @@ it('takes our own Debugger off the fan in the commit the gesture lets go of it',
   } as unknown as BoardState
   let handAtRelease: string[] | undefined
   const release = vi.fn(() => {
-    handAtRelease = published.at(-1)?.you.hand.map((h) => h.uid)
+    handAtRelease = published.at(-1)?.you?.hand.map((h) => h.uid)
   })
   const staging = {
     current: { mainUid: 'dbg', el: node(), release },
@@ -1426,7 +1426,7 @@ it('lets the victim’s zone go of a stolen release as it takes off, and lands i
         base: robbed,
         publish: (s) => {
           published.push(s)
-          if (liftedAfter === null && !s.you.release.frontend) liftedAfter = [...played.names]
+          if (liftedAfter === null && !s.you?.release.frontend) liftedAfter = [...played.names]
         },
       },
     ),

@@ -56,7 +56,7 @@ export function useHandOrder(gameKey: string | null): HandOrder {
 
   const arrange = useCallback(
     (live: BoardState): BoardState => {
-      if (order.length === 0) return live
+      if (live.you === null || order.length === 0) return live
       const hand = live.you.hand
       const at = new Map(order.map((uid, i) => [uid, i]))
       // Sorted cards take their stored places; cards the order has never seen

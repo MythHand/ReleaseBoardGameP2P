@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Implement the full lobby page in `apps/frontend`, extending `useLobby` to sync game settings and disband, and add a "continue session" entry to the start screen.
+**Goal:** Implement the full lobby page in `apps/frontend`, extending `useLobby` to sync game settings and disband.
 
-**Architecture:** Three milestones — network layer (protocol + state extensions), `_LobbyView` UI component, start screen extension — implemented together on one branch. The UI consumes `useSession()` from the existing `SessionProvider`.
+**Architecture:** Two milestones — network layer (protocol + state extensions) and `_LobbyView` UI component — implemented together on one branch. The UI consumes `useSession()` from the existing `SessionProvider`.
 
 **Tech Stack:** React 19, TypeScript, Tailwind v4, `@release/ui` primitives, `@release/translation` (react-i18next), PeerJS P2P transport.
 
@@ -156,48 +156,10 @@ Action bar:
 
 ---
 
-### Part 3 — Start screen "continue session"
-
-**Files changed:**
-- `apps/frontend/src/pages/start.tsx`
-- `apps/frontend/src/pages/lobby/_LobbyFlow.tsx`
-- `packages/translation/src/locales/en/common.json`
-- `packages/translation/src/locales/ru/common.json`
-
-#### `start.tsx`
-
-```tsx
-const session = useSession()
-const navigate = useNavigate()
-const hasSession = session.status === 'in-lobby' && !!session.state
-
-// In <Menu>:
-{hasSession && (
-  <MenuButton onClick={() => navigate('/lobby', { state: { resumed: true } })}>
-    {t('start.continueSession')}
-  </MenuButton>
-)}
-```
-
-Placement: between the create/join group and the rules/github group.
-
-#### `_LobbyFlow.tsx` — seed change
-
-```ts
-const [continued, setContinued] = useState(
-  session.status !== 'in-lobby' || !!(location.state as { resumed?: boolean })?.resumed
-)
-```
-
-This skips the "active session" intermediate prompt when arriving via the start screen Continue button.
-
----
-
 ## New translation keys
 
 | Key | EN | RU |
 |-----|----|----|
-| `start.continueSession` | continue session | продолжить сессию |
 | `lobby.modesLockedHint` | managed by host | настраивает хост |
 | `lobby.disbandTitle` | Disband lobby? | Расформировать лобби? |
 | `lobby.disbandConfirm` | The lobby will be closed and all connected players will be disconnected. This cannot be undone. | Лобби будет закрыто, все подключённые игроки — отключены. Действие нельзя отменить. |

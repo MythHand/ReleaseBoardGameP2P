@@ -1,7 +1,7 @@
 import type { Action, Target } from './actions'
 import type { Event } from './events'
 import type { CardId, CardUid, GameState, PlayerId, Setup } from './state'
-import type { PlayerView } from './view'
+import type { PlayerView, SpectatorView } from './view'
 
 // Deck composition, supplied by the caller from the card catalogue so quantities
 // live in exactly one place.
@@ -35,5 +35,6 @@ export interface Engine {
   // `rejected` event.
   reduce(state: GameState, action: Action): Reduction
   project(state: GameState, viewerId: PlayerId): PlayerView
+  spectate(state: GameState): SpectatorView
   legalTargets(state: GameState, actor: PlayerId, card: CardUid): Target[]
 }

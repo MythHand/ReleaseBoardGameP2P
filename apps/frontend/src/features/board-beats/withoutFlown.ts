@@ -39,12 +39,19 @@ export function withoutFlown(base: BoardState, flown: DiscardCard[]): BoardState
 
   return {
     ...base,
-    you: {
-      ...base.you,
-      hand:
-        handIndexes.size > 0 ? base.you.hand.filter((_, i) => !handIndexes.has(i)) : base.you.hand,
-      release: withoutSlots(base.you.release, clearedSlots.get(base.selfId)),
-    },
+    ...(base.you
+      ? {
+          selfId: base.selfId,
+          you: {
+            ...base.you,
+            hand:
+              handIndexes.size > 0
+                ? base.you.hand.filter((_, i) => !handIndexes.has(i))
+                : base.you.hand,
+            release: withoutSlots(base.you.release, clearedSlots.get(base.selfId)),
+          },
+        }
+      : { selfId: null, you: null }),
     opponents: base.opponents.map((o) => {
       const drop = seatDrops.get(o.id)
       const slots = clearedSlots.get(o.id)

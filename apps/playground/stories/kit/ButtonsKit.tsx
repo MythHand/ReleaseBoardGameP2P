@@ -3,6 +3,7 @@ import DiceIcon from '@/icons/DiceIcon'
 import Button, { CopyButton } from '@/primitives/Button'
 import Typography from '@/primitives/Typography'
 import { useLang } from '../../Playground/lang'
+import { copyText } from '../copyText'
 import styles from './ButtonsKit.module.css'
 import { KitCell, KitPage, KitSection } from './KitShell'
 
@@ -133,7 +134,12 @@ export default function ButtonsKit() {
 
       <KitSection title={t.copy}>
         <KitCell caption="copyValue + copiedChildren">
-          <CopyButton variant="tech" copyValue="RLS-7F3K" copiedChildren={t.copied}>
+          <CopyButton
+            onCopy={copyText}
+            variant="tech"
+            copyValue="RLS-7F3K"
+            copiedChildren={t.copied}
+          >
             {t.copyBtn}
           </CopyButton>
         </KitCell>
@@ -142,6 +148,7 @@ export default function ButtonsKit() {
       <KitSection title={t.bare}>
         <KitCell caption={t.bareCap}>
           <CopyButton
+            onCopy={copyText}
             variant="bare"
             copyValue="RLS-7F3K"
             copiedChildren={

@@ -289,3 +289,20 @@ describe('the move log record', () => {
     expect(readLog('g1', 1_000)).toBeNull()
   })
 })
+
+it('preserves the viewing preference across a lobby reload while keeping old sessions readable', () => {
+  writeSession(session())
+  expect(readSession(1001)?.role).toBe('guest')
+  expect(readSession(1001)?.participantRole).toBeUndefined()
+  writeSession(
+    session({ participantRole: 'spectator', where: 'lobby', gameId: null, lastGameId: 'g1' }),
+  )
+  expect(readSession(1001)).toMatchObject({
+    role: 'guest',
+    participantRole: 'spectator',
+    where: 'lobby',
+    gameId: null,
+    lastGameId: 'g1',
+  })
+  expect(readSession(RESTORE_TTL_MS + 1001)).toBeNull()
+})

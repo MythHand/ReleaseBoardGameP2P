@@ -403,7 +403,7 @@ The start screen moves to the compact scale here, and regains the HUD grid its p
 
 - [ ] **Step 1: Delete the ported chrome**
 
-In `apps/frontend/src/pages/start.module.css`, delete `.root`, `.bg`, `.blur`, `.scrim`, `.content`, `.col`, `.logo`, `.tags` and `.desc` — `ScreenShell` owns them. Keep `.hiddenSlot` and anything else below.
+In `apps/frontend/src/pages/start.module.css`, delete `.root`, `.bg`, `.blur`, `.scrim`, `.content`, `.col`, `.logo`, `.tags` and `.desc` — `ScreenShell` owns them. Keep the menu styles.
 
 Replace `.menu` with — it gains the 44px top gap that `.desc`'s old `margin-block-end: 96px` used to provide, and its optical offset follows the smaller logo from `-11px` to `-7px`:
 
@@ -435,8 +435,6 @@ Replace the whole of `apps/frontend/src/pages/start.tsx` with:
 ```tsx
 import { useTranslation } from '@release/translation'
 import { Menu, MenuButton, MenuGroup, VideoPlayer } from '@release/ui'
-import { useGoToLobby } from '~/app/lib/lobbyNavigation'
-import { useSession } from '~/app/providers/SessionProvider'
 import ScreenShell from '~/shared/ui/ScreenShell'
 import { useModalRoute } from '~/shared/ui/ModalRouter'
 import styles from './start.module.css'
@@ -447,9 +445,6 @@ const VIDEO_URL = 'https://www.youtube.com/embed/bxGtRnoYW4g?autoplay=1'
 export default function StartPage() {
   const { t } = useTranslation()
   const handleMenuClick = useModalRoute()
-  const session = useSession()
-  const goToLobby = useGoToLobby()
-  const hasSession = session.status === 'in-lobby' && !!session.state
 
   return (
     <div className={styles.screen}>
@@ -469,19 +464,7 @@ export default function StartPage() {
         }
       >
         <Menu className={styles.menu}>
-          {/* Always rendered so toggling it never reflows the column — without
-              a reserved slot, mounting/unmounting would change the column's
-              height and shift everything. Hidden and inert when there is no
-              session to resume. */}
           <MenuGroup>
-            <MenuButton
-              aria-hidden={!hasSession}
-              disabled={!hasSession}
-              className={hasSession ? undefined : styles.hiddenSlot}
-              onClick={() => session.roomCode && goToLobby(session.roomCode)}
-            >
-              {t('start.continueSession')}
-            </MenuButton>
             <MenuButton autoFocus value="create" onClick={handleMenuClick}>
               {t('start.createGame')}
             </MenuButton>
@@ -523,7 +506,7 @@ Expected: all pass. `src/pages/__tests__/start.test.tsx` queries menu labels, wh
 - [ ] **Step 4: Verify visually**
 
 Run: `pnpm dev` and open `http://localhost:5173/start` at 1440×900.
-Expected: the compact column (logo 263px wide, not 480) and — new — the HUD grid over the background photo. The continue-session slot, the `?modal=create` / `?modal=join` / `?modal=rules` routing and the video player all behave as before. Nothing clipped; no horizontal scrollbar.
+Expected: the compact column (logo 263px wide, not 480) and — new — the HUD grid over the background photo. The `?modal=create` / `?modal=join` / `?modal=rules` routing and the video player all behave as before. Nothing clipped; no horizontal scrollbar.
 
 - [ ] **Step 5: Commit**
 
@@ -1523,6 +1506,6 @@ git commit -m "feat(web): /lobby/:lobbyId renders the invite screen in all five 
 
 - [ ] `pnpm lint`, `pnpm typecheck`, `pnpm test` all pass
 - [ ] `apps/ui/` and `apps/playground/` are untouched by this branch
-- [ ] `/start`: compact column, HUD grid restored, modals and continue-session unchanged
+- [ ] `/start`: compact column, HUD grid restored, modals unchanged
 - [ ] `/lobby/:lobbyId`: all five states, no raw PeerJS strings
 - [ ] `/lobby/:lobbyId` kicked, disbanded and Continue/Leave branches unchanged

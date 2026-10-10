@@ -62,12 +62,14 @@ export function withoutCard(board: BoardState, place: Place): BoardState {
     case 'shown': {
       // one card, two fields when it is ours: the hand that holds it and the
       // centre it was put out at — whichever of them the beat named
-      const ours = place.kind === 'hand' || place.player === board.selfId
-      const hand = ours ? board.you.hand.filter((c) => c.uid !== place.uid) : board.you.hand
+      const ours = board.you !== null && (place.kind === 'hand' || place.player === board.selfId)
+      const hand = ours ? board.you?.hand.filter((c) => c.uid !== place.uid) : board.you?.hand
       const shown = board.shown?.filter((s) => s.uid !== place.uid)
-      if (hand.length === board.you.hand.length && shown?.length === board.shown?.length)
+      if (hand?.length === board.you?.hand.length && shown?.length === board.shown?.length)
         return board
-      return { ...board, you: { ...board.you, hand }, shown }
+      return board.you && hand
+        ? { ...board, selfId: board.selfId, you: { ...board.you, hand }, shown }
+        : { ...board, shown }
     }
     case 'seat':
       // nobody there, or nothing left to take: the board as it was, so a beat
@@ -169,7 +171,7 @@ function withoutAtCentre(board: BoardState, card: string): BoardState {
 }
 
 function withoutInZone(board: BoardState, player: string, slot: Slot): BoardState {
-  if (player === board.selfId) {
+  if (board.you && player === board.selfId) {
     const you = board.you
     if (!you.release[slot] && !you.support?.[slot]) return board
     return {
@@ -233,7 +235,7 @@ export function withCard(board: BoardState, to: Landing): BoardState {
   switch (to.kind) {
     case 'hand': {
       const card = data(to.card)
-      if (!card || board.you.hand.some((c) => c.uid === to.uid)) return board
+      if (!card || !board.you || board.you.hand.some((c) => c.uid === to.uid)) return board
       const hand = [...board.you.hand]
       hand.splice(to.at ?? hand.length, 0, { uid: to.uid, card })
       return { ...board, you: { ...board.you, hand } }
@@ -262,7 +264,7 @@ export function withCard(board: BoardState, to: Landing): BoardState {
               releaseEvent: { ...owner.releaseEvent, [to.slot]: ai.event },
             }
           : {}
-      if (to.player === board.selfId) {
+      if (board.you && to.player === board.selfId) {
         const you = board.you
         return {
           ...board,

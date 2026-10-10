@@ -109,7 +109,7 @@ export default function Seat({
       <ReleaseZone
         release={player.release}
         support={support}
-        size="72px"
+        size="var(--seat-card-size, 72px)"
         variant="compact"
         slotRef={slotRef}
         lod

@@ -7,6 +7,7 @@ import PlayerSlot, { EmptySlot } from '@/blocks/PlayerSlot'
 import Rules, { type RulesCopy } from '@/blocks/Rules'
 import ReleaseLogo from '@/brand/ReleaseLogo'
 import { DEFAULT_SETUP, type GameModesCopy, type Setup } from '@/game/modes'
+import { MAX_SPECTATORS, spectatorLimitColor } from '@/game/spectatorLimit'
 import Badge from '@/primitives/Badge'
 import Button from '@/primitives/Button'
 import HudBackground, { type HudBackgroundTone } from '@/primitives/HudBackground'
@@ -29,6 +30,7 @@ interface Spectator {
 }
 interface LobbyProps {
   code?: string
+  onCopy?: (text: string) => Promise<boolean>
   initialCapacity?: number
   initialPlayers?: Player[]
   role?: 'host' | 'guest'
@@ -120,16 +122,9 @@ const MOCK_SPECTATORS: Spectator[] = [
   { id: 102, name: 'cypher' },
 ]
 
-// светофор для лимита зрителей: 0–8 зелёный, 9–18 жёлтый, 19–28 красный
-const SPEC_MAX = 28
-function specColorFor(n: number) {
-  if (n <= 8) return '#8fd9b0'
-  if (n <= 18) return '#e3b341'
-  return '#ff6b81'
-}
-
 export default function Lobby({
   code = '4F2A-9K',
+  onCopy,
   link,
   initialCapacity = 5,
   initialPlayers = MOCK_PLAYERS,
@@ -166,7 +161,7 @@ export default function Lobby({
   const shareLink = link ?? `release.game/lobby/${code}`
   const rulesCopy = rulesBlockCopy[lang]
 
-  const specColor = specColorFor(specCapacity)
+  const specColor = spectatorLimitColor(specCapacity)
 
   const setMode = (key: string, value: string) => setSetup((s) => ({ ...s, [key]: value }))
   const me = players.find((p) => p.id === meId)
@@ -178,13 +173,13 @@ export default function Lobby({
   const kickSpectator = (id: number) => setSpectators((ss) => ss.filter((s) => s.id !== id))
   const toSpectator = (id: number) => {
     const p = players.find((x) => x.id === id)
-    if (!p) return
+    if (!p || p.host || spectators.length >= specCapacity) return
     setPlayers((ps) => ps.filter((x) => x.id !== id))
     setSpectators((ss) => [...ss, { id: p.id, name: p.name }])
   }
   const toPlayer = (id: number) => {
     const s = spectators.find((x) => x.id === id)
-    if (!s) return
+    if (!s || players.length >= capacity) return
     setSpectators((ss) => ss.filter((x) => x.id !== id))
     setPlayers((ps) => [...ps, { id: s.id, name: s.name, host: false, ready: false, online: true }])
   }
@@ -251,7 +246,7 @@ export default function Lobby({
         {/* the room between the two sides of the header is the mini-game's */}
         <BugRunner label={copy.bugRunner} className={styles.runner} />
         <div className={styles.headRight}>
-          <LobbyCode code={code} link={shareLink} copy={codeCopy} />
+          <LobbyCode onCopy={onCopy} code={code} link={shareLink} copy={codeCopy} />
           <LangSwitcher value={lang} onChange={setLang} label={copy.language} />
         </div>
       </header>
@@ -372,8 +367,10 @@ export default function Lobby({
                 label={copy.specLimit}
                 value={specCapacity}
                 min={0}
-                max={SPEC_MAX}
-                onChange={setSpecCapacity}
+                max={MAX_SPECTATORS}
+                onChange={(n) => {
+                  if (Number.isInteger(n) && n >= 0 && n <= MAX_SPECTATORS) setSpecCapacity(n)
+                }}
                 color={specColor}
                 fill
               />

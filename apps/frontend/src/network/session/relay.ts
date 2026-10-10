@@ -39,6 +39,7 @@ import type { MessageType } from '../types'
 // sends through the host in the first place — which is part of the handover
 // wiring in #18.
 const NEVER_RELAYED: ReadonlySet<MessageType> = new Set<MessageType>([
+  'JOIN_REJECTED',
   'PEER_LIST',
   'PEER_JOINED',
   'LOBBY_CONFIG_UPDATED',

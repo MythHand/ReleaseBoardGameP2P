@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Implement the full lobby page — two-column layout with game settings sync, spectators, and disband — and extend the start screen with a "continue session" entry.
+**Goal:** Implement the full lobby page — two-column layout with game settings sync, spectators, and disband.
 
-**Architecture:** Three milestones on one branch: (M1) extend the network layer (wire types, state, host pure functions, useLobby hook); (M2) create `_LobbyView.tsx` and update `_LobbyFlow.tsx`; (M3) add "continue session" to the start screen. Each milestone is independently testable via `pnpm typecheck && pnpm -r test`.
+**Architecture:** Two milestones on one branch: (M1) extend the network layer (wire types, state, host pure functions, useLobby hook); (M2) create `_LobbyView.tsx` and update `_LobbyFlow.tsx`. Each milestone is independently testable via `pnpm typecheck && pnpm -r test`.
 
 **Tech Stack:** React 19, TypeScript, Tailwind v4, PeerJS P2P transport, `@release/ui` primitives, `@release/translation` (react-i18next).
 
@@ -35,8 +35,6 @@
 | `apps/frontend/src/pages/lobby/_LobbyView.tsx` | **New** — full two-column lobby UI |
 | `apps/frontend/src/pages/lobby/_LobbyFlow.tsx` | Import `LobbyView`; handle `'disbanded'`; update `continued` seed |
 | `apps/frontend/src/pages/lobby/_SessionView.tsx` | **Delete** |
-| `apps/frontend/src/pages/start.tsx` | Add `useSession()` check + `MenuButton` |
-| `apps/frontend/src/pages/__tests__/start.test.tsx` | Add test for "continue session" button |
 
 ---
 
@@ -606,14 +604,9 @@ git commit -m "feat(network): add setSetup + disband to useLobby, disbanded stat
 - Modify: `packages/translation/src/locales/ru/common.json`
 
 **Interfaces:**
-- Produces: `t('start.continueSession')`, `t('lobby.modesLockedHint')`, `t('lobby.disbandTitle')`, `t('lobby.disbandConfirm')`, `t('lobby.disband')`, `t('lobby.disbandedMessage')` — available in both catalogs.
+- Produces: `t('lobby.modesLockedHint')`, `t('lobby.disbandTitle')`, `t('lobby.disbandConfirm')`, `t('lobby.disband')`, `t('lobby.disbandedMessage')` — available in both catalogs.
 
 - [ ] **Step 1: Add keys to `en/common.json`**
-
-In `packages/translation/src/locales/en/common.json`, add to `"start"` object (after `"required"`):
-```json
-"continueSession": "continue session"
-```
 
 Add to `"lobby"` object (after `"drop"`):
 ```json
@@ -625,11 +618,6 @@ Add to `"lobby"` object (after `"drop"`):
 ```
 
 - [ ] **Step 2: Add keys to `ru/common.json`**
-
-In `packages/translation/src/locales/ru/common.json`, add to `"start"` object (after `"required"`):
-```json
-"continueSession": "продолжить сессию"
-```
 
 Add to `"lobby"` object (after `"drop"`):
 ```json
@@ -654,7 +642,7 @@ Expected: PASS.
 ```bash
 git add packages/translation/src/locales/en/common.json \
         packages/translation/src/locales/ru/common.json
-git commit -m "feat(i18n): add lobby disband + continue session translation keys"
+git commit -m "feat(i18n): add lobby disband translation keys"
 ```
 
 ---
@@ -1130,164 +1118,11 @@ git commit -m "feat(lobby): implement _LobbyView (two-column, modes, spectators,
 
 ---
 
-## Task 5: Start screen "continue session"
-
-**Files:**
-- Modify: `apps/frontend/src/pages/start.tsx`
-- Modify: `apps/frontend/src/pages/__tests__/start.test.tsx`
-
-**Interfaces:**
-- Consumes: `useSession()` from `~/app/providers/SessionProvider`; `t('start.continueSession')` (Task 3)
-
-- [ ] **Step 1: Add failing test to `start.test.tsx`**
-
-In `apps/frontend/src/pages/__tests__/start.test.tsx`, add the `useSession` mock and two tests.
-
-Add near the top with other mocks:
-```ts
-import type { UseLobby } from '~/entities/lobby'
-
-vi.mock('~/app/providers/SessionProvider', () => ({
-  useSession: () => sessionValue,
-}))
-
-let sessionValue: Pick<UseLobby, 'status' | 'state'>
-```
-
-Add before the existing `beforeEach` or before the test:
-```ts
-// default: no active session
-```
-
-Update the existing test to set `sessionValue` first, and add two new tests:
-
-```ts
-it('renders the start screen with create and join actions', () => {
-  sessionValue = { status: 'idle', state: null }
-  render(
-    <MemoryRouter>
-      <StartPage />
-    </MemoryRouter>,
-  )
-  expect(screen.getByText('start.createGame')).toBeTruthy()
-  expect(screen.getByText('start.joinGame')).toBeTruthy()
-})
-
-it('shows continue session button when session is active', () => {
-  sessionValue = {
-    status: 'in-lobby',
-    state: {
-      selfId: 'h', hostId: 'h', maxPlayers: 4,
-      setup: {},
-      peers: { h: { id: 'h', name: 'Host', role: 'host', ready: true } },
-    },
-  }
-  render(
-    <MemoryRouter>
-      <StartPage />
-    </MemoryRouter>,
-  )
-  expect(screen.getByText('start.continueSession')).toBeTruthy()
-})
-
-it('hides continue session button when no session', () => {
-  sessionValue = { status: 'idle', state: null }
-  render(
-    <MemoryRouter>
-      <StartPage />
-    </MemoryRouter>,
-  )
-  expect(screen.queryByText('start.continueSession')).toBeNull()
-})
-```
-
-- [ ] **Step 2: Run tests to confirm they fail**
-
-```bash
-cd /Users/andreykonnov/dev/MythHand/ReleaseBoardGameP2P
-pnpm --filter @release/web test apps/frontend/src/pages/__tests__/start.test.tsx
-```
-
-Expected: FAIL — `useSession` mock not found (start.tsx doesn't call it yet); `start.continueSession` text absent.
-
-- [ ] **Step 3: Update `start.tsx`**
-
-In `apps/frontend/src/pages/start.tsx`:
-
-1. Add imports at the top:
-   ```ts
-   import { useNavigate } from 'react-router'
-   import { useSession } from '~/app/providers/SessionProvider'
-   ```
-
-2. Inside `StartPage`, add after `const handleMenuClick = useModalRoute()`:
-   ```ts
-   const session = useSession()
-   const navigate = useNavigate()
-   const hasSession = session.status === 'in-lobby' && !!session.state
-   ```
-
-3. In the `<Menu>` block, add between the create/join group and the rules/github group:
-   ```tsx
-   {hasSession && (
-     <MenuButton onClick={() => navigate('/lobby', { state: { resumed: true } })}>
-       {t('start.continueSession')}
-     </MenuButton>
-   )}
-   ```
-
-   Full updated `<Menu>` block:
-   ```tsx
-   <Menu className="-ml-2.75 items-center">
-     <MenuButton autoFocus value="create" onClick={handleMenuClick}>
-       {t('start.createGame')}
-     </MenuButton>
-     <MenuButton value="join" onClick={handleMenuClick}>
-       {t('start.joinGame')}
-     </MenuButton>
-     {hasSession && (
-       <MenuButton onClick={() => navigate('/lobby', { state: { resumed: true } })}>
-         {t('start.continueSession')}
-       </MenuButton>
-     )}
-     <div className="flex flex-col pt-6">
-       <MenuButton value="rules" onClick={handleMenuClick}>
-         {t('start.rules')}
-       </MenuButton>
-       <MenuButton onClick={() => window.open(REPO_URL, '_blank', 'noopener')}>
-         {t('start.github')}
-       </MenuButton>
-     </div>
-   </Menu>
-   ```
-
-- [ ] **Step 4: Run tests and typecheck**
-
-```bash
-cd /Users/andreykonnov/dev/MythHand/ReleaseBoardGameP2P
-pnpm typecheck
-pnpm --filter @release/web test apps/frontend/src/pages/__tests__/start.test.tsx
-pnpm -r test
-```
-
-Expected: all PASS.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add apps/frontend/src/pages/start.tsx \
-        apps/frontend/src/pages/__tests__/start.test.tsx
-git commit -m "feat(start): add continue session menu entry"
-```
-
----
-
 ## Self-Review
 
 **Spec coverage:**
 - ✅ M1 — `LOBBY_CONFIG_UPDATED` extended with `setup?`; `LOBBY_DISBANDED` added; `'disbanded'` status; `setSetup`/`disband` on `UseLobby`; guest-side handlers → Tasks 1 & 2
 - ✅ M2 — `_LobbyView.tsx` two-column layout, game modes (`GAME_MODES.map(ModeSelect)`), host readOnly, players, spectators, capacity `Slider`, disband `Modal`, `_LobbyFlow` disbanded handling, `continued` seed → Task 4
-- ✅ M3 — `start.tsx` continue session button, `location.state.resumed` seed skip → Task 5
 - ✅ All translation keys from spec table → Task 3 (+ `lobby.disbandedMessage` added for disbanded status message)
 
 **Placeholder scan:** No TBD/TODO in any step. All code blocks are complete.

@@ -77,7 +77,6 @@ workspaces, Biome + Stylelint.
 | `apps/frontend/src/network/useLobby.ts` | `startSolo`, `restoreSolo`, the mount-effect branch, solo's `leaveGame`, the `UseLobby` interface. |
 | `apps/frontend/src/shared/ui/Form.tsx` | `FormData` is built with its submitter, so a named submit button is readable. |
 | `apps/frontend/src/features/create-lobby/CreateLobbyForm.tsx` | Bot-count slider and a second submit. |
-| `apps/frontend/src/pages/start.tsx` | Resume branch for a solo record. |
 | `packages/translation/src/locales/{en,ru}/common.json` | Four new keys under `start`. |
 
 ---
@@ -794,7 +793,7 @@ pnpm typecheck
 ```
 
 Expected: PASS. `typecheck` also surfaces every place that assumed `StoredSession.roomCode` was a
-`string` — there should be none outside `useLobby.ts` and `start.tsx`, and `start.tsx` is Task 6.
+`string` — these reads belong in `useLobby.ts`.
 Fix any that appear by narrowing at the read, not by casting.
 
 - [ ] **Step 6: Commit**
@@ -1238,9 +1237,7 @@ git commit -m "feat(web): play with bots, from the same form that opens a room"
 **Files:**
 - Modify: `apps/frontend/src/network/useLobby.ts` (a `restoreSolo` callback beside `restoreHost` at
   line 870, the mount effect at line 1160, and `leaveGame` at line 1352)
-- Modify: `apps/frontend/src/pages/start.tsx:26-36`
-- Test: `apps/frontend/src/network/useLobby.test.ts`,
-  `apps/frontend/src/pages/__tests__/start.test.tsx`
+- Test: `apps/frontend/src/network/useLobby.test.ts`
 
 **Interfaces:**
 - Consumes: `StoredSession.role === 'solo'` (Task 4). **Not** `buildSoloTable` — a restore has no
@@ -1284,10 +1281,7 @@ it('restores a solo match on mount, with no transport to rebuild', async () => {
   }
 })
 
-// The dead-button trap: `leaveGame` blanks a record's gameId, which is right
-// for a room that outlives its match. A solo record walked back that way keeps
-// role 'solo' with nothing left to resume, and the start screen goes on
-// offering it.
+// A room outlives its match; a solo session ends when its match is left.
 it('forgets a solo session entirely when the match is left', () => {
   const { result } = renderHook(() => useLobby())
   act(() => {
@@ -1300,48 +1294,13 @@ it('forgets a solo session entirely when the match is left', () => {
 })
 ```
 
-Add to `apps/frontend/src/pages/__tests__/start.test.tsx`:
-
-```tsx
-it('sends a stored solo match back to its board, not to a lobby', async () => {
-  writeSession({
-    roomCode: null,
-    name: 'Ann',
-    role: 'solo',
-    gameId: 'solo-1',
-    joinedAt: Date.now(),
-  })
-  sessionValue = { status: 'idle', state: null, roomCode: null }
-  render(
-    <MemoryRouter>
-      <StartPage />
-    </MemoryRouter>,
-  )
-  fireEvent.click(screen.getByText('start.continueSession'))
-  expect(navigate).toHaveBeenCalledWith('/board/solo-1')
-})
-```
-
-That test needs `writeSession` and `fireEvent` imported, plus a `navigate` spy. This file has **no**
-`react-router` mock today — nothing in it asserts navigation yet — so add one at the top, beside the
-existing `vi.mock` calls:
-
-```tsx
-const navigate = vi.fn()
-vi.mock('react-router', async () => ({
-  ...(await vi.importActual<typeof import('react-router')>('react-router')),
-  useNavigate: () => navigate,
-}))
-```
-
 - [ ] **Step 2: Run the tests to verify they fail**
 
 ```bash
-pnpm --filter @release/web test -- useLobby.test.ts start.test.tsx
+pnpm --filter @release/web test -- useLobby.test.ts
 ```
 
-Expected: FAIL — the remounted hook has a null `gameId`, `readSession()` still returns a record, and
-the start screen navigates nowhere.
+Expected: FAIL — the remounted hook has a null `gameId`, and `readSession()` still returns a record after leaving.
 
 - [ ] **Step 3: Write `restoreSolo`**
 
@@ -1449,44 +1408,18 @@ and add `restoreSolo` to that effect's dependency array.
 In `leaveGame`, replace the `rememberGame(null)` call with the branch:
 
 ```ts
-    // A room outlives the match played in it, so walking the record back to
-    // `gameId: null` keeps it restorable. A solo session IS its match: walked
-    // back the same way it would keep `role: 'solo'` with nothing left to
-    // resume, and the start screen would go on offering a button that resolves
-    // to nowhere. So it goes entirely.
+    // A room outlives its match; a solo session ends with its match.
+    // Clear the solo record rather than keeping it with gameId: null.
     if (readSession()?.role === 'solo') clearSession()
     else rememberGame(null)
 ```
 
 `clearSession` is already imported in this file; add `readSession` to that import if absent.
 
-- [ ] **Step 5: Send a stored solo match back to its board**
-
-In `apps/frontend/src/pages/start.tsx`, replace the body of `resume`:
-
-```tsx
-  const resume = () => {
-    // A solo match has no room to return to — the stored record IS the match,
-    // and the board is the only place it can be resumed.
-    if (stored?.role === 'solo' && stored.gameId) {
-      void navigate(`/board/${stored.gameId}`)
-      return
-    }
-    const code = session.roomCode ?? stored?.roomCode
-    if (!code) return
-    // A stored match goes back to the board; a stored lobby goes to the lobby.
-    if (stored?.gameId && !session.state) {
-      void navigate(`/board/${stored.gameId}`)
-      return
-    }
-    void goToLobby(code)
-  }
-```
-
 - [ ] **Step 6: Run the tests to verify they pass**
 
 ```bash
-pnpm --filter @release/web test -- useLobby.test.ts start.test.tsx
+pnpm --filter @release/web test -- useLobby.test.ts
 pnpm test
 pnpm typecheck
 pnpm lint
@@ -1499,12 +1432,12 @@ Expected: PASS.
 Run `pnpm dev`, start a solo match, take a turn, then reload the tab. Expected: the board comes back
 with the same hand and the same move history, and the bots keep playing — with no thirty-second
 pause before the next bot move, which is the whole point of Task 1's `restoreSeats` branch. Then
-leave from the results or the board and confirm the start screen no longer offers "continue game".
+leave from the results or the board and confirm the solo session record is cleared.
 
 - [ ] **Step 8: Commit**
 
 ```bash
-git add apps/frontend/src/network/useLobby.ts apps/frontend/src/network/useLobby.test.ts apps/frontend/src/pages
+git add apps/frontend/src/network/useLobby.ts apps/frontend/src/network/useLobby.test.ts
 git commit -m "feat(web): a solo match survives a reload, and is forgotten when it is left"
 ```
 
@@ -1653,4 +1586,4 @@ anything the three above do not. Task 6 Step 8 and Task 7 Step 7 cover the real 
 - The start screen's create modal starts a match against 1–5 bots with no room code and no network.
 - Bots take their turns on their own, and never during the opening deal.
 - A reload returns to the match, and the bots resume immediately rather than after a grace period.
-- Leaving the match clears the record, and "continue game" stops offering it.
+- Leaving the match clears the solo session record.

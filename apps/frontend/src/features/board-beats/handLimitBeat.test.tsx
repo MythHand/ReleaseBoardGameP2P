@@ -387,7 +387,7 @@ it('publishes the cards out of the hand, and files them into the heap once they 
   render(<Probe />)
   await drive(() => api.beat?.run(plan(), ctx))
   expect(published).toHaveLength(2)
-  expect(published[0].you.hand).toHaveLength(0)
+  expect(published[0].you?.hand).toHaveLength(0)
   expect(published[0].decks.discardCount).toBe(base.decks.discardCount)
   expect(published[1].decks.discardCount).toBe(base.decks.discardCount + plan().cards.length)
   expect(published[1].decks.discardHeap?.map((card) => card.uid)).toEqual(
@@ -395,7 +395,7 @@ it('publishes the cards out of the hand, and files them into the heap once they 
   )
   // …and they are not back in the hand as they lie down: filed on a base that
   // still held them, every card was in the fan AND the heap (#168)
-  expect(published[1].you.hand).toHaveLength(0)
+  expect(published[1].you?.hand).toHaveLength(0)
 })
 
 // The road home (#106): the AI card standing behind this prompt
@@ -493,7 +493,7 @@ it('clears Bad Vibe’s standing pair and sends all three cards away together', 
     ])
     expect(published.at(-1)?.pending).toBeNull()
     expect(published.at(-1)?.aiCause).toBeUndefined()
-    expect(published.at(-1)?.you.hand.map((card) => card.uid)).toEqual(['u2'])
+    expect(published.at(-1)?.you?.hand.map((card) => card.uid)).toEqual(['u2'])
   } finally {
     exits.holdMs = 0
   }

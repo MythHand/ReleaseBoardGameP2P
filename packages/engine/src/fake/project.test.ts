@@ -1,7 +1,7 @@
 import { rulesFor } from '../cards'
 import type { GameConfig } from '../engine'
-import type { CardInstance, GameState } from '../state'
-import { playableFor, project } from './project'
+import type { CardInstance, GameState, Pending } from '../state'
+import { playableFor, project, spectate } from './project'
 import { createGame } from './setup'
 
 // A typo in a CardId is invisible to TypeScript (CardId is just string) and
@@ -808,5 +808,189 @@ describe('the AI facts a board cannot otherwise see', () => {
     // `card` stays null — `bankAlarm` reads it to decide what to bank, and the
     // mimic's own card is already home in the events deck
     expect(project(mimic, 'p2').pending).toMatchObject({ card: null, source: 'ai-error-503' })
+  })
+})
+
+describe('public spectator projection', () => {
+  it('projects all seats without exposing hands, seed, or ordered piles', () => {
+    const state = createGame(config())
+    const view = spectate(state)
+    expect(view.self).toBeNull()
+    expect(view.opponents.map((p) => p.id)).toEqual(['p1', 'p2'])
+    expect(view.opponents.map((p) => p.handCount)).toEqual([5, 5])
+    expect(view).not.toHaveProperty('seed')
+    const hidden = [
+      ...Object.values(state.players).flatMap((p) => p.hand),
+      ...state.decks.main.flat(),
+      ...state.decks.events,
+    ]
+    for (const card of hidden) expect(JSON.stringify(view)).not.toContain(card.uid)
+    expect(project(state, 'p1').self.hand).toEqual(state.players.p1.hand)
+  })
+
+  it('publishes reaction timing and releases but no playable attacks', () => {
+    const state = createGame(config())
+    state.players.p1.release.frontend = { card: inst('release-frontend', 90) }
+    state.window = {
+      target: { player: 'p1', slot: 'frontend', card: 'release-frontend#90' },
+      round: 1,
+      openedAt: 10,
+      deadline: 20,
+      passed: [],
+    }
+    expect(spectate(state).opponents[0].release.frontend).toMatchObject({
+      card: 'release-frontend',
+    })
+    expect(spectate(state).window).toEqual({
+      player: 'p1',
+      slot: 'frontend',
+      round: 1,
+      openedAt: 10,
+      deadline: 20,
+      passed: [],
+      canAttackWith: [],
+    })
+  })
+
+  const secret = { uid: 'private-choice', id: 'defense-hotfix' }
+  const context = { owner: 'p1', attack: inst('attack-security-bug', 90), parent: 1 }
+  const cases: { pending: Pending; publicFields: object }[] = [
+    {
+      pending: { kind: 'discardForRelease', player: 'p1', release: 'public-release' },
+      publicFields: { kind: 'discardForRelease', release: 'public-release', options: [] },
+    },
+    {
+      pending: {
+        kind: 'defend',
+        player: 'p1',
+        attacker: 'p2',
+        attack: 'public-attack',
+        attackId: 'attack-bug',
+        attackEventId: 1,
+        sudo: false,
+        canDefendWith: [secret.uid],
+        openedAt: 10,
+        deadline: 20,
+        scope: 'hand',
+      },
+      publicFields: { attackCard: 'attack-bug', options: [], deadline: 20 },
+    },
+    {
+      pending: {
+        kind: 'neutralize503',
+        player: 'p1',
+        card: inst('trigger-error-503', 90),
+        methods: ['debugger'],
+      },
+      publicFields: { card: 'trigger-error-503', methods: [] },
+    },
+    {
+      pending: {
+        kind: 'crush',
+        player: 'p1',
+        slot: 'frontend',
+        methods: ['debugger'],
+        source: 'ai-crush-frontend',
+      },
+      publicFields: { slot: 'frontend', source: 'ai-crush-frontend', methods: [] },
+    },
+    {
+      pending: {
+        kind: 'stealCard',
+        player: 'p1',
+        target: 'p2',
+        slots: [secret.uid],
+        context,
+        openedAt: 10,
+        deadline: 20,
+      },
+      publicFields: { target: 'p2', count: 1, attack: 'attack-security-bug' },
+    },
+    {
+      pending: { kind: 'requestCard', player: 'p1', target: 'p2', context },
+      publicFields: { target: 'p2', attack: 'attack-security-bug' },
+    },
+    {
+      pending: {
+        kind: 'giveCard',
+        player: 'p2',
+        attacker: 'p1',
+        requested: 'defense-hotfix',
+        context,
+      },
+      publicFields: { requested: 'defense-hotfix', attacker: 'p1' },
+    },
+    {
+      pending: { kind: 'handLimit', player: 'p1', excess: 1, source: 'ai-bad-vibe-coding' },
+      publicFields: { excess: 1, source: 'ai-bad-vibe-coding', options: [] },
+    },
+    {
+      pending: {
+        kind: 'pickFromDiscard',
+        player: 'p1',
+        options: [secret],
+        picks: 1,
+        source: 'operation-git-cherry-pick',
+        raisedAt: 1,
+      },
+      publicFields: { options: [], source: 'operation-git-cherry-pick', picks: 1 },
+    },
+    {
+      pending: {
+        kind: 'reorderTop',
+        player: 'p1',
+        piles: [{ pile: 0, cards: [secret] }],
+        source: 'operation-git-rebase',
+        raisedAt: 1,
+      },
+      publicFields: { piles: [], source: 'operation-git-rebase' },
+    },
+    {
+      pending: {
+        kind: 'systemUpgrade',
+        actor: 'p1',
+        owed: ['p2'],
+        thrown: [{ player: 'p2', card: inst('attack-bug', 90) }],
+        sudo: true,
+        phase: 'picking',
+        source: 'operation-system-upgrade',
+      },
+      publicFields: {
+        owed: ['p2'],
+        thrown: [{ player: 'p2', card: { uid: 'attack-bug#90', id: 'attack-bug' } }],
+        phase: 'picking',
+      },
+    },
+  ]
+  it.each(
+    cases,
+  )('redacts private choices from $pending.kind while retaining its public situation', ({
+    pending,
+    publicFields,
+  }) => {
+    const state = createGame(config())
+    state.players.p1.hand = [secret]
+    if (pending.kind === 'discardForRelease') {
+      state.players.p1.hand.push({ uid: 'public-release', id: 'release-frontend' })
+      state.players.p1.shown = ['public-release']
+    }
+    state.pending = pending
+    const view = spectate(state)
+    expect(view.pending).toMatchObject(publicFields)
+    if (pending.kind !== 'discardForRelease') expect(view.pending).not.toHaveProperty('release')
+    expect(JSON.stringify(view)).not.toContain(secret.uid)
+    if (pending.kind === 'neutralize503' || pending.kind === 'crush') {
+      expect(project(state, 'p2').pending).toMatchObject({ methods: ['debugger'] })
+    }
+  })
+
+  it('publishes final tallies only after the game ends', () => {
+    const state = createGame(config())
+    expect(spectate(state).tally).toBeNull()
+    state.over = { winner: 'p2', condition: 'release' }
+    const view = spectate(state)
+    expect(view.over).toEqual({ winner: 'p2', condition: 'release' })
+    expect(Object.keys(view.tally ?? {})).toEqual(['p1', 'p2'])
+    expect(view.tally?.p1).not.toBe(state.tally.p1)
   })
 })

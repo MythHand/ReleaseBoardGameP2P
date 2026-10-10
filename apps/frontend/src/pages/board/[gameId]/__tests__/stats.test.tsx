@@ -1,7 +1,8 @@
-import type { PlayerView } from '@release/engine'
+import type { GameView, PlayerView } from '@release/engine'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { vi } from 'vitest'
 import type { PeerInfo, Seat } from '~/network'
+import { createFakeVoiceFacade } from '~/network/voice/testing/fakeVoiceFacade'
 import StatsPage from '../stats'
 
 const goToLobby = vi.fn()
@@ -9,7 +10,7 @@ const leaveGame = vi.fn()
 const setWhere = vi.fn()
 const sendChat = vi.fn(() => true)
 
-let view: PlayerView | null
+let view: GameView | null
 let peers: Record<string, PeerInfo>
 let seats: Seat[]
 let selfId: string
@@ -30,6 +31,7 @@ vi.mock('~/app/providers/SessionProvider', () => ({
     // The seating frozen at the deal, as the session holds it (#19) — not
     // something this page derives from a roster that changes under it.
     seats,
+    voice: createFakeVoiceFacade(),
     chat: { entries: [], notificationEntryIds: [], selfMemberId: 'member-a', send: sendChat },
     leaveGame,
     setWhere,
@@ -172,10 +174,25 @@ it('leaves the match before navigating, so the follower does not bounce it back'
 })
 
 it('renders an empty result rather than crashing when there is no projection', () => {
-  // A spectator holds no seat and is never projected to; a reload loses the
-  // session entirely. Both land here.
+  // The results route can mount before a resumed session receives its view.
   view = null
   render(<StatsPage />)
   expect(screen.getByTestId('stats-page')).toBeTruthy()
   expect(screen.queryByText('Ann')).toBeNull()
+})
+
+it('shows public counters to a spectator without marking a player as self', () => {
+  if (!view) throw new Error('Missing results fixture')
+  selfId = 'watcher'
+  view = { ...view, self: null }
+  render(<StatsPage />)
+  expect(screen.getByText('5')).toBeTruthy()
+  expect(screen.getByText('3')).toBeTruthy()
+  expect(screen.queryByText('stats.selfTag')).toBeNull()
+})
+
+it('renders the room voice slot under its translated title', () => {
+  render(<StatsPage />)
+  expect(screen.getByText('stats.voiceChat')).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'voiceChat.connect' })).toBeTruthy()
 })

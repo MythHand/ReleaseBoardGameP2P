@@ -165,7 +165,7 @@ export function useOperationBeat(anchors: BoardAnchors, staging?: RefObject<Stag
       const used = new Set<string>()
       const inHand = mine
         ? ids.flatMap((id) => {
-            const held = ctx.base.you.hand.find((h) => !used.has(h.uid) && h.card.id === id)
+            const held = ctx.base.you?.hand.find((h) => !used.has(h.uid) && h.card.id === id)
             if (!held) return []
             used.add(held.uid)
             return [held]
@@ -182,7 +182,7 @@ export function useOperationBeat(anchors: BoardAnchors, staging?: RefObject<Stag
       // Another player's card they had put out at the centre first is already
       // standing there — it starts where it stands, not at the seat.
       const shown = mine ? null : shownSource(ctx.base, plan.player, ids, a)
-      const slot = inHand[0] ? a.handSlotAt(ctx.base.you.hand.indexOf(inHand[0])) : null
+      const slot = inHand[0] ? a.handSlotAt(ctx.base.you?.hand.indexOf(inHand[0]) ?? -1) : null
       const from = shown?.rect ?? rectOf(slot) ?? a.seatBox(plan.player)
       if (!to || !main || !from) {
         // nothing to fly it along: it still goes where it stands

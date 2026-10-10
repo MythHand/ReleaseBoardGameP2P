@@ -5,9 +5,10 @@ import styles from './CopyButton.module.css'
 // How long the "copied" label holds before reverting to the normal one.
 const COPIED_HOLD_MS = 1800
 
-export interface CopyButtonProps extends ButtonProps {
+export interface CopyButtonProps extends Omit<ButtonProps, 'onCopy'> {
   // Clicking copies this value to the clipboard.
   copyValue: string
+  onCopy?: (text: string) => Promise<boolean>
   // Shown briefly in place of the label after a copy. Omit for no visual feedback.
   copiedChildren?: ReactNode
 }
@@ -18,6 +19,7 @@ export interface CopyButtonProps extends ButtonProps {
 export default function CopyButton({
   copyValue,
   copiedChildren,
+  onCopy,
   children,
   onClick,
   ...rest
@@ -29,25 +31,24 @@ export default function CopyButton({
 
   const handleClick = (e: MouseEvent<HTMLButtonElement>) => {
     onClick?.(e)
-    // Nothing to copy, or no clipboard (insecure context) — don't show a false
-    // "copied" confirmation the user would trust.
-    if (!copyValue.trim() || !navigator.clipboard) return
-    navigator.clipboard
-      .writeText(copyValue)
-      .then(() => {
-        // Only confirm once the write actually succeeds.
+    if (!copyValue.trim() || !onCopy || e.defaultPrevented) return
+    onCopy(copyValue)
+      .then((success) => {
+        if (!success) return
         setCopied(true)
         clearTimeout(timer.current)
         timer.current = setTimeout(() => setCopied(false), COPIED_HOLD_MS)
       })
-      .catch(() => {
-        // Write rejected (denied permission / insecure context) — stay silent.
-      })
+      .catch(() => {})
   }
 
   const showCopied = copied && copiedChildren != null
   return (
-    <Button onClick={handleClick} {...rest}>
+    <Button
+      {...rest}
+      disabled={rest.disabled || !onCopy || !copyValue.trim()}
+      onClick={handleClick}
+    >
       {showCopied ? <span className={styles.copied}>{copiedChildren}</span> : children}
     </Button>
   )

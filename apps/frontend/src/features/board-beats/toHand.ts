@@ -57,9 +57,13 @@ export interface Landing {
 }
 
 /** the uid the arriving card answers to once the projection catches up */
-function arrivingUid(base: BoardState, after: BoardState | undefined, fallback: string): string {
+function arrivingUid(
+  base: Extract<BoardState, { selfId: string }>,
+  after: BoardState | undefined,
+  fallback: string,
+): string {
   const held = new Set(base.you.hand.map((c) => c.uid))
-  return after?.you.hand.find((c) => !held.has(c.uid))?.uid ?? fallback
+  return after?.you?.hand.find((c) => !held.has(c.uid))?.uid ?? fallback
 }
 
 export function useToHand(
@@ -96,7 +100,7 @@ export function useToHand(
       // means the slots could not be read, and an order built from that would be
       // the landed card alone — every other card of the fan pushed behind it. The
       // player's own arrangement is not something to rewrite on a guess.
-      if (fan.length > 0 || (c?.base.you.hand.length ?? 0) === 0) {
+      if (fan.length > 0 || (c?.base.you?.hand.length ?? 0) === 0) {
         const order = [...fan]
         order.splice(gap, 0, ...landed.map((it) => it.key))
         commit.current?.(order, landed[0].key, gap)
@@ -107,7 +111,7 @@ export function useToHand(
         back.done?.(gap, landed)
         return
       }
-      if (!c) return
+      if (!c?.base.you) return
       // …and the run's own base grows by what landed, so the beat's last frame is
       // the projection it hands over to.
       //
@@ -143,6 +147,7 @@ export function useToHand(
    */
   const land = useCallback(
     (ctx: BeatRun, it: Landing): Promise<boolean> => {
+      if (!ctx.base.you) return Promise.resolve(false)
       run.current = ctx
       const key = arrivingUid(ctx.base, ctx.after, it.fallbackKey)
       return arrive(

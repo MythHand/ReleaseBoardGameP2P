@@ -204,17 +204,8 @@ snapshot. Storage changes are two:
 - The mount-time restore effect tries `restoreSolo` alongside `restoreHost`; the three roles are
   mutually exclusive, so it stays a chain of declines.
 
-`start.tsx`'s "Continue session" needs one branch: today `resume()` reads a room code first and
-returns early when there is none, so a solo record would render the button and do nothing on click.
-A stored `role: 'solo'` with a `gameId` navigates straight to `/board/:gameId`.
-
-**Leaving the match needs the same branch, for the same reason.** `leaveGame` clears the keeper
-snapshot and then calls `rememberGame(null)`, which rewrites the session record with `gameId: null` —
-correct for a room, which outlives the match played in it. A solo record walked back that way keeps
-`role: 'solo'` with nothing left to resume, and `start.tsx` would go on rendering "Continue session"
-over a record that resolves to nowhere: the dead button the branch above exists to prevent, arrived
-at from the other side. So a solo `leaveGame` clears the record outright (`forgetStored`) rather
-than blanking its `gameId`.
+A solo `leaveGame` clears its session record outright (`forgetStored`), because a solo session
+ends with its match. A room instead keeps its record with `gameId: null`.
 
 The results screen needs nothing. `useLeaveMatch` (`app/lib/lobbyNavigation.ts:42`) already sends a
 null room code to `/start` instead of a lobby, which is exactly right for a session with no room —

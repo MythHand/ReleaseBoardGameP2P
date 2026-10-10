@@ -39,7 +39,8 @@ export function useUpgradeStaging(args: {
   const { state, actions, copy, enabled } = args
   const pending = state.pending?.kind === 'systemUpgrade' ? state.pending : null
 
-  const asked = pending?.phase === 'discarding' && pending.owed.includes(state.selfId)
+  const asked =
+    state.selfId !== null && pending?.phase === 'discarding' && pending.owed.includes(state.selfId)
   const picking = pending?.phase === 'picking' && pending.actor === state.selfId
 
   const reduced = useReducedMotion()
@@ -82,8 +83,9 @@ export function useUpgradeStaging(args: {
   })
 
   const onHandPlay = (uid: string, drop: HandPlayDrop) => {
-    const item = state.you.hand.find((c) => c.uid === uid)
-    if (!enabled || !asked || inFlight.current || given || !item) return false
+    const item = (state.you?.hand ?? EMPTY_HAND).find((c) => c.uid === uid)
+    if (state.selfId === null || !enabled || !asked || inFlight.current || given || !item)
+      return false
     inFlight.current = true
     const token = ++attempt.current
     const valid = () =>
@@ -112,7 +114,7 @@ export function useUpgradeStaging(args: {
     })()
     return true
   }
-  const handItems = state.you.hand.filter((c) => c.uid !== given)
+  const handItems = (state.you?.hand ?? EMPTY_HAND).filter((c) => c.uid !== given)
   const stateAt = (index: number): HandCardState =>
     enabled && asked && !given && !confirmed && handItems[index] ? 'playable' : 'idle'
   const interaction = {
@@ -248,3 +250,5 @@ export function useUpgradeStaging(args: {
   // Answered, or never asked: the cards simply stand.
   return { ...interaction, surface: <div className={styles.surface}>{centre}</div> }
 }
+
+const EMPTY_HAND: NonNullable<BoardState['you']>['hand'] = []

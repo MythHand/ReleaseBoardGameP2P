@@ -187,8 +187,10 @@ export function useNeutralizeStaging({
 
   const handItems = useMemo(() => {
     const hidden = staged?.home.kind === 'hand' ? staged.home.uid : null
-    return hidden ? state.you.hand.filter((c) => c.uid !== hidden) : state.you.hand
-  }, [state.you.hand, staged])
+    return hidden
+      ? (state.you?.hand ?? EMPTY_HAND).filter((c) => c.uid !== hidden)
+      : (state.you?.hand ?? EMPTY_HAND)
+  }, [state.you?.hand, staged])
 
   // Your own area is the release zone and the fan together. Everything else on
   // screen is table. Measured, not guessed: both nodes are already anchored.
@@ -264,6 +266,7 @@ export function useNeutralizeStaging({
       return
     }
 
+    if (state.selfId === null) return
     const to = anchors.releaseSlot(state.selfId, s.home.slot)?.getBoundingClientRect()
     if (!to) {
       commitStaged(null)
@@ -304,15 +307,15 @@ export function useNeutralizeStaging({
     onCancel: () => {},
     onDrop: (key, at) => {
       if (key === 'monitoring' || !pending) return // Monitoring answers on a press
-      const uid = state.you.releaseUid?.[key]
-      const card = state.you.release[key]
+      const uid = state.you?.releaseUid?.[key]
+      const card = state.you?.release[key]
       if (!uid || !card) return
       commit(
         { kind: pending.kind, method: 'sacrifice', card: uid },
         card,
         { kind: 'zone', slot: key },
         at.rect,
-        state.you.support?.[key],
+        state.you?.support?.[key],
       )
     },
   })
@@ -324,8 +327,8 @@ export function useNeutralizeStaging({
       !answered &&
       (key === 'monitoring'
         ? methods.includes('monitoring')
-        : methods.includes('sacrifice') && Boolean(state.you.release[key])),
-    [active, staged, answered, methods, state.you.release],
+        : methods.includes('sacrifice') && Boolean(state.you?.release[key])),
+    [active, staged, answered, methods, state.you?.release],
   )
 
   // What lights is exactly what can be taken — `grabbable` is the one answer,
@@ -333,10 +336,10 @@ export function useNeutralizeStaging({
   const accentAt = useCallback(
     (key: NeutralizeSlotKey) => {
       if (!grabbable(key)) return undefined
-      const card = state.you.release[key]
+      const card = state.you?.release[key]
       return card ? `var(--cat-${card.category})` : undefined
     },
-    [grabbable, state.you.release],
+    [grabbable, state.you?.release],
   )
 
   // A slot shows its empty place while its card is elsewhere: in the drag
@@ -372,8 +375,8 @@ export function useNeutralizeStaging({
   const onHandPlay = useCallback(
     (uid: string, drop: HandPlayDrop): boolean => {
       if (!active || !pending || staged || answered || !methods.includes('debugger')) return false
-      const index = state.you.hand.findIndex((h) => h.uid === uid)
-      const item = state.you.hand[index]
+      const index = (state.you?.hand ?? EMPTY_HAND).findIndex((h) => h.uid === uid)
+      const item = (state.you?.hand ?? EMPTY_HAND)[index]
       if (item?.card.id !== 'protection-debugger') return false
       // The whole table accepts the drop; only your own area gives the card
       // back — dropping it where it came from reads as changing your mind.
@@ -386,7 +389,7 @@ export function useNeutralizeStaging({
       )
       return true
     },
-    [active, pending, staged, answered, methods, state.you.hand, onTable, commit],
+    [active, pending, staged, answered, methods, state.you?.hand, onTable, commit],
   )
 
   // GESTURE — the zone. A sacrifice is dragged out of its slot; Monitoring is
@@ -399,7 +402,7 @@ export function useNeutralizeStaging({
       // middle-click from spending the player's only answer.
       if (e.button !== 0) return
       if (!pending || !grabbable(key)) return
-      const card = state.you.release[key]
+      const card = state.you?.release[key]
       if (!card) return
       if (key === 'monitoring') {
         // Nothing is staged and nothing flies: the answer is given from where
@@ -415,7 +418,7 @@ export function useNeutralizeStaging({
       pull.render(<Card card={card} interactive={false} width="100%" />)
       pull.begin(key, e.currentTarget, e)
     },
-    [pending, grabbable, state.you.release, actions, flight.mark, pull.render, pull.begin],
+    [pending, grabbable, state.you?.release, actions, flight.mark, pull.render, pull.begin],
   )
 
   // the engine said no: the answer goes home and the offer opens again. Scoped
@@ -504,3 +507,5 @@ export function useNeutralizeStaging({
     whenLanded,
   }
 }
+
+const EMPTY_HAND: NonNullable<BoardState['you']>['hand'] = []

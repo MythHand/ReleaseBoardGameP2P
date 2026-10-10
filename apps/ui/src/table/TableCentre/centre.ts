@@ -187,7 +187,7 @@ export const centreTransform = (slot: CentreSlot): string => {
 export const centrePlaceStyle = (set: CentreSet, slot: CentreSlot): CSSProperties => {
   const place = (CENTRE_SETS[set] as Partial<Record<CentreSlot, CentrePlace>>)[slot]
   return {
-    insetBlockStart: `${CENTRE_TOP}%`,
+    insetBlockStart: `var(--table-centre-top, ${CENTRE_TOP}%)`,
     insetInlineStart: '50%',
     inlineSize: `${CENTRE_SLOTS[slot].w}px`,
     transform: centreTransform(slot),

@@ -1,4 +1,4 @@
-import type { PlayerView } from '@release/engine'
+import type { GameView, PlayerView } from '@release/engine'
 
 // Whether this projection is a game nobody has played yet. The intro plays on
 // fresh entry only, and freshness is decided from the state itself rather than
@@ -7,7 +7,7 @@ import type { PlayerView } from '@release/engine'
 // Accepted edge: a refresh in the first seconds of turn 1, before anyone has
 // acted, still looks like an opening and replays the deal. That is preferred to
 // storing "already seen" somewhere it can go stale.
-export function isOpening(view: PlayerView): boolean {
+export function isOpening(view: GameView): boolean {
   if (view.over) return false
   if (view.turn.index !== 0 || view.turn.hasDrawn) return false
   if (view.decks.discardCount > 0) return false
@@ -20,6 +20,6 @@ export function isOpening(view: PlayerView): boolean {
   // yes for the host and no for everyone else, and the host alone was refused
   // its opening. Two peers, one game, two different object shapes.
   const released = (r: PlayerView['self']['release']) => Object.values(r).some(Boolean)
-  if (released(view.self.release)) return false
+  if (view.self && released(view.self.release)) return false
   return view.opponents.every((o) => !o.eliminated && !released(o.release))
 }

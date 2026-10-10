@@ -1,9 +1,10 @@
+import { cardById } from '@release/ui'
 import { describe, expect, it } from 'vitest'
-import type { BoardState } from '~/entities/game/board'
+import type { PlayerBoardState } from '~/entities/game/board'
 import type { DiscardCard } from './planBeats'
 import { withoutFlown } from './withoutFlown'
 
-const board = (): BoardState =>
+const board = (): PlayerBoardState =>
   ({
     selfId: 'p1',
     you: {
@@ -27,7 +28,7 @@ const board = (): BoardState =>
     setup: {},
     playable: [],
     frozen: [],
-  }) as unknown as BoardState
+  }) as unknown as PlayerBoardState
 
 describe('withoutFlown', () => {
   it('removes flying cards from hands, releases, and opponent seats without changing the base', () => {
@@ -45,11 +46,35 @@ describe('withoutFlown', () => {
 
     const result = withoutFlown(base, flown)
 
-    expect(result.you.hand).toHaveLength(1)
-    expect(result.you.release).toEqual({ frontend: null, backend: { id: 'r2' } })
+    expect(result.you?.hand).toHaveLength(1)
+    expect(result.you?.release).toEqual({ frontend: null, backend: { id: 'r2' } })
     expect(result.opponents[0]).toMatchObject({ handCount: 2, release: { frontend: { id: 'r3' } } })
     expect(result.decks).toBe(base.decks)
-    expect(base.you.hand).toHaveLength(2)
-    expect(base.you.release.frontend).toEqual({ id: 'r1' })
+    expect(base.you?.hand).toHaveLength(2)
+    expect(base.you?.release.frontend).toEqual({ id: 'r1' })
   })
+})
+
+it('keeps the public identity null when cards leave a seat or release', () => {
+  const publicBoard = {
+    ...board(),
+    selfId: null,
+    you: null,
+    opponents: [
+      { id: 'p1', name: 'One', handCount: 3, release: { frontend: cardById('release-frontend') } },
+    ],
+  }
+  const result = withoutFlown(publicBoard, [
+    { key: 'hand', eventId: 1, card: 'c1', source: { kind: 'seat', player: 'p1' } },
+    {
+      key: 'release',
+      eventId: 2,
+      card: 'r1',
+      source: { kind: 'release', player: 'p1', slot: 'frontend' },
+    },
+  ])
+  expect(result.you).toBeNull()
+  expect(result.selfId).toBeNull()
+  expect(result.opponents[0].handCount).toBe(2)
+  expect(result.opponents[0].release.frontend).toBeNull()
 })

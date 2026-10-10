@@ -68,3 +68,7 @@ it('forwards to all peers except the sender and the host', () => {
 it('returns empty when sender is the only non-host peer', () => {
   expect(relayTargets({ connectedPeerIds: ['h', 'a'], hostId: 'h', from: 'a' })).toEqual([])
 })
+
+it('never forwards a peer-authored join rejection', () => {
+  expect(isRelayable('JOIN_REJECTED')).toBe(false)
+})

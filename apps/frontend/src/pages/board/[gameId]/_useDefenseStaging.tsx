@@ -265,9 +265,9 @@ export function useDefenseStaging({
     const out = new Set(
       [staged?.support?.uid, staged?.main?.uid].filter((uid): uid is string => Boolean(uid)),
     )
-    if (out.size === 0) return state.you.hand
-    return state.you.hand.filter((c) => !out.has(c.uid))
-  }, [state.you.hand, staged])
+    if (out.size === 0) return state.you?.hand ?? EMPTY_HAND
+    return (state.you?.hand ?? EMPTY_HAND).filter((c) => !out.has(c.uid))
+  }, [state.you?.hand, staged])
 
   // While a Sudo waits for a partner, the defences it may enhance keep the
   // support's own category accent — the same reading `_useBoardStaging`'s own
@@ -323,11 +323,11 @@ export function useDefenseStaging({
     (uid: string): { item: CardData; index: number } | null => {
       if (!enabled || !pending || declinedRef.current || stagedRef.current) return null
       if (!defenceOptions.includes(uid)) return null
-      const index = state.you.hand.findIndex((c) => c.uid === uid)
-      const item = state.you.hand[index]
+      const index = (state.you?.hand ?? EMPTY_HAND).findIndex((c) => c.uid === uid)
+      const item = (state.you?.hand ?? EMPTY_HAND)[index]
       return item ? { item: item.card, index } : null
     },
-    [enabled, pending, defenceOptions, state.you.hand],
+    [enabled, pending, defenceOptions, state.you?.hand],
   )
 
   // Task 17's own gate: a Sudo is pullable only while nothing is staged and
@@ -339,13 +339,13 @@ export function useDefenseStaging({
   const resolveSudo = useCallback(
     (uid: string): { item: CardData; index: number } | null => {
       if (!enabled || !pending || declinedRef.current || stagedRef.current) return null
-      const index = state.you.hand.findIndex((c) => c.uid === uid)
-      const item = state.you.hand[index]
+      const index = (state.you?.hand ?? EMPTY_HAND).findIndex((c) => c.uid === uid)
+      const item = (state.you?.hand ?? EMPTY_HAND)[index]
       if (item?.card.id !== 'support-sudo') return null
       if ((state.comboOptions?.[uid] ?? []).length === 0) return null
       return { item: item.card, index }
     },
-    [enabled, pending, state.you.hand, state.comboOptions],
+    [enabled, pending, state.you?.hand, state.comboOptions],
   )
 
   // The plain path's own half: commit the dispatched play, fire the RESOLVE,
@@ -569,7 +569,7 @@ export function useDefenseStaging({
       const fromRect = rectOf(anchors.handSlotAt(index)) ?? undefined
       if (!box || !sudoBox) return
       arrowCtl.stop() // the choice is made — nothing is pointed at while the pair folds
-      const mainIndex = state.you.hand.findIndex((c) => c.uid === item.uid)
+      const mainIndex = (state.you?.hand ?? EMPTY_HAND).findIndex((c) => c.uid === item.uid)
       const main: DefenseStagedCard = { uid: item.uid, card: item.card, index: mainIndex }
       // the fold is committed — irrevocable until it lands; `cancel()` and a
       // second click both refuse while this is true.
@@ -645,7 +645,7 @@ export function useDefenseStaging({
       enabled,
       handItems,
       state.comboOptions,
-      state.you.hand,
+      state.you?.hand,
       reduced,
       anchors.cover,
       anchors.sudo,
@@ -687,7 +687,7 @@ export function useDefenseStaging({
   // this cannot strand the staging: `landed` is in the deps, so the effect
   // re-runs the moment the carrier does let go, and clears then if the
   // projection still says the card is gone. If a beat is running instead, the
-  // shadow puts the card back in `state.you.hand` and there is nothing to
+  // shadow puts the card back in `(state.you?.hand ?? EMPTY_HAND)` and there is nothing to
   // clear — the beat's own `release()` ends the staging, which is the designed
   // hand-over.
   // biome-ignore lint/correctness/useExhaustiveDependencies: commitStaged closes only over refs/setStaged and is stable in effect
@@ -695,8 +695,8 @@ export function useDefenseStaging({
     const s = stagedRef.current
     if (s?.phase !== 'dispatched' || !s.main) return
     if (!landed) return
-    if (!state.you.hand.some((c) => c.uid === s.main?.uid)) commitStaged(null)
-  }, [state.you.hand, landed])
+    if (!(state.you?.hand ?? EMPTY_HAND).some((c) => c.uid === s.main?.uid)) commitStaged(null)
+  }, [state.you?.hand, landed])
 
   // the engine said no: the staged defence returns to the fan. A rejected
   // RESOLVE carries no top-level `card` (packages/engine/src/fake/core.ts's
@@ -825,3 +825,5 @@ export function useDefenseStaging({
     whenLanded,
   }
 }
+
+const EMPTY_HAND: NonNullable<BoardState['you']>['hand'] = []

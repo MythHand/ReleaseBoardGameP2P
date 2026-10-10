@@ -1,3 +1,5 @@
+import type { Event, SpectatorView } from '@release/engine'
+import { play } from '@release/ui/animations'
 import { act, render, screen } from '@testing-library/react'
 import { StrictMode } from 'react'
 import { expect, it, vi } from 'vitest'
@@ -13,6 +15,10 @@ const motion = vi.hoisted(() => ({ reduced: true }))
 vi.mock('~/shared/lib/useReducedMotion', () => ({
   useReducedMotion: () => motion.reduced,
 }))
+vi.mock('@release/ui/animations', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@release/ui/animations')>()
+  return { ...real, play: vi.fn(real.play) }
+})
 
 // The fan's slots — the Hand marks each one `data-hand-slot` (there is no
 // `hand-card` test id on the kit's Hand; the brief assumed one).
@@ -169,4 +175,64 @@ it('renders the live board when no intro is given', () => {
   const props = makeBoardProps()
   render(<Board {...props} />)
   expect(screen.queryAllByText(props.copy.turnDock.gameStart)).toHaveLength(0)
+})
+
+it('queues a live public draw during the deal and animates it exactly once afterwards', async () => {
+  vi.useFakeTimers()
+  motion.reduced = false
+  vi.mocked(play).mockClear()
+  try {
+    const props = makeBoardProps()
+    const initial = introFixture()
+    const view: SpectatorView = {
+      ...initial.view,
+      self: null,
+      opponents: [
+        { id: 'p1', name: 'One', handCount: 2, release: {}, eliminated: false },
+        ...initial.view.opponents,
+      ],
+    }
+    const state = {
+      ...props.state,
+      selfId: null,
+      you: null,
+      opponents: view.opponents.map((seat) => ({ ...seat, release: {} })),
+      turn: 'p1',
+      decks: { main: [100], events: 21, discardCount: 0, discardHeap: [] },
+    }
+    const intro = { ...initial, view, onDone: vi.fn() }
+    const { rerender, container } = render(<Board {...props} state={state} intro={intro} />)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500)
+    })
+    expect(intro.onDone).not.toHaveBeenCalled()
+    const events: Event[] = [
+      ...initial.events,
+      { id: 3, type: 'drawn', player: 'p1', pile: 0, deckSize: 99 },
+    ]
+    const next = {
+      ...state,
+      opponents: state.opponents.map((seat) => ({ ...seat, handCount: seat.id === 'p1' ? 3 : 2 })),
+      decks: { ...state.decks, main: [99] },
+    }
+    rerender(<Board {...props} state={next} intro={{ ...intro, events }} />)
+    expect(vi.mocked(play).mock.calls.filter(([preset]) => preset === 'drawToCenter')).toHaveLength(
+      0,
+    )
+    for (let elapsed = 0; elapsed < 12000; elapsed += 100) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(100)
+      })
+    }
+    expect(intro.onDone).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(play).mock.calls.filter(([preset]) => preset === 'drawToCenter')).toHaveLength(
+      1,
+    )
+    // Four opening cards and one live draw reach the public seats.
+    expect(vi.mocked(play).mock.calls.filter(([preset]) => preset === 'dealToSeat')).toHaveLength(5)
+    expect(container.querySelector('[data-hand-slot]')).toBeNull()
+  } finally {
+    vi.useRealTimers()
+    motion.reduced = true
+  }
 })

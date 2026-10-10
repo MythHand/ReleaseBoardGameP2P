@@ -1,0 +1,4 @@
+interface:
+  display_name: "Playground Parity"
+  short_description: "Find and fix playground differences for exact parity"
+  default_prompt: "$playground-parity First find all differences between the implementation and playground, then fix them and recheck appearance, behavior, and animations until they match exactly."

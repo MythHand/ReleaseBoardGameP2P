@@ -4,6 +4,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router'
 import { vi } from 'vitest'
 import type { UseLobby } from '~/entities/lobby'
 import { MAX_RECONNECT_ATTEMPTS } from '~/entities/lobby'
+import { createFakeVoiceFacade } from '~/network/voice/testing/fakeVoiceFacade'
 import BoardPage from '../index'
 
 // Same opening-collapse mock board.test.tsx uses, for the same reason: this
@@ -25,6 +26,7 @@ function session(overrides: Partial<UseLobby> = {}): UseLobby {
     roomCode: 'YTG-N2Q',
     isHost: true,
     seats: [],
+    voice: createFakeVoiceFacade(),
     chat: {
       entries: [],
       notificationEntryIds: [],
@@ -83,6 +85,7 @@ it('keeps a dropped player on the table and marks the seat offline', async () =>
       selfId: 'me',
       hostId: 'me',
       maxPlayers: 6,
+      maxSpectators: 8,
       bots: 0,
       setup: {},
       peers: {
@@ -124,6 +127,7 @@ it('never marks a bot seat offline', async () => {
       selfId: 'me',
       hostId: 'me',
       maxPlayers: 6,
+      maxSpectators: 8,
       bots: 1,
       setup: {},
       peers: {
@@ -168,6 +172,7 @@ it('stays online once the roster is complete and nothing is reconnecting', () =>
       selfId: 'me',
       hostId: 'me',
       maxPlayers: 6,
+      maxSpectators: 8,
       bots: 0,
       setup: {},
       peers: {

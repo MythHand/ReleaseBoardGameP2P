@@ -5,6 +5,7 @@ import type { Setup } from '@/game/modes'
 import type { HeapCard } from '@/primitives/Pile/Pile'
 import type { HistoryEntry } from '@/table/MoveHistory/MoveHistory'
 import type { Participant, Spectator } from '@/table/Participants/Participants'
+import type { SpectatorTableState } from '@/table/Table/types'
 import type { HandCard } from './hand'
 import { makeHand } from './hand'
 
@@ -272,5 +273,29 @@ export function makeTable(opponentCount = 3): TableState {
         children: [{ id: 91, who: 'null_ptr', kind: 'выбыл' }],
       },
     ],
+  }
+}
+
+// The observer sees every seat, including the fixture's usual local player.
+export function makeSpectatorTable(playerCount: 2 | 3 | 4 | 5 | 6): SpectatorTableState {
+  const base = makeTable(playerCount - 1)
+  return {
+    selfId: null,
+    you: null,
+    opponents: [
+      {
+        id: 'you',
+        name: base.you.name,
+        handCount: base.you.hand.length,
+        release: base.you.release,
+      },
+      ...base.opponents,
+    ],
+    decks: base.decks,
+    turn: base.turn,
+    history: base.history,
+    setup: base.setup,
+    playable: [],
+    frozen: [],
   }
 }

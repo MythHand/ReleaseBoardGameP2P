@@ -6,9 +6,13 @@ import { redactFor } from '@release/engine'
 // is public but one of its FIELDS is not, how to redact it. This layer reads the
 // audience and applies the engine's own redaction; it never re-derives either
 // answer from an event's payload.
-export function forViewer(events: Event[], viewerId: PlayerId): Event[] {
+export function forViewer(events: Event[], viewerId: PlayerId | null): Event[] {
   return events
-    .filter((e) => e.type !== 'rejected' && (!e.visibleTo || e.visibleTo.includes(viewerId)))
+    .filter(
+      (e) =>
+        e.type !== 'rejected' &&
+        (!e.visibleTo || (viewerId !== null && e.visibleTo.includes(viewerId))),
+    )
     .map((e) => redactFor(e, viewerId))
 }
 

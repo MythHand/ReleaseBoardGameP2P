@@ -13,12 +13,15 @@ import { resources } from '@release/translation'
 // elsewhere in this app (`@/icons/DiceIcon`, `@/brand/ReleaseLogo`) that reach
 // past the barrel for pieces it does not export.
 import { makeTable } from '@/mocks/table'
-import type { BoardProps } from '~/entities/game/board'
+import type { BoardProps, PlayerBoardState } from '~/entities/game/board'
 
 const enCommon = resources.en.common
 
 // Full, valid props for Board. Tests override only the slice they assert on:
 //   makeBoardProps({ room: { ...base.room, role: 'guest' } })
+type PlayerProps = Omit<BoardProps, 'state'> & { state: PlayerBoardState }
+export function makeBoardProps(over?: Partial<PlayerProps>): PlayerProps
+export function makeBoardProps(over: Partial<BoardProps>): BoardProps
 export function makeBoardProps(over: Partial<BoardProps> = {}): BoardProps {
   const mock = makeTable(3)
   return {

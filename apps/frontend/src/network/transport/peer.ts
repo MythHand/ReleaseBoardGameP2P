@@ -11,8 +11,11 @@ import {
 } from '~/shared/config'
 import { createEnvelope, nextSeq, parseEnvelope } from '../envelope'
 import type { Message, WireMessage } from '../types'
+import { createMediaPort } from './media'
+import type { VoiceMediaPort } from './mediaTypes'
 
 export interface Transport {
+  media?: VoiceMediaPort
   id: string
   connectTo(peerId: string): void
   authenticate(peerId: string): void
@@ -22,6 +25,7 @@ export interface Transport {
   // send(), it preserves the original `from`/`seq` (the host must not rewrite
   // itself as the sender when relaying) and serializes once for all recipients.
   relay(toIds: string[], frame: WireMessage): void
+  disconnectPeer(peerId: string, finalMessage?: Message): Promise<void>
   connectedIds(): string[]
   close(): void
 }
@@ -65,6 +69,7 @@ function peerOptions() {
 
 export function createTransport(args: {
   peerId?: string
+  signal?: AbortSignal
   onMessage: (msg: WireMessage) => void
   onPeerOpen?: (id: string) => void
   onConnection?: (peerId: string) => void
@@ -75,33 +80,72 @@ export function createTransport(args: {
   onError?: (err: { type?: string; message: string }) => void
 }): Promise<Transport> {
   return new Promise((resolve, reject) => {
+    if (args.signal?.aborted) {
+      reject(new DOMException('Request aborted', 'AbortError'))
+      return
+    }
     const peer = args.peerId
       ? new Peer(args.peerId, peerOptions())
       : new Peer(undefined as never, peerOptions())
     interface ConnectionGeneration {
       connection: DataConnection
       authenticated: boolean
+      retired: boolean
     }
     const connections = new Map<string, ConnectionGeneration>()
     let opened = false
+    let closed = false
+    const dataDialPeers = new Set<string>()
+    const dataDials = new Map<string, DataConnection>()
+    const clearDataDial = (conn: DataConnection) => {
+      if (dataDials.get(conn.peer) !== conn) return
+      dataDials.delete(conn.peer)
+      dataDialPeers.delete(conn.peer)
+    }
+    const media = createMediaPort(peer, dataDialPeers)
+
+    const close = () => {
+      if (closed) return
+      closed = true
+      args.signal?.removeEventListener('abort', abort)
+      media.close()
+      peer.destroy()
+    }
+    const abort = () => {
+      close()
+      if (!opened) reject(new DOMException('Request aborted', 'AbortError'))
+    }
+    args.signal?.addEventListener('abort', abort, { once: true })
 
     const wire = (conn: DataConnection, authenticated = false) => {
-      const generation: ConnectionGeneration = { connection: conn, authenticated }
+      if (closed) {
+        conn.close()
+        return
+      }
+      const generation: ConnectionGeneration = { connection: conn, authenticated, retired: false }
       conn.on('open', () => {
+        clearDataDial(conn)
+        if (closed) return
         const previous = connections.get(conn.peer)
         if (previous?.connection === conn) return
         connections.set(conn.peer, generation)
         if (previous) {
+          previous.retired = true
           previous.connection.close()
           args.onDisconnect?.(conn.peer)
         }
         args.onConnection?.(conn.peer)
       })
       conn.on('data', (data) => {
-        if (connections.get(conn.peer) !== generation) return
+        if (closed || connections.get(conn.peer) !== generation) return
         try {
           const frame = parseEnvelope(typeof data === 'string' ? data : JSON.stringify(data))
-          if (!generation.authenticated && frame.type !== 'JOIN_REQUEST') return
+          if (
+            !generation.authenticated &&
+            frame.type !== 'JOIN_REQUEST' &&
+            frame.type !== 'ROOM_CHECK'
+          )
+            return
           // `from` is overwritten with the connection it arrived on, never read
           // from the payload: the sender wrote that field and could write any
           // peer id into it, and the keeper resolves a seat from it. The
@@ -114,11 +158,15 @@ export function createTransport(args: {
         }
       })
       conn.on('close', () => {
-        if (connections.get(conn.peer) !== generation) return
+        clearDataDial(conn)
+        if (closed || connections.get(conn.peer) !== generation) return
+        generation.retired = true
         connections.delete(conn.peer)
         args.onDisconnect?.(conn.peer)
       })
       conn.on('error', (e) => {
+        clearDataDial(conn)
+        if (closed || generation.retired) return
         const active = connections.get(conn.peer)
         if (active && active !== generation) return
         args.onError?.({ type: 'connection', message: (e as Error)?.message ?? String(e) })
@@ -127,16 +175,24 @@ export function createTransport(args: {
 
     peer.on('connection', wire)
     peer.on('error', (err) => {
+      if (closed) return
       const e = err as { type?: string; message: string }
+      if (media.handlePeerError(e)) return
       // Before the peer opens, an error means setup failed — reject the promise.
       // After it opens, surface the error instead of discarding it silently.
-      if (opened) args.onError?.({ type: e.type, message: e.message })
-      else reject(err)
+      if (opened)
+        args.onError?.({ type: e.type === 'webrtc' ? 'connection' : e.type, message: e.message })
+      else {
+        close()
+        reject(err)
+      }
     })
     peer.on('open', (id) => {
+      if (closed) return
       opened = true
       args.onPeerOpen?.(id as string)
       resolve({
+        media,
         id: id as string,
         connectTo(peerId) {
           // ORDERED (#168). Without `reliable`, PeerJS opens the channel with
@@ -146,7 +202,10 @@ export function createTransport(args: {
           // table the player had taken it off. The keeper runs a player's
           // intents one by one; this makes them arrive in the order made — and
           // the keeper's own syncs back in the order sent.
-          wire(peer.connect(peerId, { reliable: true }), true)
+          dataDialPeers.add(peerId)
+          const connection = peer.connect(peerId, { reliable: true })
+          dataDials.set(peerId, connection)
+          wire(connection, true)
         },
         authenticate(peerId) {
           const generation = connections.get(peerId)
@@ -159,18 +218,38 @@ export function createTransport(args: {
         },
         broadcast(message) {
           const frame = JSON.stringify(createEnvelope(message, id as string, nextSeq()))
-          for (const { connection } of connections.values()) connection.send(frame)
+          for (const { connection, authenticated } of connections.values()) {
+            if (authenticated) connection.send(frame)
+          }
         },
         relay(toIds, frame) {
           const serialized = JSON.stringify(frame)
-          for (const to of toIds) connections.get(to)?.connection.send(serialized)
+          for (const to of toIds) {
+            const generation = connections.get(to)
+            if (generation?.authenticated) generation.connection.send(serialized)
+          }
+        },
+        async disconnectPeer(peerId, finalMessage) {
+          const generation = connections.get(peerId)
+          if (!generation) return
+          generation.retired = true
+          connections.delete(peerId)
+          args.onDisconnect?.(peerId)
+          try {
+            if (finalMessage)
+              await generation.connection.send(
+                JSON.stringify(createEnvelope(finalMessage, id as string, nextSeq())),
+              )
+          } catch {
+            // The recipient may have closed while its final response was sent.
+          } finally {
+            generation.connection.close({ flush: true })
+          }
         },
         connectedIds() {
           return [...connections.keys()]
         },
-        close() {
-          peer.destroy()
-        },
+        close,
       })
     })
   })

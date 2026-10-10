@@ -166,8 +166,11 @@ export type TablePending =
 // expression so the two cannot drift into different answers about whose move
 // it is. `systemUpgrade` owes its roster while it is discarding and the actor
 // once it is picking; every other kind owes the single seat it names.
-export function pendingOwesSelf(pending: TablePending | null | undefined, selfId: string): boolean {
-  if (!pending) return false
+export function pendingOwesSelf(
+  pending: TablePending | null | undefined,
+  selfId: string | null,
+): boolean {
+  if (!pending || selfId === null) return false
   if (pending.kind !== 'systemUpgrade') return pending.player === selfId
   return pending.phase === 'picking' ? pending.actor === selfId : pending.owed.includes(selfId)
 }

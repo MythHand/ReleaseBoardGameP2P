@@ -51,7 +51,7 @@ it('restores the seat on reconnect with one fresh SYNC', () => {
   expect(outgoing).toHaveLength(1)
   expect(sync.to).toBe('peer-b-2')
   expect(sync.message.type).toBe('SYNC')
-  if (sync.message.type === 'SYNC') expect(sync.message.payload.view.self.id).toBe('b')
+  if (sync.message.type === 'SYNC') expect(sync.message.payload.view.self?.id).toBe('b')
 })
 
 it('refuses to rebind a seat that is still connected', () => {

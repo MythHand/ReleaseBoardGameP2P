@@ -344,7 +344,8 @@ it('sends each seat its own hand and never another seat`s', () => {
   const viewA = toA.message.type === 'SYNC' ? toA.message.payload.view : null
   const viewB = toB.message.type === 'SYNC' ? toB.message.payload.view : null
 
-  expect(viewA?.self.id).toBe('a')
+  if (!viewA?.self || !viewB?.self) throw new Error('expected seated views')
+  expect(viewA.self.id).toBe('a')
   expect(viewB?.self.id).toBe('b')
   expect(viewA?.self.hand.length).toBeGreaterThan(0)
   // The opponent is a count, never an identity.

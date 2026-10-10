@@ -203,11 +203,11 @@ export function useRequestStaging(args: {
       !actions?.onResolve
     )
       return
-    const card = state.you.hand.find((item) => item.card.id === pending.requested)
+    const card = (state.you?.hand ?? EMPTY_HAND).find((item) => item.card.id === pending.requested)
     if (!card) return
     locked.current = true
     resolve({ kind: 'giveCard', card: card.uid })
-  }, [enabled, giving, pending, state.you.hand, actions?.onResolve, resolve])
+  }, [enabled, giving, pending, state.you?.hand, actions?.onResolve, resolve])
 
   // A position is taken by CLICKING it, the scene's own gesture: the fan goes
   // back up and the card leaves for you on its own. `rect` is where it stood
@@ -374,3 +374,5 @@ export function useRequestStaging(args: {
       ) : null,
   }
 }
+
+const EMPTY_HAND: NonNullable<BoardState['you']>['hand'] = []

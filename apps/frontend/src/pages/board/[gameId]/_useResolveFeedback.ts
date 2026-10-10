@@ -14,15 +14,15 @@ type Choice = Parameters<NonNullable<TableActions['onResolve']>>[0]
 // every render. It reads the feed and the actions through a ref instead.
 export function useResolveFeedback(
   events: Event[],
-  player: string,
+  player: string | null,
   actions: TableActions | undefined,
   onRejected: () => void,
 ) {
   const attempt = useRef<{ since: number; choice: string } | null>(null)
   const reset = useRef(onRejected)
   reset.current = onRejected
-  const latest = useRef({ events, actions })
-  latest.current = { events, actions }
+  const latest = useRef({ events, actions, player })
+  latest.current = { events, actions, player }
 
   useEffect(() => {
     const sent = attempt.current
@@ -42,6 +42,7 @@ export function useResolveFeedback(
   }, [events, player])
 
   return useCallback((choice: Choice) => {
+    if (latest.current.player === null) return
     const { events: feed, actions: act } = latest.current
     attempt.current = { since: feed.at(-1)?.id ?? 0, choice: JSON.stringify(choice) }
     act?.onResolve?.(choice)

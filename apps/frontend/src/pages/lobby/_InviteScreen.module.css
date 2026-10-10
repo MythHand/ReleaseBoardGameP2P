@@ -13,7 +13,7 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  min-block-size: 295px;
+  min-block-size: 319px;
 }
 
 .formTitle {
@@ -119,4 +119,66 @@
   justify-content: center;
   inline-size: 320px;
   margin-block-start: 64px;
+}
+
+.fieldWrap {
+  inline-size: 100%;
+}
+
+.codeStatus {
+  display: flex;
+  align-items: center;
+  min-block-size: 18px;
+  margin-block-start: 6px;
+  line-height: 1.5;
+}
+
+.codeStatus[data-state='checking'] {
+  color: var(--cat-support);
+}
+
+.codeStatus[data-state='error'] {
+  color: var(--cat-attack);
+}
+
+.dots {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+  margin-inline-start: 5px;
+}
+
+.dots i {
+  inline-size: 3px;
+  block-size: 3px;
+  background: currentColor;
+  border-radius: 50%;
+  opacity: 0.25;
+  animation: code-dot 1.2s ease-in-out infinite;
+}
+
+.dots i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.dots i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes code-dot {
+  0%, 70%, 100% { opacity: 0.25; }
+  35% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dots i { animation: none; }
+}
+
+.note {
+  line-height: 1.5;
+  color: var(--cat-support);
+}
+
+.joinIdle {
+  opacity: 0.4;
 }

@@ -14,6 +14,9 @@ class FakeConn {
     if (!this.handlers[event]) this.handlers[event] = []
     this.handlers[event].push(cb)
   }
+  off(event: string, cb: (arg: unknown) => void) {
+    this.handlers[event] = (this.handlers[event] ?? []).filter((handler) => handler !== cb)
+  }
   emit(event: string, arg?: unknown) {
     for (const cb of this.handlers[event] ?? []) cb(arg)
   }
@@ -33,18 +36,21 @@ const connectOptions = new Map<string, unknown>()
 // The most recently constructed peer, so a test can play the broker and push
 // an inbound connection at the transport.
 let lastPeer: FakePeer | null = null
+let openImmediately = true
 
 class FakePeer {
   id: string
+  static created = 0
   private handlers: Record<string, ((arg: unknown) => void)[]> = {}
   constructor(id?: string) {
+    FakePeer.created++
     this.id = id ?? 'self-generated'
     lastPeer = this
   }
   on(event: string, cb: (arg: unknown) => void) {
     if (!this.handlers[event]) this.handlers[event] = []
     this.handlers[event].push(cb)
-    if (event === 'open') cb(this.id)
+    if (event === 'open' && openImmediately) cb(this.id)
   }
   emit(event: string, arg?: unknown) {
     for (const cb of this.handlers[event] ?? []) cb(arg)
@@ -55,6 +61,16 @@ class FakePeer {
     connectOptions.set(peerId, options)
     queueMicrotask(() => conn.emit('open'))
     return conn
+  }
+  call(peerId: string, _stream: MediaStream, options: { metadata: unknown }) {
+    return Object.assign(new FakeConn(peerId), {
+      connectionId: 'media-1',
+      metadata: options.metadata,
+      answer: vi.fn(),
+    })
+  }
+  off(event: string, cb: (arg: unknown) => void) {
+    this.handlers[event] = (this.handlers[event] ?? []).filter((handler) => handler !== cb)
   }
   destroy() {}
 }
@@ -70,6 +86,7 @@ afterEach(() => {
   outboundConns.clear()
   connectOptions.clear()
   lastPeer = null
+  openImmediately = true
 })
 
 it('resolves with an id when the peer opens', async () => {
@@ -242,4 +259,223 @@ it('relay forwards a wire frame verbatim, preserving the original sender', async
   // The host must NOT rewrite itself as the sender when relaying.
   expect(received.from).toBe('peer-9')
   expect(received.seq).toBe(7)
+})
+
+it('broadcasts and relays only to accepted inbound connections', async () => {
+  const transport = await createTransport({ onMessage: () => {} })
+  const pending = new FakeConn('pending')
+  const accepted = new FakeConn('accepted')
+  for (const conn of [pending, accepted]) {
+    lastPeer?.emit('connection', conn)
+    conn.emit('open')
+  }
+  transport.authenticate('accepted')
+  const message: Message = { type: 'LOBBY_DISBANDED', payload: {} }
+  transport.broadcast(message)
+  transport.relay(['pending', 'accepted'], { ...message, from: 'original', seq: 1 })
+  expect(pending.sent).toEqual([])
+  expect(accepted.sent).toHaveLength(2)
+  transport.send('pending', message)
+  expect(pending.sent).toHaveLength(1)
+})
+
+it('retires a rejected channel immediately and flushes its reason before closing', async () => {
+  const disconnected = vi.fn()
+  const received = vi.fn()
+  const transport = await createTransport({ onMessage: received, onDisconnect: disconnected })
+  const old = new FakeConn('watcher')
+  lastPeer?.emit('connection', old)
+  old.emit('open')
+  transport.authenticate('watcher')
+  let finish!: () => void
+  const sent = new Promise<void>((resolve) => {
+    finish = resolve
+  })
+  vi.spyOn(old, 'send').mockImplementation((frame) => {
+    old.sent.push(frame)
+    return sent
+  })
+  const close = vi.spyOn(old, 'close')
+  const rejection: Message = {
+    type: 'JOIN_REJECTED',
+    payload: { reason: 'room-full', availability: { player: false, spectator: false } },
+  }
+  const pending = transport.disconnectPeer('watcher', rejection)
+  expect(transport.connectedIds()).toEqual([])
+  expect(disconnected).toHaveBeenCalledExactlyOnceWith('watcher')
+  transport.broadcast({ type: 'LOBBY_DISBANDED', payload: {} })
+  old.emit('data', JSON.stringify({ type: 'PLAYER_READY', payload: {}, from: 'watcher', seq: 1 }))
+  expect(received).not.toHaveBeenCalled()
+  expect(old.sent.map((frame) => JSON.parse(frame).type)).toEqual(['JOIN_REJECTED'])
+  expect(close).not.toHaveBeenCalled()
+  const replacement = new FakeConn('watcher')
+  lastPeer?.emit('connection', replacement)
+  replacement.emit('open')
+  finish()
+  await pending
+  expect(close).toHaveBeenCalledExactlyOnceWith({ flush: true })
+  expect(replacement.closed).toBe(false)
+  old.emit('close')
+  expect(disconnected).toHaveBeenCalledTimes(1)
+  expect(transport.connectedIds()).toEqual(['watcher'])
+})
+
+it('closes once even when the final send fails', async () => {
+  const disconnected = vi.fn()
+  const transport = await createTransport({ onMessage: () => {}, onDisconnect: disconnected })
+  const connection = new FakeConn('watcher')
+  lastPeer?.emit('connection', connection)
+  connection.emit('open')
+  vi.spyOn(connection, 'send').mockImplementation(() => {
+    throw new Error('closed during send')
+  })
+  const close = vi.spyOn(connection, 'close')
+  await transport.disconnectPeer('watcher', { type: 'LOBBY_DISBANDED', payload: {} })
+  await transport.disconnectPeer('watcher')
+  connection.emit('close')
+  expect(close).toHaveBeenCalledTimes(1)
+  expect(disconnected).toHaveBeenCalledTimes(1)
+})
+
+it('uses its single Peer for media and scopes media-only errors away from the game', async () => {
+  const errors = vi.fn()
+  const before = FakePeer.created
+  const transport = await createTransport({ onMessage: () => {}, onError: errors })
+  if (!transport.media) throw new Error('Media port missing')
+  const call = transport.media.call('audio-only', {} as MediaStream, {
+    version: 1,
+    callerSessionId: 'a',
+    calleeSessionId: 'b',
+  })
+  const mediaErrors = vi.fn()
+  call.subscribe(mediaErrors)
+  lastPeer?.emit('error', {
+    type: 'peer-unavailable',
+    message: 'Could not connect to peer audio-only',
+  })
+  expect(mediaErrors).toHaveBeenCalledWith({
+    type: 'error',
+    error: { type: 'peer-unavailable', message: 'Could not connect to peer audio-only' },
+  })
+  expect(errors).not.toHaveBeenCalled()
+  expect(FakePeer.created - before).toBe(1)
+  lastPeer?.emit('error', { type: 'webrtc', message: 'negotiation failed' })
+  expect(errors).toHaveBeenCalledWith({ type: 'connection', message: 'negotiation failed' })
+  lastPeer?.emit('error', { type: 'network', message: 'socket lost' })
+  expect(errors).toHaveBeenCalledWith({ type: 'network', message: 'socket lost' })
+})
+it('preserves peer-unavailable for a pending game data dial', async () => {
+  const errors = vi.fn()
+  const transport = await createTransport({ onMessage: () => {}, onError: errors })
+  if (!transport.media) throw new Error('Media port missing')
+  transport.media.call('host', {} as MediaStream, {
+    version: 1,
+    callerSessionId: 'a',
+    calleeSessionId: 'b',
+  })
+  transport.connectTo('host')
+  lastPeer?.emit('error', { type: 'peer-unavailable', message: 'Could not connect to peer host' })
+  expect(errors).toHaveBeenCalledWith({
+    type: 'peer-unavailable',
+    message: 'Could not connect to peer host',
+  })
+})
+
+it('retired data callbacks cannot misclassify the next dial as a media-only error', async () => {
+  const errors = vi.fn()
+  const transport = await createTransport({ onMessage: () => {}, onError: errors })
+  transport.connectTo('host')
+  await Promise.resolve()
+  const old = outboundConns.get('host')
+  if (!transport.media) throw new Error('Media port missing')
+  transport.media.call('host', {} as MediaStream, {
+    version: 1,
+    callerSessionId: 'a',
+    calleeSessionId: 'b',
+  })
+  transport.connectTo('host')
+  old?.emit('error', new Error('old connection error'))
+  errors.mockClear()
+  lastPeer?.emit('error', { type: 'peer-unavailable', message: 'Could not connect to peer host' })
+  expect(errors).toHaveBeenCalledWith({
+    type: 'peer-unavailable',
+    message: 'Could not connect to peer host',
+  })
+})
+
+it('permits an unauthenticated availability check without permitting broadcasts', async () => {
+  const received: WireMessage[] = []
+  const transport = await createTransport({ onMessage: (message) => received.push(message) })
+  const connection = new FakeConn('visitor')
+  lastPeer?.emit('connection', connection)
+  connection.emit('open')
+  connection.emit(
+    'data',
+    JSON.stringify({ type: 'ROOM_CHECK', payload: {}, from: 'visitor', seq: 1 }),
+  )
+  expect(received.map((message) => message.type)).toEqual(['ROOM_CHECK'])
+  transport.broadcast({ type: 'PLAYER_READY', payload: {} })
+  expect(connection.sent).toEqual([])
+})
+
+it('destroys a temporary peer when its request is aborted', async () => {
+  const destroy = vi.spyOn(FakePeer.prototype, 'destroy')
+  const controller = new AbortController()
+  await createTransport({ onMessage: () => {}, signal: controller.signal })
+  controller.abort()
+  expect(destroy).toHaveBeenCalledOnce()
+  destroy.mockRestore()
+})
+
+it('closes owned voice calls when the transport is aborted', async () => {
+  const dial = vi.spyOn(FakePeer.prototype, 'call')
+  const controller = new AbortController()
+  const transport = await createTransport({ onMessage: () => {}, signal: controller.signal })
+  if (!transport.media) throw new Error('Media port missing')
+  transport.media.call('speaker', {} as MediaStream, {
+    version: 1,
+    callerSessionId: 'a',
+    calleeSessionId: 'b',
+  })
+  const connection = dial.mock.results[0].value as FakeConn
+  expect(connection.closed).toBe(false)
+  controller.abort()
+  expect(connection.closed).toBe(true)
+  dial.mockRestore()
+})
+
+it('ignores queued data after an aborted temporary transport is destroyed', async () => {
+  const received: WireMessage[] = []
+  const controller = new AbortController()
+  const transport = await createTransport({
+    signal: controller.signal,
+    onMessage: (message) => received.push(message),
+  })
+  const connection = new FakeConn('host')
+  lastPeer?.emit('connection', connection)
+  connection.emit('open')
+  transport.authenticate('host')
+  controller.abort()
+  connection.emit(
+    'data',
+    JSON.stringify({
+      type: 'ROOM_AVAILABILITY',
+      payload: { player: true, spectator: true },
+      from: 'host',
+      seq: 1,
+    }),
+  )
+  expect(received).toEqual([])
+})
+
+it('aborts before signaling opens and ignores a late open event', async () => {
+  openImmediately = false
+  const controller = new AbortController()
+  const onPeerOpen = vi.fn()
+  const pending = createTransport({ signal: controller.signal, onMessage: () => {}, onPeerOpen })
+  const rejection = expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+  controller.abort()
+  await rejection
+  lastPeer?.emit('open', 'visitor')
+  expect(onPeerOpen).not.toHaveBeenCalled()
 })

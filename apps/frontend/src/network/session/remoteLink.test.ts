@@ -74,7 +74,7 @@ it('carries a remote peer`s intent to the keeper and its view back', () => {
   link.submit({ type: 'DRAW' })
 
   expect(seen).toHaveLength(1)
-  expect(seen[0].view.self.id).toBe('b')
+  expect(seen[0].view.self?.id).toBe('b')
   expect(seen[0].events.map((e) => e.type)).toEqual(['rejected'])
   expect(ref.current.state.turn.player).toBe('a')
 })
@@ -105,7 +105,7 @@ it('drives the keeper`s own seat through its link, with no connection to itself'
 
   expect(ref.current.state.turn.drawnFrom).not.toEqual([])
   expect(seen).toHaveLength(1)
-  expect(seen[0].view.self.id).toBe('a')
+  expect(seen[0].view.self?.id).toBe('a')
 })
 
 it('ignores a SYNC that did not come from the keeper', () => {
@@ -220,10 +220,10 @@ it('deals every seat its opening hand without anyone acting first', () => {
 
   expect(remoteSeen).toHaveLength(1)
   expect(keeperSeen).toHaveLength(1)
-  expect(remoteSeen[0].view.self.id).toBe('b')
-  expect(keeperSeen[0].view.self.id).toBe('a')
-  expect(remoteSeen[0].view.self.hand.length).toBeGreaterThan(0)
-  expect(keeperSeen[0].view.self.hand.length).toBeGreaterThan(0)
+  expect(remoteSeen[0].view.self?.id).toBe('b')
+  expect(keeperSeen[0].view.self?.id).toBe('a')
+  expect(remoteSeen[0].view.self?.hand.length).toBeGreaterThan(0)
+  expect(keeperSeen[0].view.self?.hand.length).toBeGreaterThan(0)
   // A statement of position, not a replay.
   expect(remoteSeen[0].events).toEqual([])
 })

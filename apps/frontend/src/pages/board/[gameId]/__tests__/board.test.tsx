@@ -4,6 +4,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router'
 import { vi } from 'vitest'
 import type { UseLobby } from '~/entities/lobby'
 import type { RoomChatView } from '~/features/chat/RoomChat'
+import { createFakeVoiceFacade } from '~/network/voice/testing/fakeVoiceFacade'
 // The board's own style module — the `.enter` class the opening hides blocks
 // with is reached the same way the ported suite reaches Arrow's classnames.
 import boardStyles from '../_Board.module.css'
@@ -54,7 +55,22 @@ vi.mock('~/app/providers/SessionProvider', () => ({
 }))
 
 function session(peers: Record<string, unknown> = {}): UseLobby {
+  const engine = createFakeEngine()
+  const state = engine.createGame({
+    gameId: 'g1',
+    seed: 1,
+    setup: {},
+    deck: FAKE_DECK,
+    events: FAKE_EVENTS,
+    players: [
+      { id: 'p1', name: 'One' },
+      { id: 'p2', name: 'Two' },
+    ],
+  })
   return {
+    gameId: 'g1',
+    gameSync: { view: engine.spectate(state), events: [], resync: true },
+    voice: createFakeVoiceFacade(),
     state: { selfId: 'me', hostId: 'me', maxPlayers: 6, setup: {}, peers },
     status: 'in-lobby',
     roomCode: 'YTG-N2Q',
@@ -69,6 +85,7 @@ function session(peers: Record<string, unknown> = {}): UseLobby {
     restoring: false,
     reconnect: { attempt: 0, maxAttempts: 5, status: 'idle', events: [], retry: vi.fn() },
     kick: vi.fn(),
+    introReady: vi.fn(),
     setWhere: vi.fn(),
     leaveGame: vi.fn(),
   } as unknown as UseLobby
@@ -95,11 +112,37 @@ function renderBoard(path = '/board/g1') {
     [
       { path: '/board/:gameId', element: <BoardPage /> },
       { path: '/board/:gameId/stats', element: <StatsPage /> },
+      { path: '/start', element: <div>start screen</div> },
     ],
     { initialEntries: [path] },
   )
   return { router, ...render(<RouterProvider router={router} />) }
 }
+
+it.each([
+  true,
+  false,
+])('explains a full spectator room on reconnect (snapshot=%s)', async (hasSnapshot) => {
+  const retry = vi.fn()
+  const leave = vi.fn()
+  sessionValue = {
+    ...session(),
+    gameSync: hasSnapshot ? session().gameSync : null,
+    isHost: false,
+    errorKind: 'room-full',
+    reconnect: { attempt: 1, maxAttempts: 5, status: 'failed', events: [], retry },
+    leaveSession: leave,
+  }
+  renderBoard()
+  expect(screen.getByText(/no places are available in this room/i)).toBeTruthy()
+  expect(screen.queryByText(/host unreachable|peer-unavailable/)).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: '[reconnect]' }))
+  expect(retry).toHaveBeenCalledTimes(1)
+  fireEvent.click(screen.getByRole('button', { name: '[leave]' }))
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: '[confirm]' })))
+  expect(leave).toHaveBeenCalledTimes(1)
+  expect(screen.getByText('start screen')).toBeTruthy()
+})
 
 it('does not replay async history as notifications, then opens chat for a live remote message', async () => {
   const initial = {
@@ -162,10 +205,8 @@ it('shows a spectator the live table, not a board held hidden', async () => {
   })
   const { container } = renderBoard()
   await screen.findByTestId('board-page')
-  // A spectator holds no seat, so the keeper never projects to them and
-  // `game.view` stays null for good — an intro armed here could never report
-  // done, and every block it hides (`.enter`, opacity 0) would stay hidden for
-  // the whole match. So the opening is not armed for them at all.
+  // A public sync unlocks the table; the observer owns no local hand.
+  expect(screen.queryByTestId('board-you')).toBeNull()
   expect(container.querySelectorAll(`.${boardStyles.enter}`)).toHaveLength(0)
 })
 
@@ -471,4 +512,13 @@ it('sends the game-over continue action to this game’s own stats route', async
 
   expect(await screen.findByTestId('stats-page')).toBeTruthy()
   expect(router.state.location.pathname).toBe('/board/g1/stats')
+})
+
+it('connects board voice using the session facade and keeps it on route unmount', () => {
+  const page = renderBoard()
+  fireEvent.click(screen.getByRole('button', { name: 'voice chat' }))
+  fireEvent.click(screen.getByRole('button', { name: 'join' }))
+  expect(sessionValue.voice.connect).toHaveBeenCalledOnce()
+  page.unmount()
+  expect(sessionValue.voice.disconnect).not.toHaveBeenCalled()
 })

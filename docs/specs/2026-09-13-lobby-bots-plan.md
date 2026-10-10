@@ -1024,8 +1024,7 @@ In `apps/frontend/src/shared/lib/persistence.ts`: `StoredSession.role` goes back
 `'host' | 'guest'` and `roomCode` back to `string`. `typecheck` will then point at the two
 nullability guards that change forced — in `restoreHost` and `runGuestReconnect` — which go too.
 
-In `apps/frontend/src/pages/start.tsx`: delete the second `MenuButton` and the `role === 'solo'`
-branch in `resume()`.
+In `apps/frontend/src/pages/start.tsx`: delete the solo `MenuButton`.
 
 In `apps/frontend/src/features/create-lobby/CreateLobbyForm.tsx`: delete the bots `Slider`, the
 second submit, the `intent` branch in `onSubmit`, the `bots` state and the `useStartSolo` import, so

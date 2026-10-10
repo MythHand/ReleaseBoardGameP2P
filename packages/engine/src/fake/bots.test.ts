@@ -123,6 +123,7 @@ it('does not hang when the policy cannot make progress', () => {
     // advance toward p1's turn or a finished game.
     reduce: (state) => ({ state, events: [] }),
     project: engine.project,
+    spectate: engine.spectate,
     legalTargets: engine.legalTargets,
   }
 

@@ -188,8 +188,10 @@ export function useHandLimit({
 
   const handItems = useMemo(
     () =>
-      picked.length === 0 ? state.you.hand : state.you.hand.filter((c) => !picked.includes(c.uid)),
-    [state.you.hand, picked],
+      picked.length === 0
+        ? (state.you?.hand ?? EMPTY_HAND)
+        : (state.you?.hand ?? EMPTY_HAND).filter((c) => !picked.includes(c.uid)),
+    [state.you?.hand, picked],
   )
   const handItemsRef = useRef(handItems)
   handItemsRef.current = handItems
@@ -449,7 +451,7 @@ export function useHandLimit({
       // AT THE LIMIT: refused, and the kit glides the card home — the existing
       // settle-back (`Hand.tsx`), not a new animation.
       if (pickedRef.current.length >= p.excess) return false
-      const item = state.you.hand.find((c) => c.uid === uid)
+      const item = (state.you?.hand ?? EMPTY_HAND).find((c) => c.uid === uid)
       if (!item) return false
       // the first pull fixes the grid: the excess is known before anything moves
       if (cellsRef.current === 0) {
@@ -464,7 +466,7 @@ export function useHandLimit({
       void flyToCell(uid, item.card, slot, drop.rect)
       return true
     },
-    [back, placementReturning, enabled, state.you.hand, flyToCell, freeSlot],
+    [back, placementReturning, enabled, state.you?.hand, flyToCell, freeSlot],
   )
 
   // Lit while cards are still owed, and only on the cards that answer — the
@@ -623,3 +625,5 @@ export function useHandLimit({
     release,
   }
 }
+
+const EMPTY_HAND: NonNullable<BoardState['you']>['hand'] = []

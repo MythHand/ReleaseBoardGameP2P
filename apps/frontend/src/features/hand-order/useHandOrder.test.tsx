@@ -26,8 +26,8 @@ const hand = (...ids: string[]): BoardState =>
     frozen: [],
   }) as unknown as BoardState
 
-const uids = (s: BoardState) => s.you.hand.map((c) => c.uid)
-const items = (s: BoardState) => s.you.hand
+const uids = (s: BoardState) => s.you?.hand.map((c) => c.uid)
+const items = (s: BoardState) => s.you?.hand ?? []
 
 it('is the identity while the player has not sorted anything', () => {
   const { result } = renderHook(() => useHandOrder('g1'))

@@ -34,5 +34,8 @@ export type {
   HandLimitHandoff,
   IntroBeat,
   Panel,
+  PlayerBoardState,
+  SpectatorBoardState,
   StagedHandoff,
 } from './types'
+export { isPlayerBoard } from './types'

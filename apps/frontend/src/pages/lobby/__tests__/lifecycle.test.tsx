@@ -27,6 +27,7 @@ vi.mock('~/network/transport/peer', () => ({
       relay: vi.fn(),
       connectedIds: () => [],
       authenticate: vi.fn(),
+      disconnectPeer: vi.fn(async () => {}),
     }
   }),
 }))
@@ -110,8 +111,30 @@ it.each([
   fireEvent.change(screen.getByLabelText('invite.nicknameLabel'), { target: { value: 'Bo' } })
   fireEvent.click(screen.getByText('invite.joinCta'))
   await waitFor(() => expect(transports).toHaveLength(2))
-  act(() => transports[1].onConnection?.(code.replace('-', '').toLowerCase()))
+  act(() => {
+    const hostId = code.replace('-', '').toLowerCase()
+    transports[1].onConnection?.(hostId)
+    transports[1].onMessage?.({
+      type: 'PEER_LIST',
+      from: hostId,
+      seq: 1,
+      payload: {
+        yourRole: 'player',
+        peers: [
+          { id: hostId, memberId: 'host', name: 'Host', role: 'host', ready: true, where: 'lobby' },
+          {
+            id: 'guest-2',
+            memberId: 'bo',
+            name: 'Bo',
+            role: 'player',
+            ready: false,
+            where: 'lobby',
+          },
+        ],
+      },
+    })
+  })
   expect(session.status).toBe('in-lobby')
   expect(session.roomCode).toBe(code)
-  expect(screen.getByText('invite.connected')).toBeTruthy()
+  expect(screen.getByText('Bo')).toBeTruthy()
 })

@@ -10,13 +10,13 @@
 import type { TablePending } from '@release/ui'
 import { fireEvent, render, renderHook, within } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
-import type { BoardState } from '~/entities/game/board'
+import type { PlayerBoardState } from '~/entities/game/board'
 import type { RequestPickHandoff } from '~/entities/game/board/types'
 import Board from '../_Board'
 import { useRequestStaging } from '../_useRequestStaging'
 import { makeBoardProps } from './fixture'
 
-const withPending = (pending: TablePending | null, over: Partial<BoardState> = {}) => {
+const withPending = (pending: TablePending | null, over: Partial<PlayerBoardState> = {}) => {
   const base = makeBoardProps()
   return {
     ...base,

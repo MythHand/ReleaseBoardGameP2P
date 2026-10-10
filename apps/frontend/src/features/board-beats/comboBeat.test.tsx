@@ -5,7 +5,13 @@ import { scatterAt } from '@release/ui/animations'
 import { act, render } from '@testing-library/react'
 import type { RefObject } from 'react'
 import { beforeEach, expect, it, vi } from 'vitest'
-import type { BeatRun, BoardAnchors, BoardState, StagedHandoff } from '~/entities/game/board'
+import type {
+  BeatRun,
+  BoardAnchors,
+  BoardState,
+  PlayerBoardState,
+  StagedHandoff,
+} from '~/entities/game/board'
 import { useComboBeat } from './comboBeat'
 import type { BeatPlan } from './planBeats'
 import { spot } from './testing'
@@ -124,7 +130,7 @@ const base = {
   setup: {},
   playable: [],
   frozen: [],
-} as unknown as BoardState
+} as unknown as PlayerBoardState
 
 const node = () => document.createElement('div')
 
@@ -343,7 +349,7 @@ it.each([
   expect(published.every((state) => state.pending?.kind !== 'defend')).toBe(true)
   if (local) {
     expect(played.names).toEqual(['release', 'centerToDiscard'])
-    expect(published.at(-1)?.you.hand.map((item) => item.uid)).toEqual(['ddos#1'])
+    expect(published.at(-1)?.you?.hand.map((item) => item.uid)).toEqual(['ddos#1'])
   } else {
     expect(played.names).toEqual(['playToCenter', 'centerToDiscard'])
     expect(played.wholePairs).toEqual([true])
@@ -476,7 +482,7 @@ it('publishes nothing when the attack was already standing before this batch', a
       deadline: 0,
       scope: 'hand',
     },
-  } as unknown as BoardState
+  } as unknown as PlayerBoardState
   await drive(() =>
     api.beat?.runAttack(
       {
@@ -536,7 +542,7 @@ it('publishes our own attack too when the answer arrives in the same batch', asy
     attacker: 'p1',
     attackCard: 'attack-bug',
   })
-  expect(last?.you.hand.map((h) => h.uid)).not.toContain('u1')
+  expect(last?.you?.hand.map((h) => h.uid)).not.toContain('u1')
 })
 
 // It DECLINES over a standing pending rather than replacing it (#101, Fix D,
@@ -556,7 +562,7 @@ it('never replaces a pending that is already standing', async () => {
       player: 'p2',
       options: [],
     },
-  } as unknown as BoardState
+  } as unknown as PlayerBoardState
   await drive(() =>
     api.beat?.runAttack(
       {
@@ -710,7 +716,7 @@ const soloReleaseCtx: BeatRun = {
         { uid: 'u2', card: card('release-frontend') },
       ],
     },
-  } as unknown as BoardState,
+  } as unknown as PlayerBoardState,
   publish: () => {},
 }
 
@@ -1200,5 +1206,5 @@ it('lands the actor’s own plain release in their zone as its carrier comes dow
       { ...soloReleaseCtx, publish: (s) => published.push(s) },
     ),
   )
-  expect(published.at(-1)?.you.release.frontend?.id).toBe('release-frontend')
+  expect(published.at(-1)?.you?.release.frontend?.id).toBe('release-frontend')
 })
