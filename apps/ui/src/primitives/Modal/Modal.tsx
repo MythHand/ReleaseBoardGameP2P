@@ -20,6 +20,17 @@ export default function Modal({ open, onClose, title, children, wide = false }: 
   const returnRef = useRef<HTMLElement | null>(null)
   const titleId = useId()
 
+  // While it fades out — `open` already false, still mounted for the exit — the
+  // modal takes no more requests to close. A second Escape, or a click on the
+  // backdrop or the ✕, would otherwise call onClose again, and a consumer that
+  // does something on close would do it twice. A ref, so the keyboard listener
+  // reads the current value without waiting to be re-subscribed.
+  const openRef = useRef(open)
+  openRef.current = open
+  const requestClose = () => {
+    if (openRef.current) onClose()
+  }
+
   useEffect(() => {
     if (open) {
       returnRef.current = document.activeElement as HTMLElement
@@ -62,7 +73,7 @@ export default function Modal({ open, onClose, title, children, wide = false }: 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault()
-        onClose()
+        if (openRef.current) onClose()
         return
       }
       if (e.key !== 'Tab') return
@@ -91,7 +102,7 @@ export default function Modal({ open, onClose, title, children, wide = false }: 
     // biome-ignore lint/a11y/noStaticElementInteractions: backdrop click-to-dismiss; accessible affordances are the close <button> + Escape handler; overlay is presentational
     <div
       className={`${styles.overlay} ${shown ? styles.shown : ''}`}
-      onClick={onClose}
+      onClick={requestClose}
       role="presentation"
     >
       <dialog
@@ -110,7 +121,7 @@ export default function Modal({ open, onClose, title, children, wide = false }: 
           </Typography>
         </div>
         <div className={styles.body}>{children}</div>
-        <button type="button" className={styles.close} onClick={onClose} aria-label="close">
+        <button type="button" className={styles.close} onClick={requestClose} aria-label="close">
           ✕
         </button>
       </dialog>
