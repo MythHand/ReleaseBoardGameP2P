@@ -512,8 +512,25 @@ What happens once the engine answers is a separate, event-driven beat — it als
 combo, or a local window attack that staged nothing at all.
 
 An attack resolved immediately (DDoS) has no defense prompt to stand on. Its `attackPlaced`
-plan owns the spent attack and optional Sudo: retain the local staging or the remote fold for
-`SHOW_HOLD`, then send both through `useDiscardExit` using their discard event scatters.
+plan owns the spent attack, its optional Sudo and what the throw struck (`hit`):
+
+1. The DDoS stands at the centre: the local staging is kept where it already stands, anyone
+   else's flies in from the thrower's seat (`foldIn`).
+2. What the throw struck — a Monitoring, a bare release, a release under Code Review, an AI card —
+   comes up from its zone slot to the centre's `cover` place, **over the DDoS**: the place a
+   defence takes over an attack (`toSlot` with `playToCenter`, `COVER_POSE`, one layer above the
+   exchange). A release under Code Review travels as one `CardPair`. The zone slot is let go in the
+   commit the carrier goes up, so the card is never drawn twice.
+3. Both hold for `SHOW_HOLD` (1500 ms).
+4. Both leave at once, each by its own road. The DDoS and its Sudo go to the discard through
+   `useDiscardExit`, using their discard event scatters. A Monitoring goes to the discard in the
+   same exchange, over the DDoS. A release goes to its owner's hand — our own fan through the hand
+   arrival, another seat by `dealToSeat` — and its Code Review splits off to the discard. An AI card
+   turns face down and goes back to the events deck (`toEventsDeck`); its Code Review goes to the
+   discard.
+5. The heap takes them in the engine's order. The engine banks the throw first, so the struck card
+   lies over the DDoS in the heap, as it did at the centre.
+
 The same takeoff removes only the spent local instances from the hand shadow. No later
 `pairToDiscard` is planned for those cards.
 
@@ -521,12 +538,14 @@ The same takeoff removes only the spent local instances from the hand shadow. No
   runner's aux-less degenerate case, no separate branch): `runAttack` reads the staging→beat handoff
   SYNCHRONOUSLY, before its first `await` — the actor's OWN play is already standing exactly where
   the pending render takes over, so nothing moves; it calls `handoff.release()` and hands the table
-  back. Anyone else's attack folds the pair in fresh via `foldIn` — a second, beat-side
-  implementation of the same steps as the gesture's own fold above (raise a carrier at the centre via
-  `useFlyer`, paint both halves at their source with `enterPose`, `await nextFrames()` — **I2** —
-  then `foldIntoPair` per half from the actor's seat or the hand slot a local thrower's card left) —
-  and settles at the centre pending, `[data-pending-play]`, upgraded from a lone card to a `CardPair`
-  under `pending.sudo`.
+  back. Anyone else's attack comes in via `foldIn`, from where its cards are: the place it was put
+  out at the centre, the thrower's seat, or the hand slot a local thrower's card left. Nothing folds
+  at the centre. A plain attack lands at its own tilt — `landInPose` with
+  `restTransform(ATTACK_POSE)`, 480 ms, the first frame painted with `enterPose` after
+  `await nextFrames()` (**I2**, **I11**). An attack with Sudo flies as one already composed
+  `CardPair` through `playToCenter` (480 ms) at `ATTACK_POSE`, as DefenseRelease's `throwAttack`
+  does. Either way it settles at the centre pending, `[data-pending-play]`, upgraded from a lone
+  card to a `CardPair` under `pending.sudo`, at the tilt it landed in.
 
   Letting go of whatever held the attack is safe only because that static render takes the card over
   on the same commit. When the throw and its answer arrive in ONE sync flush, `base` predates the
