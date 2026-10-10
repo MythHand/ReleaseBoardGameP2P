@@ -2,7 +2,7 @@ import enCommon from '@release/translation/locales/en/common.json'
 import ruCommon from '@release/translation/locales/ru/common.json'
 import { useState } from 'react'
 import Chat, { type ChatMessage, type ChatRole } from '@/blocks/Chat'
-import { CHAT_SELF, makeChat } from '@/mocks/chat'
+import { CHAT_SELF, makeChat, withMockAvatars } from '@/mocks/chat'
 import { pick, useLang } from '../../Playground/lang'
 import { TechSwitch } from '../controls/TechControls'
 import { KitCell, KitPage, KitSection } from '../kit/KitShell'
@@ -42,7 +42,7 @@ export default function ChatBlock() {
           })}
         >
           <div className={styles.column}>
-            <Chat messages={own} copy={copy} selfName={CHAT_SELF} onSend={send} />
+            <Chat messages={withMockAvatars(own)} copy={copy} selfName={CHAT_SELF} onSend={send} />
           </div>
         </KitCell>
 

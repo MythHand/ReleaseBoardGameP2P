@@ -51,6 +51,7 @@ export default function PlayerSlotBlock() {
             name="dimbo"
             me
             youLabel={t.you}
+            onEdit={() => {}}
             badge={
               <Badge tone="success" size="sm" outlined>
                 {t.host}

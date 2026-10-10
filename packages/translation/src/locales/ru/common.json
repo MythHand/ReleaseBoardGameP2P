@@ -96,6 +96,18 @@
       "attackedInto": {
         "title": "Забагованный",
         "unit": "атак прилетело"
+      },
+      "defense": {
+        "title": "Решала",
+        "unit": "карт обороны сыграно"
+      },
+      "monitoring": {
+        "title": "Параноик",
+        "unit": "раз поставил Monitoring"
+      },
+      "gitBranch": {
+        "title": "Дровосек",
+        "unit": "раз разделил колоду"
       }
     }
   },
@@ -257,6 +269,7 @@
       "memberReconnected": "{{name}} снова на связи",
       "memberKicked": "{{name}} исключён из комнаты",
       "roleChanged": "{{name}} теперь {{role}}",
+      "memberRenamed": "{{from}} сменил ник на {{to}}",
       "modeChanged": "хост изменил {{setting}}: {{value}}",
       "modeChangedUnknown": "хост изменил настройки игры"
     },
@@ -379,6 +392,13 @@
     "copyCode": "код",
     "copied": "скопировано"
   },
+  "playerSettings": {
+    "avatars": "Аватар",
+    "nicknameLabel": "Ваш никнейм",
+    "nicknamePlaceholder": "НАПР. Dimbo",
+    "randomNick": "случайный ник",
+    "nicknameTaken": "Этот никнейм уже занят"
+  },
   "physicalEdition": {
     "title": "Печатная версия",
     "lead": "У «Release любой ценой» есть печатное издание — можете поддержать проект и сыграть вживую.",
@@ -439,7 +459,6 @@
   "lobbyScreen": {
     "title": "Лобби",
     "subtitle": "Ожидание игроков…",
-    "botName": "Бот {{n}}",
     "language": "язык",
     "disband": "расформировать",
     "rules": "правила",
@@ -476,6 +495,7 @@
     "disbandText": "Лобби будет закрыто, все подключённые игроки — отключены. Действие нельзя отменить.",
     "leaveTitle": "Покинуть лобби?",
     "leaveText": "Вы выйдете из лобби, и ваше место освободится.",
+    "playerSettingsTitle": "Настройки игрока",
     "bugRunner": "Мини-игра: нажмите, чтобы баг прыгнул",
     "cancel": "отмена",
     "errors": {

@@ -1,5 +1,5 @@
 import type { VoiceParticipant } from '@/blocks/VoiceChat'
-import { CHAT_SELF } from './chat'
+import { CHAT_SELF, mockAvatar } from './chat'
 
 // Mock voice chat in the lobby, with the lobby chat mock's names and roles. The
 // local player is the chat's own, `deadlock`, and is in the voice chat only once
@@ -15,13 +15,16 @@ export const VOICE_SELF: VoiceParticipant = {
   id: CHAT_SELF,
   name: CHAT_SELF,
   role: 'player',
+  avatar: mockAvatar(CHAT_SELF, 'player'),
   volume: 100,
 }
 
+// a player comes with the avatar the chat mock gives them; a spectator, none
 const person = (name: string, role: VoiceParticipant['role']): VoiceParticipant => ({
   id: name,
   name,
   role,
+  avatar: mockAvatar(name, role),
   volume: 100,
 })
 
@@ -30,10 +33,9 @@ const FOUR: VoiceParticipant[] = [
   person('null_ptr', 'spectator'),
   { ...person('segfault', 'player'), micOff: true },
   person('TabsOverSpaces', 'host'),
-  {
-    ...person('kernel_panic_at_the_disco', 'player'),
-    name: 'kernel_panic_at_the_disco_since_1991',
-  },
+  // the table's and the lobby's kernel_panic, under the long name the list must
+  // wrap — the id stays the short one, so "who speaks" finds them everywhere
+  { ...person('kernel_panic', 'player'), name: 'kernel_panic_at_the_disco_since_1991' },
 ]
 
 // what the sixteen add to the four: two more players and ten more spectators

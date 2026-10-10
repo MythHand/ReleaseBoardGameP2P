@@ -59,6 +59,10 @@
   --role-player: var(--periwinkle);
   --role-spectator: var(--white-80);
 
+  /* someone speaking in the voice chat — the ring around their avatar. Mint, as
+     the headphones are once you are on the line: the voice's own colour. */
+  --voice-speaking: var(--mint);
+
   /* the table's alarm — an Error 503 nobody has answered yet */
   --alarm-glow: #f34;
 

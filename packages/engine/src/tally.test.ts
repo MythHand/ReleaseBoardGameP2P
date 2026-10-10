@@ -97,6 +97,26 @@ it('counts a cherry-pick once per play, not once per card pulled', () => {
   expect(out.p1.cherryPick).toBe(1)
 })
 
+it('counts every Monitoring set up, from the hand or off the events deck', () => {
+  // An AI Monitoring is placed under the plain catalogue id (fake/triggers.ts),
+  // so both arrive as the same event. A Debugger is a placement too, and is not
+  // a Monitoring.
+  const out = foldTally(base(), [
+    ev({ type: 'placed', player: 'p1', card: 'protection-monitoring' }),
+    ev({ type: 'placed', player: 'p1', card: 'protection-monitoring' }),
+    ev({ type: 'placed', player: 'p1', card: 'protection-debugger' }),
+  ])
+  expect(out.p1.monitoring).toBe(2)
+})
+
+it('counts Git Branch plays and no other operation', () => {
+  const out = foldTally(base(), [
+    ev({ type: 'operationPlayed', player: 'p2', card: 'operation-git-branch', sudo: false }),
+    ev({ type: 'operationPlayed', player: 'p2', card: 'operation-git-merge', sudo: false }),
+  ])
+  expect(out.p2.gitBranch).toBe(1)
+})
+
 it('counts an attack against the seat it was aimed at, landed or not', () => {
   // A Bug thrown at me is one attack against me whether I defended it or not —
   // whether it got through is what the defence column already says (design

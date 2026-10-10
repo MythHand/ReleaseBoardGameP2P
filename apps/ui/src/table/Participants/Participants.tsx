@@ -1,3 +1,4 @@
+import PresetAvatar from '@/avatars/PresetAvatar'
 import Avatar from '@/primitives/Avatar'
 import Badge, { type BadgeTone } from '@/primitives/Badge'
 import Dropdown from '@/primitives/Dropdown'
@@ -7,13 +8,18 @@ import styles from './Participants.module.css'
 export interface Participant {
   id: string
   name: string
+  // preset avatar id — a player's; without it, the name's initial
+  avatar?: string
   eliminated?: boolean
   connected?: boolean
+  // speaking in the voice chat — the ring around the avatar
+  speaking?: boolean
 }
 
 export interface Spectator {
   id: string
   name: string
+  speaking?: boolean
 }
 
 // Текст состава — приходит пропсом (компонент i18n-agnostic). Дефолт — русский.
@@ -62,7 +68,11 @@ export default function Participants({
               const text = lost ? copy.connectionLost : p.eliminated ? copy.eliminated : copy.inGame
               return (
                 <li key={p.id} className={styles.row}>
-                  <Avatar name={p.name} size={28} />
+                  {p.avatar ? (
+                    <PresetAvatar id={p.avatar} size={28} speaking={p.speaking} />
+                  ) : (
+                    <Avatar name={p.name} size={28} speaking={p.speaking} />
+                  )}
                   <span className={styles.name}>{p.name}</span>
                   <Badge tone={tone} className={styles.pushEnd}>
                     {text}
@@ -80,7 +90,7 @@ export default function Participants({
           <ul className={styles.list}>
             {spectators.map((s) => (
               <li key={s.id} className={styles.row}>
-                <Avatar name={s.name} size={28} />
+                <Avatar name={s.name} size={28} speaking={s.speaking} />
                 <span className={styles.name}>{s.name}</span>
                 <Badge tone="muted" className={styles.pushEnd}>
                   {copy.spectator}

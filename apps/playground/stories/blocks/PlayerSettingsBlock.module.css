@@ -1,0 +1,12 @@
+/* each variant at the width of the modal body it lives in: the wide modal
+   (1040 − 2 × 26 padding) for a player, the standard one (640 − 2 × 26) for a
+   spectator */
+.panel {
+  inline-size: 100%;
+  max-inline-size: 988px;
+}
+
+.panelNarrow {
+  inline-size: 100%;
+  max-inline-size: 588px;
+}

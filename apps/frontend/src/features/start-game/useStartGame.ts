@@ -1,9 +1,9 @@
+import { botNames } from '@release/ui'
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router'
 import { runViewTransition } from '~/app/lib/viewTransition'
 import { useSession } from '~/app/providers/SessionProvider'
 import { effectiveBots } from '~/network'
-import { botNames } from './botNames'
 
 // Host-start trigger. It broadcasts rather than navigating: the host used to
 // walk to the board alone, leaving every guest behind in the lobby.

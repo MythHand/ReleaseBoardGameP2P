@@ -6,6 +6,7 @@ import type { HeapCard } from '@/primitives/Pile/Pile'
 import type { HistoryEntry } from '@/table/MoveHistory/MoveHistory'
 import type { Participant, Spectator } from '@/table/Participants/Participants'
 import type { SpectatorTableState } from '@/table/Table/types'
+import { CHAT_SELF, mockAvatar } from './chat'
 import type { HandCard } from './hand'
 import { makeHand } from './hand'
 
@@ -131,11 +132,19 @@ export function makeTable(opponentCount = 3): TableState {
 
     // Полный состав: игроки (в игре / выбыл / нет связи) + зрители.
     // i===0: в игре, но потеряна связь (красный); i===1: выбыл и без связи (серый)
+    // Every player carries the avatar the chat mock gives them.
     participants: [
-      { id: 'you', name: 'deadlock', eliminated: false, connected: true },
+      {
+        id: 'you',
+        name: 'deadlock',
+        avatar: mockAvatar(CHAT_SELF, 'player'),
+        eliminated: false,
+        connected: true,
+      },
       ...opponents.map((o, i) => ({
         id: o.id,
         name: o.name,
+        avatar: mockAvatar(o.name, 'player'),
         eliminated: i === 1,
         connected: i > 1,
       })),

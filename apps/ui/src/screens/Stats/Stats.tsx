@@ -1,4 +1,5 @@
 import { type ReactNode, useLayoutEffect, useRef, useState } from 'react'
+import PresetAvatar from '@/avatars/PresetAvatar'
 import LangSwitcher, { type SwitchLang } from '@/blocks/LangSwitcher'
 import { cardById } from '@/cards'
 import Avatar from '@/primitives/Avatar'
@@ -20,11 +21,23 @@ const LOC_TONE: Record<Location, BadgeTone> = {
   lobby: 'info',
   offline: 'muted',
 }
-type MetricKey = 'ddos' | 'ai' | 'err503' | 'cherryPick' | 'attackedInto'
+type MetricKey =
+  | 'ddos'
+  | 'ai'
+  | 'err503'
+  | 'cherryPick'
+  | 'attackedInto'
+  | 'defense'
+  | 'monitoring'
+  | 'gitBranch'
 
 export interface StatPlayer {
   id: string
   name: string
+  // preset avatar id; without it, the name's initial (a bot has none)
+  avatar?: string
+  // speaking in the voice chat — the ring around the avatar
+  speaking?: boolean
   location: Location
   attack: number
   defense: number
@@ -33,6 +46,10 @@ export interface StatPlayer {
   ai: number
   err503: number
   cherryPick: number
+  // Monitorings set up (AI Monitoring included)
+  monitoring: number
+  // Git Branch played
+  gitBranch: number
 }
 
 // Весь текст экрана — пропсом (i18n-agnostic). Ачивки/локации — по ключам.
@@ -83,7 +100,7 @@ interface StatsProps {
 
 // Accent of a plate — the whole HUD scheme of the achievement hangs on it:
 // border, bloom, rail, glow of the name, the counter chip.
-type AchTone = 'attack' | 'ai' | 'danger' | 'operation'
+type AchTone = 'attack' | 'ai' | 'danger' | 'operation' | 'defense' | 'protection'
 
 interface Achievement {
   key: MetricKey
@@ -93,15 +110,17 @@ interface Achievement {
 }
 
 // Структура ачивок: какой показатель, каким акцентом горит плашка и какие
-// карты-превью. Тексты — из copy. Порядок — порядок показа: первым идёт широкий
-// «Забагованный» (со всеми картами атаки + Error 503), он занимает строку
-// целиком, дальше обычные парами.
+// карты-превью. Тексты — из copy. Порядок — порядок показа: первыми идут две
+// широкие — «Забагованный» (все карты атаки + Error 503) и «Решала» (все карты
+// обороны), дальше обычные. Сетка кладёт их плотно (Stats.module.css), так что
+// в три колонки обычная плашка встаёт рядом с широкой, а не оставляет дыру.
 // Порядок — единственное, что раскладка знает наверняка: сколько плашек дойдёт
 // до экрана, решает `leader` (ничья не достаётся никому), так что ряд обычных
 // может оборваться на середине — и это нормальный вид, а не сломанный.
-// Акцент = категория карты, о которой ачивка (attack / operation / ai). Оба
-// триггера цвета категории не имеют (`--cat-trigger` технически белый), поэтому
-// Error 503 берёт `--danger-accent` — токен, который именно за 503 и закреплён.
+// Акцент = категория карты, о которой ачивка (attack / defense / protection /
+// operation / ai). Оба триггера цвета категории не имеют (`--cat-trigger`
+// технически белый), поэтому Error 503 берёт `--danger-accent` — токен, который
+// именно за 503 и закреплён.
 const ACHIEVEMENTS: Achievement[] = [
   {
     key: 'attackedInto',
@@ -117,10 +136,27 @@ const ACHIEVEMENTS: Achievement[] = [
       'attack-bug',
     ],
   },
+  {
+    key: 'defense',
+    tone: 'defense',
+    wide: true,
+    // all six defence cards — the Unicorns at the bottom, Hotfix on top
+    cards: [
+      'defense-works-on-my-machine',
+      'defense-not-a-bug',
+      'defense-rollback',
+      'defense-pr-approved',
+      'defense-rubber-ducky',
+      'defense-hotfix',
+    ],
+  },
   { key: 'ai', tone: 'ai', cards: ['trigger-ai'] },
   { key: 'cherryPick', tone: 'operation', cards: ['operation-git-cherry-pick'] },
   { key: 'err503', tone: 'danger', cards: ['trigger-error-503'] },
   { key: 'ddos', tone: 'attack', cards: ['attack-ddos'] },
+  // AI Monitoring counts too; the preview shows the Monitoring it plays as
+  { key: 'monitoring', tone: 'protection', cards: ['protection-monitoring'] },
+  { key: 'gitBranch', tone: 'operation', cards: ['operation-git-branch'] },
 ]
 
 // Шаги кегля имени, от героя вниз. Что за строка придёт — экран не знает:
@@ -190,6 +226,8 @@ const TONE_CLASS: Record<AchTone, string> = {
   ai: styles.toneAi,
   danger: styles.toneDanger,
   operation: styles.toneOperation,
+  defense: styles.toneDefense,
+  protection: styles.toneProtection,
 }
 
 export default function Stats({
@@ -216,8 +254,8 @@ export default function Stats({
   // Достаётся ли ачивка кому-то вообще. Двух причин, по которым нет, две:
   // показателя не случилось ни у кого (максимум — ноль), и показатель разделён
   // поровну. Ничья не разрешается ни в чью пользу: плашка называет ОДНОГО, и
-  // назвать первого попавшегося из равных — значит соврать. Поэтому ачивок не
-  // всегда пять, и раскладка обязана переживать неполный ряд.
+  // назвать первого попавшегося из равных — значит соврать. Поэтому на экран
+  // доходят не все ачивки, и раскладка обязана переживать неполный ряд.
   const leader = (key: MetricKey): StatPlayer | undefined => {
     if (players.length === 0) return undefined
     const best = players.reduce((top, p) => (p[key] > top[key] ? p : top))
@@ -259,7 +297,11 @@ export default function Stats({
           {players.map((p) => (
             <li key={p.id} className={`${styles.row} ${p.id === winnerId ? styles.rowWin : ''}`}>
               <span className={styles.colName}>
-                <Avatar name={p.name} size={30} />
+                {p.avatar ? (
+                  <PresetAvatar id={p.avatar} size={30} speaking={p.speaking} />
+                ) : (
+                  <Avatar name={p.name} size={30} speaking={p.speaking} />
+                )}
                 <span className={styles.name}>{p.name}</span>
                 {selfMark(p.id)}
                 {p.id === winnerId && (
