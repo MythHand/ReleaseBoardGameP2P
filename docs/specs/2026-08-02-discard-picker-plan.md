@@ -9,7 +9,7 @@
 **Tech Stack:** TypeScript, React 19, CSS Modules, Vitest + @testing-library/react, pnpm workspaces, Vite source aliases.
 
 **Spec:** [`2026-08-02-discard-picker-design.md`](./2026-08-02-discard-picker-design.md)
-**Rules answers:** [`2026-08-02-git-operations-rules-decisions.md`](./2026-08-02-git-operations-rules-decisions.md)
+**Rules answers:** [`2026-08-01-git-operations-open-questions.md`](../rules/decisions/2026-08-01-git-operations-open-questions.md)
 
 ## Global Constraints
 

@@ -2,7 +2,7 @@
 
 Slice A of [#61](https://github.com/MythHand/ReleaseBoardGameP2P/issues/61): the turn's draw stops being one card and becomes an obligation over every pile, and the `gitBranch` mode axis starts being read.
 
-Rules answers this implements: [`2026-08-02-git-operations-rules-decisions.md`](./2026-08-02-git-operations-rules-decisions.md), answers 1, 2, 6 and 7.
+Rules answers this implements: [`2026-08-01-git-operations-open-questions.md`](../rules/decisions/2026-08-01-git-operations-open-questions.md), answers 1, 2, 6 and 7.
 
 ## What the answers ask for
 

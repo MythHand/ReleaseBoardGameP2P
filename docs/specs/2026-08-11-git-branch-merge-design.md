@@ -2,7 +2,7 @@
 
 Slice B of [#61](https://github.com/MythHand/ReleaseBoardGameP2P/issues/61): the two cards that change how many draw piles are on the table. Slice A made the draw run over every pile; this is what creates the piles it runs over.
 
-Rules answers this implements: [`2026-08-02-git-operations-rules-decisions.md`](./2026-08-02-git-operations-rules-decisions.md), answers 3, 4, 5, 7 and 12. Card text: [rules :136–142](../rules-board-game.md).
+Rules answers this implements: [`2026-08-01-git-operations-open-questions.md`](../rules/decisions/2026-08-01-git-operations-open-questions.md), answers 3, 4, 5, 7 and 12. Card text: [rules, «Карты Git-операций»](../rules/rules-board-game.md#карты-git-операций).
 
 ## The two cards
 

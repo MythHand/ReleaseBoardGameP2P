@@ -4,7 +4,7 @@ Slice C of [#61](https://github.com/MythHand/ReleaseBoardGameP2P/issues/61): the
 
 **Goal:** Git Cherry-pick is playable from hand, plain and sudo, and the AI event Inside resolves — each taking a card out of the discard through one shared prompt.
 
-Rules answers this implements: [`2026-08-02-git-operations-rules-decisions.md`](./2026-08-02-git-operations-rules-decisions.md), questions 8–12. The rules file itself is stale (see that document's warning); these two cards rest on the owner's answers, not on it.
+Rules answers this implements: [`2026-08-01-git-operations-open-questions.md`](../rules/decisions/2026-08-01-git-operations-open-questions.md), questions 8–12. These two cards rest on the owner's answers, which go further than the rules text; where the online game departs from the table, that record says how.
 
 ## Why this slice first
 

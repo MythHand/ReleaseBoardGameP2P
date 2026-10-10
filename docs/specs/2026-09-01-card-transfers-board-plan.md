@@ -1598,7 +1598,8 @@ import styles from './_useRequestStaging.module.css'
 // belongs here, and the two meet through the projection.
 
 // The guess space: every card that can actually BE in a hand. Triggers cannot
-// (`docs/rules/cards.md:320`, `:339` — they resolve as they are drawn), and no
+// (`docs/rules/cards.md`, section «trigger — срабатывают при доборе» and its
+// Error 503 section — they resolve as they are drawn), and no
 // event-deck card can either (`docs/rules/general.md:189` — each of them is at
 // any time «либо в колоде, либо на столе»). Same filter the kit's own panel now
 // uses; declared again here rather than imported, because the kit does not put
