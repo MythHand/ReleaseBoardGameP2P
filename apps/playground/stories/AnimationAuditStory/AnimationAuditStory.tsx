@@ -784,10 +784,13 @@ const DIVERGENCES: Divergence[] = [
       en: 'FLIP_MS = 420 (animations/presets.ts)',
     },
     playground: {
-      ru: 'своя копия FLIP_MS = 420: DrawCardStory, AiCardsStory',
-      en: 'own copy FLIP_MS = 420: DrawCardStory, AiCardsStory',
+      ru: 'своя копия FLIP_MS = 420: DrawCardStory, AiCardsStory; свой FLIP_DUR = 420: GitCards/CherryPick, GitCards/Rebase',
+      en: 'own copy FLIP_MS = 420: DrawCardStory, AiCardsStory; own FLIP_DUR = 420: GitCards/CherryPick, GitCards/Rebase',
     },
-    table: { ru: 'берёт из модулей', en: 'takes it from the modules' },
+    table: {
+      ru: 'берёт из модулей; свой FLIP_DUR = 420: _useCherryPickStaging, _useRebaseStaging',
+      en: 'takes it from the modules; own FLIP_DUR = 420: _useCherryPickStaging, _useRebaseStaging',
+    },
     note: { ru: '—', en: '—' },
     status: 'rework',
   },
@@ -823,12 +826,12 @@ const DIVERGENCES: Divergence[] = [
       en: 'none — only the parts: the travels (play) and pinning in place (useFlyer.pin)',
     },
     playground: {
-      ru: 'собрано вручную: AiCardsStory — 3 места, DrawCardStory — 2, Error503Story — 1; DefenseReleaseStory: цена — свой полёт без закрепления',
-      en: 'assembled by hand: AiCardsStory — 3 places, DrawCardStory — 2, Error503Story — 1; DefenseReleaseStory: the cost — its own flight with no pinning',
+      ru: 'собрано вручную: AiCardsStory — 4 места, DrawCardStory — 2, Error503Story — 1; DefenseReleaseStory: цена — свой полёт без закрепления; CSS-переходом вручную: OpponentTakesCardStory, PickSpecificCardStory, PickOpponentCardStory, GitCards/SystemUpgrade, GitCards/CherryPick',
+      en: 'assembled by hand: AiCardsStory — 4 places, DrawCardStory — 2, Error503Story — 1; DefenseReleaseStory: the cost — its own flight with no pinning; by a hand-written CSS transition: OpponentTakesCardStory, PickSpecificCardStory, PickOpponentCardStory, GitCards/SystemUpgrade, GitCards/CherryPick',
     },
     table: {
-      ru: 'модуль toSlot (board-beats/toCentre.ts): drawBeat, aiBeat, DDoS в comboBeat, оплата релиза (_useBoardStaging.ts); вручную: handLimitBeat, upgradeBeat',
-      en: 'the toSlot module (board-beats/toCentre.ts): drawBeat, aiBeat, the DDoS in comboBeat, the release cost (_useBoardStaging.ts); by hand: handLimitBeat, upgradeBeat',
+      ru: 'модуль toSlot (board-beats/toCentre.ts): drawBeat, aiBeat (и Inside), DDoS в comboBeat, оплата релиза (_useBoardStaging.ts); вручную: handLimitBeat, upgradeBeat, transferBeat ×3, _useCherryPickStaging ×2',
+      en: 'the toSlot module (board-beats/toCentre.ts): drawBeat, aiBeat (Inside too), the DDoS in comboBeat, the release cost (_useBoardStaging.ts); by hand: handLimitBeat, upgradeBeat, transferBeat ×3, _useCherryPickStaging ×2',
     },
     note: {
       ru: 'своя цена: в DefenseReleaseStory — без закрепления, на столе — toSlot с закреплением',
@@ -883,16 +886,16 @@ const DIVERGENCES: Divergence[] = [
     },
     kit: { ru: 'нет', en: 'none' },
     playground: {
-      ru: 'GameDealStory: ×0.7 от ширины карты колоды; DrawCardStory: ×0.7 от ширины карты, стоящей в центре; OpponentTakesCardStory: своя копия SEAT_SHRINK = 0.7 от ширины летящей карты',
-      en: "GameDealStory: ×0.7 of the deck card's width; DrawCardStory: ×0.7 of the width of the card standing at the centre; OpponentTakesCardStory: own copy SEAT_SHRINK = 0.7 of the flying card's width",
+      ru: 'GameDealStory: ×0.7 от ширины карты колоды; DrawCardStory: ×0.7 от ширины карты, стоящей в центре; OpponentTakesCardStory: своя копия SEAT_SHRINK = 0.7 от ширины прямоугольника слота веера, уход в место — CSS-переходом вручную, не dealToSeat',
+      en: "GameDealStory: ×0.7 of the deck card's width; DrawCardStory: ×0.7 of the width of the card standing at the centre; OpponentTakesCardStory: own copy SEAT_SHRINK = 0.7 of the fan slot rect's width, the move into the seat — a hand-written CSS transition, not dealToSeat",
     },
     table: {
       ru: 'board-beats/seat.ts: seatCardBox (×0.7 от ширины карты веера) — drawBeat, transferBeat ×4, shownBeat; SEAT_SHRINK как масштаб полёта — aiBeat, upgradeBeat, _useCherryPickStaging.tsx; game-intro/useDealIntro.ts — ×0.7 от ширины карты колоды, числом в коде',
       en: "board-beats/seat.ts: seatCardBox (×0.7 of the fan card's width) — drawBeat, transferBeat ×4, shownBeat; SEAT_SHRINK as the travel's scale — aiBeat, upgradeBeat, _useCherryPickStaging.tsx; game-intro/useDealIntro.ts — ×0.7 of the deck card's width, as a number in the code",
     },
     note: {
-      ru: 'два написания на столе записаны в docs/animations/beat-copies.md («Left»)',
-      en: 'the two spellings on the table are on record in docs/animations/beat-copies.md ("Left")',
+      ru: 'два написания на столе записаны в docs/animations/beat-copies.md («Left»); SEAT_SHRINK как масштаб полёта не действует — полёт масштаб не принимает (D44). Поправка 13.10: в OpponentTakesCardStory база — прямоугольник слота, а не летящая карта',
+      en: 'the two spellings on the table are on record in docs/animations/beat-copies.md ("Left"); SEAT_SHRINK as the travel\'s scale has no effect — the travel takes no scale (D44). Corrected 13.10: in OpponentTakesCardStory the base is the slot rect, not the flying card',
     },
     status: 'rework',
   },
@@ -928,12 +931,12 @@ const DIVERGENCES: Divergence[] = [
       en: 'useHandArrival takes both a place (from) and the card itself (el)',
     },
     playground: {
-      ru: 'саму карту отдают: GitCards/CherryPick, GitCards/SystemUpgrade; снимают и пускают заново из места: DrawCardStory, AiCardsStory ×2 (Inside и добор в руку)',
-      en: 'hand over the card itself: GitCards/CherryPick, GitCards/SystemUpgrade; take it down and fly it again from its place: DrawCardStory, AiCardsStory ×2 (Inside and the draw to the hand)',
+      ru: 'саму карту отдают: GitCards/CherryPick, GitCards/SystemUpgrade; снимают и пускают заново из места: DrawCardStory, AiCardsStory ×3 (Inside из центра, выбранный релиз Inside из ряда, добор в руку)',
+      en: 'hand over the card itself: GitCards/CherryPick, GitCards/SystemUpgrade; take it down and fly it again from its place: DrawCardStory, AiCardsStory ×3 (Inside from the centre, the chosen Inside release from the row, the draw to the hand)',
     },
     table: {
-      ru: 'саму карту отдают: drawBeat, transferBeat, aiBeat (Inside), _useCherryPickStaging.tsx',
-      en: 'hand over the card itself: drawBeat, transferBeat, aiBeat (Inside), _useCherryPickStaging.tsx',
+      ru: 'саму карту отдают: drawBeat, transferBeat, aiBeat (Inside), _useCherryPickStaging.tsx; upgradeBeat отдаёт и карту, и место',
+      en: 'hand over the card itself: drawBeat, transferBeat, aiBeat (Inside), _useCherryPickStaging.tsx; upgradeBeat hands over both the card and the place',
     },
     note: {
       ru: 'комментарий в drawBeat.tsx: при старом порядке карта, ждавшая очереди за другой посадкой, пропадала (#168)',
@@ -1028,7 +1031,10 @@ const DIVERGENCES: Divergence[] = [
       ru: 'board-beats/transferBeat.tsx: CENTER_HOLD 820',
       en: 'board-beats/transferBeat.tsx: CENTER_HOLD 820',
     },
-    note: { ru: '—', en: '—' },
+    note: {
+      ru: 'то же число 820 под другими именами: transferBeat — REVEAL_HOLD, REQUEST_HOLD; PickSpecificCardStory, PickOpponentCardStory — REVEAL_HOLD',
+      en: 'the same 820 under other names: transferBeat — REVEAL_HOLD, REQUEST_HOLD; PickSpecificCardStory, PickOpponentCardStory — REVEAL_HOLD',
+    },
     status: 'rework',
   },
   {
@@ -1085,12 +1091,12 @@ const DIVERGENCES: Divergence[] = [
       en: 'slotPlacement (table/Hand/fan.ts), cardBoxIn',
     },
     playground: {
-      ru: 'копии slotBox: ComboStory, DefenseReleaseStory (slotBoxAt), DeckAnimationsStory',
-      en: 'slotBox copies: ComboStory, DefenseReleaseStory (slotBoxAt), DeckAnimationsStory',
+      ru: 'копии slotBox: ComboStory, DefenseReleaseStory (slotBoxAt), DeckAnimationsStory; прямоугольник слота без обрезки: OpponentTakesCardStory, PickSpecificCardStory',
+      en: 'slotBox copies: ComboStory, DefenseReleaseStory (slotBoxAt), DeckAnimationsStory; the slot rect untrimmed: OpponentTakesCardStory, PickSpecificCardStory',
     },
     table: {
-      ru: 'копия slotBox в _useBoardStaging (запасная); живой слот через cardBoxIn там же; _useDefenseStaging.tsx:569 — прямоугольник слота без обрезки',
-      en: 'a slotBox copy in _useBoardStaging (the fallback); the live slot through cardBoxIn there too; _useDefenseStaging.tsx:569 — the slot rect untrimmed',
+      ru: 'копия slotBox в _useBoardStaging (запасная); живой слот через cardBoxIn там же; прямоугольник слота без обрезки: _useDefenseStaging.tsx:569, comboBeat, transferBeat, defenseBeat ×2, discardBeat, handLimitBeat',
+      en: 'a slotBox copy in _useBoardStaging (the fallback); the live slot through cardBoxIn there too; the slot rect untrimmed: _useDefenseStaging.tsx:569, comboBeat, transferBeat, defenseBeat ×2, discardBeat, handLimitBeat',
     },
     note: {
       ru: 'комментарий _useBoardStaging: «The slot is rotated, so its bounding rect is the box AROUND the tilted card»',
@@ -1199,12 +1205,12 @@ const DIVERGENCES: Divergence[] = [
       en: 'scatterAt, jitter (animations/scatter.ts)',
     },
     playground: {
-      ru: 'разброс не передаётся — случайный (jitter): DeckAnimationsStory, DefenseReleaseStory, Error503Story, ComboStory',
-      en: 'no scatter passed — random (jitter): DeckAnimationsStory, DefenseReleaseStory, Error503Story, ComboStory',
+      ru: 'разброс не передаётся — случайный (jitter): DeckAnimationsStory, DefenseReleaseStory, Error503Story, ComboStory, AiCardsStory; по порядку, scatterAt(i, 116): GitCards/SystemUpgrade, GitCards/CherryPick',
+      en: 'no scatter passed — random (jitter): DeckAnimationsStory, DefenseReleaseStory, Error503Story, ComboStory, AiCardsStory; by order, scatterAt(i, 116): GitCards/SystemUpgrade, GitCards/CherryPick',
     },
     table: {
-      ru: 'по номеру события (scatterAt): exchange.ts, discardBeat, drawBeat, operationBeat, comboBeat',
-      en: 'by the event id (scatterAt): exchange.ts, discardBeat, drawBeat, operationBeat, comboBeat',
+      ru: 'по номеру события (scatterAt): exchange.ts, discardBeat, drawBeat, operationBeat, comboBeat, upgradeBeat, aiBeat, aiCauseExit, handLimitBeat; _useCherryPickStaging — поза из кучи, запасной scatterAt(i, 116)',
+      en: 'by the event id (scatterAt): exchange.ts, discardBeat, drawBeat, operationBeat, comboBeat, upgradeBeat, aiBeat, aiCauseExit, handLimitBeat; _useCherryPickStaging — the pose from the heap, a scatterAt(i, 116) fallback',
     },
     note: {
       ru: 'сцены — случайно, стол — по номеру события',
@@ -1259,12 +1265,12 @@ const DIVERGENCES: Divergence[] = [
     },
     kit: { ru: '—', en: '—' },
     playground: {
-      ru: 'ComboStory: пара стоит или идёт розыгрыш',
-      en: 'ComboStory: a pair stands or a play is running',
+      ru: 'ComboStory: пара стоит или идёт розыгрыш; своё условие — OpponentTakesCardStory, PickSpecificCardStory, GitCards/SystemUpgrade, GitCards/CherryPick, AiCardsStory, GameEndStory, DefenseReleaseStory',
+      en: 'ComboStory: a pair stands or a play is running; a condition of their own — OpponentTakesCardStory, PickSpecificCardStory, GitCards/SystemUpgrade, GitCards/CherryPick, AiCardsStory, GameEndStory, DefenseReleaseStory',
     },
     table: {
-      ru: 'пара стоит, или выбор цели, или ход отправлен, плюс стол занят (_Board.tsx:874-877)',
-      en: 'a pair stands, or a target is being chosen, or the play is sent, plus the table is busy (_Board.tsx:874-877)',
+      ru: 'пара стоит, или выбор цели, или ход отправлен, плюс стол занят (_Board.tsx:874-877, handInert); _useUpgradeStaging (answering)',
+      en: 'a pair stands, or a target is being chosen, or the play is sent, plus the table is busy (_Board.tsx:874-877, handInert); _useUpgradeStaging (answering)',
     },
     note: {
       ru: "комментарий _Board.tsx: «The scene's own rule»",
@@ -1283,12 +1289,12 @@ const DIVERGENCES: Divergence[] = [
       en: 'the layer by place in the send (useDiscardExit, exitLayer)',
     },
     playground: {
-      ru: 'слои вручную: DefenseReleaseStory, Error503Story',
-      en: 'layers by hand: DefenseReleaseStory, Error503Story',
+      ru: 'слои вручную: DefenseReleaseStory, Error503Story; GitCards/SystemUpgrade — layer: i, на вид не влияет: карты летят своими элементами со слоем 100',
+      en: 'layers by hand: DefenseReleaseStory, Error503Story; GitCards/SystemUpgrade — layer: i, no visible effect: the cards fly as their own elements on layer 100',
     },
     table: {
-      ru: 'exchange.ts (слой по позиции): defenseBeat, DDoS в comboBeat; вручную мимо него — runPairOut в comboBeat',
-      en: 'exchange.ts (the layer by position): defenseBeat, the DDoS in comboBeat; by hand past it — runPairOut in comboBeat',
+      ru: 'exchange.ts (слой по позиции): defenseBeat, DDoS в comboBeat; вручную мимо него — runPairOut в comboBeat, upgradeBeat (слой выше на 2), handLimitBeat (0 и +1)',
+      en: 'exchange.ts (the layer by position): defenseBeat, the DDoS in comboBeat; by hand past it — runPairOut in comboBeat, upgradeBeat (two layers up), handLimitBeat (0 and +1)',
     },
     note: { ru: '—', en: '—' },
     status: 'rework',
@@ -1431,8 +1437,8 @@ const DIVERGENCES: Divergence[] = [
       en: 'Error503Story: under Monitoring — 1200; with no defence — 2500 with the glow',
     },
     table: {
-      ru: 'TABLE_HOLD 2600 (drawBeat), без подсветки',
-      en: 'TABLE_HOLD 2600 (drawBeat), with no glow',
+      ru: 'TABLE_HOLD 2600 (drawBeat), без подсветки; тот же TABLE_HOLD держит открытый триггер перед сбросом (drawBeat)',
+      en: 'TABLE_HOLD 2600 (drawBeat), with no glow; the same TABLE_HOLD holds an open trigger before the discard (drawBeat)',
     },
     note: {
       ru: 'на столе — то же значение, что у AI-карты (D4)',
@@ -1453,8 +1459,8 @@ const DIVERGENCES: Divergence[] = [
       en: 'at takeoff after the hold (defenseBeat); lit through the whole sweep, out when the clip comes (useBeats)',
     },
     note: {
-      ru: 'Error503Story.module.css: комментарий говорит, что отступ задаётся инлайн через barH; в коде такого стиля нет',
-      en: 'Error503Story.module.css: the comment says the offset is set inline via barH; there is no such style in the code',
+      ru: 'Error503Story.module.css: комментарий говорит, что отступ задаётся инлайн через barH; в коде такого стиля нет. Когда подсветка загорается — D69',
+      en: 'Error503Story.module.css: the comment says the offset is set inline via barH; there is no such style in the code. When the glow comes on — D69',
     },
     status: 'rework',
   },
@@ -1612,6 +1618,700 @@ const DIVERGENCES: Divergence[] = [
       ru: 'имя MERGE_MS в других местах означает 620 (D15)',
       en: 'the name MERGE_MS means 620 elsewhere (D15)',
     },
+    status: 'rework',
+  },
+  // ----- pool 3: AI cards, Cherry-pick, Rebase, System Upgrade, an opponent takes a card -----
+  {
+    id: 'D44',
+    moment: {
+      ru: 'Параметр полёта, который полёт молча не читает',
+      en: 'A travel parameter the travel silently ignores',
+    },
+    kit: {
+      ru: 'playToCenter / playToReleaseZone — 480 зашито, centerToDiscard — 420 (animations/presets.ts); полёт (move) масштаб не принимает',
+      en: 'playToCenter / playToReleaseZone — 480 hard-coded, centerToDiscard — 420 (animations/presets.ts); the travel (move) takes no scale',
+    },
+    playground: { ru: '—', en: '—' },
+    table: {
+      ru: 'длительность 460 передаётся: upgradeBeat ×2, _useUpgradeStaging, _useCherryPickStaging ×2; scale: SEAT_SHRINK — aiBeat, upgradeBeat, _useCherryPickStaging',
+      en: 'a 460 duration is passed: upgradeBeat ×2, _useUpgradeStaging, _useCherryPickStaging ×2; scale: SEAT_SHRINK — aiBeat, upgradeBeat, _useCherryPickStaging',
+    },
+    note: {
+      ru: 'длительность читают drawToCenter, dealToSeat, gatherToDeck, absorbToDeck, returnToDeck, flyFrom',
+      en: 'the duration is read by drawToCenter, dealToSeat, gatherToDeck, absorbToDeck, returnToDeck, flyFrom',
+    },
+    status: 'rework',
+  },
+  {
+    id: 'D45',
+    moment: {
+      ru: 'Ряд брошенных карт System Upgrade в центре',
+      en: 'The row of System Upgrade cards thrown to the centre',
+    },
+    kit: {
+      ru: 'место ряда upgrade (150, зазор 24; centreRow.ts), высота CENTRE_TOP 42',
+      en: 'the upgrade row place (150, gap 24; centreRow.ts), height CENTRE_TOP 42',
+    },
+    playground: {
+      ru: 'GitCards/SystemUpgrade: свои 150 и 24, высота 50%, слой 30',
+      en: 'GitCards/SystemUpgrade: its own 150 and 24, height 50%, layer 30',
+    },
+    table: {
+      ru: "rowPlaceStyle('upgrade') из модуля (_useUpgradeStaging), слой --z-flight + 10",
+      en: "rowPlaceStyle('upgrade') from the module (_useUpgradeStaging), layer --z-flight + 10",
+    },
+    note: { ru: '—', en: '—' },
+    status: 'rework',
+  },
+  {
+    id: 'D46',
+    moment: {
+      ru: 'Бросок System Upgrade: карта летит из места соперника в ряд',
+      en: "The System Upgrade throw: a card flies from an opponent's seat into the row",
+    },
+    kit: { ru: 'playToCenter 480', en: 'playToCenter 480' },
+    playground: {
+      ru: 'GitCards/SystemUpgrade: CSS-переход 460, --ease-out, от 0.42, прозрачность 0→1, шаг 260, хвост +80',
+      en: 'GitCards/SystemUpgrade: a CSS transition 460, --ease-out, from 0.42, opacity 0→1, step 260, a +80 tail',
+    },
+    table: {
+      ru: 'upgradeBeat: копии THROW_DUR 460 (фактически 480, D44), THROW_STEP 260, THROW_SCALE 0.42; прозрачность не меняется',
+      en: 'upgradeBeat: copies THROW_DUR 460 (480 in fact, D44), THROW_STEP 260, THROW_SCALE 0.42; opacity unchanged',
+    },
+    note: { ru: '—', en: '—' },
+    status: 'rework',
+  },
+  {
+    id: 'D47',
+    moment: {
+      ru: 'Пауза перед уходом ряда System Upgrade в сброс',
+      en: 'The pause before the System Upgrade row leaves for the discard',
+    },
+    kit: { ru: 'нет', en: 'none' },
+    playground: {
+      ru: 'GitCards/SystemUpgrade: HOLD_MS 2500',
+      en: 'GitCards/SystemUpgrade: HOLD_MS 2500',
+    },
+    table: { ru: 'upgradeBeat: копия HOLD_MS 2500', en: 'upgradeBeat: a copy HOLD_MS 2500' },
+    note: { ru: '—', en: '—' },
+    status: 'rework',
+  },
+  {
+    id: 'D48',
+    moment: {
+      ru: 'Ряд в центре уходит в сброс',
+      en: 'The row at the centre leaves for the discard',
+    },
+    kit: {
+      ru: 'useDiscardExit умеет задержку на карту (delay)',
+      en: 'useDiscardExit has a per-card delay',
+    },
+    playground: {
+      ru: 'GitCards/SystemUpgrade: по одной, шаг CLEAR_STEP 90; тот же шаг — HandLimitStory',
+      en: 'GitCards/SystemUpgrade: one by one, step CLEAR_STEP 90; the same step — HandLimitStory',
+    },
+    table: {
+      ru: 'upgradeBeat: разом; CLEAR_STEP 90 — poses.ts (handLimitBeat)',
+      en: 'upgradeBeat: all at once; CLEAR_STEP 90 — poses.ts (handLimitBeat)',
+    },
+    note: {
+      ru: 'комментарий upgradeBeat: «THE CENTRE EMPTIES IN ONE GO … (owner, 17.09)»',
+      en: 'the comment in upgradeBeat: "THE CENTRE EMPTIES IN ONE GO … (owner, 17.09)"',
+    },
+    status: 'rework',
+  },
+  {
+    id: 'D49',
+    moment: {
+      ru: 'Что летит в сброс: сам элемент, закреплённый на месте, или носитель',
+      en: 'What flies to the discard: the element itself, frozen in place, or a carrier',
+    },
+    kit: { ru: 'носители useDiscardExit', en: 'the useDiscardExit carriers' },
+    playground: {
+      ru: 'сами элементы, закреплённые на месте: GitCards/SystemUpgrade — слой 100; GitCards/CherryPick — 100 / 130 / 120; GitCards/Rebase — 52 / 51 / 50',
+      en: 'the elements themselves, frozen in place: GitCards/SystemUpgrade — layer 100; GitCards/CherryPick — 100 / 130 / 120; GitCards/Rebase — 52 / 51 / 50',
+    },
+    table: {
+      ru: 'upgradeBeat — носители; закрепление на месте: _useCherryPickStaging (100 + слой по глубине), _useRebaseStaging (53 / 52 / 51)',
+      en: 'upgradeBeat — carriers; frozen in place: _useCherryPickStaging (100 + a layer by depth), _useRebaseStaging (53 / 52 / 51)',
+    },
+    note: {
+      ru: 'комментарий upgradeBeat (owner, 03.10): ответы пересекали стол под System Upgrade и оказывались поверх неё в момент посадки',
+      en: 'the comment in upgradeBeat (owner, 03.10): the answers crossed the table under the System Upgrade and came out on top of it as they landed',
+    },
+    status: 'rework',
+  },
+  {
+    id: 'D50',
+    moment: {
+      ru: 'Карты ниже видимого верха кучи растворяются на лету',
+      en: 'Cards below the visible top of the heap dissolve in flight',
+    },
+    kit: {
+      ru: 'HEAP_SHOW 6 (scatter.ts), растворение в useDiscardExit (fade)',
+      en: 'HEAP_SHOW 6 (scatter.ts), the fade in useDiscardExit',
+    },
+    playground: {
+      ru: 'GitCards/SystemUpgrade, GitCards/CherryPick: растворяются карты ниже 6 верхних',
+      en: 'GitCards/SystemUpgrade, GitCards/CherryPick: the cards below the top 6 dissolve',
+    },
+    table: {
+      ru: 'upgradeBeat — без растворения; _useCherryPickStaging — растворяется только карта без места в куче',
+      en: 'upgradeBeat — no fade; _useCherryPickStaging — only a card with no place in the heap dissolves',
+    },
+    note: {
+      ru: 'комментарий _Board.tsx: куча рисуется целиком, без среза по HEAP_SHOW (#168)',
+      en: 'the comment in _Board.tsx: the heap is drawn whole, with no HEAP_SHOW cut (#168)',
+    },
+    status: 'rework',
+  },
+  {
+    id: 'D51',
+    moment: { ru: 'Когда карты попадают в кучу', en: 'When the cards join the heap' },
+    kit: { ru: 'событие посадки в useDiscardExit', en: 'the landing callback in useDiscardExit' },
+    playground: {
+      ru: 'по часам в конце раунда: +160 (GitCards/SystemUpgrade), +100 (GitCards/CherryPick), не раньше HAND_MIN',
+      en: 'by a clock at the end of the round: +160 (GitCards/SystemUpgrade), +100 (GitCards/CherryPick), not before HAND_MIN',
+    },
+    table: {
+      ru: 'сразу по приземлении (upgradeBeat, settleInto)',
+      en: 'as they land (upgradeBeat, settleInto)',
+    },
+    note: {
+      ru: 'комментарий upgradeBeat (owner, 03.10): «AND THE CARDS GO INTO THE HEAP AS THEY LAND»',
+      en: 'the comment in upgradeBeat (owner, 03.10): "AND THE CARDS GO INTO THE HEAP AS THEY LAND"',
+    },
+    status: 'rework',
+  },
+  {
+    id: 'D52',
+    moment: {
+      ru: 'Выбранная карта выезжает в центр крупно, держится, уходит в руку',
+      en: 'The chosen card comes to the centre enlarged, holds, goes to the hand',
+    },
+    kit: {
+      ru: 'место centre шириной 150 (centre.ts)',
+      en: 'the centre place, width 150 (centre.ts)',
+    },
+    playground: {
+      ru: 'GitCards/CherryPick, GitCards/SystemUpgrade: 220 / 460 / 560, к центру всей сцены вместе с технической панелью; PickSpecificCardStory, PickOpponentCardStory: 220 / 820; OpponentTakesCardStory: 220',
+      en: 'GitCards/CherryPick, GitCards/SystemUpgrade: 220 / 460 / 560, to the centre of the whole scene with the tech bar; PickSpecificCardStory, PickOpponentCardStory: 220 / 820; OpponentTakesCardStory: 220',
+    },
+    table: {
+      ru: '_useCherryPickStaging: 220 / 460 (фактически 480) / 560, место centre; transferBeat: REVEAL_W 220 (берущий), 820; upgradeBeat: ширина 150, 480, 560',
+      en: '_useCherryPickStaging: 220 / 460 (480 in fact) / 560, the centre place; transferBeat: REVEAL_W 220 (the taker), 820; upgradeBeat: width 150, 480, 560',
+    },
+    note: {
+      ru: 'в System Upgrade: 220 в сцене, 150 в игре',
+      en: 'in System Upgrade: 220 in the scene, 150 in the game',
+    },
+    status: 'rework',
+  },
+  {
+    id: 'D53',
+    moment: {
+      ru: 'Карта выбора приподнимается при наведении',
+      en: 'A card to choose lifts on hover',
+    },
+    kit: { ru: 'нет', en: 'none' },
+    playground: {
+      ru: '−6px, 180 мс, слой 5 / 8, запрещённая — 0.72: GitCards.module.css (.cell, .suCard), HandLimitStory',
+      en: '−6px, 180 ms, layer 5 / 8, a refused one — 0.72: GitCards.module.css (.cell, .suCard), HandLimitStory',
+    },
+    table: {
+      ru: '_useCherryPickStaging.module.css, _Board.module.css; _useUpgradeStaging — подъёма нет',
+      en: '_useCherryPickStaging.module.css, _Board.module.css; _useUpgradeStaging — no lift',
+    },
+    note: {
+      ru: "комментарий _useCherryPickStaging.module.css: «the scene's hover and selection … 1:1»",
+      en: 'the comment in _useCherryPickStaging.module.css: "the scene\'s hover and selection … 1:1"',
+    },
+    status: 'rework',
+  },
+  {
+    id: 'D54',
+    moment: {
+      ru: 'Затемнение стола на время выбора',
+      en: 'The table dims while a choice is made',
+    },
+    kit: {
+      ru: 'TableSurface / Overlay: blur 3, --black-60, 320 мс, слой --z-flight + 45, тяжёлое — --black-72',
+      en: 'TableSurface / Overlay: blur 3, --black-60, 320 ms, layer --z-flight + 45, heavy — --black-72',
+    },
+    playground: {
+      ru: 'копии в GitCards.module.css (.scrim слой 15, .scrimOver 25): без перехода, ниже стопок',
+      en: 'copies in GitCards.module.css (.scrim layer 15, .scrimOver 25): no transition, below the piles',
+    },
+    table: {
+      ru: 'TableSurface из кита: Cherry-pick, Rebase (тяжёлое), System Upgrade',
+      en: 'TableSurface from the kit: Cherry-pick, Rebase (heavy), System Upgrade',
+    },
+    note: {
+      ru: 'Rebase: в сцене затемнение держится до конца, в игре гаснет на подтверждении',
+      en: 'Rebase: the dim holds to the end in the scene, goes out at the confirm in the game',
+    },
+    status: 'rework',
+  },
+  {
+    id: 'D55',
+    moment: {
+      ru: 'Карты из сброса вылетают в сетку выбора (Cherry-pick, Inside)',
+      en: 'Cards fly out of the discard into the choice grid (Cherry-pick, Inside)',
+    },
+    kit: { ru: 'landInPose 480', en: 'landInPose 480' },
+    playground: {
+      ru: 'GitCards/CherryPick: из центра стопки, ровно, прозрачность, 360, --ease-out, шаг 16 (предел 40), своё between(); AiCardsStory (Inside): drawToCenter из коробки сброса, все разом',
+      en: "GitCards/CherryPick: from the pile's centre, square, opacity, 360, --ease-out, step 16 (cap 40), its own between(); AiCardsStory (Inside): drawToCenter from the discard box, all at once",
+    },
+    table: {
+      ru: '_useCherryPickStaging: landInPose из позы каждой карты в куче, все разом',
+      en: "_useCherryPickStaging: landInPose from each card's pose in the heap, all at once",
+    },
+    note: {
+      ru: 'комментарий _useCherryPickStaging: «the deal read as cards appearing (owner, 04.10)»',
+      en: 'the comment in _useCherryPickStaging: "the deal read as cards appearing (owner, 04.10)"',
+    },
+    status: 'rework',
+  },
+  {
+    id: 'D56',
+    moment: {
+      ru: 'Rebase: три верхние карты вылетают из колоды в ряд',
+      en: 'Rebase: the top three cards fly out of the deck into a row',
+    },
+    kit: { ru: 'нет', en: 'none' },
+    playground: {
+      ru: 'GitCards/Rebase: от левого верхнего угла, без масштаба, закреплены на месте со слоем 40, 520 / 80',
+      en: 'GitCards/Rebase: from the top-left corner, no scale, frozen in place on layer 40, 520 / 80',
+    },
+    table: {
+      ru: '_useRebaseStaging: копия between() (по центрам, с масштабом), 520 / 80',
+      en: '_useRebaseStaging: a between() copy (by centres, with scale), 520 / 80',
+    },
+    note: {
+      ru: 'between() записан дважды: GitCards/CherryPick.tsx:93, _useRebaseStaging.tsx:60',
+      en: 'between() is written twice: GitCards/CherryPick.tsx:93, _useRebaseStaging.tsx:60',
+    },
+    status: 'rework',
+  },
+  {
+    id: 'D57',
+    moment: {
+      ru: 'Карта уходит на колоду (Sudo в Cherry-pick): переворот, полёт, пауза',
+      en: 'A card goes onto the deck (Sudo in Cherry-pick): flip, travel, pause',
+    },
+    kit: { ru: 'returnToDeck', en: 'returnToDeck' },
+    playground: {
+      ru: 'GitCards/CherryPick: к стопке без подписи; 420 / 360',
+      en: 'GitCards/CherryPick: to the pile without its label; 420 / 360',
+    },
+    table: {
+      ru: '_useCherryPickStaging: к ячейке колоды вместе с подписью; 420 / 360',
+      en: "_useCherryPickStaging: to the deck's cell with its label; 420 / 360",
+    },
+    note: {
+      ru: 'комментарий _useRebaseStaging: целясь в ячейку целиком, карта «lands low, over the label»',
+      en: 'the comment in _useRebaseStaging: aimed at the whole cell, a card "lands low, over the label"',
+    },
+    status: 'rework',
+  },
+  {
+    id: 'D58',
+    moment: {
+      ru: 'Rebase: карты переворачиваются, пауза, по одной летят в колоду',
+      en: 'Rebase: the cards turn over, a pause, they fly into the deck one by one',
+    },
+    kit: { ru: 'returnToDeck (длительность читает)', en: 'returnToDeck (reads the duration)' },
+    playground: {
+      ru: 'GitCards/Rebase: 420 / 260 / 600 / 90',
+      en: 'GitCards/Rebase: 420 / 260 / 600 / 90',
+    },
+    table: {
+      ru: '_useRebaseStaging: копии 420 / 260 / 600 / 90',
+      en: '_useRebaseStaging: copies 420 / 260 / 600 / 90',
+    },
+    note: {
+      ru: 'комментарий _useRebaseStaging: «values verbatim»',
+      en: 'the comment in _useRebaseStaging: "values verbatim"',
+    },
+    status: 'rework',
+  },
+  {
+    id: 'D59',
+    moment: {
+      ru: 'Остальные карты возвращаются в сброс (Cherry-pick, Inside)',
+      en: 'The rest of the cards go back to the discard (Cherry-pick, Inside)',
+    },
+    kit: { ru: 'useDiscardExit', en: 'useDiscardExit' },
+    playground: {
+      ru: 'GitCards/CherryPick: шаг 14, растворение ниже 6 верхних, слой по порядку; AiCardsStory (Inside): без задержки, слой по порядку',
+      en: 'GitCards/CherryPick: step 14, a fade below the top 6, a layer by order; AiCardsStory (Inside): no delay, a layer by order',
+    },
+    table: {
+      ru: '_useCherryPickStaging: шаг 14, растворяется только карта без места в куче, слой по глубине',
+      en: '_useCherryPickStaging: step 14, only a card with no place in the heap dissolves, a layer by depth',
+    },
+    note: { ru: '—', en: '—' },
+    status: 'rework',
+  },
+  {
+    id: 'D60',
+    moment: {
+      ru: 'Ряд Rebase: размеры и перестановка',
+      en: 'The Rebase row: sizes and reordering',
+    },
+    kit: { ru: 'useCardReorder (шаг передаётся)', en: 'useCardReorder (the step is passed in)' },
+    playground: {
+      ru: 'GitCards/Rebase: 150 / 30 / 180 / 210 / 24, переход 300, слой 6',
+      en: 'GitCards/Rebase: 150 / 30 / 180 / 210 / 24, a 300 transition, layer 6',
+    },
+    table: {
+      ru: '_useRebaseStaging: 180 числом в коде, CSS-копии',
+      en: '_useRebaseStaging: 180 as a number in the code, CSS copies',
+    },
+    note: { ru: '—', en: '—' },
+    status: 'rework',
+  },
+  {
+    id: 'D61',
+    moment: { ru: 'Нумерация 1-2-3 в Rebase', en: 'The 1-2-3 numbering in Rebase' },
+    kit: { ru: 'нет', en: 'none' },
+    playground: {
+      ru: 'GitCards/Rebase: одна над всеми рядами, 340 мс',
+      en: 'GitCards/Rebase: one above all the rows, 340 ms',
+    },
+    table: {
+      ru: '_useRebaseStaging: номер в каждом ряду, 340 мс',
+      en: '_useRebaseStaging: a number in each row, 340 ms',
+    },
+    note: {
+      ru: 'шапка _useRebaseStaging: «sharing a single 1-2-3 numbering … as the story does»',
+      en: 'the header of _useRebaseStaging: "sharing a single 1-2-3 numbering … as the story does"',
+    },
+    status: 'rework',
+  },
+  {
+    id: 'D62',
+    moment: { ru: 'Сетка выбора: размеры', en: 'The choice grid: sizes' },
+    kit: { ru: 'нет', en: 'none' },
+    playground: {
+      ru: 'GitCards.module.css: 27 / 150 / 210, зазор 26 / 20, отступ 8; AiCardsStory: 42%, по центру, зазор 20, слой 100',
+      en: 'GitCards.module.css: 27 / 150 / 210, gap 26 / 20, padding 8; AiCardsStory: 42%, centred, gap 20, layer 100',
+    },
+    table: {
+      ru: '_useCherryPickStaging.module.css: 27 / 150 / 210, 26 / 20, отступы 24 / 32 и 40',
+      en: '_useCherryPickStaging.module.css: 27 / 150 / 210, 26 / 20, padding 24 / 32 and 40',
+    },
+    note: {
+      ru: 'комментарий: «Board-only: the padding»',
+      en: 'the comment: "Board-only: the padding"',
+    },
+    status: 'rework',
+  },
+  {
+    id: 'D63',
+    moment: {
+      ru: 'Когда открывается плашка подтверждения выбора',
+      en: 'When the choice confirm bar opens',
+    },
+    kit: { ru: 'ConfirmAction', en: 'ConfirmAction' },
+    playground: {
+      ru: 'AiCardsStory: вместе с вылетом карт; GitCards/CherryPick: на выборе',
+      en: 'AiCardsStory: with the cards flying out; GitCards/CherryPick: at the choice',
+    },
+    table: {
+      ru: 'после раздачи (_useCherryPickStaging)',
+      en: 'after the deal (_useCherryPickStaging)',
+    },
+    note: {
+      ru: 'комментарий _useCherryPickStaging: «After the deal, never with it … (owner, 16.09)»',
+      en: 'the comment in _useCherryPickStaging: "After the deal, never with it … (owner, 16.09)"',
+    },
+    status: 'rework',
+  },
+  {
+    id: 'D64',
+    moment: { ru: 'Когда кончается розыгрыш выбора', en: 'When a choice play is over' },
+    kit: { ru: 'нет', en: 'none' },
+    playground: {
+      ru: 'по часам: HAND_MIN, +100 (GitCards/CherryPick), +160 (GitCards/SystemUpgrade)',
+      en: 'by a clock: HAND_MIN, +100 (GitCards/CherryPick), +160 (GitCards/SystemUpgrade)',
+    },
+    table: {
+      ru: 'ждёт окончания всех полётов (_useCherryPickStaging)',
+      en: 'waits for every flight to end (_useCherryPickStaging)',
+    },
+    note: { ru: '—', en: '—' },
+    status: 'rework',
+  },
+  {
+    id: 'D65',
+    moment: {
+      ru: 'Inside: порядок, место одного релиза, путь выбранного',
+      en: 'Inside: the order, where a single release goes, the chosen one’s road',
+    },
+    kit: { ru: '—', en: '—' },
+    playground: {
+      ru: 'AiCardsStory: держит 2600 → триггер в сброс, Inside в колоду → потом релиз; один релиз — на место эффекта (сдвиг 82, ширина 200); выбранный — из ряда прямо в руку',
+      en: 'AiCardsStory: holds 2600 → the trigger to the discard, Inside to the deck → then the release; a single release — to the effect place (offset 82, width 200); the chosen one — straight from the row to the hand',
+    },
+    table: {
+      ru: 'aiBeat: без выдержки, пара стоит, пока игрок выбирает, уходит после посадки в руку; один релиз — к centre (сдвиг 0, ширина 150); _useCherryPickStaging: выбранный — в центр 220 / 460 / 560, потом в руку',
+      en: 'aiBeat: no hold, the pair stands while the player chooses, leaves after the landing in the hand; a single release — to centre (offset 0, width 150); _useCherryPickStaging: the chosen one — to the centre 220 / 460 / 560, then to the hand',
+    },
+    note: { ru: '—', en: '—' },
+    status: 'rework',
+  },
+  {
+    id: 'D66',
+    moment: {
+      ru: 'Стоящие карты снова становятся носителями на своём месте и уходят',
+      en: 'Standing cards become carriers again where they stand and leave',
+    },
+    kit: { ru: 'нет', en: 'none' },
+    playground: {
+      ru: 'AiCardsStory: один подъём на три карты',
+      en: 'AiCardsStory: one raise for three cards',
+    },
+    table: {
+      ru: 'копии: aiBeat, aiCauseExit, handLimitBeat и defenseBeat (sendHomeward)',
+      en: 'copies: aiBeat, aiCauseExit, handLimitBeat and defenseBeat (sendHomeward)',
+    },
+    note: {
+      ru: 'комментарий handLimitBeat: «Written out here rather than imported … each runner owns its own useFlyer carrier»',
+      en: 'the comment in handLimitBeat: "Written out here rather than imported … each runner owns its own useFlyer carrier"',
+    },
+    status: 'rework',
+  },
+  {
+    id: 'D67',
+    moment: {
+      ru: 'Crush: раздавленный релиз выходит из слота',
+      en: 'Crush: the crushed release leaves its slot',
+    },
+    kit: { ru: 'exitLayer (useDiscardExit)', en: 'exitLayer (useDiscardExit)' },
+    playground: {
+      ru: 'AiCardsStory: без слоя, без Code Review; разброс случайный',
+      en: 'AiCardsStory: no layer, no Code Review; a random scatter',
+    },
+    table: {
+      ru: 'aiBeat (raiseCrushed): слой exitLayer(2), Code Review exitLayer(1) с наклоном пары; разброс по номеру события',
+      en: "aiBeat (raiseCrushed): layer exitLayer(2), Code Review exitLayer(1) at the pair's tilt; a scatter by the event id",
+    },
+    note: { ru: '—', en: '—' },
+    status: 'rework',
+  },
+  {
+    id: 'D68',
+    moment: {
+      ru: 'Bad Vibe: отданная карта стоит рядом с AI-картой',
+      en: 'Bad Vibe: the card given up stands beside the AI card',
+    },
+    kit: { ru: 'место picked (centre.ts)', en: 'the picked place (centre.ts)' },
+    playground: {
+      ru: 'AiCardsStory: PICK_HOLD 900; две отправки без слоёв',
+      en: 'AiCardsStory: PICK_HOLD 900; two sends with no layers',
+    },
+    table: {
+      ru: 'handLimitBeat: GATHER_HOLD 1500; одна отправка — триггер 0, отданная карта +1',
+      en: 'handLimitBeat: GATHER_HOLD 1500; one send — the trigger 0, the card given up +1',
+    },
+    note: { ru: '—', en: '—' },
+    status: 'rework',
+  },
+  {
+    id: 'D69',
+    moment: {
+      ru: 'Когда загорается своя красная подсветка',
+      en: 'When your own red glow comes on',
+    },
+    kit: { ru: 'EdgeGlow', en: 'EdgeGlow' },
+    playground: {
+      ru: 'AiCardsStory: через 200 после паузы чтения; Error503Story: сразу после 180 / 560; DrawCardStory: после 220 / 560',
+      en: 'AiCardsStory: 200 after the reading pause; Error503Story: right after 180 / 560; DrawCardStory: after 220 / 560',
+    },
+    table: {
+      ru: 'aiBeat: в момент переворота; drawBeat: после 220 / 560',
+      en: 'aiBeat: at the flip; drawBeat: after 220 / 560',
+    },
+    note: { ru: 'когда гаснет — D35', en: 'when it goes out — D35' },
+    status: 'rework',
+  },
+  {
+    id: 'D70',
+    moment: {
+      ru: 'Карта, добытая эффектом AI, встаёт в центре (Good Vibe, базовый Error 503)',
+      en: 'A card an AI effect draws stands at the centre (Good Vibe, a base Error 503)',
+    },
+    kit: { ru: 'места центра (centre.ts)', en: 'the centre places (centre.ts)' },
+    playground: {
+      ru: 'AiCardsStory: на месте эффекта; 160 / FLIP_MS + 140; в руку — без ожидания + FLIGHT_MS + 140',
+      en: 'AiCardsStory: at the effect place; 160 / FLIP_MS + 140; to the hand — not awaited + FLIGHT_MS + 140',
+    },
+    table: {
+      ru: 'drawBeat: к centre; 220 / 560; ждёт посадки; Error 503 — с ALARM_POSE',
+      en: 'drawBeat: to centre; 220 / 560; awaits the landing; an Error 503 — at ALARM_POSE',
+    },
+    note: { ru: '—', en: '—' },
+    status: 'rework',
+  },
+  {
+    id: 'D71',
+    moment: {
+      ru: 'Выбранная карта держится в каталоге',
+      en: 'The chosen card is held in the catalogue',
+    },
+    kit: { ru: 'CardCatalog (держание)', en: 'CardCatalog (the hold)' },
+    playground: {
+      ru: 'копии PICK_BEAT 620: OpponentTakesCardStory, PickSpecificCardStory',
+      en: 'PICK_BEAT 620 copies: OpponentTakesCardStory, PickSpecificCardStory',
+    },
+    table: { ru: 'transferBeat: копия PICK_BEAT 620', en: 'transferBeat: a PICK_BEAT 620 copy' },
+    note: {
+      ru: "комментарий transferBeat: «PICK_BEAT is the scene's own hold»",
+      en: 'the comment in transferBeat: "PICK_BEAT is the scene\'s own hold"',
+    },
+    status: 'rework',
+  },
+  {
+    id: 'D72',
+    moment: {
+      ru: 'Веер смыкается, когда карта взлетает',
+      en: 'The fan closes up as a card takes off',
+    },
+    kit: {
+      ru: 'нет — cardPlace / withoutFlown — модули стола',
+      en: 'none — cardPlace / withoutFlown are table modules',
+    },
+    playground: {
+      ru: 'вручную в 10 сценах (по номеру или по имени карты)',
+      en: 'by hand in 10 scenes (by index or by the card id)',
+    },
+    table: {
+      ru: 'transferBeat — вручную, по номеру; cardPlace (liftOff) и withoutFlown — по имени карты',
+      en: 'transferBeat — by hand, by index; cardPlace (liftOff) and withoutFlown — by the card id',
+    },
+    note: { ru: '—', en: '—' },
+    status: 'rework',
+  },
+  {
+    id: 'D73',
+    moment: {
+      ru: 'Полёт запускается через два кадра',
+      en: 'A travel starts two frames later',
+    },
+    kit: { ru: 'nextFrames (animations/timing.ts)', en: 'nextFrames (animations/timing.ts)' },
+    playground: {
+      ru: 'вручную, двойным requestAnimationFrame: OpponentTakesCardStory, PickSpecificCardStory ×2, PickOpponentCardStory ×2, GitCards/SystemUpgrade, GitCards/CherryPick',
+      en: 'by hand, a double requestAnimationFrame: OpponentTakesCardStory, PickSpecificCardStory ×2, PickOpponentCardStory ×2, GitCards/SystemUpgrade, GitCards/CherryPick',
+    },
+    table: { ru: 'nextFrames', en: 'nextFrames' },
+    note: { ru: '—', en: '—' },
+    status: 'rework',
+  },
+  {
+    id: 'D74',
+    moment: {
+      ru: 'Куда в центре встаёт карта для чтения',
+      en: 'Where at the centre a card stands to be read',
+    },
+    kit: {
+      ru: 'CENTRE_TOP 42, места centre / cost (centre.ts)',
+      en: 'CENTRE_TOP 42, the centre / cost places (centre.ts)',
+    },
+    playground: {
+      ru: 'середина сцены 50% / 50% (в PickOpponentCardStory — середина окна)',
+      en: 'the middle of the scene, 50% / 50% (the middle of the window in PickOpponentCardStory)',
+    },
+    table: {
+      ru: 'место centre на 42%; если в центре стоит атака — место cost; правило записано 4 раза в transferBeat',
+      en: 'the centre place at 42%; with an attack standing at the centre — the cost place; the rule is written 4 times in transferBeat',
+    },
+    note: { ru: '—', en: '—' },
+    status: 'rework',
+  },
+  {
+    id: 'D75',
+    moment: { ru: 'Слой летящей карты', en: 'The layer of a card in flight' },
+    kit: { ru: '--z-flight 250 (useFlyer)', en: '--z-flight 250 (useFlyer)' },
+    playground: {
+      ru: 'слой 55 в CSS семи сцен',
+      en: 'layer 55 in the CSS of seven scenes',
+    },
+    table: { ru: 'из кита', en: 'from the kit' },
+    note: { ru: '—', en: '—' },
+    status: 'rework',
+  },
+  {
+    id: 'D76',
+    moment: { ru: 'Промах при запросе карты', en: 'A miss when a card is asked for' },
+    kit: { ru: 'нет', en: 'none' },
+    playground: {
+      ru: 'копия MISS_HOLD 1620; записка сразу после PICK_BEAT, без тряски; названная карта уходит из каталога сразу; «у тебя нет такой карты», 42%, зелёная',
+      en: 'a MISS_HOLD 1620 copy; the note right after PICK_BEAT, no shake; the named card leaves the catalogue at once; «у тебя нет такой карты», 42%, green',
+    },
+    table: {
+      ru: 'transferBeat: MISS_HOLD 1620; сначала 820, потом тряска веера, потом записка; карта держится в каталоге до конца; «нет такой карты», 50% + 140, белая на подложке',
+      en: 'transferBeat: MISS_HOLD 1620; first 820, then the fan shakes, then the note; the card held in the catalogue to the end; «нет такой карты», 50% + 140, white on a plate',
+    },
+    note: { ru: '—', en: '—' },
+    status: 'rework',
+  },
+  {
+    id: 'D77',
+    moment: {
+      ru: 'Счётчик руки в месте получателя растёт после приземления',
+      en: "The hand counter in the receiver's seat goes up after the landing",
+    },
+    kit: {
+      ru: 'нет — cardPlace (setDown в место) — модуль стола',
+      en: 'none — cardPlace (setDown into a seat) is a table module',
+    },
+    playground: { ru: 'setState в сценах', en: 'setState in the scenes' },
+    table: {
+      ru: 'вручную: transferBeat, drawBeat, aiBeat, upgradeBeat, shownBeat',
+      en: 'by hand: transferBeat, drawBeat, aiBeat, upgradeBeat, shownBeat',
+    },
+    note: {
+      ru: 'комментарии: «that counter IS the hidden hand»',
+      en: 'the comments: "that counter IS the hidden hand"',
+    },
+    status: 'rework',
+  },
+  {
+    id: 'D78',
+    moment: { ru: 'Ширина колод и сброса', en: 'The width of the decks and the discard' },
+    kit: {
+      ru: 'PILE_WIDTH 150 (table/Table/piles.ts), сброс 116 (Table)',
+      en: 'PILE_WIDTH 150 (table/Table/piles.ts), the discard 116 (Table)',
+    },
+    playground: {
+      ru: 'числами 150 / 116 в двенадцати сценах; PILE_W 116 — GitCards/CherryPick, GitCards/SystemUpgrade',
+      en: 'as numbers 150 / 116 in twelve scenes; PILE_W 116 — GitCards/CherryPick, GitCards/SystemUpgrade',
+    },
+    table: {
+      ru: 'числами в _Board (150 у колоды событий, 116); _useCherryPickStaging — 116',
+      en: 'as numbers in _Board (150 for the events deck, 116); _useCherryPickStaging — 116',
+    },
+    note: { ru: '—', en: '—' },
+    status: 'rework',
+  },
+  {
+    id: 'D79',
+    moment: {
+      ru: 'Rebase при нескольких колодах',
+      en: 'Rebase with several decks',
+    },
+    kit: { ru: '—', en: '—' },
+    playground: {
+      ru: 'GitCards/Rebase: отдельный шаг выбора колоды кликом, подпись «колода N», отступ снизу — только при панели подтверждения',
+      en: 'GitCards/Rebase: a separate step to pick the deck by click, the «колода N» label, the bottom padding — only with the confirm bar',
+    },
+    table: {
+      ru: '_useRebaseStaging: колода выбирается стрелкой при розыгрыше, подписи нет, отступ всегда',
+      en: '_useRebaseStaging: the deck is picked with the arrow on the play, no label, the padding always',
+    },
+    note: { ru: '—', en: '—' },
     status: 'rework',
   },
 ]
