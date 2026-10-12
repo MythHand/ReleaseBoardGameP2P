@@ -9,6 +9,9 @@ import styles from './AnimationAuditStory.module.css'
 //      A scenario is a sequence, not a module: it isn't formalized separately,
 //      so it has NO statuses, only what is already implemented.
 //   3. Needs rework — where it's off, with statuses (rework / reuse).
+//   4. Divergences in module use — a moment and every place it is written in
+//      (the kit's modules, the playground, the table); each row feeds an entry
+//      of table 3 and shares its status.
 // Change the animations — update this page.
 //
 // Language: technical names (module ids, file paths, rect/FLIP/move/fade/DOM…)
@@ -51,6 +54,21 @@ interface Issue {
   what: Loc
   problem: Loc
   where: Loc
+  status: Status
+  // Set on the entries the divergence table feeds (see DIVERGENCES): the id of
+  // its row, so the two link to each other.
+  divergence?: string
+}
+// One moment of the animations and every place it is written in. Right is the
+// kit's modules alone, with the playground and the table taking it from there;
+// a copy in a scene, on the table, or in both is the divergence.
+interface Divergence {
+  id: string
+  moment: Loc
+  kit: Loc
+  playground: Loc
+  table: Loc
+  note: Loc
   status: Status
 }
 
@@ -750,6 +768,298 @@ const SCENARIOS: Scenario[] = [
     where: 'blocks/BugRunner (Bug runner), Lobby',
   },
 ]
+
+// ===== Divergences in animation module use =====
+// A moment per row, with every place it is written in: the kit's modules
+// (apps/ui/src), the playground's scenes, the table (apps/frontend). Each row
+// feeds one entry of the register below, which takes its status from here — so
+// a status lives in one place. A new place of the same moment, found later, is
+// added to its row; a new row only for a new moment.
+const DIVERGENCES: Divergence[] = [
+  {
+    id: 'D1',
+    moment: { ru: 'Сколько длится переворот карты', en: 'How long a card flip takes' },
+    kit: {
+      ru: 'FLIP_MS = 420 (animations/presets.ts)',
+      en: 'FLIP_MS = 420 (animations/presets.ts)',
+    },
+    playground: {
+      ru: 'своя копия FLIP_MS = 420: DrawCardStory, AiCardsStory',
+      en: 'own copy FLIP_MS = 420: DrawCardStory, AiCardsStory',
+    },
+    table: { ru: 'берёт из модулей', en: 'takes it from the modules' },
+    note: { ru: '—', en: '—' },
+    status: 'rework',
+  },
+  {
+    id: 'D2',
+    moment: {
+      ru: 'Карта встала на место → пауза → переворот → пауза, чтобы прочитать',
+      en: 'A card stands in its place → pause → flip → pause to read it',
+    },
+    kit: { ru: 'нет', en: 'none' },
+    playground: {
+      ru: 'DrawCardStory: 220 / 560 (дважды), 160 / 560 у AI-карты; AiCardsStory: 160 / FLIP_MS + 140; Error503Story: 560',
+      en: 'DrawCardStory: 220 / 560 (twice), 160 / 560 for the AI card; AiCardsStory: 160 / FLIP_MS + 140; Error503Story: 560',
+    },
+    table: {
+      ru: 'BEFORE_FLIP / AFTER_FLIP = 220 / 560 — копией в board-beats/drawBeat.tsx и board-beats/aiBeat.tsx; board-beats/upgradeBeat.tsx: 560',
+      en: 'BEFORE_FLIP / AFTER_FLIP = 220 / 560 — copied in board-beats/drawBeat.tsx and board-beats/aiBeat.tsx; board-beats/upgradeBeat.tsx: 560',
+    },
+    note: {
+      ru: 'перед переворотом AI-карты: 160 в плейграунде, 220 на столе',
+      en: 'before the AI card flips: 160 in the playground, 220 on the table',
+    },
+    status: 'rework',
+  },
+  {
+    id: 'D3',
+    moment: {
+      ru: 'Карта летит на место в центре и остаётся там стоять',
+      en: 'A card flies to a place at the centre and stays standing there',
+    },
+    kit: {
+      ru: 'нет — есть только части: полёты (play) и закрепление на месте (useFlyer.pin)',
+      en: 'none — only the parts: the travels (play) and pinning in place (useFlyer.pin)',
+    },
+    playground: {
+      ru: 'собрано вручную: AiCardsStory — 3 места, DrawCardStory — 2, Error503Story — 1',
+      en: 'assembled by hand: AiCardsStory — 3 places, DrawCardStory — 2, Error503Story — 1',
+    },
+    table: {
+      ru: 'модуль toSlot (board-beats/toCentre.ts): drawBeat, aiBeat, DDoS в comboBeat, оплата релиза (_useBoardStaging.ts); вручную: handLimitBeat, upgradeBeat',
+      en: 'the toSlot module (board-beats/toCentre.ts): drawBeat, aiBeat, the DDoS in comboBeat, the release cost (_useBoardStaging.ts); by hand: handLimitBeat, upgradeBeat',
+    },
+    note: { ru: '—', en: '—' },
+    status: 'rework',
+  },
+  {
+    id: 'D4',
+    moment: {
+      ru: 'Сколько стол держит открытую AI-карту',
+      en: 'How long the table holds an AI card open',
+    },
+    kit: { ru: 'нет', en: 'none' },
+    playground: {
+      ru: 'AiCardsStory: TABLE_HOLD 2600, HALLUCINATION_HOLD ×2; DrawCardStory: AI_HOLD 4000',
+      en: 'AiCardsStory: TABLE_HOLD 2600, HALLUCINATION_HOLD ×2; DrawCardStory: AI_HOLD 4000',
+    },
+    table: {
+      ru: 'TABLE_HOLD 2600, HALLUCINATION_HOLD ×2 (board-beats/toCentre.ts)',
+      en: 'TABLE_HOLD 2600, HALLUCINATION_HOLD ×2 (board-beats/toCentre.ts)',
+    },
+    note: {
+      ru: 'комментарий в toCentre.ts: значение взято из AiCardsStory',
+      en: 'the comment in toCentre.ts: the value is taken from AiCardsStory',
+    },
+    status: 'rework',
+  },
+  {
+    id: 'D5',
+    moment: {
+      ru: 'AI-карта уходит в колоду событий: переворот рубашкой, полёт в колоду',
+      en: 'An AI card goes back to the events deck: a flip face down, a travel into the deck',
+    },
+    kit: { ru: 'только полёт returnToDeck', en: 'only the travel, returnToDeck' },
+    playground: {
+      ru: 'собрано вручную: AiCardsStory — 2 места, DrawCardStory — 1',
+      en: 'assembled by hand: AiCardsStory — 2 places, DrawCardStory — 1',
+    },
+    table: {
+      ru: 'модуль toEventsDeck (board-beats/toEventsDeck.ts): comboBeat, handLimitBeat, defenseBeat ×2, aiBeat ×2',
+      en: 'the toEventsDeck module (board-beats/toEventsDeck.ts): comboBeat, handLimitBeat, defenseBeat ×2, aiBeat ×2',
+    },
+    note: { ru: '—', en: '—' },
+    status: 'rework',
+  },
+  {
+    id: 'D6',
+    moment: {
+      ru: 'Каким размером карта входит в место соперника',
+      en: "How big a card is as it enters an opponent's seat",
+    },
+    kit: { ru: 'нет', en: 'none' },
+    playground: {
+      ru: 'GameDealStory: ×0.7 от ширины карты колоды; DrawCardStory: ×0.7 от ширины карты, стоящей в центре; OpponentTakesCardStory: своя копия SEAT_SHRINK = 0.7 от ширины летящей карты',
+      en: "GameDealStory: ×0.7 of the deck card's width; DrawCardStory: ×0.7 of the width of the card standing at the centre; OpponentTakesCardStory: own copy SEAT_SHRINK = 0.7 of the flying card's width",
+    },
+    table: {
+      ru: 'board-beats/seat.ts: seatCardBox (×0.7 от ширины карты веера) — drawBeat, transferBeat ×4, shownBeat; SEAT_SHRINK как масштаб полёта — aiBeat, upgradeBeat, _useCherryPickStaging.tsx; game-intro/useDealIntro.ts — ×0.7 от ширины карты колоды, числом в коде',
+      en: "board-beats/seat.ts: seatCardBox (×0.7 of the fan card's width) — drawBeat, transferBeat ×4, shownBeat; SEAT_SHRINK as the travel's scale — aiBeat, upgradeBeat, _useCherryPickStaging.tsx; game-intro/useDealIntro.ts — ×0.7 of the deck card's width, as a number in the code",
+    },
+    note: {
+      ru: 'два написания на столе записаны в docs/animations/beat-copies.md («Left»)',
+      en: 'the two spellings on the table are on record in docs/animations/beat-copies.md ("Left")',
+    },
+    status: 'rework',
+  },
+  {
+    id: 'D7',
+    moment: {
+      ru: 'Атака ложится в центре с наклоном',
+      en: 'An attack lands at the centre at a tilt',
+    },
+    kit: { ru: 'нет', en: 'none' },
+    playground: {
+      ru: 'DefenseReleaseStory: своя ATTACK_POSE −4°; CardPlayStory: атаки ложатся без наклона',
+      en: 'DefenseReleaseStory: own ATTACK_POSE −4°; CardPlayStory: attacks land with no tilt',
+    },
+    table: {
+      ru: 'ATTACK_POSE −4° (entities/game/board/poses.ts)',
+      en: 'ATTACK_POSE −4° (entities/game/board/poses.ts)',
+    },
+    note: {
+      ru: 'комментарий в poses.ts: значения переписаны из DefenseReleaseStory',
+      en: 'the comment in poses.ts: the values are quoted from DefenseReleaseStory',
+    },
+    status: 'rework',
+  },
+  {
+    id: 'D8',
+    moment: {
+      ru: 'Карта, которая уже летит, садится в свой веер',
+      en: 'A card already in the air lands in its own fan',
+    },
+    kit: {
+      ru: 'useHandArrival принимает и место (from), и саму карту (el)',
+      en: 'useHandArrival takes both a place (from) and the card itself (el)',
+    },
+    playground: {
+      ru: 'саму карту отдают: GitCards/CherryPick, GitCards/SystemUpgrade; снимают и пускают заново из места: DrawCardStory, AiCardsStory ×2 (Inside и добор в руку)',
+      en: 'hand over the card itself: GitCards/CherryPick, GitCards/SystemUpgrade; take it down and fly it again from its place: DrawCardStory, AiCardsStory ×2 (Inside and the draw to the hand)',
+    },
+    table: {
+      ru: 'саму карту отдают: drawBeat, transferBeat, aiBeat (Inside), _useCherryPickStaging.tsx',
+      en: 'hand over the card itself: drawBeat, transferBeat, aiBeat (Inside), _useCherryPickStaging.tsx',
+    },
+    note: {
+      ru: 'комментарий в drawBeat.tsx: при старом порядке карта, ждавшая очереди за другой посадкой, пропадала (#168)',
+      en: 'the comment in drawBeat.tsx: in the old order a card waiting its turn behind another arrival vanished (#168)',
+    },
+    status: 'rework',
+  },
+  {
+    id: 'D9',
+    moment: { ru: 'Тайминги раздачи (15 значений)', en: 'The deal timings (15 values)' },
+    kit: { ru: 'нет', en: 'none' },
+    playground: { ru: 'GameDealStory', en: 'GameDealStory' },
+    table: { ru: 'game-intro/useDealIntro.ts', en: 'game-intro/useDealIntro.ts' },
+    note: {
+      ru: 'комментарий в useDealIntro.ts: «copied verbatim from the story»',
+      en: 'the comment in useDealIntro.ts: "copied verbatim from the story"',
+    },
+    status: 'rework',
+  },
+  {
+    id: 'D10',
+    moment: {
+      ru: 'Сколько карта стоит открытой в центре перед уходом',
+      en: 'How long a card stands open at the centre before it leaves',
+    },
+    kit: { ru: 'нет', en: 'none' },
+    playground: {
+      ru: 'DefenseReleaseStory: SHOW_HOLD 1200; AiCardsStory: SHOW_HOLD 1500',
+      en: 'DefenseReleaseStory: SHOW_HOLD 1200; AiCardsStory: SHOW_HOLD 1500',
+    },
+    table: {
+      ru: 'entities/game/board/poses.ts: SHOW_HOLD 1200; board-beats/aiBeat.tsx: SHOW_HOLD 1500',
+      en: 'entities/game/board/poses.ts: SHOW_HOLD 1200; board-beats/aiBeat.tsx: SHOW_HOLD 1500',
+    },
+    note: { ru: 'одно имя, два значения', en: 'one name, two values' },
+    status: 'rework',
+  },
+  {
+    id: 'D11',
+    moment: { ru: 'Защита ложится поверх атаки', en: 'A defence lands over the attack' },
+    kit: { ru: 'нет', en: 'none' },
+    playground: {
+      ru: 'DefenseReleaseStory: COVER_POSE 6°, сдвиг 16 / −12; Error503Story: COVER_POSE 6°, без сдвига',
+      en: 'DefenseReleaseStory: COVER_POSE 6°, offset 16 / −12; Error503Story: COVER_POSE 6°, no offset',
+    },
+    table: {
+      ru: 'COVER_POSE 6°, сдвиг 16 / −12 (entities/game/board/poses.ts)',
+      en: 'COVER_POSE 6°, offset 16 / −12 (entities/game/board/poses.ts)',
+    },
+    note: {
+      ru: 'одно имя, в Error503Story другое значение',
+      en: 'one name, a different value in Error503Story',
+    },
+    status: 'rework',
+  },
+  {
+    id: 'D12',
+    moment: { ru: 'Sudo стоит на своём месте', en: 'A Sudo stands in its own place' },
+    kit: {
+      ru: 'primitives/CardPair: −7° — наклон второй карты в паре',
+      en: 'primitives/CardPair: −7° — the tilt of the second card of a pair',
+    },
+    playground: {
+      ru: 'DefenseReleaseStory: SUDO_POSE −7°',
+      en: 'DefenseReleaseStory: SUDO_POSE −7°',
+    },
+    table: {
+      ru: 'SUDO_POSE −7° (entities/game/board/poses.ts)',
+      en: 'SUDO_POSE −7° (entities/game/board/poses.ts)',
+    },
+    note: { ru: '—', en: '—' },
+    status: 'rework',
+  },
+  {
+    id: 'D13',
+    moment: {
+      ru: 'Карта стоит в центре рубашкой перед уходом в место соперника',
+      en: "A card stands face down at the centre before it goes into an opponent's seat",
+    },
+    kit: { ru: 'нет', en: 'none' },
+    playground: {
+      ru: 'OpponentTakesCardStory: CENTER_HOLD 820',
+      en: 'OpponentTakesCardStory: CENTER_HOLD 820',
+    },
+    table: {
+      ru: 'board-beats/transferBeat.tsx: CENTER_HOLD 820',
+      en: 'board-beats/transferBeat.tsx: CENTER_HOLD 820',
+    },
+    note: { ru: '—', en: '—' },
+    status: 'rework',
+  },
+  {
+    id: 'D14',
+    moment: {
+      ru: 'Карта стоит в центре после действия, перед уходом в сброс',
+      en: 'A card stands at the centre after its effect, before it leaves for the discard',
+    },
+    kit: { ru: 'нет', en: 'none' },
+    playground: {
+      ru: 'DeckAnimationsStory: CENTER_HOLD 420',
+      en: 'DeckAnimationsStory: CENTER_HOLD 420',
+    },
+    table: {
+      ru: 'board-beats/operationBeat.tsx: CENTER_HOLD 420',
+      en: 'board-beats/operationBeat.tsx: CENTER_HOLD 420',
+    },
+    note: { ru: '—', en: '—' },
+    status: 'rework',
+  },
+]
+
+// A divergence's entry in the register: named by its row, pointing back at it
+// and at the backlog, with the row's own status.
+const divergenceIssue = (d: Divergence): Issue => ({
+  what: {
+    ru: `Расхождение ${d.id} по использованию модулей: ${d.moment.ru}`,
+    en: `Module-use divergence ${d.id}: ${d.moment.en}`,
+  },
+  problem: {
+    ru: `Момент записан не только в модулях кита. Где он живёт — в модулях, в плейграунде, на столе — таблица «Расхождения по использованию модулей анимаций», строка ${d.id}; развёрнуто — docs/animations/backlog.md, ${d.id}.`,
+    en: `The moment is written outside the kit's modules too. Where it lives — the modules, the playground, the table — is the "Divergences in animation module use" table, row ${d.id}; in full — docs/animations/backlog.md, ${d.id}.`,
+  },
+  where: {
+    ru: `таблица расхождений, ${d.id}`,
+    en: `the divergence table, ${d.id}`,
+  },
+  status: d.status,
+  divergence: d.id,
+})
 
 // ===== 3. Needs rework — THE register of findings =====
 // Everything found about the animations lands here: this page is where the work
@@ -1661,6 +1971,8 @@ const ISSUES: Issue[] = [
     },
     status: 'open',
   },
+  // one entry per row of the divergence table, built from that row
+  ...DIVERGENCES.map(divergenceIssue),
 ]
 
 // Section headings, notes, legend and table headers.
@@ -1696,6 +2008,17 @@ const UI = {
     colWhatShort: 'что',
     colProblem: 'проблема',
     copy: 'копировать',
+    divH: 'Расхождения по использованию модулей анимаций',
+    divNote:
+      'Момент анимации и все места, где он записан. Правильно — когда момент живёт в модулях кита (apps/ui/src), а плейграунд и стол (apps/frontend) берут его оттуда. Копия только в плейграунде, только на столе или в обоих — расхождение. Строка закрывается, когда в колонках «плейграунд» и «стол» осталось «берёт из модулей». Каждая строка — запись в реестре находок выше, статус у них общий. Новое место того же момента дописывается в его строку, а не заводит новую.',
+    colMoment: 'момент',
+    colKit: 'модули',
+    colPlayground: 'плейграунд',
+    colTable: 'стол',
+    colNote: 'заметка',
+    colFinding: 'находка',
+    toFinding: 'в реестре',
+    toDivergence: 'строка',
   },
   en: {
     title: 'Animation audit',
@@ -1727,6 +2050,17 @@ const UI = {
     colWhatShort: 'what',
     colProblem: 'problem',
     copy: 'copy',
+    divH: 'Divergences in animation module use',
+    divNote:
+      'A moment of the animations and every place it is written in. Right is the moment living in the kit\'s modules (apps/ui/src), with the playground and the table (apps/frontend) taking it from there. A copy in the playground alone, on the table alone, or in both is a divergence. A row closes when the playground and table columns are left with "takes it from the modules". Every row is an entry in the register of findings above, and the two share one status. A new place of the same moment goes into its row rather than opening a new one.',
+    colMoment: 'moment',
+    colKit: 'modules',
+    colPlayground: 'playground',
+    colTable: 'table',
+    colNote: 'note',
+    colFinding: 'finding',
+    toFinding: 'in the register',
+    toDivergence: 'row',
   },
 }
 
@@ -1846,10 +2180,63 @@ function IssueTable({ rows }: { rows: Issue[] }) {
       </thead>
       <tbody>
         {rows.map((r) => (
-          <tr key={r.what.en}>
+          <tr
+            key={r.what.en}
+            id={r.divergence ? `finding-${r.divergence}` : undefined}
+            className={r.divergence ? styles.anchored : undefined}
+          >
             <td className={styles.mod}>{r.what[lang]}</td>
             <td className={styles.what}>{r.problem[lang]}</td>
-            <td className={styles.where}>{r.where[lang]}</td>
+            <td className={styles.where}>
+              {r.divergence ? (
+                <a className={styles.ref} href={`#divergence-${r.divergence}`}>
+                  {ui.toDivergence} {r.divergence}
+                </a>
+              ) : (
+                r.where[lang]
+              )}
+            </td>
+            <td className={styles.status}>
+              <Badge status={r.status} />
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
+function DivergenceTable({ rows }: { rows: Divergence[] }) {
+  const { lang } = useLang()
+  const ui = UI[lang]
+  return (
+    <table className={`${styles.table} ${styles.divTable}`}>
+      <thead>
+        <tr>
+          <th>{ui.colMoment}</th>
+          <th>{ui.colKit}</th>
+          <th>{ui.colPlayground}</th>
+          <th>{ui.colTable}</th>
+          <th>{ui.colNote}</th>
+          <th className={styles.finding}>{ui.colFinding}</th>
+          <th className={styles.status}>{ui.colStatus}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r) => (
+          <tr key={r.id} id={`divergence-${r.id}`} className={styles.anchored}>
+            <td className={styles.mod}>
+              {r.id} · {r.moment[lang]}
+            </td>
+            <td className={styles.where}>{r.kit[lang]}</td>
+            <td className={styles.where}>{r.playground[lang]}</td>
+            <td className={styles.where}>{r.table[lang]}</td>
+            <td className={styles.what}>{r.note[lang]}</td>
+            <td className={`${styles.where} ${styles.finding}`}>
+              <a className={styles.ref} href={`#finding-${r.id}`}>
+                {ui.toFinding}
+              </a>
+            </td>
             <td className={styles.status}>
               <Badge status={r.status} />
             </td>
@@ -1873,7 +2260,9 @@ export default function AnimationAuditStory() {
             сборки. Затем <b>сценарные комбинации</b> — как кирпичики складываются под игровые
             ситуации (сценарий — это последовательность, а не модуль: его не оформляют отдельно,
             поэтому без статусов). И в конце — <b>реестр находок</b>: всё, что нашли про анимации,
-            от копии словарного движения в сцене до вопроса, который никто не решил.
+            от копии словарного движения в сцене до вопроса, который никто не решил. После него —{' '}
+            <b>расхождения по использованию модулей</b>: момент анимации и все места, где он
+            записан, — в модулях, в плейграунде, на столе.
           </>
         ) : (
           <>
@@ -1882,7 +2271,8 @@ export default function AnimationAuditStory() {
             (a scenario is a sequence, not a module: it isn't formalized separately, so no
             statuses). And at the end — the <b>register of findings</b>: everything found about the
             animations, from a scene carrying its own copy of a registry movement to a question
-            nobody has decided.
+            nobody has decided. After it — the <b>divergences in module use</b>: a moment of the
+            animations and every place it is written in, in the modules, the playground, the table.
           </>
         )}
       </p>
@@ -1921,6 +2311,12 @@ export default function AnimationAuditStory() {
         ) : (
           <p className={styles.sectionNote}>{ui.issuesEmpty}</p>
         )}
+      </section>
+
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>{ui.divH}</h2>
+        <p className={styles.sectionNote}>{ui.divNote}</p>
+        <DivergenceTable rows={DIVERGENCES} />
       </section>
     </div>
   )
