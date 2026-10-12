@@ -799,16 +799,16 @@ const DIVERGENCES: Divergence[] = [
     },
     kit: { ru: 'нет', en: 'none' },
     playground: {
-      ru: 'DrawCardStory: 220 / 560 (дважды), 160 / 560 у AI-карты; AiCardsStory: 160 / FLIP_MS + 140; Error503Story: 560',
-      en: 'DrawCardStory: 220 / 560 (twice), 160 / 560 for the AI card; AiCardsStory: 160 / FLIP_MS + 140; Error503Story: 560',
+      ru: 'DrawCardStory: 220 / 560 (дважды), 160 / 560 у AI-карты; AiCardsStory: 160 / FLIP_MS + 140; Error503Story: 180 / 560',
+      en: 'DrawCardStory: 220 / 560 (twice), 160 / 560 for the AI card; AiCardsStory: 160 / FLIP_MS + 140; Error503Story: 180 / 560',
     },
     table: {
       ru: 'BEFORE_FLIP / AFTER_FLIP = 220 / 560 — копией в board-beats/drawBeat.tsx и board-beats/aiBeat.tsx; board-beats/upgradeBeat.tsx: 560',
       en: 'BEFORE_FLIP / AFTER_FLIP = 220 / 560 — copied in board-beats/drawBeat.tsx and board-beats/aiBeat.tsx; board-beats/upgradeBeat.tsx: 560',
     },
     note: {
-      ru: 'перед переворотом AI-карты: 160 в плейграунде, 220 на столе',
-      en: 'before the AI card flips: 160 in the playground, 220 on the table',
+      ru: 'перед переворотом AI-карты: 160 в плейграунде, 220 на столе; перед переворотом Error 503: 180 в Error503Story, 220 в drawBeat',
+      en: 'before the AI card flips: 160 in the playground, 220 on the table; before the Error 503 flips: 180 in Error503Story, 220 in drawBeat',
     },
     status: 'rework',
   },
@@ -823,14 +823,17 @@ const DIVERGENCES: Divergence[] = [
       en: 'none — only the parts: the travels (play) and pinning in place (useFlyer.pin)',
     },
     playground: {
-      ru: 'собрано вручную: AiCardsStory — 3 места, DrawCardStory — 2, Error503Story — 1',
-      en: 'assembled by hand: AiCardsStory — 3 places, DrawCardStory — 2, Error503Story — 1',
+      ru: 'собрано вручную: AiCardsStory — 3 места, DrawCardStory — 2, Error503Story — 1; DefenseReleaseStory: цена — свой полёт без закрепления',
+      en: 'assembled by hand: AiCardsStory — 3 places, DrawCardStory — 2, Error503Story — 1; DefenseReleaseStory: the cost — its own flight with no pinning',
     },
     table: {
       ru: 'модуль toSlot (board-beats/toCentre.ts): drawBeat, aiBeat, DDoS в comboBeat, оплата релиза (_useBoardStaging.ts); вручную: handLimitBeat, upgradeBeat',
       en: 'the toSlot module (board-beats/toCentre.ts): drawBeat, aiBeat, the DDoS in comboBeat, the release cost (_useBoardStaging.ts); by hand: handLimitBeat, upgradeBeat',
     },
-    note: { ru: '—', en: '—' },
+    note: {
+      ru: 'своя цена: в DefenseReleaseStory — без закрепления, на столе — toSlot с закреплением',
+      en: 'your own cost: no pinning in DefenseReleaseStory, toSlot with pinning on the table',
+    },
     status: 'rework',
   },
   {
@@ -905,12 +908,12 @@ const DIVERGENCES: Divergence[] = [
       en: 'DefenseReleaseStory: own ATTACK_POSE −4°; CardPlayStory: attacks land with no tilt',
     },
     table: {
-      ru: 'ATTACK_POSE −4° (entities/game/board/poses.ts)',
-      en: 'ATTACK_POSE −4° (entities/game/board/poses.ts)',
+      ru: 'ATTACK_POSE −4° (entities/game/board/poses.ts); одиночная атака — landInPose с restTransform(ATTACK_POSE) (board-beats/comboBeat.tsx:204-211)',
+      en: 'ATTACK_POSE −4° (entities/game/board/poses.ts); a single attack — landInPose with restTransform(ATTACK_POSE) (board-beats/comboBeat.tsx:204-211)',
     },
     note: {
-      ru: 'комментарий в poses.ts: значения переписаны из DefenseReleaseStory',
-      en: 'the comment in poses.ts: the values are quoted from DefenseReleaseStory',
+      ru: 'комментарий в poses.ts: значения переписаны из DefenseReleaseStory. Одиночная атака: в DefenseReleaseStory — playToCenter с поворотом −4, на столе — landInPose; атака с Sudo в обоих местах летит одинаково',
+      en: 'the comment in poses.ts: the values are quoted from DefenseReleaseStory. A single attack: playToCenter with a −4 turn in DefenseReleaseStory, landInPose on the table; an attack with Sudo flies the same way in both',
     },
     status: 'rework',
   },
@@ -958,14 +961,17 @@ const DIVERGENCES: Divergence[] = [
     },
     kit: { ru: 'нет', en: 'none' },
     playground: {
-      ru: 'DefenseReleaseStory: SHOW_HOLD 1200; AiCardsStory: SHOW_HOLD 1500',
-      en: 'DefenseReleaseStory: SHOW_HOLD 1200; AiCardsStory: SHOW_HOLD 1500',
+      ru: 'DefenseReleaseStory: SHOW_HOLD 1200; AiCardsStory: SHOW_HOLD 1500; Error503Story: COVER_HOLD 1200',
+      en: 'DefenseReleaseStory: SHOW_HOLD 1200; AiCardsStory: SHOW_HOLD 1500; Error503Story: COVER_HOLD 1200',
     },
     table: {
-      ru: 'entities/game/board/poses.ts: SHOW_HOLD 1200; board-beats/aiBeat.tsx: SHOW_HOLD 1500',
-      en: 'entities/game/board/poses.ts: SHOW_HOLD 1200; board-beats/aiBeat.tsx: SHOW_HOLD 1500',
+      ru: 'entities/game/board/poses.ts: SHOW_HOLD 1200 — в defenseBeat ×2, comboBeat ×3, _useBoardStaging; board-beats/aiBeat.tsx: SHOW_HOLD 1500',
+      en: 'entities/game/board/poses.ts: SHOW_HOLD 1200 — in defenseBeat ×2, comboBeat ×3, _useBoardStaging; board-beats/aiBeat.tsx: SHOW_HOLD 1500',
     },
-    note: { ru: 'одно имя, два значения', en: 'one name, two values' },
+    note: {
+      ru: 'одно имя, два значения; на столе отсчёт начинается после посадки (whenLanded)',
+      en: 'one name, two values; on the table the count starts after the landing (whenLanded)',
+    },
     status: 'rework',
   },
   {
@@ -973,16 +979,16 @@ const DIVERGENCES: Divergence[] = [
     moment: { ru: 'Защита ложится поверх атаки', en: 'A defence lands over the attack' },
     kit: { ru: 'нет', en: 'none' },
     playground: {
-      ru: 'DefenseReleaseStory: COVER_POSE 6°, сдвиг 16 / −12; Error503Story: COVER_POSE 6°, без сдвига',
-      en: 'DefenseReleaseStory: COVER_POSE 6°, offset 16 / −12; Error503Story: COVER_POSE 6°, no offset',
+      ru: 'DefenseReleaseStory: COVER_POSE 6°, сдвиг 16 / −12; Error503Story: COVER_POSE 6° / 0 / 0, сдвиг 16 / −12 прибавлен к месту цели (COVER_DX / COVER_DY)',
+      en: 'DefenseReleaseStory: COVER_POSE 6°, offset 16 / −12; Error503Story: COVER_POSE 6° / 0 / 0, the 16 / −12 offset added to the target rect (COVER_DX / COVER_DY)',
     },
     table: {
-      ru: 'COVER_POSE 6°, сдвиг 16 / −12 (entities/game/board/poses.ts)',
-      en: 'COVER_POSE 6°, offset 16 / −12 (entities/game/board/poses.ts)',
+      ru: 'COVER_POSE 6°, сдвиг 16 / −12 (entities/game/board/poses.ts) — в _useNeutralizeStaging, _useDefenseStaging ×2, comboBeat ×6, defenseBeat ×5',
+      en: 'COVER_POSE 6°, offset 16 / −12 (entities/game/board/poses.ts) — in _useNeutralizeStaging, _useDefenseStaging ×2, comboBeat ×6, defenseBeat ×5',
     },
     note: {
-      ru: 'одно имя, в Error503Story другое значение',
-      en: 'one name, a different value in Error503Story',
+      ru: 'сдвиг записан двумя способами: в позе (DefenseReleaseStory, стол) и в месте цели (Error503Story)',
+      en: 'the offset is written two ways: in the pose (DefenseReleaseStory, the table) and in the target rect (Error503Story)',
     },
     status: 'rework',
   },
@@ -1001,7 +1007,10 @@ const DIVERGENCES: Divergence[] = [
       ru: 'SUDO_POSE −7° (entities/game/board/poses.ts)',
       en: 'SUDO_POSE −7° (entities/game/board/poses.ts)',
     },
-    note: { ru: '—', en: '—' },
+    note: {
+      ru: 'при отмене Sudo возвращается в веер с наклоном −7 в DefenseReleaseStory и без наклона на столе (_useDefenseStaging.tsx:495)',
+      en: 'on a cancel the Sudo goes back to the fan at −7 in DefenseReleaseStory and with no tilt on the table (_useDefenseStaging.tsx:495)',
+    },
     status: 'rework',
   },
   {
@@ -1037,7 +1046,572 @@ const DIVERGENCES: Divergence[] = [
       ru: 'board-beats/operationBeat.tsx: CENTER_HOLD 420',
       en: 'board-beats/operationBeat.tsx: CENTER_HOLD 420',
     },
+    note: {
+      ru: 'на столе 420 стоит и до действия (PLACED_HOLD = CENTER_HOLD, operationBeat); в DeckAnimationsStory до действия паузы нет',
+      en: 'on the table 420 also stands before the effect (PLACED_HOLD = CENTER_HOLD, operationBeat); DeckAnimationsStory has no pause before the effect',
+    },
+    status: 'rework',
+  },
+  // ----- pool 2: Combo, Defense Release, Error 503, decks -----
+  {
+    id: 'D15',
+    moment: { ru: 'Две карты складываются в пару', en: 'Two cards fold into a pair' },
+    kit: {
+      ru: 'usePairFold: FOLD_MS 620; foldIntoPair — 620 по умолчанию',
+      en: 'usePairFold: FOLD_MS 620; foldIntoPair — 620 by default',
+    },
+    playground: {
+      ru: 'копия MERGE_MS 620 — ComboStory, DefenseReleaseStory; AnimationsStory складывает вручную',
+      en: 'a copy MERGE_MS 620 — ComboStory, DefenseReleaseStory; AnimationsStory folds by hand',
+    },
+    table: {
+      ru: 'копия MERGE_MS 620 (poses.ts) — _useBoardStaging, _useDefenseStaging; shownBeat — из модуля; comboBeat (foldIn) складывает вручную, обе половины стартуют из одного места',
+      en: 'a copy MERGE_MS 620 (poses.ts) — _useBoardStaging, _useDefenseStaging; shownBeat — from the module; comboBeat (foldIn) folds by hand, both halves start from one place',
+    },
+    note: {
+      ru: 'комментарий usePairFold.tsx: «there were four such callers: the scene, and three on the board»',
+      en: 'the comment in usePairFold.tsx: "there were four such callers: the scene, and three on the board"',
+    },
+    status: 'rework',
+  },
+  {
+    id: 'D16',
+    moment: {
+      ru: 'Карта из веера стартует с коробки карты в своём слоте',
+      en: 'A card leaves the fan from the card box in its slot',
+    },
+    kit: {
+      ru: 'slotPlacement (table/Hand/fan.ts), cardBoxIn',
+      en: 'slotPlacement (table/Hand/fan.ts), cardBoxIn',
+    },
+    playground: {
+      ru: 'копии slotBox: ComboStory, DefenseReleaseStory (slotBoxAt), DeckAnimationsStory',
+      en: 'slotBox copies: ComboStory, DefenseReleaseStory (slotBoxAt), DeckAnimationsStory',
+    },
+    table: {
+      ru: 'копия slotBox в _useBoardStaging (запасная); живой слот через cardBoxIn там же; _useDefenseStaging.tsx:569 — прямоугольник слота без обрезки',
+      en: 'a slotBox copy in _useBoardStaging (the fallback); the live slot through cardBoxIn there too; _useDefenseStaging.tsx:569 — the slot rect untrimmed',
+    },
+    note: {
+      ru: 'комментарий _useBoardStaging: «The slot is rotated, so its bounding rect is the box AROUND the tilted card»',
+      en: 'the comment in _useBoardStaging: "The slot is rotated, so its bounding rect is the box AROUND the tilted card"',
+    },
+    status: 'rework',
+  },
+  {
+    id: 'D17',
+    moment: {
+      ru: 'Карта летит на место в центре, носитель снимается, место рисует неподвижная карта',
+      en: 'A card flies to a place at the centre, its carrier comes down, the place draws a still card',
+    },
+    kit: { ru: 'только пресет playToCenter 480', en: 'only the playToCenter preset, 480' },
+    playground: {
+      ru: 'вручную: ComboStory, CardPlayStory, DeckAnimationsStory, HandLimitStory, DefenseReleaseStory, Error503Story',
+      en: 'by hand: ComboStory, CardPlayStory, DeckAnimationsStory, HandLimitStory, DefenseReleaseStory, Error503Story',
+    },
+    table: {
+      ru: 'вручную: _useBoardStaging — 4 места, _useHandLimit, _useUpgradeStaging (460), operationBeat, comboBeat; с позой — _useCoverFlight',
+      en: 'by hand: _useBoardStaging — 4 places, _useHandLimit, _useUpgradeStaging (460), operationBeat, comboBeat; with a pose — _useCoverFlight',
+    },
     note: { ru: '—', en: '—' },
+    status: 'rework',
+  },
+  {
+    id: 'D18',
+    moment: {
+      ru: 'Где встаёт вытянутый Sudo или Code Review, пока ждёт партнёра',
+      en: 'Where a pulled Sudo or Code Review stands while it waits for a partner',
+    },
+    kit: {
+      ru: 'места ряда staging (150, зазор 18 → ±84; centreRow.ts), CENTRE_TOP 42 (centre.ts)',
+      en: 'the staging row places (150, gap 18 → ±84; centreRow.ts), CENTRE_TOP 42 (centre.ts)',
+    },
+    playground: {
+      ru: 'ComboStory: центр, сдвиг 0; DeckAnimationsStory: ряд из двух мест',
+      en: 'ComboStory: the centre, offset 0; DeckAnimationsStory: a row of two places',
+    },
+    table: {
+      ru: 'место 0 ряда, сдвиг −84 (_useBoardStaging, stageAtCentre)',
+      en: 'row place 0, offset −84 (_useBoardStaging, stageAtCentre)',
+    },
+    note: {
+      ru: 'в ComboStory стрелка и отмена идут из центра, на столе — из места 0; пустое место 1 с пунктиром: в DeckAnimationsStory — после полёта, на столе — сразу',
+      en: 'in ComboStory the arrow and the cancel start at the centre, on the table at place 0; the empty dashed place 1: after the flight in DeckAnimationsStory, at once on the table',
+    },
+    status: 'rework',
+  },
+  {
+    id: 'D19',
+    moment: {
+      ru: 'Sudo с операцией (System Upgrade)',
+      en: 'A Sudo with an operation (System Upgrade)',
+    },
+    kit: { ru: '—', en: '—' },
+    playground: { ru: 'ComboStory: складываются в пару', en: 'ComboStory: they fold into a pair' },
+    table: {
+      ru: 'две карты рядом, места 0 и 1 (_useBoardStaging, sideBySide)',
+      en: 'two cards side by side, places 0 and 1 (_useBoardStaging, sideBySide)',
+    },
+    note: { ru: '—', en: '—' },
+    status: 'rework',
+  },
+  {
+    id: 'D20',
+    moment: {
+      ru: 'Собранная пара стоит перед уходом',
+      en: 'An assembled pair stands before it leaves',
+    },
+    kit: { ru: 'нет', en: 'none' },
+    playground: { ru: 'ComboStory: PAIR_HOLD 2100', en: 'ComboStory: PAIR_HOLD 2100' },
+    table: {
+      ru: 'такой паузы нет, ход уходит сразу; Sudo с операцией — 420 + 420 (operationBeat)',
+      en: 'no such pause, the play is sent at once; a Sudo with an operation — 420 + 420 (operationBeat)',
+    },
+    note: { ru: '—', en: '—' },
+    status: 'rework',
+  },
+  {
+    id: 'D21',
+    moment: {
+      ru: 'Пара уходит в сброс и распадается на две карты',
+      en: 'A pair leaves for the discard and splits into two cards',
+    },
+    kit: { ru: 'useDiscardExit сам делит пару', en: 'useDiscardExit splits the pair itself' },
+    playground: {
+      ru: 'через модуль: ComboStory, DefenseReleaseStory, Error503Story',
+      en: 'through the module: ComboStory, DefenseReleaseStory, Error503Story',
+    },
+    table: {
+      ru: 'через модуль, плюс деление вручную: comboBeat:391-398, defenseBeat:470-476, discardBeat:84-91, aiBeat:118-133',
+      en: 'through the module, plus splitting by hand: comboBeat:391-398, defenseBeat:470-476, discardBeat:84-91, aiBeat:118-133',
+    },
+    note: { ru: '—', en: '—' },
+    status: 'rework',
+  },
+  {
+    id: 'D22',
+    moment: {
+      ru: 'Где каждая карта ложится в куче сброса',
+      en: 'Where each card comes to rest in the discard heap',
+    },
+    kit: {
+      ru: 'scatterAt, jitter (animations/scatter.ts)',
+      en: 'scatterAt, jitter (animations/scatter.ts)',
+    },
+    playground: {
+      ru: 'разброс не передаётся — случайный (jitter): DeckAnimationsStory, DefenseReleaseStory, Error503Story, ComboStory',
+      en: 'no scatter passed — random (jitter): DeckAnimationsStory, DefenseReleaseStory, Error503Story, ComboStory',
+    },
+    table: {
+      ru: 'по номеру события (scatterAt): exchange.ts, discardBeat, drawBeat, operationBeat, comboBeat',
+      en: 'by the event id (scatterAt): exchange.ts, discardBeat, drawBeat, operationBeat, comboBeat',
+    },
+    note: {
+      ru: 'сцены — случайно, стол — по номеру события',
+      en: 'the scenes — at random, the table — by the event id',
+    },
+    status: 'rework',
+  },
+  {
+    id: 'D23',
+    moment: {
+      ru: 'Пара садится в зону — когда снимается носитель',
+      en: 'A pair lands in the zone — when its carrier comes down',
+    },
+    kit: { ru: 'playToReleaseZone', en: 'playToReleaseZone' },
+    playground: {
+      ru: 'ComboStory: пара встала → следующий кадр → носитель снимается',
+      en: 'ComboStory: the pair is set → the next frame → the carrier comes down',
+    },
+    table: {
+      ru: 'в одном обновлении экрана (comboBeat, setDown)',
+      en: 'in one commit (comboBeat, setDown)',
+    },
+    note: { ru: '—', en: '—' },
+    status: 'rework',
+  },
+  {
+    id: 'D24',
+    moment: { ru: 'Цвет стрелки', en: 'The arrow colour' },
+    kit: {
+      ru: 'useArrow — цвет передаётся вместе с прицелом',
+      en: 'useArrow — the colour is passed with the aim',
+    },
+    playground: {
+      ru: 'цвет отдельным свойством <Arrow color>: ComboStory, DeckAnimationsStory, DefenseReleaseStory',
+      en: 'the colour as a separate <Arrow color> prop: ComboStory, DeckAnimationsStory, DefenseReleaseStory',
+    },
+    table: {
+      ru: 'цвет вместе с прицелом (_useBoardStaging, _useDefenseStaging)',
+      en: 'the colour with the aim (_useBoardStaging, _useDefenseStaging)',
+    },
+    note: {
+      ru: 'комментарий useArrow.ts: «Passing it separately to <Arrow> means the consumer holds a second rule for the same fact, and the two drift»',
+      en: 'the comment in useArrow.ts: "Passing it separately to <Arrow> means the consumer holds a second rule for the same fact, and the two drift"',
+    },
+    status: 'rework',
+  },
+  {
+    id: 'D25',
+    moment: {
+      ru: 'Когда веер не отзывается на курсор',
+      en: 'When the fan does not respond to the cursor',
+    },
+    kit: { ru: '—', en: '—' },
+    playground: {
+      ru: 'ComboStory: пара стоит или идёт розыгрыш',
+      en: 'ComboStory: a pair stands or a play is running',
+    },
+    table: {
+      ru: 'пара стоит, или выбор цели, или ход отправлен, плюс стол занят (_Board.tsx:874-877)',
+      en: 'a pair stands, or a target is being chosen, or the play is sent, plus the table is busy (_Board.tsx:874-877)',
+    },
+    note: {
+      ru: "комментарий _Board.tsx: «The scene's own rule»",
+      en: 'the comment in _Board.tsx: "The scene\'s own rule"',
+    },
+    status: 'rework',
+  },
+  {
+    id: 'D26',
+    moment: {
+      ru: 'Атака и ответ уходят в сброс одной отправкой: атака снизу, ответ сверху',
+      en: 'The attack and its answer leave for the discard in one send: the attack below, the answer on top',
+    },
+    kit: {
+      ru: 'слой по месту в отправке (useDiscardExit, exitLayer)',
+      en: 'the layer by place in the send (useDiscardExit, exitLayer)',
+    },
+    playground: {
+      ru: 'слои вручную: DefenseReleaseStory, Error503Story',
+      en: 'layers by hand: DefenseReleaseStory, Error503Story',
+    },
+    table: {
+      ru: 'exchange.ts (слой по позиции): defenseBeat, DDoS в comboBeat; вручную мимо него — runPairOut в comboBeat',
+      en: 'exchange.ts (the layer by position): defenseBeat, the DDoS in comboBeat; by hand past it — runPairOut in comboBeat',
+    },
+    note: { ru: '—', en: '—' },
+    status: 'rework',
+  },
+  {
+    id: 'D27',
+    moment: {
+      ru: 'Атака лежит, прежде чем на неё можно ответить',
+      en: 'An attack rests before it can be answered',
+    },
+    kit: { ru: 'нет', en: 'none' },
+    playground: {
+      ru: 'DefenseReleaseStory: LAND_HOLD 700',
+      en: 'DefenseReleaseStory: LAND_HOLD 700',
+    },
+    table: { ru: 'такой паузы нет', en: 'no such pause' },
+    note: { ru: '—', en: '—' },
+    status: 'rework',
+  },
+  {
+    id: 'D28',
+    moment: {
+      ru: 'Атака возвращается в руку (Rollback)',
+      en: 'The attack goes back to a hand (Rollback)',
+    },
+    kit: { ru: 'dealToSeat, useHandArrival', en: 'dealToSeat, useHandArrival' },
+    playground: {
+      ru: 'DefenseReleaseStory: к сопернику — playToCenter, карта видна в месте соперника, пока не снят носитель; в свою руку — посадка без ожидания + пауза 480',
+      en: "DefenseReleaseStory: to the opponent — playToCenter, the card stays drawn at the opponent's seat until the carrier comes down; to your own hand — a landing not awaited + a 480 pause",
+    },
+    table: {
+      ru: 'к сопернику — dealToSeat с растворением; в свою руку — ожидание самой посадки (defenseBeat:248-268)',
+      en: 'to the opponent — dealToSeat with a fade; to your own hand — the landing itself awaited (defenseBeat:248-268)',
+    },
+    note: {
+      ru: 'комментарий defenseBeat: под playToCenter это «reads as a blink rather than an arrival (owner, 22.09)»',
+      en: 'the comment in defenseBeat: under playToCenter it "reads as a blink rather than an arrival (owner, 22.09)"',
+    },
+    status: 'rework',
+  },
+  {
+    id: 'D29',
+    moment: {
+      ru: 'Атака прошла: атака и релиз уходят в сброс',
+      en: 'The attack went through: the attack and the release leave for the discard',
+    },
+    kit: { ru: '—', en: '—' },
+    playground: {
+      ru: 'DefenseReleaseStory: одной отправкой, атака поверх релиза',
+      en: 'DefenseReleaseStory: in one send, the attack on top of the release',
+    },
+    table: {
+      ru: 'двумя тактами подряд — сначала атака, потом релиз (planBeats); в куче релиз ложится поверх атаки',
+      en: 'in two beats in a row — the attack, then the release (planBeats); in the heap the release lands on top of the attack',
+    },
+    note: { ru: '—', en: '—' },
+    status: 'rework',
+  },
+  {
+    id: 'D30',
+    moment: {
+      ru: 'Security Bug: релиз переходит в зону атакующего',
+      en: "Security Bug: the release crosses to the attacker's zone",
+    },
+    kit: { ru: '—', en: '—' },
+    playground: {
+      ru: 'DefenseReleaseStory: одновременно с уходом атаки',
+      en: 'DefenseReleaseStory: together with the attack leaving',
+    },
+    table: {
+      ru: 'отдельным тактом после ухода атаки (planBeats, defenseBeat)',
+      en: 'a beat of its own after the attack leaves (planBeats, defenseBeat)',
+    },
+    note: {
+      ru: 'комментарий planBeats: «One event, one beat — the crossing is its own gesture, never coalesced»',
+      en: 'the comment in planBeats: "One event, one beat — the crossing is its own gesture, never coalesced"',
+    },
+    status: 'rework',
+  },
+  {
+    id: 'D31',
+    moment: {
+      ru: 'Подсветка веера, пока Sudo ждёт защиту',
+      en: 'The fan highlight while a Sudo waits for its defence',
+    },
+    kit: { ru: '—', en: '—' },
+    playground: {
+      ru: 'DefenseReleaseStory: карты подсвечены как доступные, без цвета',
+      en: 'DefenseReleaseStory: the cards lit as playable, with no colour',
+    },
+    table: {
+      ru: 'карты выделены, цвет Sudo (_useDefenseStaging)',
+      en: "the cards selected, in the Sudo's colour (_useDefenseStaging)",
+    },
+    note: { ru: '—', en: '—' },
+    status: 'rework',
+  },
+  {
+    id: 'D32',
+    moment: {
+      ru: 'Строка-просьба под центром стола',
+      en: 'The ask line under the centre of the table',
+    },
+    kit: { ru: 'AskLine (table/TableCentre)', en: 'AskLine (table/TableCentre)' },
+    playground: { ru: 'DefenseReleaseStory: AskLine', en: 'DefenseReleaseStory: AskLine' },
+    table: {
+      ru: 'своя разметка и CSS (_Board.tsx, _Board.module.css .ask)',
+      en: 'its own markup and CSS (_Board.tsx, _Board.module.css .ask)',
+    },
+    note: {
+      ru: 'комментарий AskLine.tsx: «It was written twice before this»; текст: в сцене «вытащи любую из руки», на столе «вытащите любую»',
+      en: 'the comment in AskLine.tsx: "It was written twice before this"; the text: «вытащи любую из руки» in the scene, «вытащите любую» on the table',
+    },
+    status: 'rework',
+  },
+  {
+    id: 'D33',
+    moment: {
+      ru: 'Error 503 стоит в центре ровно',
+      en: 'An Error 503 stands straight at the centre',
+    },
+    kit: { ru: 'наборы мест центра (centre.ts)', en: 'the centre place sets (centre.ts)' },
+    playground: { ru: 'Error503Story: набор reveal', en: 'Error503Story: the reveal set' },
+    table: {
+      ru: 'ALARM_POSE 0 / 0 / 0 (poses.ts), набор defence',
+      en: 'ALARM_POSE 0 / 0 / 0 (poses.ts), the defence set',
+    },
+    note: { ru: '—', en: '—' },
+    status: 'rework',
+  },
+  {
+    id: 'D34',
+    moment: {
+      ru: 'Сколько Error 503 держится в центре без ответа игрока',
+      en: "How long an Error 503 holds at the centre with no player's answer",
+    },
+    kit: { ru: 'нет', en: 'none' },
+    playground: {
+      ru: 'Error503Story: при Monitoring — 1200; без защиты — 2500 с подсветкой',
+      en: 'Error503Story: under Monitoring — 1200; with no defence — 2500 with the glow',
+    },
+    table: {
+      ru: 'TABLE_HOLD 2600 (drawBeat), без подсветки',
+      en: 'TABLE_HOLD 2600 (drawBeat), with no glow',
+    },
+    note: {
+      ru: 'на столе — то же значение, что у AI-карты (D4)',
+      en: 'on the table — the same value as for an AI card (D4)',
+    },
+    status: 'rework',
+  },
+  {
+    id: 'D35',
+    moment: { ru: 'Когда гаснет своя красная подсветка', en: 'When your own red glow goes out' },
+    kit: { ru: 'EdgeGlow', en: 'EdgeGlow' },
+    playground: {
+      ru: 'Error503Story: при Debugger — в момент броска, до полёта; перед зачисткой',
+      en: 'Error503Story: for a Debugger — at the drop, before the flight; before the sweep',
+    },
+    table: {
+      ru: 'на взлёте после выдержки (defenseBeat); горит всю зачистку, гаснет на клипе (useBeats)',
+      en: 'at takeoff after the hold (defenseBeat); lit through the whole sweep, out when the clip comes (useBeats)',
+    },
+    note: {
+      ru: 'Error503Story.module.css: комментарий говорит, что отступ задаётся инлайн через barH; в коде такого стиля нет',
+      en: 'Error503Story.module.css: the comment says the offset is set inline via barH; there is no such style in the code',
+    },
+    status: 'rework',
+  },
+  {
+    id: 'D36',
+    moment: {
+      ru: 'Релиз вытаскивают из своей зоны в ответ на Error 503',
+      en: 'A release is pulled out of your own zone to answer an Error 503',
+    },
+    kit: { ru: 'нет', en: 'none' },
+    playground: {
+      ru: 'Error503Story: место захвата под курсором; сжатие 200; пара видна парой; слой --z-flight + 10; брошенный на стол — переход CSS 240 + 300; брошенный на своё место — возврат 240 + 260',
+      en: 'Error503Story: the grab point under the cursor; resize 200; a pair shown as a pair; layer --z-flight + 10; dropped on the table — a CSS transition 240 + 300; dropped on your own area — a return 240 + 260',
+    },
+    table: {
+      ru: '_useZonePull.tsx: RESIZE_MS 200; одиночная карта; слой --z-flight; на стол — playToCenter 480; на своё место — без полёта',
+      en: '_useZonePull.tsx: RESIZE_MS 200; a single card; layer --z-flight; on the table — playToCenter 480; on your own area — no flight',
+    },
+    note: {
+      ru: "комментарий _useZonePull.tsx: «Ported from the playground's Error503Story»; похожее перетаскивание — HandLimitStory, _useHandLimit",
+      en: 'the comment in _useZonePull.tsx: "Ported from the playground\'s Error503Story"; a similar drag — HandLimitStory, _useHandLimit',
+    },
+    status: 'rework',
+  },
+  {
+    id: 'D37',
+    moment: {
+      ru: 'Всё имущество выбывшего собирается в кучу в центре и разлетается в сброс',
+      en: 'Everything the eliminated player held gathers in a heap at the centre and scatters to the discard',
+    },
+    kit: { ru: 'useFlyer.glide, restTransform', en: 'useFlyer.glide, restTransform' },
+    playground: {
+      ru: 'Error503Story: сбор 300, держит 1500, разброс по ширине 150; HandLimitStory: GRID_HOLD 1500',
+      en: 'Error503Story: gather 300, hold 1500, scatter at width 150; HandLimitStory: GRID_HOLD 1500',
+    },
+    table: {
+      ru: 'discardBeat: сбор 300, GATHER_HOLD 1500 (poses.ts), разброс по ширине 120; handLimitBeat',
+      en: 'discardBeat: gather 300, GATHER_HOLD 1500 (poses.ts), scatter at width 120; handLimitBeat',
+    },
+    note: {
+      ru: "комментарий discardBeat.tsx: «Ported from the playground's own Error503Story.sweep»; в сцене без защиты сгребается только рука, на столе — рука и зона",
+      en: 'the comment in discardBeat.tsx: "Ported from the playground\'s own Error503Story.sweep"; with no defence the scene sweeps the hand only, the table — the hand and the zone',
+    },
+    status: 'rework',
+  },
+  {
+    id: 'D38',
+    moment: {
+      ru: 'Выбывший: рука и зона гаснут, появляется «вы выбыли»',
+      en: 'Eliminated: the hand and the zone fade, "you are out" appears',
+    },
+    kit: { ru: 'плашка Table без перехода', en: 'the Table badge, no transition' },
+    playground: {
+      ru: 'Error503Story: переход прозрачности 420',
+      en: 'Error503Story: an opacity transition, 420',
+    },
+    table: {
+      ru: 'мгновенная замена (_Board.tsx:1974-1977)',
+      en: 'an instant swap (_Board.tsx:1974-1977)',
+    },
+    note: { ru: '—', en: '—' },
+    status: 'rework',
+  },
+  {
+    id: 'D39',
+    moment: { ru: 'Клип выбывания', en: 'The elimination clip' },
+    kit: { ru: 'нет', en: 'none' },
+    playground: {
+      ru: 'Error503Story: задержка 400, минимум 5000, выбор случайный; часы — с показа, круги — по длительности видео',
+      en: "Error503Story: delay 400, minimum 5000, a random pick; the clock from the show, the loops by the video's duration",
+    },
+    table: {
+      ru: 'eliminateBeat: задержка 400, минимум 5000, выбор по номеру события из сортированного списка; часы — с начала проигрывания; страховки 10000 и 250; CSS наложения — копия тех же значений',
+      en: 'eliminateBeat: delay 400, minimum 5000, a pick by the event id from a sorted list; the clock from playback start; guards 10000 and 250; the overlay CSS — a copy of the same values',
+    },
+    note: {
+      ru: 'комментарии в Error503Story расходятся: «finishes the current loop and fades out» — и «Going away is abrupt on purpose»',
+      en: 'the comments in Error503Story disagree: "finishes the current loop and fades out" — and "Going away is abrupt on purpose"',
+    },
+    status: 'rework',
+  },
+  {
+    id: 'D40',
+    moment: {
+      ru: 'Новая половина колоды вылетает на своё место',
+      en: 'The new half of a deck flies out to its place',
+    },
+    kit: { ru: 'flyFrom — 520 по умолчанию', en: 'flyFrom — 520 by default' },
+    playground: {
+      ru: 'DeckAnimationsStory: копия SPLIT_MS 520; летит только новая колода, встаёт в конец ряда; пауза 670',
+      en: 'DeckAnimationsStory: a copy SPLIT_MS 520; only the new deck flies, it takes the end of the row; a 670 pause',
+    },
+    table: {
+      ru: 'deckBeat: копия PILE_SPLIT_MS 520; летят новая и стоящие колоды, новая встаёт за исходной (как в движке); пауза 520 + 360',
+      en: 'deckBeat: a copy PILE_SPLIT_MS 520; the new and the standing decks fly, the new one takes the place after its source (as in the engine); a 520 + 360 pause',
+    },
+    note: { ru: '—', en: '—' },
+    status: 'rework',
+  },
+  {
+    id: 'D41',
+    moment: {
+      ru: 'Git Branch + Sudo: колода делится и сброс становится колодой',
+      en: 'Git Branch + Sudo: the deck splits and the discard becomes a deck',
+    },
+    kit: { ru: '—', en: '—' },
+    playground: {
+      ru: 'DeckAnimationsStory: по очереди, между ними SPLIT_HOLD 600',
+      en: 'DeckAnimationsStory: one after the other, SPLIT_HOLD 600 between',
+    },
+    table: { ru: 'deckBeat: одновременно', en: 'deckBeat: together' },
+    note: {
+      ru: 'комментарий deckBeat: «They are ONE event at the table, so they play together … (owner, 18.09)»',
+      en: 'the comment in deckBeat: "They are ONE event at the table, so they play together … (owner, 18.09)"',
+    },
+    status: 'rework',
+  },
+  {
+    id: 'D42',
+    moment: {
+      ru: 'Сброс становится колодой: сбор → подъём → полёт → переворот',
+      en: 'The discard becomes a deck: gather → lift → travel → flip',
+    },
+    kit: {
+      ru: 'переход Pile 320; gatherToDeck — 520 по умолчанию; переворот 420',
+      en: 'the Pile transition 320; gatherToDeck — 520 by default; the flip 420',
+    },
+    playground: {
+      ru: 'DeckAnimationsStory: сбор 360, пауза 360, полёт 560, пауза 360, TURN_MS 460, пауза 360',
+      en: 'DeckAnimationsStory: gather 360, pause 360, travel 560, pause 360, TURN_MS 460, pause 360',
+    },
+    table: {
+      ru: 'deckBeat: сбор 360, без паузы, полёт 560, пауза 360, TURN_MS 460, без паузы',
+      en: 'deckBeat: gather 360, no pause, travel 560, pause 360, TURN_MS 460, no pause',
+    },
+    note: {
+      ru: 'каталог AnimationsStory пишет для gatherToDeck 520',
+      en: 'the AnimationsStory catalogue gives 520 for gatherToDeck',
+    },
+    status: 'rework',
+  },
+  {
+    id: 'D43',
+    moment: { ru: 'Колоды сливаются в первую', en: 'The decks merge into the first one' },
+    kit: { ru: 'absorbToDeck — 520 по умолчанию', en: 'absorbToDeck — 520 by default' },
+    playground: {
+      ru: 'DeckAnimationsStory: копия MERGE_MS 520; цель — колода вместе с подписью; при Sudo сброс сначала собирается и переворачивается; после слияния без паузы',
+      en: 'DeckAnimationsStory: a copy MERGE_MS 520; the target — the deck with its label; with Sudo the discard is first gathered and turned; no pause after the merge',
+    },
+    table: {
+      ru: 'deckBeat: копия PILE_MERGE_MS 520; цель — сама карта колоды; при Sudo сброс летит лицом вверх без сбора; после слияния 360',
+      en: "deckBeat: a copy PILE_MERGE_MS 520; the target — the deck's card itself; with Sudo the discard flies face up with no gather; 360 after the merge",
+    },
+    note: {
+      ru: 'имя MERGE_MS в других местах означает 620 (D15)',
+      en: 'the name MERGE_MS means 620 elsewhere (D15)',
+    },
     status: 'rework',
   },
 ]
