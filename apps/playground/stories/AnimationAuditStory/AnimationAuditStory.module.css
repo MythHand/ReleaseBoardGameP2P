@@ -103,6 +103,17 @@
   inline-size: auto;
 }
 
+/* the game situation a run of divergence rows belongs to */
+.table .groupRow td {
+  padding-block: 18px 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--white-50);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border-block-end: 1px solid var(--white-14);
+}
+
 .table tr:hover td {
   background: var(--white-03);
 }
@@ -233,6 +244,11 @@
 
 .ref:hover {
   text-decoration: underline;
+}
+
+/* a group heading does not light up under the cursor like a row of content */
+.table .groupRow:hover td {
+  background: none;
 }
 
 /* a row reached by its link lands clear of the page's top edge */

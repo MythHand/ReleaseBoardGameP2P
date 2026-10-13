@@ -64,6 +64,10 @@ interface Issue {
 // a copy in a scene, on the table, or in both is the divergence.
 interface Divergence {
   id: string
+  // the game situation the row belongs to — the table is grouped by it
+  group: string
+  // other rows and older register entries tied to this one, and what they share
+  related: Loc
   moment: Loc
   kit: Loc
   playground: Loc
@@ -769,6 +773,35 @@ const SCENARIOS: Scenario[] = [
   },
 ]
 
+// The game situations the divergence table is grouped by, in reading order.
+const DIVERGENCE_GROUPS: { id: string; title: Loc }[] = [
+  { id: 'deal', title: { ru: 'Раздача', en: 'The deal' } },
+  {
+    id: 'play',
+    title: { ru: 'Розыгрыш и полёт в центр', en: 'Playing a card and the flight to the centre' },
+  },
+  { id: 'hand', title: { ru: 'Карта в руку', en: 'A card into the hand' } },
+  { id: 'draw', title: { ru: 'Добор и вскрытие', en: 'Drawing and revealing' } },
+  { id: 'seat', title: { ru: 'Карта в место соперника', en: "A card into an opponent's seat" } },
+  { id: 'decks', title: { ru: 'Колоды', en: 'The decks' } },
+  { id: 'defense', title: { ru: 'Защита релиза', en: 'Defending a release' } },
+  { id: 'combo', title: { ru: 'Комбо', en: 'Combo' } },
+  { id: 'e503', title: { ru: 'Error 503 и выбывание', en: 'Error 503 and elimination' } },
+  { id: 'ai', title: { ru: 'AI-карты', en: 'AI cards' } },
+  { id: 'git', title: { ru: 'Cherry-pick и Rebase', en: 'Cherry-pick and Rebase' } },
+  { id: 'upgrade', title: { ru: 'System Upgrade', en: 'System Upgrade' } },
+  {
+    id: 'take',
+    title: {
+      ru: 'Карта из чужой руки: взятие, кража, запрос',
+      en: 'A card out of another hand: taking, stealing, asking',
+    },
+  },
+  { id: 'limit', title: { ru: 'Лимит руки', en: 'The hand limit' } },
+  { id: 'end', title: { ru: 'Конец партии', en: 'The end of a match' } },
+  { id: 'common', title: { ru: 'Общее для всех сцен', en: 'Common to every scene' } },
+]
+
 // ===== Divergences in animation module use =====
 // A moment per row, with every place it is written in: the kit's modules
 // (apps/ui/src), the playground's scenes, the table (apps/frontend). Each row
@@ -778,6 +811,11 @@ const SCENARIOS: Scenario[] = [
 const DIVERGENCES: Divergence[] = [
   {
     id: 'D1',
+    group: 'draw',
+    related: {
+      ru: 'D2 — паузы до и после переворота считаются от этой длительности (FLIP_MS + 140 в AiCardsStory)',
+      en: 'D2 — the pauses around a flip are counted from this duration (FLIP_MS + 140 in AiCardsStory)',
+    },
     moment: { ru: 'Сколько длится переворот карты', en: 'How long a card flip takes' },
     kit: {
       ru: 'FLIP_MS = 420 (animations/presets.ts)',
@@ -796,6 +834,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D2',
+    group: 'draw',
+    related: {
+      ru: 'D1 — длительность самого переворота, FLIP_MS; D70 — те же паузы 160 / FLIP_MS + 140 у карты, добытой эффектом AI',
+      en: 'D1 — the duration of the flip itself, FLIP_MS; D70 — the same 160 / FLIP_MS + 140 pauses for a card an AI effect draws',
+    },
     moment: {
       ru: 'Карта встала на место → пауза → переворот → пауза, чтобы прочитать',
       en: 'A card stands in its place → pause → flip → pause to read it',
@@ -817,6 +860,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D3',
+    group: 'play',
+    related: {
+      ru: 'D17 — тот же полёт в центр, но носитель снимается и место рисует неподвижная карта; обе строки закроет один модуль полёта на место',
+      en: 'D17 — the same flight to the centre, but the carrier comes down and a still card takes the place; one module of the flight to a place closes both',
+    },
     moment: {
       ru: 'Карта летит на место в центре и остаётся там стоять',
       en: 'A card flies to a place at the centre and stays standing there',
@@ -841,6 +889,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D4',
+    group: 'draw',
+    related: {
+      ru: 'D34 — на столе тем же TABLE_HOLD держится Error 503 без ответа: правка значения сдвинет обе; старая запись реестра «Сколько триггер стоит в центре — значения нет» — значение теперь есть, TABLE_HOLD',
+      en: 'D34 — on the table the same TABLE_HOLD holds an unanswered Error 503: changing the value moves both; the older register entry "How long a trigger stands at the centre — there is no value" — there is one now, TABLE_HOLD',
+    },
     moment: {
       ru: 'Сколько стол держит открытую AI-карту',
       en: 'How long the table holds an AI card open',
@@ -862,6 +915,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D5',
+    group: 'ai',
+    related: {
+      ru: 'D66 — перед уходом домой стоящая AI-карта снова становится носителем на своём месте',
+      en: 'D66 — before going home a standing AI card becomes a carrier again where it stands',
+    },
     moment: {
       ru: 'AI-карта уходит в колоду событий: переворот рубашкой, полёт в колоду',
       en: 'An AI card goes back to the events deck: a flip face down, a travel into the deck',
@@ -880,6 +938,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D6',
+    group: 'seat',
+    related: {
+      ru: 'D44 — scale: SEAT_SHRINK полёт не читает; D28 — Rollback к сопернику целится в его место коробкой карты CARD_W, без ×0.7',
+      en: 'D44 — the travel does not read scale: SEAT_SHRINK; D28 — the Rollback to the opponent aims at the seat with a CARD_W card box, no ×0.7',
+    },
     moment: {
       ru: 'Каким размером карта входит в место соперника',
       en: "How big a card is as it enters an opponent's seat",
@@ -901,6 +964,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D7',
+    group: 'play',
+    related: {
+      ru: 'D10, D11, D12, D15, D33, D37, D48 — значения того же файла стола entities/game/board/poses.ts, переписанные из сцен; закроются одним переносом этих значений в кит',
+      en: 'D10, D11, D12, D15, D33, D37, D48 — values of the same table file, entities/game/board/poses.ts, quoted from the scenes; one move of those values into the kit closes them all',
+    },
     moment: {
       ru: 'Атака ложится в центре с наклоном',
       en: 'An attack lands at the centre at a tilt',
@@ -922,6 +990,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D8',
+    group: 'hand',
+    related: {
+      ru: 'D95 — щель в веере под несомой картой при лимите руки',
+      en: 'D95 — the gap the fan opens under a carried card in the hand limit',
+    },
     moment: {
       ru: 'Карта, которая уже летит, садится в свой веер',
       en: 'A card already in the air lands in its own fan',
@@ -946,6 +1019,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D9',
+    group: 'deal',
+    related: { ru: '—', en: '—' },
     moment: { ru: 'Тайминги раздачи (15 значений)', en: 'The deal timings (15 values)' },
     kit: { ru: 'нет', en: 'none' },
     playground: { ru: 'GameDealStory', en: 'GameDealStory' },
@@ -958,6 +1033,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D10',
+    group: 'defense',
+    related: {
+      ru: 'D7, D11, D12, D15, D33, D37, D48 — значения того же файла стола entities/game/board/poses.ts, переписанные из сцен; закроются одним переносом этих значений в кит; D82 — та же выдержка 1200 у платы за последний релиз перед хлопушками',
+      en: 'D7, D11, D12, D15, D33, D37, D48 — values of the same table file, entities/game/board/poses.ts, quoted from the scenes; one move of those values into the kit closes them all; D82 — the same 1200 hold for the cost of the last release before the confetti',
+    },
     moment: {
       ru: 'Сколько карта стоит открытой в центре перед уходом',
       en: 'How long a card stands open at the centre before it leaves',
@@ -979,6 +1059,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D11',
+    group: 'defense',
+    related: {
+      ru: 'D7, D10, D12, D15, D33, D37, D48 — значения того же файла стола entities/game/board/poses.ts, переписанные из сцен; закроются одним переносом этих значений в кит',
+      en: 'D7, D10, D12, D15, D33, D37, D48 — values of the same table file, entities/game/board/poses.ts, quoted from the scenes; one move of those values into the kit closes them all',
+    },
     moment: { ru: 'Защита ложится поверх атаки', en: 'A defence lands over the attack' },
     kit: { ru: 'нет', en: 'none' },
     playground: {
@@ -997,6 +1082,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D12',
+    group: 'defense',
+    related: {
+      ru: 'D7, D10, D11, D15, D33, D37, D48 — значения того же файла стола entities/game/board/poses.ts, переписанные из сцен; закроются одним переносом этих значений в кит',
+      en: 'D7, D10, D11, D15, D33, D37, D48 — values of the same table file, entities/game/board/poses.ts, quoted from the scenes; one move of those values into the kit closes them all',
+    },
     moment: { ru: 'Sudo стоит на своём месте', en: 'A Sudo stands in its own place' },
     kit: {
       ru: 'primitives/CardPair: −7° — наклон второй карты в паре',
@@ -1018,6 +1108,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D13',
+    group: 'seat',
+    related: {
+      ru: 'D52 — то же число 820 у выдержки открытой карты (REVEAL_HOLD в transferBeat, PickSpecificCardStory, PickOpponentCardStory); D76 — то же 820 перед тряской при промахе (REQUEST_HOLD)',
+      en: 'D52 — the same 820 for the hold of an open card (REVEAL_HOLD in transferBeat, PickSpecificCardStory, PickOpponentCardStory); D76 — the same 820 before the shake on a miss (REQUEST_HOLD)',
+    },
     moment: {
       ru: 'Карта стоит в центре рубашкой перед уходом в место соперника',
       en: "A card stands face down at the centre before it goes into an opponent's seat",
@@ -1039,6 +1134,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D14',
+    group: 'play',
+    related: {
+      ru: 'D20 — Sudo с операцией: на столе 420 + 420, это PLACED_HOLD и CENTER_HOLD этой строки',
+      en: "D20 — a Sudo with an operation: on the table 420 + 420, this row's PLACED_HOLD and CENTER_HOLD",
+    },
     moment: {
       ru: 'Карта стоит в центре после действия, перед уходом в сброс',
       en: 'A card stands at the centre after its effect, before it leaves for the discard',
@@ -1061,6 +1161,11 @@ const DIVERGENCES: Divergence[] = [
   // ----- pool 2: Combo, Defense Release, Error 503, decks -----
   {
     id: 'D15',
+    group: 'combo',
+    related: {
+      ru: 'D7, D10, D11, D12, D33, D37, D48 — значения того же файла стола entities/game/board/poses.ts, переписанные из сцен; закроются одним переносом этих значений в кит; D43 — то же имя MERGE_MS у слияния колод, но значение 520; старая запись реестра «Фолд карты и судо в пару написан четыре раза, не как модуль» — тот же момент',
+      en: 'D7, D10, D11, D12, D33, D37, D48 — values of the same table file, entities/game/board/poses.ts, quoted from the scenes; one move of those values into the kit closes them all; D43 — the same name MERGE_MS for the deck merge, but the value 520; the older register entry "The card-and-sudo fold into a pair is written four times, not as a module" — the same moment',
+    },
     moment: { ru: 'Две карты складываются в пару', en: 'Two cards fold into a pair' },
     kit: {
       ru: 'usePairFold: FOLD_MS 620; foldIntoPair — 620 по умолчанию',
@@ -1082,6 +1187,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D16',
+    group: 'hand',
+    related: {
+      ru: 'старая запись реестра «Такт летит из bounding-box наклонённого слота веера» — оформлена по ответу владельца: карта, которую игрок вытягивает сам, под курсором выровнена; в этой строке остаются места, где карта уходит из веера не из-под курсора (transferBeat, discardBeat)',
+      en: 'the older register entry "A beat flies from the bounding box of a tilted fan slot" — the same places that start from the fan slot rect',
+    },
     moment: {
       ru: 'Карта из веера стартует с коробки карты в своём слоте',
       en: 'A card leaves the fan from the card box in its slot',
@@ -1106,6 +1216,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D17',
+    group: 'play',
+    related: {
+      ru: 'D3 — тот же полёт в центр, но карта остаётся стоять на носителе; D44 — переданная длительность 460 (_useUpgradeStaging) полётом не читается',
+      en: 'D3 — the same flight to the centre, but the card stays standing on its carrier; D44 — the 460 duration passed (_useUpgradeStaging) is not read by the travel',
+    },
     moment: {
       ru: 'Карта летит на место в центре, носитель снимается, место рисует неподвижная карта',
       en: 'A card flies to a place at the centre, its carrier comes down, the place draws a still card',
@@ -1127,6 +1242,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D18',
+    group: 'combo',
+    related: { ru: '—', en: '—' },
     moment: {
       ru: 'Где встаёт вытянутый Sudo или Code Review, пока ждёт партнёра',
       en: 'Where a pulled Sudo or Code Review stands while it waits for a partner',
@@ -1151,6 +1268,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D19',
+    group: 'combo',
+    related: { ru: '—', en: '—' },
     moment: {
       ru: 'Sudo с операцией (System Upgrade)',
       en: 'A Sudo with an operation (System Upgrade)',
@@ -1166,6 +1285,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D20',
+    group: 'combo',
+    related: { ru: '—', en: '—' },
     moment: {
       ru: 'Собранная пара стоит перед уходом',
       en: 'An assembled pair stands before it leaves',
@@ -1181,6 +1302,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D21',
+    group: 'combo',
+    related: {
+      ru: 'D26 — та же отправка в сброс: слой атаки и слой ответа; D67 — пару Crush делит вручную aiBeat',
+      en: "D26 — the same send to the discard: the attack layer and the answer layer; D67 — aiBeat splits Crush's pair by hand",
+    },
     moment: {
       ru: 'Пара уходит в сброс и распадается на две карты',
       en: 'A pair leaves for the discard and splits into two cards',
@@ -1199,6 +1325,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D22',
+    group: 'common',
+    related: {
+      ru: 'D37 — разброс кучи в центре при выбывании: сцена считает по ширине 150, стол по 120',
+      en: 'D37 — the scatter of the heap at the centre on elimination: the scene counts on width 150, the table on 120',
+    },
     moment: {
       ru: 'Где каждая карта ложится в куче сброса',
       en: 'Where each card comes to rest in the discard heap',
@@ -1223,6 +1354,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D23',
+    group: 'combo',
+    related: {
+      ru: 'D82 — посадка последнего релиза в слот перед хлопушками',
+      en: 'D82 — the last release landing in its slot before the confetti',
+    },
     moment: {
       ru: 'Пара садится в зону — когда снимается носитель',
       en: 'A pair lands in the zone — when its carrier comes down',
@@ -1244,6 +1380,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D24',
+    group: 'combo',
+    related: { ru: '—', en: '—' },
     moment: { ru: 'Цвет стрелки', en: 'The arrow colour' },
     kit: {
       ru: 'useArrow — цвет передаётся вместе с прицелом',
@@ -1265,6 +1403,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D25',
+    group: 'common',
+    related: { ru: '—', en: '—' },
     moment: {
       ru: 'Когда веер не отзывается на курсор',
       en: 'When the fan does not respond to the cursor',
@@ -1286,6 +1426,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D26',
+    group: 'defense',
+    related: {
+      ru: 'D21 — пара в той же отправке распадается на две карты; D29 — когда атака прошла, на столе это два такта, а не одна отправка; D49 — в System Upgrade слой задан, но в сцене карты летят своими элементами со слоем 100',
+      en: 'D21 — a pair in the same send splits into two cards; D29 — when the attack went through, the table plays two beats, not one send; D49 — in System Upgrade a layer is given, but in the scene the cards fly as their own elements on layer 100',
+    },
     moment: {
       ru: 'Атака и ответ уходят в сброс одной отправкой: атака снизу, ответ сверху',
       en: 'The attack and its answer leave for the discard in one send: the attack below, the answer on top',
@@ -1307,6 +1452,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D27',
+    group: 'defense',
+    related: { ru: '—', en: '—' },
     moment: {
       ru: 'Атака лежит, прежде чем на неё можно ответить',
       en: 'An attack rests before it can be answered',
@@ -1322,6 +1469,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D28',
+    group: 'defense',
+    related: {
+      ru: 'D6 — каким размером карта входит в место соперника',
+      en: "D6 — how big a card is as it enters an opponent's seat",
+    },
     moment: {
       ru: 'Атака возвращается в руку (Rollback)',
       en: 'The attack goes back to a hand (Rollback)',
@@ -1343,6 +1495,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D29',
+    group: 'defense',
+    related: {
+      ru: 'D26 — одна отправка в сброс со слоем атаки и слоем ответа',
+      en: 'D26 — one send to the discard with the attack layer and the answer layer',
+    },
     moment: {
       ru: 'Атака прошла: атака и релиз уходят в сброс',
       en: 'The attack went through: the attack and the release leave for the discard',
@@ -1361,6 +1518,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D30',
+    group: 'defense',
+    related: { ru: '—', en: '—' },
     moment: {
       ru: 'Security Bug: релиз переходит в зону атакующего',
       en: "Security Bug: the release crosses to the attacker's zone",
@@ -1382,6 +1541,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D31',
+    group: 'defense',
+    related: { ru: '—', en: '—' },
     moment: {
       ru: 'Подсветка веера, пока Sudo ждёт защиту',
       en: 'The fan highlight while a Sudo waits for its defence',
@@ -1400,6 +1561,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D32',
+    group: 'common',
+    related: { ru: '—', en: '—' },
     moment: {
       ru: 'Строка-просьба под центром стола',
       en: 'The ask line under the centre of the table',
@@ -1421,6 +1584,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D33',
+    group: 'e503',
+    related: {
+      ru: 'D7, D10, D11, D12, D15, D37, D48 — значения того же файла стола entities/game/board/poses.ts, переписанные из сцен; закроются одним переносом этих значений в кит; D70 — тот же ALARM_POSE у базового Error 503, добытого эффектом AI',
+      en: 'D7, D10, D11, D12, D15, D37, D48 — values of the same table file, entities/game/board/poses.ts, quoted from the scenes; one move of those values into the kit closes them all; D70 — the same ALARM_POSE for a base Error 503 an AI effect draws',
+    },
     moment: {
       ru: 'Error 503 стоит в центре ровно',
       en: 'An Error 503 stands straight at the centre',
@@ -1436,6 +1604,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D34',
+    group: 'e503',
+    related: {
+      ru: 'D4 — тот же TABLE_HOLD у AI-карты на столе; D35 — своя красная подсветка при Error 503 без ответа; старые записи реестра «Сколько триггер стоит в центре — значения нет» и «У ответа Monitoring на 503 нет движения вообще» — значение и движение теперь есть',
+      en: 'D4 — the same TABLE_HOLD for an AI card on the table; D35 — your own red glow under an unanswered Error 503; the older register entries "How long a trigger stands at the centre — there is no value" and "The Monitoring answer to a 503 has no movement at all" — the value and the movement are there now',
+    },
     moment: {
       ru: 'Сколько Error 503 держится в центре без ответа игрока',
       en: "How long an Error 503 holds at the centre with no player's answer",
@@ -1457,24 +1630,37 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D35',
-    moment: { ru: 'Когда гаснет своя красная подсветка', en: 'When your own red glow goes out' },
+    group: 'e503',
+    related: {
+      ru: 'D34 — сколько Error 503 держится без ответа: в сцене с подсветкой, на столе без',
+      en: 'D34 — how long an unanswered Error 503 holds: with the glow in the scene, without it on the table',
+    },
+    moment: {
+      ru: 'Когда загорается и гаснет своя красная подсветка',
+      en: 'When your own red glow comes on and goes out',
+    },
     kit: { ru: 'EdgeGlow', en: 'EdgeGlow' },
     playground: {
-      ru: 'Error503Story: при Debugger — в момент броска, до полёта; перед зачисткой',
-      en: 'Error503Story: for a Debugger — at the drop, before the flight; before the sweep',
+      ru: 'загорается: AiCardsStory — через 200 после паузы чтения; Error503Story — сразу после 180 / 560; DrawCardStory — после 220 / 560. Гаснет: Error503Story — при Debugger в момент броска, до полёта; перед зачисткой',
+      en: 'comes on: AiCardsStory — 200 after the reading pause; Error503Story — right after 180 / 560; DrawCardStory — after 220 / 560. Goes out: Error503Story — for a Debugger at the drop, before the flight; before the sweep',
     },
     table: {
-      ru: 'на взлёте после выдержки (defenseBeat); горит всю зачистку, гаснет на клипе (useBeats)',
-      en: 'at takeoff after the hold (defenseBeat); lit through the whole sweep, out when the clip comes (useBeats)',
+      ru: 'загорается: aiBeat — в момент переворота; drawBeat — после 220 / 560. Гаснет: на взлёте после выдержки (defenseBeat); горит всю зачистку, гаснет на клипе (useBeats)',
+      en: 'comes on: aiBeat — at the flip; drawBeat — after 220 / 560. Goes out: at takeoff after the hold (defenseBeat); lit through the whole sweep, out when the clip comes (useBeats)',
     },
     note: {
-      ru: 'Error503Story.module.css: комментарий говорит, что отступ задаётся инлайн через barH; в коде такого стиля нет. Когда подсветка загорается — D69',
-      en: 'Error503Story.module.css: the comment says the offset is set inline via barH; there is no such style in the code. When the glow comes on — D69',
+      ru: 'Error503Story.module.css: комментарий говорит, что отступ задаётся инлайн через barH; в коде такого стиля нет. Соединено 13.10 с бывшей отдельной строкой о том, когда подсветка загорается',
+      en: 'Error503Story.module.css: the comment says the offset is set inline via barH; there is no such style in the code. Merged 13.10 with the former separate row on when the glow comes on',
     },
     status: 'rework',
   },
   {
     id: 'D36',
+    group: 'e503',
+    related: {
+      ru: 'D94, D95 — то же перетаскивание из клетки сетки лимита руки и щель в веере; закроются одним модулем «достать карту из места и нести»',
+      en: 'D94, D95 — the same drag out of a hand-limit grid cell and the gap in the fan; one module "take a card out of a place and carry it" closes them',
+    },
     moment: {
       ru: 'Релиз вытаскивают из своей зоны в ответ на Error 503',
       en: 'A release is pulled out of your own zone to answer an Error 503',
@@ -1496,6 +1682,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D37',
+    group: 'e503',
+    related: {
+      ru: 'D7, D10, D11, D12, D15, D33, D48 — значения того же файла стола entities/game/board/poses.ts, переписанные из сцен; закроются одним переносом этих значений в кит; D22 — разброс кучи сброса; D68 — то же GATHER_HOLD 1500 у Bad Vibe на столе',
+      en: 'D7, D10, D11, D12, D15, D33, D48 — values of the same table file, entities/game/board/poses.ts, quoted from the scenes; one move of those values into the kit closes them all; D22 — the discard heap scatter; D68 — the same GATHER_HOLD 1500 for Bad Vibe on the table',
+    },
     moment: {
       ru: 'Всё имущество выбывшего собирается в кучу в центре и разлетается в сброс',
       en: 'Everything the eliminated player held gathers in a heap at the centre and scatters to the discard',
@@ -1517,6 +1708,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D38',
+    group: 'e503',
+    related: { ru: '—', en: '—' },
     moment: {
       ru: 'Выбывший: рука и зона гаснут, появляется «вы выбыли»',
       en: 'Eliminated: the hand and the zone fade, "you are out" appears',
@@ -1535,6 +1728,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D39',
+    group: 'e503',
+    related: { ru: '—', en: '—' },
     moment: { ru: 'Клип выбывания', en: 'The elimination clip' },
     kit: { ru: 'нет', en: 'none' },
     playground: {
@@ -1553,6 +1748,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D40',
+    group: 'decks',
+    related: { ru: '—', en: '—' },
     moment: {
       ru: 'Новая половина колоды вылетает на своё место',
       en: 'The new half of a deck flies out to its place',
@@ -1571,6 +1768,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D41',
+    group: 'decks',
+    related: { ru: '—', en: '—' },
     moment: {
       ru: 'Git Branch + Sudo: колода делится и сброс становится колодой',
       en: 'Git Branch + Sudo: the deck splits and the discard becomes a deck',
@@ -1589,6 +1788,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D42',
+    group: 'decks',
+    related: { ru: '—', en: '—' },
     moment: {
       ru: 'Сброс становится колодой: сбор → подъём → полёт → переворот',
       en: 'The discard becomes a deck: gather → lift → travel → flip',
@@ -1613,6 +1814,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D43',
+    group: 'decks',
+    related: {
+      ru: 'D15 — то же имя MERGE_MS у складывания пары, 620',
+      en: 'D15 — the same name MERGE_MS for the pair fold, 620',
+    },
     moment: { ru: 'Колоды сливаются в первую', en: 'The decks merge into the first one' },
     kit: { ru: 'absorbToDeck — 520 по умолчанию', en: 'absorbToDeck — 520 by default' },
     playground: {
@@ -1632,6 +1838,11 @@ const DIVERGENCES: Divergence[] = [
   // ----- pool 3: AI cards, Cherry-pick, Rebase, System Upgrade, an opponent takes a card -----
   {
     id: 'D44',
+    group: 'common',
+    related: {
+      ru: 'D6 — scale: SEAT_SHRINK; D17, D46, D52 — переданная длительность 460 у полёта в центр',
+      en: 'D6 — scale: SEAT_SHRINK; D17, D46, D52 — the 460 duration passed to the flight to the centre',
+    },
     moment: {
       ru: 'Параметр полёта, который полёт молча не читает',
       en: 'A travel parameter the travel silently ignores',
@@ -1653,6 +1864,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D45',
+    group: 'upgrade',
+    related: { ru: '—', en: '—' },
     moment: {
       ru: 'Ряд брошенных карт System Upgrade в центре',
       en: 'The row of System Upgrade cards thrown to the centre',
@@ -1674,6 +1887,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D46',
+    group: 'upgrade',
+    related: { ru: '—', en: '—' },
     moment: {
       ru: 'Бросок System Upgrade: карта летит из места соперника в ряд',
       en: "The System Upgrade throw: a card flies from an opponent's seat into the row",
@@ -1692,6 +1907,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D47',
+    group: 'upgrade',
+    related: { ru: '—', en: '—' },
     moment: {
       ru: 'Пауза перед уходом ряда System Upgrade в сброс',
       en: 'The pause before the System Upgrade row leaves for the discard',
@@ -1707,6 +1924,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D48',
+    group: 'upgrade',
+    related: {
+      ru: 'D7, D10, D11, D12, D15, D33, D37 — значения того же файла стола entities/game/board/poses.ts, переписанные из сцен; закроются одним переносом этих значений в кит',
+      en: 'D7, D10, D11, D12, D15, D33, D37 — values of the same table file, entities/game/board/poses.ts, quoted from the scenes; one move of those values into the kit closes them all',
+    },
     moment: {
       ru: 'Ряд в центре уходит в сброс',
       en: 'The row at the centre leaves for the discard',
@@ -1731,6 +1953,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D49',
+    group: 'upgrade',
+    related: {
+      ru: 'D26 — слои карт в одной отправке в сброс',
+      en: 'D26 — the layers of the cards in one send to the discard',
+    },
     moment: {
       ru: 'Что летит в сброс: сам элемент, закреплённый на месте, или носитель',
       en: 'What flies to the discard: the element itself, frozen in place, or a carrier',
@@ -1752,6 +1979,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D50',
+    group: 'upgrade',
+    related: {
+      ru: 'D59 — возврат остальных карт в сброс после выбора Cherry-pick и Inside',
+      en: 'D59 — the rest of the cards going back to the discard after a Cherry-pick or Inside choice',
+    },
     moment: {
       ru: 'Карты ниже видимого верха кучи растворяются на лету',
       en: 'Cards below the visible top of the heap dissolve in flight',
@@ -1776,6 +2008,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D51',
+    group: 'upgrade',
+    related: { ru: '—', en: '—' },
     moment: { ru: 'Когда карты попадают в кучу', en: 'When the cards join the heap' },
     kit: { ru: 'событие посадки в useDiscardExit', en: 'the landing callback in useDiscardExit' },
     playground: {
@@ -1794,6 +2028,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D52',
+    group: 'take',
+    related: {
+      ru: 'D74 — куда в центре встаёт карта для чтения; D13 — то же число 820; D44 — переданная длительность 460 полётом не читается',
+      en: 'D74 — where at the centre a card stands to be read; D13 — the same 820; D44 — the 460 duration passed is not read by the travel',
+    },
     moment: {
       ru: 'Выбранная карта выезжает в центр крупно, держится, уходит в руку',
       en: 'The chosen card comes to the centre enlarged, holds, goes to the hand',
@@ -1818,6 +2057,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D53',
+    group: 'git',
+    related: { ru: '—', en: '—' },
     moment: {
       ru: 'Карта выбора приподнимается при наведении',
       en: 'A card to choose lifts on hover',
@@ -1839,6 +2080,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D54',
+    group: 'git',
+    related: { ru: '—', en: '—' },
     moment: {
       ru: 'Затемнение стола на время выбора',
       en: 'The table dims while a choice is made',
@@ -1863,6 +2106,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D55',
+    group: 'git',
+    related: { ru: '—', en: '—' },
     moment: {
       ru: 'Карты из сброса вылетают в сетку выбора (Cherry-pick, Inside)',
       en: 'Cards fly out of the discard into the choice grid (Cherry-pick, Inside)',
@@ -1884,6 +2129,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D56',
+    group: 'git',
+    related: { ru: '—', en: '—' },
     moment: {
       ru: 'Rebase: три верхние карты вылетают из колоды в ряд',
       en: 'Rebase: the top three cards fly out of the deck into a row',
@@ -1905,6 +2152,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D57',
+    group: 'git',
+    related: {
+      ru: 'D58 — Rebase целится в саму карту колоды, а не в ячейку с подписью',
+      en: "D58 — Rebase aims at the deck's card itself, not at the cell with its label",
+    },
     moment: {
       ru: 'Карта уходит на колоду (Sudo в Cherry-pick): переворот, полёт, пауза',
       en: 'A card goes onto the deck (Sudo in Cherry-pick): flip, travel, pause',
@@ -1926,6 +2178,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D58',
+    group: 'git',
+    related: {
+      ru: 'D57 — Cherry-pick на столе целится в ячейку колоды вместе с подписью',
+      en: "D57 — Cherry-pick on the table aims at the deck's cell with its label",
+    },
     moment: {
       ru: 'Rebase: карты переворачиваются, пауза, по одной летят в колоду',
       en: 'Rebase: the cards turn over, a pause, they fly into the deck one by one',
@@ -1947,6 +2204,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D59',
+    group: 'git',
+    related: {
+      ru: 'D50 — растворение карт на лету: в сцене ниже 6 верхних, на столе только карта без места; D65 — Inside идёт по той же поверхности; старые записи реестра «Грид Cherry-pick на борде стоит над живой кучей» и «Inside: релизы при выкладке и возврате могут идти над картами, которые не релизы»',
+      en: 'D50 — cards fading in flight: below the top 6 in the scene, only a card with no place on the table; D65 — Inside goes through the same surface; the older register entries "The Cherry-pick grid on the board stands over the LIVE heap" and "Inside: releases may travel over cards that are not releases on the way out and back"',
+    },
     moment: {
       ru: 'Остальные карты возвращаются в сброс (Cherry-pick, Inside)',
       en: 'The rest of the cards go back to the discard (Cherry-pick, Inside)',
@@ -1965,6 +2227,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D60',
+    group: 'git',
+    related: {
+      ru: 'старая запись реестра «Rebase переставляет карты кнопками на борде и перетаскиванием в сцене» — на борде теперь перетаскивание (useCardReorder)',
+      en: 'the older register entry "Rebase reorders by buttons on the board and by dragging in the scene" — the board drags now (useCardReorder)',
+    },
     moment: {
       ru: 'Ряд Rebase: размеры и перестановка',
       en: 'The Rebase row: sizes and reordering',
@@ -1983,6 +2250,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D61',
+    group: 'git',
+    related: { ru: '—', en: '—' },
     moment: { ru: 'Нумерация 1-2-3 в Rebase', en: 'The 1-2-3 numbering in Rebase' },
     kit: { ru: 'нет', en: 'none' },
     playground: {
@@ -2001,6 +2270,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D62',
+    group: 'git',
+    related: { ru: '—', en: '—' },
     moment: { ru: 'Сетка выбора: размеры', en: 'The choice grid: sizes' },
     kit: { ru: 'нет', en: 'none' },
     playground: {
@@ -2019,6 +2290,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D63',
+    group: 'git',
+    related: { ru: '—', en: '—' },
     moment: {
       ru: 'Когда открывается плашка подтверждения выбора',
       en: 'When the choice confirm bar opens',
@@ -2040,6 +2313,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D64',
+    group: 'git',
+    related: {
+      ru: 'старая запись реестра «Две соседние сцены расходятся в том, ждёт ли RESOLVE своего полёта» — тот же вопрос с другой стороны',
+      en: 'the older register entry "Two neighbouring scenes disagree on whether RESOLVE waits for its flight" — the same question from the other side',
+    },
     moment: { ru: 'Когда кончается розыгрыш выбора', en: 'When a choice play is over' },
     kit: { ru: 'нет', en: 'none' },
     playground: {
@@ -2055,6 +2333,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D65',
+    group: 'ai',
+    related: {
+      ru: 'D55, D59, D62, D63 — Inside идёт по поверхности выбора Cherry-pick; старая запись реестра «Inside: релизы при выкладке и возврате могут идти над картами, которые не релизы»',
+      en: 'D55, D59, D62, D63 — Inside goes through Cherry-pick\'s choice surface; the older register entry "Inside: releases may travel over cards that are not releases on the way out and back"',
+    },
     moment: {
       ru: 'Inside: порядок, место одного релиза, путь выбранного',
       en: 'Inside: the order, where a single release goes, the chosen one’s road',
@@ -2073,6 +2356,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D66',
+    group: 'ai',
+    related: {
+      ru: 'D5 — уход AI-карты в колоду событий',
+      en: 'D5 — an AI card going back to the events deck',
+    },
     moment: {
       ru: 'Стоящие карты снова становятся носителями на своём месте и уходят',
       en: 'Standing cards become carriers again where they stand and leave',
@@ -2094,6 +2382,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D67',
+    group: 'ai',
+    related: {
+      ru: 'D21 — пара распадается на две карты при уходе в сброс',
+      en: 'D21 — a pair splits into two cards on its way to the discard',
+    },
     moment: {
       ru: 'Crush: раздавленный релиз выходит из слота',
       en: 'Crush: the crushed release leaves its slot',
@@ -2112,6 +2405,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D68',
+    group: 'ai',
+    related: { ru: 'D37 — то же GATHER_HOLD 1500', en: 'D37 — the same GATHER_HOLD 1500' },
     moment: {
       ru: 'Bad Vibe: отданная карта стоит рядом с AI-картой',
       en: 'Bad Vibe: the card given up stands beside the AI card',
@@ -2129,25 +2424,12 @@ const DIVERGENCES: Divergence[] = [
     status: 'rework',
   },
   {
-    id: 'D69',
-    moment: {
-      ru: 'Когда загорается своя красная подсветка',
-      en: 'When your own red glow comes on',
-    },
-    kit: { ru: 'EdgeGlow', en: 'EdgeGlow' },
-    playground: {
-      ru: 'AiCardsStory: через 200 после паузы чтения; Error503Story: сразу после 180 / 560; DrawCardStory: после 220 / 560',
-      en: 'AiCardsStory: 200 after the reading pause; Error503Story: right after 180 / 560; DrawCardStory: after 220 / 560',
-    },
-    table: {
-      ru: 'aiBeat: в момент переворота; drawBeat: после 220 / 560',
-      en: 'aiBeat: at the flip; drawBeat: after 220 / 560',
-    },
-    note: { ru: 'когда гаснет — D35', en: 'when it goes out — D35' },
-    status: 'rework',
-  },
-  {
     id: 'D70',
+    group: 'ai',
+    related: {
+      ru: 'D2 — паузы вокруг переворота; D33 — ALARM_POSE',
+      en: 'D2 — the pauses around a flip; D33 — ALARM_POSE',
+    },
     moment: {
       ru: 'Карта, добытая эффектом AI, встаёт в центре (Good Vibe, базовый Error 503)',
       en: 'A card an AI effect draws stands at the centre (Good Vibe, a base Error 503)',
@@ -2166,6 +2448,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D71',
+    group: 'take',
+    related: {
+      ru: 'старая запись реестра «Запрос карты без поверхности выбора двоится два кадра» — тот же путь popIn',
+      en: 'the older register entry "A request with no choice surface doubles for two frames" — the same popIn road',
+    },
     moment: {
       ru: 'Выбранная карта держится в каталоге',
       en: 'The chosen card is held in the catalogue',
@@ -2187,6 +2474,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D72',
+    group: 'hand',
+    related: {
+      ru: 'D77 — модуль стола cardPlace для места соперника',
+      en: "D77 — the table's cardPlace module for an opponent's seat",
+    },
     moment: {
       ru: 'Веер смыкается, когда карта взлетает',
       en: 'The fan closes up as a card takes off',
@@ -2208,6 +2500,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D73',
+    group: 'common',
+    related: { ru: '—', en: '—' },
     moment: {
       ru: 'Полёт запускается через два кадра',
       en: 'A travel starts two frames later',
@@ -2229,6 +2523,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D74',
+    group: 'play',
+    related: {
+      ru: 'D52 — выбранная карта выезжает в центр крупно',
+      en: 'D52 — the chosen card comes to the centre enlarged',
+    },
     moment: {
       ru: 'Куда в центре встаёт карта для чтения',
       en: 'Where at the centre a card stands to be read',
@@ -2253,6 +2552,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D75',
+    group: 'common',
+    related: { ru: '—', en: '—' },
     moment: { ru: 'Слой летящей карты', en: 'The layer of a card in flight' },
     kit: { ru: '--z-flight 250 (useFlyer)', en: '--z-flight 250 (useFlyer)' },
     playground: {
@@ -2268,6 +2569,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D76',
+    group: 'take',
+    related: {
+      ru: 'D13 — то же 820 (REQUEST_HOLD); старая запись реестра «Промах Security Bug нечем показать» — промах теперь есть',
+      en: 'D13 — the same 820 (REQUEST_HOLD); the older register entry "A Security Bug miss has nothing to show it" — the miss is there now',
+    },
     moment: { ru: 'Промах при запросе карты', en: 'A miss when a card is asked for' },
     kit: { ru: 'нет', en: 'none' },
     playground: {
@@ -2283,6 +2589,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D77',
+    group: 'seat',
+    related: {
+      ru: 'D72 — модуль стола cardPlace для руки',
+      en: "D72 — the table's cardPlace module for the hand",
+    },
     moment: {
       ru: 'Счётчик руки в месте получателя растёт после приземления',
       en: "The hand counter in the receiver's seat goes up after the landing",
@@ -2304,6 +2615,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D78',
+    group: 'common',
+    related: { ru: '—', en: '—' },
     moment: { ru: 'Ширина колод и сброса', en: 'The width of the decks and the discard' },
     kit: {
       ru: 'PILE_WIDTH 150 (table/Table/piles.ts), сброс 116 (Table)',
@@ -2322,6 +2635,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D79',
+    group: 'git',
+    related: { ru: '—', en: '—' },
     moment: {
       ru: 'Rebase при нескольких колодах',
       en: 'Rebase with several decks',
@@ -2341,6 +2656,8 @@ const DIVERGENCES: Divergence[] = [
   // ----- pool 4: the closed fan, a card asked for, the hand limit, the end of a match -----
   {
     id: 'D80',
+    group: 'end',
+    related: { ru: '—', en: '—' },
     moment: {
       ru: 'Хлопушки: залпы, частицы, слой, уборка',
       en: 'The confetti: the volleys, the pieces, the layer, the clean-up',
@@ -2362,6 +2679,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D81',
+    group: 'end',
+    related: { ru: '—', en: '—' },
     moment: {
       ru: 'Когда появляется окно конца партии',
       en: 'When the end-of-match window appears',
@@ -2380,6 +2699,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D82',
+    group: 'end',
+    related: {
+      ru: 'D10 — та же выдержка 1200 (SHOW_HOLD); D23 — посадка релиза в слот',
+      en: 'D10 — the same 1200 hold (SHOW_HOLD); D23 — a release landing in its slot',
+    },
     moment: {
       ru: 'Путь своего последнего релиза перед хлопушками',
       en: 'The road of your own last release before the confetti',
@@ -2401,6 +2725,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D83',
+    group: 'take',
+    related: { ru: '—', en: '—' },
     moment: {
       ru: 'Закрытый веер соперника: въезд сверху, разворот 180°, слой',
       en: "The opponent's closed fan: sliding in from above, the 180° turn, the layer",
@@ -2422,6 +2748,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D84',
+    group: 'take',
+    related: { ru: '—', en: '—' },
     moment: {
       ru: 'Место выбранной карты в закрытом веере остаётся пустым',
       en: 'The chosen card’s place in the closed fan stays empty',
@@ -2440,6 +2768,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D85',
+    group: 'take',
+    related: { ru: '—', en: '—' },
     moment: {
       ru: 'Когда начинается полёт карты из закрытого веера',
       en: 'When the card starts its flight out of the closed fan',
@@ -2458,6 +2788,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D86',
+    group: 'take',
+    related: { ru: '—', en: '—' },
     moment: { ru: 'Подсказка «выбери карту»', en: 'The "pick a card" hint' },
     kit: { ru: 'нет', en: 'none' },
     playground: {
@@ -2473,6 +2805,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D87',
+    group: 'common',
+    related: { ru: '—', en: '—' },
     moment: { ru: 'Где стоит своя рука', en: 'Where your own hand stands' },
     kit: {
       ru: 'Table (.you): снизу 16, по бокам 196 / 56',
@@ -2491,6 +2825,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D88',
+    group: 'take',
+    related: { ru: '—', en: '—' },
     moment: {
       ru: 'Каталог карт: место и размер на экране',
       en: 'The card catalogue: its place and size on screen',
@@ -2509,6 +2845,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D89',
+    group: 'take',
+    related: { ru: '—', en: '—' },
     moment: { ru: 'Какие карты лежат в каталоге', en: 'Which cards the catalogue holds' },
     kit: { ru: 'нет', en: 'none' },
     playground: {
@@ -2521,6 +2859,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D90',
+    group: 'take',
+    related: { ru: '—', en: '—' },
     moment: {
       ru: 'Наведение и названная карта в каталоге',
       en: 'Hover and the named card in the catalogue',
@@ -2542,6 +2882,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D91',
+    group: 'take',
+    related: { ru: '—', en: '—' },
     moment: {
       ru: 'Из какого места веера выходит названная карта',
       en: 'Which place of the fan the named card comes out of',
@@ -2563,6 +2905,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D92',
+    group: 'take',
+    related: { ru: '—', en: '—' },
     moment: {
       ru: 'Веер соперника отвечает на курсор при запросе',
       en: "The opponent's fan responds to the cursor during a request",
@@ -2581,6 +2925,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D93',
+    group: 'limit',
+    related: { ru: '—', en: '—' },
     moment: { ru: 'Слой сетки лимита руки', en: 'The layer of the hand-limit grid' },
     kit: { ru: 'нет', en: 'none' },
     playground: { ru: 'HandLimitStory: 70', en: 'HandLimitStory: 70' },
@@ -2590,6 +2936,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D94',
+    group: 'limit',
+    related: {
+      ru: 'D36 — то же перетаскивание из своей зоны в ответ на Error 503',
+      en: 'D36 — the same drag out of your own zone to answer an Error 503',
+    },
     moment: {
       ru: 'Карту берут из клетки сетки и несут',
       en: 'A card is taken out of a grid cell and carried',
@@ -2611,6 +2962,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D95',
+    group: 'limit',
+    related: {
+      ru: 'D36 — то же перетаскивание из своей зоны; D8 — посадка в щель веера',
+      en: 'D36 — the same drag out of your own zone; D8 — landing in a gap of the fan',
+    },
     moment: {
       ru: 'Веер заранее раскрывает щель под несомой картой',
       en: 'The fan opens a gap under the carried card ahead of time',
@@ -2632,6 +2988,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D96',
+    group: 'common',
+    related: { ru: '—', en: '—' },
     moment: {
       ru: 'Пустое место обведено пунктиром',
       en: 'An empty place is outlined with a dashed line',
@@ -2653,6 +3011,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D97',
+    group: 'common',
+    related: { ru: '—', en: '—' },
     moment: {
       ru: 'Подсветка веера, пока надо сбросить или заплатить',
       en: 'The fan highlight while cards are owed or a cost is due',
@@ -2674,6 +3034,8 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D98',
+    group: 'limit',
+    related: { ru: '—', en: '—' },
     moment: { ru: 'Полная сетка лимита руки', en: 'A full hand-limit grid' },
     kit: { ru: '—', en: '—' },
     playground: {
@@ -2689,6 +3051,11 @@ const DIVERGENCES: Divergence[] = [
   },
   {
     id: 'D99',
+    group: 'limit',
+    related: {
+      ru: 'старая запись реестра «Лимит руки: выкладку на сброс не видят соперники и не знает хост» — тот же момент',
+      en: 'the older register entry "Hand limit: the opponents do not see the put-out cards and the host does not know them" — the same moment',
+    },
     moment: {
       ru: 'Что видят другие игроки при лимите руки',
       en: 'What the other players see during a hand limit',
@@ -2927,8 +3294,8 @@ const ISSUES: Issue[] = [
       en: 'A missed Security Bug has nothing to show it — the rule exists, the beat does not',
     },
     problem: {
-      ru: 'Владелец правил решил (22.08.2026, docs/rules/cards.md): запрос Security Bug публичен и при попадании, и при промахе — стол видит, какую карту запросили, и при промахе тоже должен увидеть, какую запросили и не получили. Был показан только удачный путь: карта соперника выбирается и открыто уезжает к атакующему (PickSpecificCardStory), а промах не показан ничем — карта атаки просто уходила в сброс. РЕШЕНО #105: промах несёт runRequested (features/board-beats/transferBeat.tsx), и несёт публично. Событие requested уходит без visibleTo, его поле hit приезжает всем, поэтому на КАЖДОМ пире названная карта поднимается в центре (popIn), стоит REQUEST_HOLD = 820, цель вздрагивает — play(«shake») характером spring, amp 9 / 460ms, — показывается подпись table.requestMiss, и через MISS_HOLD = 1620 сцена гаснет. На промахе пендинг снимается сразу, так что такт несёт всю сцену целиком или стол не узнаёт исхода вовсе. Цель вздрагивает В ТОМ ВИДЕ, в каком нарисована: её МЕСТО (seatOf) — всем смотрящим, её собственный веер (anchors.hand) — ей самой, у которой места нет. Вторая половина ответа владельца — «публичен и сам процесс выбора» — сделана наполовину: на попадании названная карта стоит в центре у всех (giveCard проецируется без гейта mine), но полоса выбора CardCatalog показывается только атакующему (`_useRequestStaging.tsx`). Остаток — в находке «Правила ставят Security Bug в центр на время выбора».',
-      en: "The rules owner decided (22.08.2026, docs/rules/cards.md) that a Security Bug request is public on a hit and on a miss alike — the table sees which card was asked for, and on a miss must likewise see which card was asked for and not received. Only the successful path was shown: the opponent card chosen and travelling to the attacker in the open (PickSpecificCardStory), with the miss shown by nothing — the attack card simply went to the discard. RESOLVED in #105: the miss is carried by runRequested (features/board-beats/transferBeat.tsx), and carried publicly. The requested event has no visibleTo and its hit field reaches everyone, so on EVERY peer the named card rises at the centre (popIn), stands for REQUEST_HOLD = 820, the target flinches — play('shake') in its spring character, amp 9 / 460ms — the table.requestMiss note shows, and after MISS_HOLD = 1620 the scene clears. On a miss the pending clears outright, so the beat carries the whole scene or the table never learns the outcome at all. The target flinches AS IT IS RENDERED: their SEAT (seatOf) to everyone watching, their own fan (anchors.hand) to the target themselves, who has no seat. The second half of the owner's answer — that the choosing is public too — is only half done: on a hit the named card stands at the centre for everyone (giveCard is projected with no mine gate), but the CardCatalog band where the pick happens is shown only to the attacker (`_useRequestStaging.tsx`). The rest lives in the finding \"The rules stand a Security Bug at the centre while the asker chooses\".",
+      ru: 'Владелец правил решил (22.08.2026, docs/rules/cards.md): запрос Security Bug публичен и при попадании, и при промахе — стол видит, какую карту запросили, и при промахе тоже должен увидеть, какую запросили и не получили. Был показан только удачный путь: карта соперника выбирается и открыто уезжает к атакующему (PickSpecificCardStory), а промах не показан ничем — карта атаки просто уходила в сброс. РЕШЕНО #105: промах несёт runRequested (features/board-beats/transferBeat.tsx), и несёт публично. Событие requested уходит без visibleTo, его поле hit приезжает всем, поэтому на КАЖДОМ пире названная карта поднимается в центре (popIn), стоит REQUEST_HOLD = 820, цель вздрагивает — play(«shake») характером spring, amp 9 / 460ms, — показывается подпись table.requestMiss, и через MISS_HOLD = 1620 сцена гаснет. На промахе пендинг снимается сразу, так что такт несёт всю сцену целиком или стол не узнаёт исхода вовсе. Цель вздрагивает В ТОМ ВИДЕ, в каком нарисована: её МЕСТО (seatOf) — всем смотрящим, её собственный веер (anchors.hand) — ей самой, у которой места нет. Вторая половина ответа владельца — «публичен и сам процесс выбора» — сделана наполовину: на попадании названная карта стоит в центре у всех (giveCard проецируется без гейта mine), но полоса выбора CardCatalog показывается только атакующему (`_useRequestStaging.tsx`). Остаток — в находке «Правила ставят Security Bug в центр на время выбора». — СВЯЗАНО 13.10: строка D76 таблицы расхождений — промах при запросе карты.',
+      en: "The rules owner decided (22.08.2026, docs/rules/cards.md) that a Security Bug request is public on a hit and on a miss alike — the table sees which card was asked for, and on a miss must likewise see which card was asked for and not received. Only the successful path was shown: the opponent card chosen and travelling to the attacker in the open (PickSpecificCardStory), with the miss shown by nothing — the attack card simply went to the discard. RESOLVED in #105: the miss is carried by runRequested (features/board-beats/transferBeat.tsx), and carried publicly. The requested event has no visibleTo and its hit field reaches everyone, so on EVERY peer the named card rises at the centre (popIn), stands for REQUEST_HOLD = 820, the target flinches — play('shake') in its spring character, amp 9 / 460ms — the table.requestMiss note shows, and after MISS_HOLD = 1620 the scene clears. On a miss the pending clears outright, so the beat carries the whole scene or the table never learns the outcome at all. The target flinches AS IT IS RENDERED: their SEAT (seatOf) to everyone watching, their own fan (anchors.hand) to the target themselves, who has no seat. The second half of the owner's answer — that the choosing is public too — is only half done: on a hit the named card stands at the centre for everyone (giveCard is projected with no mine gate), but the CardCatalog band where the pick happens is shown only to the attacker (`_useRequestStaging.tsx`). The rest lives in the finding \"The rules stand a Security Bug at the centre while the asker chooses\". — LINKED 13.10: row D76 of the divergence table — a miss when a card is asked for.",
     },
     where: {
       ru: 'features/board-beats/transferBeat.tsx (runRequested) + pages/board/[gameId]/_Board.tsx (карта в центре) + docs/rules/cards.md:125-129 (правило)',
@@ -3032,8 +3399,8 @@ const ISSUES: Issue[] = [
       en: 'Answering a 503 with Monitoring has no movement at all',
     },
     problem: {
-      ru: 'Три метода отвечают на Error 503, и у двух жест — полёт: Debugger из веера, релиз из своей зоны, оба в слот прикрытия (playToCenter, поза COVER_POSE). У Monitoring движения нет ни одного: карта отвечает оттуда, где стоит, и там же остаётся. Утверждённый источник (Error503Story) жеста под него не содержит — история выстреливала Monitoring сама. Отправить его в центр и вернуть — соврать про произошедшее, поэтому в задаче 9 (#102) сделано минимальное честное: нажатие шлёт RESOLVE и не двигает ничего. Ценой того, что единственный ответ из трёх остаётся без подтверждения на месте. Закроет пресет «карта отработала, не уходя» (вспышка/пульс на самом слоте) — в словаре такого нет. — УСТАРЕЛО: нажатия больше нет — стоящий Monitoring отвечает на 503 сам внутри того же добора, игрока ни о чём не спрашивают (`packages/engine/src/fake/triggers.ts`); сделали, но не отметили. — ОТВЕТ ВЛАДЕЛЬЦА: «У ответа Monitoring на 503 нет движения вообще» — так и должно быть; выдумывать, что движение обязано быть, избыточно. Monitoring или AI Monitoring в зоне релиза превращают добор 503 в пустой добор: карта просто уходит в сброс. Событие защиты от 503 при этом не запускается — экран по краям не светится красным. По логике всё грамотно. Если идти в наглядность, нужна хореография с самой картой Monitoring в зоне (условно — увеличивается и сама отбивает 503 независимо от действий игроков), но пока лучше не делать: для стола это может выйти избыточным. Об этом можно подумать отдельно.',
-      en: 'Three methods answer an Error 503, and two of them are a flight: the Debugger out of the fan, a release out of your own zone, both to the cover slot (playToCenter at COVER_POSE). Monitoring has no movement at all — it answers from where it stands and stays there. The approved source (Error503Story) carries no gesture for it, because the story auto-fired it. Flying it to the centre and back would be a lie about what happened, so Task 9 (#102) ships the smallest honest thing: the press sends the RESOLVE and moves nothing. The cost is that one answer of the three gets no confirmation in place. What closes it is a preset for “this card acted without leaving” (a flash/pulse on the slot itself) — the vocabulary has none. — OUT OF DATE: there is no press any more — a standing Monitoring answers the 503 itself inside the very draw, and the player is asked nothing (`packages/engine/src/fake/triggers.ts`); done, but never marked. — OWNER: "Answering a 503 with Monitoring has no movement at all" — that is how it should be; inventing a movement it must have is excessive. A Monitoring or AI Monitoring in the release zone turns drawing a 503 into an empty draw: the card simply goes to the discard. The defence against the 503 never starts — the screen edges do not glow red. Logically it is all sound. Going for visibility would take a choreography with the Monitoring card itself in the zone (say, it grows and deflects the 503 on its own, whatever the players do), but it is better not done for now: at the table it may come out excessive. It can be thought about separately.',
+      ru: 'Три метода отвечают на Error 503, и у двух жест — полёт: Debugger из веера, релиз из своей зоны, оба в слот прикрытия (playToCenter, поза COVER_POSE). У Monitoring движения нет ни одного: карта отвечает оттуда, где стоит, и там же остаётся. Утверждённый источник (Error503Story) жеста под него не содержит — история выстреливала Monitoring сама. Отправить его в центр и вернуть — соврать про произошедшее, поэтому в задаче 9 (#102) сделано минимальное честное: нажатие шлёт RESOLVE и не двигает ничего. Ценой того, что единственный ответ из трёх остаётся без подтверждения на месте. Закроет пресет «карта отработала, не уходя» (вспышка/пульс на самом слоте) — в словаре такого нет. — УСТАРЕЛО: нажатия больше нет — стоящий Monitoring отвечает на 503 сам внутри того же добора, игрока ни о чём не спрашивают (`packages/engine/src/fake/triggers.ts`); сделали, но не отметили. — ОТВЕТ ВЛАДЕЛЬЦА: «У ответа Monitoring на 503 нет движения вообще» — так и должно быть; выдумывать, что движение обязано быть, избыточно. Monitoring или AI Monitoring в зоне релиза превращают добор 503 в пустой добор: карта просто уходит в сброс. Событие защиты от 503 при этом не запускается — экран по краям не светится красным. По логике всё грамотно. Если идти в наглядность, нужна хореография с самой картой Monitoring в зоне (условно — увеличивается и сама отбивает 503 независимо от действий игроков), но пока лучше не делать: для стола это может выйти избыточным. Об этом можно подумать отдельно. — СВЯЗАНО 13.10: строка D34 таблицы расхождений — сколько Error 503 держится без ответа.',
+      en: 'Three methods answer an Error 503, and two of them are a flight: the Debugger out of the fan, a release out of your own zone, both to the cover slot (playToCenter at COVER_POSE). Monitoring has no movement at all — it answers from where it stands and stays there. The approved source (Error503Story) carries no gesture for it, because the story auto-fired it. Flying it to the centre and back would be a lie about what happened, so Task 9 (#102) ships the smallest honest thing: the press sends the RESOLVE and moves nothing. The cost is that one answer of the three gets no confirmation in place. What closes it is a preset for “this card acted without leaving” (a flash/pulse on the slot itself) — the vocabulary has none. — OUT OF DATE: there is no press any more — a standing Monitoring answers the 503 itself inside the very draw, and the player is asked nothing (`packages/engine/src/fake/triggers.ts`); done, but never marked. — OWNER: "Answering a 503 with Monitoring has no movement at all" — that is how it should be; inventing a movement it must have is excessive. A Monitoring or AI Monitoring in the release zone turns drawing a 503 into an empty draw: the card simply goes to the discard. The defence against the 503 never starts — the screen edges do not glow red. Logically it is all sound. Going for visibility would take a choreography with the Monitoring card itself in the zone (say, it grows and deflects the 503 on its own, whatever the players do), but it is better not done for now: at the table it may come out excessive. It can be thought about separately. — LINKED 13.10: row D34 of the divergence table — how long an unanswered Error 503 holds.',
     },
     where: {
       ru: 'frontend: pages/board/[gameId]/_useNeutralizeStaging.tsx + ui: animations/',
@@ -3104,8 +3471,8 @@ const ISSUES: Issue[] = [
       en: 'How long a revealed trigger stands at the centre — no approved value',
     },
     problem: {
-      ru: 'Такт добора держит вскрытый триггер на столе `REVEAL_HOLD = 900` перед уходом в сброс. `DrawCardStory` держит `AI_HOLD = 4000`, но это пауза AI-ветки (стол читает эффект), не обычного вскрытия — а для голого reveal подтверждённого значения нет вовсе. `REVEAL_HOLD = 900` — число этой задачи, ничем не подтверждённое. — ОТВЕТ ВЛАДЕЛЬЦА: значение берётся из сцены-примера, и сцена здесь — AI cards (поведение карт AI в центре её предмет), а не Draw card (её предмет колоды добора). Найдено: TABLE_HOLD = 2600, у Галлюцинации вдвое дольше. Осталась правка на борде. — ЗАКРЫТО (#106): правка сделана. `REVEAL_HOLD = 900` больше не существует — `drawBeat.tsx` держит вскрытый (не-AI) триггер на `TABLE_HOLD`, импортированным из `features/board-beats/toCentre.ts`, тем же модулем, которым теперь держит свою пару и AI-карта (`aiBeat.tsx`). Одно число, оба читателя.',
-      en: 'The draw beat holds a revealed trigger at the centre for `REVEAL_HOLD = 900` before it leaves for the discard. `DrawCardStory` has `AI_HOLD = 4000`, but that is the AI branch’s pause (the table reads the effect), not a plain reveal’s — and a plain reveal has no approved value at all. `REVEAL_HOLD = 900` is this task’s own number, unconfirmed by anything. — OWNER: the value comes from the example scene, and the scene here is AI cards (the behaviour of AI cards at the centre is its subject), not Draw card (whose subject is the draw piles). Found: TABLE_HOLD = 2600, twice as long for Hallucination. The board edit is what is left. — CLOSED (#106): the edit is made. `REVEAL_HOLD = 900` no longer exists — `drawBeat.tsx` holds a revealed (non-AI) trigger on `TABLE_HOLD`, imported from `features/board-beats/toCentre.ts`, the same module the AI card now holds its own pair on (`aiBeat.tsx`). One number, both readers.',
+      ru: 'Такт добора держит вскрытый триггер на столе `REVEAL_HOLD = 900` перед уходом в сброс. `DrawCardStory` держит `AI_HOLD = 4000`, но это пауза AI-ветки (стол читает эффект), не обычного вскрытия — а для голого reveal подтверждённого значения нет вовсе. `REVEAL_HOLD = 900` — число этой задачи, ничем не подтверждённое. — ОТВЕТ ВЛАДЕЛЬЦА: значение берётся из сцены-примера, и сцена здесь — AI cards (поведение карт AI в центре её предмет), а не Draw card (её предмет колоды добора). Найдено: TABLE_HOLD = 2600, у Галлюцинации вдвое дольше. Осталась правка на борде. — ЗАКРЫТО (#106): правка сделана. `REVEAL_HOLD = 900` больше не существует — `drawBeat.tsx` держит вскрытый (не-AI) триггер на `TABLE_HOLD`, импортированным из `features/board-beats/toCentre.ts`, тем же модулем, которым теперь держит свою пару и AI-карта (`aiBeat.tsx`). Одно число, оба читателя. — СВЯЗАНО 13.10: строка D4, D34 таблицы расхождений — значение теперь есть, TABLE_HOLD.',
+      en: 'The draw beat holds a revealed trigger at the centre for `REVEAL_HOLD = 900` before it leaves for the discard. `DrawCardStory` has `AI_HOLD = 4000`, but that is the AI branch’s pause (the table reads the effect), not a plain reveal’s — and a plain reveal has no approved value at all. `REVEAL_HOLD = 900` is this task’s own number, unconfirmed by anything. — OWNER: the value comes from the example scene, and the scene here is AI cards (the behaviour of AI cards at the centre is its subject), not Draw card (whose subject is the draw piles). Found: TABLE_HOLD = 2600, twice as long for Hallucination. The board edit is what is left. — CLOSED (#106): the edit is made. `REVEAL_HOLD = 900` no longer exists — `drawBeat.tsx` holds a revealed (non-AI) trigger on `TABLE_HOLD`, imported from `features/board-beats/toCentre.ts`, the same module the AI card now holds its own pair on (`aiBeat.tsx`). One number, both readers. — LINKED 13.10: row D4, D34 of the divergence table — there is a value now, TABLE_HOLD.',
     },
     where: {
       ru: 'frontend: features/board-beats/drawBeat.tsx, features/board-beats/toCentre.ts (TABLE_HOLD)',
@@ -3194,8 +3561,8 @@ const ISSUES: Issue[] = [
       en: 'A beat flies from a tilted fan slot’s bounding box — that is I6, backwards',
     },
     problem: {
-      ru: '`comboBeat.foldIn` и `defenseBeat.runCovered` берут исходную коробку карты как `rectOf(anchors.handSlotAt(i))` — сырой `getBoundingClientRect()` слота. Слот повёрнут (`slotPlacement` даёт каждому свой угол), так что это коробка ВОКРУГ наклонённой карты, шире и выше её самой: ровно то, от чего предостерегает I6. Соседняя нога той же цепочки уже делает правильно — `anchors.seatBox` кладёт `cardBoxIn(rect, CARD_W)`, и `useHandArrival.boxOf` тоже, со своим объяснением почему. Первый кадр полёта стартует не с той коробки, тем заметнее, чем сильнее отклонён слот. Кандидатов на починку два, и они дают РАЗНЫЕ ответы: `cardBoxIn(slotRect, CARD_W)` (дёшево, но считает от текущего прямоугольника, включая ховер-подъём) или `slotBox(i, total)` из `_useBoardStaging.ts` (честно, от `slotPlacement`, без DOM) — но `total` это длина ВЫРИСОВАННОГО веера, которой у такта нет: он работает против `base`, а веер отфильтрован тем, что стоит на столе (ровно та рассинхронизация, которую Fix D round 2 закрыл на соседнем шве). Выбор между ними — решение о геометрии, которое нечем проверить: jsdom обе ветки не различает. — ЗАКРЫТО ОТВЕТОМ ВЛАДЕЛЬЦА: карта с края веера не может стартовать наклонённой, потому что под ховером она ВЫРАВНИВАЕТСЯ. Запись упустила часть движения и спрашивала про то, чего в ней нет.',
-      en: '`comboBeat.foldIn` and `defenseBeat.runCovered` take a card’s source box as `rectOf(anchors.handSlotAt(i))` — a raw `getBoundingClientRect()` of the slot. The slot is rotated (`slotPlacement` gives each its own angle), so that is the box AROUND the tilted card, wider and taller than the card itself: exactly what I6 warns against. The sibling leg of the same chain already does it right — `anchors.seatBox` applies `cardBoxIn(rect, CARD_W)`, and so does `useHandArrival.boxOf`, with its own note on why. The flight’s first frame starts from the wrong box, the more visibly the further the slot is deflected. Two candidate fixes, and they give DIFFERENT answers: `cardBoxIn(slotRect, CARD_W)` (cheap, but reads the current rect, hover lift included) or `slotBox(i, total)` from `_useBoardStaging.ts` (honest, derived from `slotPlacement`, no DOM) — but `total` is the length of the RENDERED fan, which a beat does not have: it runs against `base`, and the fan is filtered by whatever stands on the table (the very divergence Fix D round 2 closed at the neighbouring seam). Choosing between them is a geometry decision nothing here can check: jsdom cannot tell the two apart. — CLOSED BY THE OWNER: a card at the edge of the fan cannot take off tilted, because hovering STRAIGHTENS it. The entry had dropped half of the movement and then asked about the hole.',
+      ru: '`comboBeat.foldIn` и `defenseBeat.runCovered` берут исходную коробку карты как `rectOf(anchors.handSlotAt(i))` — сырой `getBoundingClientRect()` слота. Слот повёрнут (`slotPlacement` даёт каждому свой угол), так что это коробка ВОКРУГ наклонённой карты, шире и выше её самой: ровно то, от чего предостерегает I6. Соседняя нога той же цепочки уже делает правильно — `anchors.seatBox` кладёт `cardBoxIn(rect, CARD_W)`, и `useHandArrival.boxOf` тоже, со своим объяснением почему. Первый кадр полёта стартует не с той коробки, тем заметнее, чем сильнее отклонён слот. Кандидатов на починку два, и они дают РАЗНЫЕ ответы: `cardBoxIn(slotRect, CARD_W)` (дёшево, но считает от текущего прямоугольника, включая ховер-подъём) или `slotBox(i, total)` из `_useBoardStaging.ts` (честно, от `slotPlacement`, без DOM) — но `total` это длина ВЫРИСОВАННОГО веера, которой у такта нет: он работает против `base`, а веер отфильтрован тем, что стоит на столе (ровно та рассинхронизация, которую Fix D round 2 закрыл на соседнем шве). Выбор между ними — решение о геометрии, которое нечем проверить: jsdom обе ветки не различает. — ЗАКРЫТО ОТВЕТОМ ВЛАДЕЛЬЦА: карта с края веера не может стартовать наклонённой, потому что под ховером она ВЫРАВНИВАЕТСЯ. Запись упустила часть движения и спрашивала про то, чего в ней нет. — СВЯЗАНО 13.10: открытая строка D16 таблицы расхождений — места, где карта уходит из веера не из-под курсора (соперник забирает карту — transferBeat; сброс из руки по событию — discardBeat); наклонена ли там карта на экране, не проверено. Эта запись остаётся оформленной по ответу владельца: карта, которую игрок вытягивает сам, под курсором выровнена.',
+      en: "`comboBeat.foldIn` and `defenseBeat.runCovered` take a card’s source box as `rectOf(anchors.handSlotAt(i))` — a raw `getBoundingClientRect()` of the slot. The slot is rotated (`slotPlacement` gives each its own angle), so that is the box AROUND the tilted card, wider and taller than the card itself: exactly what I6 warns against. The sibling leg of the same chain already does it right — `anchors.seatBox` applies `cardBoxIn(rect, CARD_W)`, and so does `useHandArrival.boxOf`, with its own note on why. The flight’s first frame starts from the wrong box, the more visibly the further the slot is deflected. Two candidate fixes, and they give DIFFERENT answers: `cardBoxIn(slotRect, CARD_W)` (cheap, but reads the current rect, hover lift included) or `slotBox(i, total)` from `_useBoardStaging.ts` (honest, derived from `slotPlacement`, no DOM) — but `total` is the length of the RENDERED fan, which a beat does not have: it runs against `base`, and the fan is filtered by whatever stands on the table (the very divergence Fix D round 2 closed at the neighbouring seam). Choosing between them is a geometry decision nothing here can check: jsdom cannot tell the two apart. — CLOSED BY THE OWNER: a card at the edge of the fan cannot take off tilted, because hovering STRAIGHTENS it. The entry had dropped half of the movement and then asked about the hole. — LINKED 13.10: the open row D16 of the divergence table — the places where a card leaves the fan not from under the cursor (an opponent takes the card — transferBeat; a discard from the hand by an event — discardBeat); whether the card is tilted on screen there has not been checked. This entry stays done by the owner's answer: a card the player pulls out is straight under the cursor.",
     },
     where: {
       ru: 'frontend: features/board-beats/comboBeat.tsx (foldIn), defenseBeat.tsx (runCovered) + entities/game/board/anchors.ts',
@@ -3314,8 +3681,8 @@ const ISSUES: Issue[] = [
       en: 'The card-and-sudo fold into a pair is written four times, not as a module',
     },
     problem: {
-      ru: 'Общий шаг usePairFold используется сценами DefenseRelease/Combo и на борде: сборка своей пары (_useBoardStaging), своя защита с Sudo (_useDefenseStaging), выкладка пары соперника в центр (shownBeat). Своей копией остался розыгрыш бота: боты не выкладывают карты в центр, и их релиз с Code Review складывается в центре кодом самого борда (comboBeat), а не общим шагом. Такт локальной защиты ждёт whenLanded перед SHOW_HOLD.',
-      en: 'Shared usePairFold is used by the DefenseRelease/Combo stories and on the board: forming your own pair (_useBoardStaging), your own defence with Sudo (_useDefenseStaging), an opponent’s pair put out at the centre (shownBeat). One copy of its own remains, a bot’s play: bots do not put cards out at the centre, so their release with a Code Review is folded at the centre by the board’s own code (comboBeat) rather than by the shared step. The local defense beat waits for whenLanded before SHOW_HOLD.',
+      ru: 'Общий шаг usePairFold используется сценами DefenseRelease/Combo и на борде: сборка своей пары (_useBoardStaging), своя защита с Sudo (_useDefenseStaging), выкладка пары соперника в центр (shownBeat). Своей копией остался розыгрыш бота: боты не выкладывают карты в центр, и их релиз с Code Review складывается в центре кодом самого борда (comboBeat), а не общим шагом. Такт локальной защиты ждёт whenLanded перед SHOW_HOLD. — СВЯЗАНО 13.10: строка D15 таблицы расхождений — тот же момент.',
+      en: 'Shared usePairFold is used by the DefenseRelease/Combo stories and on the board: forming your own pair (_useBoardStaging), your own defence with Sudo (_useDefenseStaging), an opponent’s pair put out at the centre (shownBeat). One copy of its own remains, a bot’s play: bots do not put cards out at the centre, so their release with a Code Review is folded at the centre by the board’s own code (comboBeat) rather than by the shared step. The local defense beat waits for whenLanded before SHOW_HOLD. — LINKED 13.10: row D15 of the divergence table — the same moment.',
     },
     where: {
       ru: 'frontend: pages/board/[gameId]/_useBoardStaging.ts, _useDefenseStaging.tsx, features/board-beats/comboBeat.tsx + playground: interactive/DefenseReleaseStory.tsx',
@@ -3434,8 +3801,8 @@ const ISSUES: Issue[] = [
       en: 'Rebase reorders by buttons on the board and by dragging in the story',
     },
     problem: {
-      ru: 'Исправлено: борд и сцена используют useCardReorder — захват, превью позиции и отпускание. Работают ряды из одной, двух и трёх карт. Борд сохраняет выбранный порядок при обновлении проекции. Клавиатурная перестановка удалена после ревью PR134.',
-      en: 'Fixed: board and story share useCardReorder for grab, insertion preview and drop, including rows of one or two cards. The board preserves the chosen order across projection refreshes. Keyboard reordering was removed after PR134 review.',
+      ru: 'Исправлено: борд и сцена используют useCardReorder — захват, превью позиции и отпускание. Работают ряды из одной, двух и трёх карт. Борд сохраняет выбранный порядок при обновлении проекции. Клавиатурная перестановка удалена после ревью PR134. — СВЯЗАНО 13.10: строка D60 таблицы расхождений — ряд Rebase и перестановка.',
+      en: 'Fixed: board and story share useCardReorder for grab, insertion preview and drop, including rows of one or two cards. The board preserves the chosen order across projection refreshes. Keyboard reordering was removed after PR134 review. — LINKED 13.10: row D60 of the divergence table — the Rebase row and the reordering.',
     },
     where: {
       ru: 'apps/playground/stories/interactive/GitCards/Rebase.tsx + pages/board/[gameId]/_useRebaseStaging.tsx',
@@ -3479,8 +3846,8 @@ const ISSUES: Issue[] = [
       en: 'The board’s Cherry-pick grid stands over a LIVE heap; the story’s over an emptied one',
     },
     problem: {
-      ru: 'Исправлено в реализации: видимая куча и счётчик скрыты, пока грид владеет кандидатами. Принятое событие запускает handoff грида, такт ждёт его вместо второго полёта из сброса. Выбранная идёт в руку, sudo-вторая на колоду, невыбранные возвращаются в кучу; отказ RESOLVE разблокирует выбор. Полный браузерный паритет не подтверждён.',
-      en: 'Corrected in implementation: the visible heap/count are hidden while the grid owns candidates. The accepted event starts the grid handoff, which the beat awaits instead of a second discard flight. The pick enters the hand, the sudo second card goes to deck, and unpicked cards return to the heap; rejected RESOLVE unlocks the choice. Full browser parity is not verified.',
+      ru: 'Исправлено в реализации: видимая куча и счётчик скрыты, пока грид владеет кандидатами. Принятое событие запускает handoff грида, такт ждёт его вместо второго полёта из сброса. Выбранная идёт в руку, sudo-вторая на колоду, невыбранные возвращаются в кучу; отказ RESOLVE разблокирует выбор. Полный браузерный паритет не подтверждён. — СВЯЗАНО 13.10: строка D59 таблицы расхождений — возврат остальных карт в сброс после выбора.',
+      en: 'Corrected in implementation: the visible heap/count are hidden while the grid owns candidates. The accepted event starts the grid handoff, which the beat awaits instead of a second discard flight. The pick enters the hand, the sudo second card goes to deck, and unpicked cards return to the heap; rejected RESOLVE unlocks the choice. Full browser parity is not verified. — LINKED 13.10: row D59 of the divergence table — the rest of the cards going back to the discard after a choice.',
     },
     where: {
       ru: 'apps/playground/stories/interactive/GitCards/CherryPick.tsx + pages/board/[gameId]/_useCherryPickStaging.tsx',
@@ -3494,8 +3861,8 @@ const ISSUES: Issue[] = [
       en: 'Two neighbouring surfaces disagree about whether a RESOLVE waits for its flight',
     },
     problem: {
-      ru: 'Cherry-pick отправляет RESOLVE сразу, но полёт запускает только принятое событие: у выбранной карты есть куда приехать, и полёт — это то, что происходит с ЛОКАЛЬНЫМ выбором, пока сеть догоняет. Rebase (план #108, задача D2) требует обратного — ответ уходит, когда села последняя карта, — потому что в проекции о зафиксированном порядке не видно ничего (содержимое колоды не проецируется никому), второго рисующего нет, и полёт и есть всё, что игроку сообщают. Оба решения защищены в своих файлах, но правило теперь одно на двоих отсутствует: третий такой экран не сможет выбрать, не перечитав оба. Приведённое движение не спасёт — расходятся не значения, а момент отправки. Закроет запись этого выбора в `docs/animations/` как правила с двумя ветками и признаком, по которому ветка выбирается (есть ли у карты видимое место назначения в проекции), — либо решение, что борд всегда отвечает сразу, и тогда правку в Rebase.',
-      en: 'Cherry-pick dispatches RESOLVE at once, but only the accepted event starts its flight: the picked card has somewhere visible to land, and the flight is what happens with the LOCAL choice while the network catches up. Rebase (plan #108, task D2) asks for the opposite — the answer goes when the last card lands — because nothing about a committed reorder is visible in the projection (a deck’s contents are projected to nobody), there is no second renderer to race, and the flight IS the whole of what the player is told. Both choices are defended in their own files, but there is now no single rule across them: a third such surface cannot choose without reading both. Aligning the movement would not help — what differs is not a value but the moment of dispatch. What closes it: writing the choice into `docs/animations/` as a rule with two branches and the test that picks one (does the card have a visible destination in the projection?), or a decision that the board always answers at once, and then an edit to Rebase.',
+      ru: 'Cherry-pick отправляет RESOLVE сразу, но полёт запускает только принятое событие: у выбранной карты есть куда приехать, и полёт — это то, что происходит с ЛОКАЛЬНЫМ выбором, пока сеть догоняет. Rebase (план #108, задача D2) требует обратного — ответ уходит, когда села последняя карта, — потому что в проекции о зафиксированном порядке не видно ничего (содержимое колоды не проецируется никому), второго рисующего нет, и полёт и есть всё, что игроку сообщают. Оба решения защищены в своих файлах, но правило теперь одно на двоих отсутствует: третий такой экран не сможет выбрать, не перечитав оба. Приведённое движение не спасёт — расходятся не значения, а момент отправки. Закроет запись этого выбора в `docs/animations/` как правила с двумя ветками и признаком, по которому ветка выбирается (есть ли у карты видимое место назначения в проекции), — либо решение, что борд всегда отвечает сразу, и тогда правку в Rebase. — СВЯЗАНО 13.10: строка D64 таблицы расхождений — когда кончается розыгрыш выбора.',
+      en: 'Cherry-pick dispatches RESOLVE at once, but only the accepted event starts its flight: the picked card has somewhere visible to land, and the flight is what happens with the LOCAL choice while the network catches up. Rebase (plan #108, task D2) asks for the opposite — the answer goes when the last card lands — because nothing about a committed reorder is visible in the projection (a deck’s contents are projected to nobody), there is no second renderer to race, and the flight IS the whole of what the player is told. Both choices are defended in their own files, but there is now no single rule across them: a third such surface cannot choose without reading both. Aligning the movement would not help — what differs is not a value but the moment of dispatch. What closes it: writing the choice into `docs/animations/` as a rule with two branches and the test that picks one (does the card have a visible destination in the projection?), or a decision that the board always answers at once, and then an edit to Rebase. — LINKED 13.10: row D64 of the divergence table — when a choice play is over.',
     },
     where: {
       ru: 'pages/board/[gameId]/_useRebaseStaging.tsx + pages/board/[gameId]/_useCherryPickStaging.tsx',
@@ -3539,8 +3906,8 @@ const ISSUES: Issue[] = [
       en: 'Hand limit: the cards laid out for the discard are unseen by the opponents and unknown to the host',
     },
     problem: {
-      ru: 'По ответу владельца (#139) у сброса по лимиту руки есть промежуточное состояние: игрок выкладывает карты на сброс (около 30 секунд), соперники видят, что он сбрасывает, а если по таймеру выложена только часть — выложенные остаются в сбросе, недостающие добираются случайно. Сейчас выкладка живёт только в браузере игрока и уходит в игру одним ответом в конце (`handLimit` с полным списком карт): соперники её не видят, а хост, у которого срабатывает таймер, не знает, что уже выложено. Закроет: выкладка — публичное действие, которое доходит до хоста и соперников по мере выкладывания.',
-      en: "By the owner's answer (#139), discarding to the hand limit has an in-between state: the player lays cards out for the discard (about 30 seconds), the opponents see what is being discarded, and if only part has been laid out when the timer runs out, those cards stay for the discard and the rest are chosen at random. Today the layout lives only in the player's browser and reaches the game as one answer at the end (`handLimit` with the full list of cards): the opponents do not see it, and the host, where the timer fires, does not know what has been laid out. Closed by: laying out is a public action that reaches the host and the opponents as it happens.",
+      ru: 'По ответу владельца (#139) у сброса по лимиту руки есть промежуточное состояние: игрок выкладывает карты на сброс (около 30 секунд), соперники видят, что он сбрасывает, а если по таймеру выложена только часть — выложенные остаются в сбросе, недостающие добираются случайно. Сейчас выкладка живёт только в браузере игрока и уходит в игру одним ответом в конце (`handLimit` с полным списком карт): соперники её не видят, а хост, у которого срабатывает таймер, не знает, что уже выложено. Закроет: выкладка — публичное действие, которое доходит до хоста и соперников по мере выкладывания. — СВЯЗАНО 13.10: строка D99 таблицы расхождений — тот же момент.',
+      en: "By the owner's answer (#139), discarding to the hand limit has an in-between state: the player lays cards out for the discard (about 30 seconds), the opponents see what is being discarded, and if only part has been laid out when the timer runs out, those cards stay for the discard and the rest are chosen at random. Today the layout lives only in the player's browser and reaches the game as one answer at the end (`handLimit` with the full list of cards): the opponents do not see it, and the host, where the timer fires, does not know what has been laid out. Closed by: laying out is a public action that reaches the host and the opponents as it happens. — LINKED 13.10: row D99 of the divergence table — the same moment.",
     },
     where: {
       ru: 'packages/engine (pending handLimit) + frontend: выкладка лимита руки + network/session/referee.ts (таймер)',
@@ -3600,8 +3967,8 @@ const ISSUES: Issue[] = [
       en: 'Inside: releases laid out and sent back may ride above the heap’s non-release cards',
     },
     problem: {
-      ru: 'На экране не подтверждено. По коду сетка Inside — та же, что у Cherry-pick; её ячейки едут на слое PIN_Z + exitLayer, выше любой карты, оставшейся в куче. У Inside в куче остаются карты, которые не релизы. Записей с Inside после правок сетки 04.10 нет; закроет запись и разбор по ней.',
-      en: 'Not confirmed on screen. By the code, the Inside grid is Cherry-pick’s own; its cells ride at PIN_Z + exitLayer, above any card left in the heap. Inside leaves the heap’s non-release cards there. No Inside recording since the grid changed on 04.10; a recording and a pass over it close it.',
+      ru: 'На экране не подтверждено. По коду сетка Inside — та же, что у Cherry-pick; её ячейки едут на слое PIN_Z + exitLayer, выше любой карты, оставшейся в куче. У Inside в куче остаются карты, которые не релизы. Записей с Inside после правок сетки 04.10 нет; закроет запись и разбор по ней. — СВЯЗАНО 13.10: строка D59, D65 таблицы расхождений — возврат в сброс и порядок Inside.',
+      en: 'Not confirmed on screen. By the code, the Inside grid is Cherry-pick’s own; its cells ride at PIN_Z + exitLayer, above any card left in the heap. Inside leaves the heap’s non-release cards there. No Inside recording since the grid changed on 04.10; a recording and a pass over it close it. — LINKED 13.10: row D59, D65 of the divergence table — the return to the discard and the order of Inside.',
     },
     where: {
       ru: 'frontend: pages/board/[gameId]/_useCherryPickStaging.tsx',
@@ -3630,8 +3997,8 @@ const ISSUES: Issue[] = [
       en: 'A card request with no choice surface shows the card twice for two frames',
     },
     problem: {
-      ru: 'В режиме без анимаций ветка запроса без поверхности (`popIn` в центре) рисует карту дважды на два кадра (запись 03.10; после правок 04.10 не перепроверено). Решение владельца 03.10: в находки. Закроет перевод ветки на cardPlace (I12).',
-      en: 'With motion reduced, the request’s branch with no surface (`popIn` at the centre) draws the card twice for two frames (recording, 03.10; not rechecked after 04.10). Owner, 03.10: a finding. Moving the branch onto cardPlace (I12) closes it.',
+      ru: 'В режиме без анимаций ветка запроса без поверхности (`popIn` в центре) рисует карту дважды на два кадра (запись 03.10; после правок 04.10 не перепроверено). Решение владельца 03.10: в находки. Закроет перевод ветки на cardPlace (I12). — СВЯЗАНО 13.10: строка D71 таблицы расхождений — выбранная карта в каталоге и popIn.',
+      en: 'With motion reduced, the request’s branch with no surface (`popIn` at the centre) draws the card twice for two frames (recording, 03.10; not rechecked after 04.10). Owner, 03.10: a finding. Moving the branch onto cardPlace (I12) closes it. — LINKED 13.10: row D71 of the divergence table — the chosen card in the catalogue and popIn.',
     },
     where: {
       ru: 'frontend: features/board-beats/transferBeat.tsx (runRequested)',
@@ -3678,8 +4045,9 @@ const UI = {
     copy: 'копировать',
     divH: 'Расхождения по использованию модулей анимаций',
     divNote:
-      'Момент анимации и все места, где он записан. Правильно — когда момент живёт в модулях кита (apps/ui/src), а плейграунд и стол (apps/frontend) берут его оттуда. Копия только в плейграунде, только на столе или в обоих — расхождение. Строка закрывается, когда в колонках «плейграунд» и «стол» осталось «берёт из модулей». Каждая строка — запись в реестре находок выше, статус у них общий. Новое место того же момента дописывается в его строку, а не заводит новую.',
+      'Момент анимации и все места, где он записан. Правильно — когда момент живёт в модулях кита (apps/ui/src), а плейграунд и стол (apps/frontend) берут его оттуда. Копия только в плейграунде, только на столе или в обоих — расхождение. Строка закрывается, когда в колонках «плейграунд» и «стол» осталось «берёт из модулей». Каждая строка — запись в реестре находок выше, статус у них общий. Новое место того же момента дописывается в его строку, а не заводит новую. Строки собраны по игровым ситуациям; в колонке «связано» — другие строки и старые записи реестра, связанные с этой, и что у них общего. Соединяется в одну строку только один и тот же момент, который закрывает одна правка.',
     colMoment: 'момент',
+    colRelated: 'связано',
     colKit: 'модули',
     colPlayground: 'плейграунд',
     colTable: 'стол',
@@ -3720,8 +4088,9 @@ const UI = {
     copy: 'copy',
     divH: 'Divergences in animation module use',
     divNote:
-      'A moment of the animations and every place it is written in. Right is the moment living in the kit\'s modules (apps/ui/src), with the playground and the table (apps/frontend) taking it from there. A copy in the playground alone, on the table alone, or in both is a divergence. A row closes when the playground and table columns are left with "takes it from the modules". Every row is an entry in the register of findings above, and the two share one status. A new place of the same moment goes into its row rather than opening a new one.',
+      'A moment of the animations and every place it is written in. Right is the moment living in the kit\'s modules (apps/ui/src), with the playground and the table (apps/frontend) taking it from there. A copy in the playground alone, on the table alone, or in both is a divergence. A row closes when the playground and table columns are left with "takes it from the modules". Every row is an entry in the register of findings above, and the two share one status. A new place of the same moment goes into its row rather than opening a new one. The rows are grouped by game situation; the "related" column names the other rows and older register entries tied to this one, and what they share. Only one and the same moment, closed by one change, is merged into one row.',
     colMoment: 'moment',
+    colRelated: 'related',
     colKit: 'modules',
     colPlayground: 'playground',
     colTable: 'table',
@@ -3874,6 +4243,25 @@ function IssueTable({ rows }: { rows: Issue[] }) {
   )
 }
 
+// The row numbers inside a "related" text become links to those rows. Keyed by
+// their offset in the text, which is unique and stable for a given text.
+function withRowLinks(text: string): ReactNode[] {
+  const out: ReactNode[] = []
+  let last = 0
+  for (const m of text.matchAll(/D\d+/g)) {
+    const at = m.index ?? 0
+    if (at > last) out.push(text.slice(last, at))
+    out.push(
+      <a key={at} className={styles.ref} href={`#divergence-${m[0]}`}>
+        {m[0]}
+      </a>,
+    )
+    last = at + m[0].length
+  }
+  if (last < text.length) out.push(text.slice(last))
+  return out
+}
+
 function DivergenceTable({ rows }: { rows: Divergence[] }) {
   const { lang } = useLang()
   const ui = UI[lang]
@@ -3886,31 +4274,42 @@ function DivergenceTable({ rows }: { rows: Divergence[] }) {
           <th>{ui.colPlayground}</th>
           <th>{ui.colTable}</th>
           <th>{ui.colNote}</th>
+          <th>{ui.colRelated}</th>
           <th className={styles.finding}>{ui.colFinding}</th>
           <th className={styles.status}>{ui.colStatus}</th>
         </tr>
       </thead>
-      <tbody>
-        {rows.map((r) => (
-          <tr key={r.id} id={`divergence-${r.id}`} className={styles.anchored}>
-            <td className={styles.mod}>
-              {r.id} · {r.moment[lang]}
-            </td>
-            <td className={styles.where}>{r.kit[lang]}</td>
-            <td className={styles.where}>{r.playground[lang]}</td>
-            <td className={styles.where}>{r.table[lang]}</td>
-            <td className={styles.what}>{r.note[lang]}</td>
-            <td className={`${styles.where} ${styles.finding}`}>
-              <a className={styles.ref} href={`#finding-${r.id}`}>
-                {ui.toFinding}
-              </a>
-            </td>
-            <td className={styles.status}>
-              <Badge status={r.status} />
-            </td>
-          </tr>
-        ))}
-      </tbody>
+      {DIVERGENCE_GROUPS.map((g) => {
+        const inGroup = rows.filter((r) => r.group === g.id)
+        if (inGroup.length === 0) return null
+        return (
+          <tbody key={g.id}>
+            <tr className={styles.groupRow}>
+              <td colSpan={8}>{g.title[lang]}</td>
+            </tr>
+            {inGroup.map((r) => (
+              <tr key={r.id} id={`divergence-${r.id}`} className={styles.anchored}>
+                <td className={styles.mod}>
+                  {r.id} · {r.moment[lang]}
+                </td>
+                <td className={styles.where}>{r.kit[lang]}</td>
+                <td className={styles.where}>{r.playground[lang]}</td>
+                <td className={styles.where}>{r.table[lang]}</td>
+                <td className={styles.what}>{r.note[lang]}</td>
+                <td className={styles.what}>{withRowLinks(r.related[lang])}</td>
+                <td className={`${styles.where} ${styles.finding}`}>
+                  <a className={styles.ref} href={`#finding-${r.id}`}>
+                    {ui.toFinding}
+                  </a>
+                </td>
+                <td className={styles.status}>
+                  <Badge status={r.status} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        )
+      })}
     </table>
   )
 }
