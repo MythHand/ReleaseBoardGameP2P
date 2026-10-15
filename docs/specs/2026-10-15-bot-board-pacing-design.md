@@ -4,7 +4,7 @@ Date: 2026-10-15
 
 Issue: https://github.com/MythHand/ReleaseBoardGameP2P/issues/226
 
-Status: conversational design approved; written specification awaiting owner review.
+Status: written specification approved by the owner; implementation plan awaiting review.
 
 ## Intent and success criteria
 
