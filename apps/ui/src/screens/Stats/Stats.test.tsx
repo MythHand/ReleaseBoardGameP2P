@@ -20,6 +20,9 @@ const copy: StatsCopy = {
     err503: { title: 'Lucky One', unit: 'Error 503s from deck' },
     cherryPick: { title: 'Treasure Hunter', unit: 'times pulled from discard' },
     attackedInto: { title: 'Bug Magnet', unit: 'attack cards taken' },
+    defense: { title: 'Fixer', unit: 'defense cards played' },
+    monitoring: { title: 'Paranoid', unit: 'times set up Monitoring' },
+    gitBranch: { title: 'Woodcutter', unit: 'times split a deck' },
   },
 }
 
@@ -35,6 +38,8 @@ const players: StatPlayer[] = [
     ai: 0,
     err503: 0,
     cherryPick: 0,
+    monitoring: 0,
+    gitBranch: 0,
   },
   {
     id: 'b',
@@ -47,6 +52,8 @@ const players: StatPlayer[] = [
     ai: 0,
     err503: 0,
     cherryPick: 0,
+    monitoring: 0,
+    gitBranch: 0,
   },
 ]
 
@@ -61,7 +68,16 @@ const players: StatPlayer[] = [
 // as the plate's identity. Leaf elements only: every ancestor's `textContent`
 // carries the title too, and counting those would report one plate several
 // times and in the wrong order.
-const PLATE_TITLES = ['Bug Magnet', 'AI Addict', 'Treasure Hunter', 'Lucky One', 'King of DDoS']
+const PLATE_TITLES = [
+  'Bug Magnet',
+  'Fixer',
+  'AI Addict',
+  'Treasure Hunter',
+  'Lucky One',
+  'King of DDoS',
+  'Paranoid',
+  'Woodcutter',
+]
 
 const platesInOrder = (container: HTMLElement): string[] =>
   [...container.querySelectorAll<HTMLElement>('*')]
@@ -136,6 +152,8 @@ it('gives no plate for a metric nobody scored, even with nobody to tie against',
   expect(queryByText('Treasure Hunter')).toBeNull()
   expect(queryByText('King of DDoS')).toBeNull()
   expect(queryByText('Bug Magnet')).toBeNull()
+  expect(queryByText('Paranoid')).toBeNull()
+  expect(queryByText('Woodcutter')).toBeNull()
 })
 
 it('still awards a plate to a lone player who actually scored', () => {
@@ -146,22 +164,43 @@ it('still awards a plate to a lone player who actually scored', () => {
   expect(getByText('King of DDoS')).toBeTruthy()
 })
 
-it('renders the plates in their designed order, the wide one first', () => {
-  // Every metric given a sole leader, so all five plates render and the order
+it('renders the plates in their designed order, the wide ones first', () => {
+  // Every metric given a sole leader, so all eight plates render and the order
   // is the whole assertion. It is a design decision, not an incidental one:
-  // «Забагованный» is the wide plate and takes a row of its own, and the four
-  // ordinary ones follow in pairs.
+  // «Забагованный» and «Решала» are the wide plates and come first, and the
+  // six ordinary ones follow.
   const all: StatPlayer[] = [
-    { ...players[0], attackedInto: 5, ai: 4, cherryPick: 3, err503: 0, ddos: 0 },
-    { ...players[1], attackedInto: 0, ai: 0, cherryPick: 0, err503: 2, ddos: 1 },
+    {
+      ...players[0],
+      attackedInto: 5,
+      ai: 4,
+      cherryPick: 3,
+      err503: 0,
+      ddos: 0,
+      monitoring: 2,
+      gitBranch: 0,
+    },
+    {
+      ...players[1],
+      attackedInto: 0,
+      ai: 0,
+      cherryPick: 0,
+      err503: 2,
+      ddos: 1,
+      monitoring: 0,
+      gitBranch: 1,
+    },
   ]
   const { container } = render(<Stats winnerId="a" copy={copy} players={all} />)
 
   expect(platesInOrder(container)).toEqual([
     'Bug Magnet',
+    'Fixer',
     'AI Addict',
     'Treasure Hunter',
     'Lucky One',
     'King of DDoS',
+    'Paranoid',
+    'Woodcutter',
   ])
 })

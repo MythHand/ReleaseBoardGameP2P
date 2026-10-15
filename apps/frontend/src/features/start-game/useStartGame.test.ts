@@ -1,7 +1,7 @@
+import { botNames } from '@release/ui'
 import { renderHook } from '@testing-library/react'
 import { vi } from 'vitest'
 import type { LobbyState } from '~/network'
-import { botNames } from './botNames'
 import { useFollowGameStart, useStartGame } from './useStartGame'
 
 const navigate = vi.fn()

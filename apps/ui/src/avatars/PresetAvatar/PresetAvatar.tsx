@@ -9,17 +9,24 @@ interface PresetAvatarProps {
   size?: number
   // muted (offline) look — the art is desaturated and dimmed
   muted?: boolean
+  // speaking in the voice chat — the ring around the square
+  speaking?: boolean
 }
 
 // A stock avatar filled with a card's art — background + dim panel + illustration,
 // composed statically (no parallax, no grid / decor) inside the square Avatar.
 // Layers and dim level are read from PARALLAX_CARDS so nothing is duplicated.
-export default function PresetAvatar({ id, size = 128, muted = false }: PresetAvatarProps) {
+export default function PresetAvatar({
+  id,
+  size = 128,
+  muted = false,
+  speaking = false,
+}: PresetAvatarProps) {
   const cfg = PARALLAX_CARDS[id]
   if (!cfg) return null
 
   return (
-    <Avatar size={size}>
+    <Avatar size={size} speaking={speaking}>
       <span className={`${styles.art} ${muted ? styles.muted : ''}`}>
         <img className={styles.bg} src={cfg.background.src} alt="" />
         <span className={styles.dim} style={{ opacity: cfg.panel.opacity }} />

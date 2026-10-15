@@ -38,6 +38,10 @@ const CONNECTION_ISSUES: ReadonlySet<VoiceIssue> = new Set([
 // whoever the calls failed with
 const UNREACHABLE = 'segfault'
 
+// Who can be speaking on these pages: me and the four. segfault has turned their
+// own microphone off, so picking them shows that a muted microphone never rings.
+const SPEAKERS = [VOICE_SELF.id, 'TabsOverSpaces', 'kernel_panic', 'null_ptr', 'segfault']
+
 // The voice chat's demo state, shared by the Lobby, Table and Stats + chat
 // pages: where I stand, how many others are in, the volumes, and what went
 // wrong. Pressing the headphones walks the real way — off, connecting,
@@ -51,6 +55,9 @@ export function useVoiceDemo() {
   const [volume, setVolume] = useState(100)
   const [micOff, setMicOff] = useState(false)
   const [issue, setIssue] = useState<VoiceIssue | null>(null)
+  // who is talking, as the network would report it — before the rules of who
+  // gets to see it
+  const [speaker, setSpeaker] = useState<string | null>(null)
 
   useEffect(() => {
     if (status !== 'connecting') return
@@ -84,7 +91,24 @@ export function useVoiceDemo() {
   }
 
   const inVoice = status === 'connected' || status === 'interrupted'
-  const participants = [...(inVoice ? [VOICE_SELF] : []), ...others.slice(0, othersCount)]
+  const shownOthers = others.slice(0, othersCount)
+
+  // What I see of the speaking (owner, 07.10): only while I am on the line — a
+  // broken-off connection brings nothing, and as in Discord nobody outside the
+  // voice sees who talks; never someone I muted for myself; never a microphone
+  // that is off. Mine rings when I talk with my microphone on.
+  const speakerSeen = (() => {
+    if (status !== 'connected' || !speaker) return null
+    if (speaker === VOICE_SELF.id) return micOff ? null : speaker
+    const other = shownOthers.find((p) => p.id === speaker)
+    return other && !other.muted && !other.micOff ? speaker : null
+  })()
+  const speaking = speakerSeen ? [speakerSeen] : []
+
+  const participants = [...(inVoice ? [VOICE_SELF] : []), ...shownOthers].map((p) => ({
+    ...p,
+    speaking: p.id === speakerSeen,
+  }))
 
   return {
     status,
@@ -93,6 +117,10 @@ export function useVoiceDemo() {
     setOthersCount,
     issue,
     setIssue: changeIssue,
+    speaker,
+    setSpeaker,
+    // the ids (= nicknames) speaking as I see them, for the rows of the screen
+    speaking,
     // everything the voice blocks take but their copy
     props: {
       participants,
@@ -142,6 +170,15 @@ export function VoiceDemoControls({ demo }: { demo: ReturnType<typeof useVoiceDe
         options={[{ value: 'none', label: 'none' }, ...ISSUES]}
         value={demo.issue ?? 'none'}
         onChange={(v) => demo.setIssue(v === 'none' ? null : (v as VoiceIssue))}
+      />
+      <HoverSelect
+        label="speaks"
+        options={[
+          { value: 'none', label: 'nobody' },
+          ...SPEAKERS.map((id) => ({ value: id, label: id === VOICE_SELF.id ? `${id} (me)` : id })),
+        ]}
+        value={demo.speaker ?? 'none'}
+        onChange={(v) => demo.setSpeaker(v === 'none' ? null : v)}
       />
     </>
   )

@@ -23,6 +23,7 @@ const COPY: Record<'ru' | 'en', InviteCopy> = {
     nicknameLabel: 'ваш никнейм',
     nicknamePlaceholder: 'НАПР. Dimbo',
     randomNick: 'случайный ник',
+    nicknameTaken: 'Этот никнейм уже занят',
     roleTitle: 'подключиться как',
     rolePlayer: 'игрок',
     roleSpectator: 'зритель',
@@ -53,6 +54,7 @@ const COPY: Record<'ru' | 'en', InviteCopy> = {
     nicknameLabel: 'your nickname',
     nicknamePlaceholder: 'E.G. Dimbo',
     randomNick: 'random name',
+    nicknameTaken: 'This nickname is already taken',
     roleTitle: 'join as',
     rolePlayer: 'player',
     roleSpectator: 'spectator',
@@ -88,6 +90,7 @@ const STATES_DEFAULT: { value: InviteState; label: Loc }[] = [
   { value: 'connected', label: { ru: 'подключено', en: 'connected' } },
   { value: 'failed', label: { ru: 'ошибка', en: 'failed' } },
   { value: 'notFound', label: { ru: 'не найдена', en: 'not found' } },
+  { value: 'nameTaken', label: { ru: 'ник занят', en: 'name taken' } },
 ]
 const STATES_FULL: { value: InviteState; label: Loc }[] = [
   { value: 'form', label: { ru: 'форма', en: 'form' } },

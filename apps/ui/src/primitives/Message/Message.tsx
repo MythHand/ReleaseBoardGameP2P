@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import PresetAvatar from '@/avatars/PresetAvatar'
 import Avatar from '@/primitives/Avatar'
 import Typography from '@/primitives/Typography'
 import styles from './Message.module.css'
@@ -17,6 +18,8 @@ export interface MessageProps {
   text: string
   // автор: ник, как он назван на любом экране
   who?: string
+  // the author's preset avatar id (a player's); without it, the nick's initial
+  avatar?: string
   // время в готовом виде — форматирование остаётся за консьюмером
   time?: string
   // роль автора в комнате. Имя проп НЕ `role`: на компоненте его не отличить от
@@ -37,6 +40,7 @@ export interface MessageProps {
 export default function Message({
   text,
   who,
+  avatar,
   time,
   authorRole = 'spectator',
   self = false,
@@ -57,7 +61,10 @@ export default function Message({
         .filter(Boolean)
         .join(' ')}
     >
-      <div className={styles.gutter}>{!grouped && <Avatar name={who} size={26} />}</div>
+      <div className={styles.gutter}>
+        {!grouped &&
+          (avatar ? <PresetAvatar id={avatar} size={26} /> : <Avatar name={who} size={26} />)}
+      </div>
       <div className={styles.body}>
         {!grouped && (
           <div className={styles.meta}>

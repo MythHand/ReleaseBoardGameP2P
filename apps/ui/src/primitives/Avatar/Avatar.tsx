@@ -10,11 +10,22 @@ interface AvatarProps {
   muted?: boolean
   // контент на всю площадь (напр. пресет-аватар) — рендерится вместо инициала
   children?: ReactNode
+  // speaking in the voice chat — a ring around the square
+  speaking?: boolean
 }
 
 // Аватар: квадрат со скруглением. По умолчанию — инициал имени; если передан
 // `children`, они заполняют аватар целиком (клип по скруглению) вместо буквы.
-export default function Avatar({ name, size = 32, muted = false, children }: AvatarProps) {
+// Two layers: the face clips its content to the rounding, so the speaking ring
+// lives on the outer one — a clip on the face would cut the ring off, and a
+// ring drawn by the face would follow its rounding.
+export default function Avatar({
+  name,
+  size = 32,
+  muted = false,
+  speaking = false,
+  children,
+}: AvatarProps) {
   const style = {
     inlineSize: size,
     blockSize: size,
@@ -22,8 +33,11 @@ export default function Avatar({ name, size = 32, muted = false, children }: Ava
   } as CSSProperties
 
   return (
-    <span className={`${styles.avatar} ${muted ? styles.muted : ''}`} style={style}>
-      {children ?? name?.[0]?.toUpperCase()}
+    <span
+      className={`${styles.avatar} ${muted ? styles.muted : ''} ${speaking ? styles.speaking : ''}`}
+      style={style}
+    >
+      <span className={styles.face}>{children ?? name?.[0]?.toUpperCase()}</span>
     </span>
   )
 }

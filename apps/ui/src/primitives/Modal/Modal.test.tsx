@@ -1,4 +1,4 @@
-import { act, render } from '@testing-library/react'
+import { act, fireEvent, render } from '@testing-library/react'
 import Modal from './Modal'
 
 // jsdom polyfills requestAnimationFrame as setTimeout(fn, 0).
@@ -45,6 +45,41 @@ it('restores focus to the previously focused element on close', () => {
 
   expect(document.activeElement).toBe(trigger)
   document.body.removeChild(trigger)
+  vi.useRealTimers()
+})
+
+it('takes no second request to close while it fades out', () => {
+  // The modal stays mounted for its exit after `open` turns false. A second
+  // Escape in that window — or a click on the ✕ or the backdrop — used to call
+  // onClose again, and a consumer announcing something on close announced it
+  // twice (PR #224 review).
+  vi.useFakeTimers()
+  const onClose = vi.fn()
+  const { rerender, container, getByLabelText } = render(
+    <Modal open onClose={onClose}>
+      <button type="button">Inside</button>
+    </Modal>,
+  )
+  act(() => {
+    vi.runAllTimers()
+  })
+
+  fireEvent.keyDown(window, { key: 'Escape' })
+  expect(onClose).toHaveBeenCalledTimes(1)
+
+  // the consumer closes it; it is still on screen, fading out
+  rerender(
+    <Modal open={false} onClose={onClose}>
+      <button type="button">Inside</button>
+    </Modal>,
+  )
+  fireEvent.keyDown(window, { key: 'Escape' })
+  fireEvent.click(getByLabelText('close'))
+  const backdrop = container.querySelector('[role="presentation"]')
+  if (backdrop) fireEvent.click(backdrop)
+
+  expect(backdrop).not.toBeNull()
+  expect(onClose).toHaveBeenCalledTimes(1)
   vi.useRealTimers()
 })
 

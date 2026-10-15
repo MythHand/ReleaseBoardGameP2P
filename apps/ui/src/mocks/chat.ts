@@ -1,10 +1,35 @@
-import type { ChatMessage } from '@/blocks/Chat'
+import type { ChatMessage, ChatRole } from '@/blocks/Chat'
 
 // Мок переписки в лобби. Ники — из того же ряда, что и в остальных моках;
 // локальный игрок здесь `deadlock`, и узнаётся он отметкой, а не именем.
 // В ленте нарочно собраны все состояния разом: хост, игрок, зритель,
 // технические записи и реплика того, кто уже вышел.
 export const CHAT_SELF = 'deadlock'
+
+// The players' avatars by nickname — the same people in the chat, voice, table
+// and stats mocks, so every panel shows each of them the same. A spectator has
+// none (SyntaxSeagull plays in the stats mock and only watches in the voice one).
+const MOCK_AVATARS: Record<string, string> = {
+  TabsOverSpaces: 'support-sudo',
+  segfault: 'attack-bug',
+  [CHAT_SELF]: 'release-frontend',
+  null_ptr: 'defense-rubber-ducky',
+  race_cond: 'attack-ddos',
+  kernel_panic: 'attack-out-of-memory',
+  off_by_one: 'defense-hotfix',
+  SyntaxSeagull_9000_x: 'defense-not-a-bug',
+}
+
+// a player's avatar (the host is a player too); a spectator has none
+export function mockAvatar(name?: string, role?: ChatRole): string | undefined {
+  return name && role && role !== 'spectator' ? MOCK_AVATARS[name] : undefined
+}
+
+// The feed with each author's avatar. Applied when a page hands the feed to the
+// chat, so a line whose role a page repaints (mine, as a spectator) follows it.
+export function withMockAvatars(messages: ChatMessage[]): ChatMessage[] {
+  return messages.map((m) => (m.system ? m : { ...m, avatar: mockAvatar(m.who, m.role) }))
+}
 
 export function makeChat(): ChatMessage[] {
   return [

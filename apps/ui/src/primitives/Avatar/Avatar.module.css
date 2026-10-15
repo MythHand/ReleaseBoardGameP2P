@@ -1,9 +1,34 @@
+/* the slot: the size, and the speaking ring around it */
 .avatar {
   position: relative;
   display: flex;
   flex: none;
+}
+
+/* the speaking ring — square, as the project's frames are, and outside the
+   face, so the face keeps its size and the row does not move when it comes and
+   goes. It fades rather than blinks: it comes and goes with every phrase. */
+.avatar::after {
+  position: absolute;
+  inset: -1px;
+  pointer-events: none;
+  content: '';
+  border: 1px solid transparent;
+  transition: border-color var(--t-fast) var(--ease-out);
+}
+
+/* speaking in the voice chat */
+.speaking::after {
+  border-color: var(--voice-speaking);
+}
+
+.face {
+  position: relative;
+  display: flex;
   align-items: center;
   justify-content: center;
+  inline-size: 100%;
+  block-size: 100%;
   overflow: hidden;
 
   /* The family is the only text property declared here, and the letter's size is
@@ -19,7 +44,7 @@
 }
 
 /* приглушённый — игрок не в сети */
-.muted {
+.muted .face {
   color: var(--white-35);
   background: var(--white-05);
 }
