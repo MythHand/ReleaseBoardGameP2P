@@ -183,3 +183,83 @@ it('preserves an adopted deadline when the successor has a different epoch', () 
     s.keeper.close()
   }
 })
+
+it('invalidates old calibration, probes and SYNC anchors after keeper departure', () => {
+  const s = setup()
+  try {
+    let heldId = 0
+    s.net.onDeliver('host', (frame) => {
+      if (frame.type === 'CLOCK_REQUEST') heldId = frame.payload.requestId
+    })
+    s.remote.activate('g1')
+    s.keeper.resync()
+    expect(s.remote.link.clock.now()).toBe(10_000)
+    s.net.transport('host').send('guest', { type: 'KEEPER_CHANGED', payload: { keeperId: 'p2' } })
+    expect(s.remote.link.clock.now()).toBeNull()
+    expect(vi.getTimerCount()).toBe(0)
+    s.keeper.resync()
+    s.net.transport('host').send('guest', {
+      type: 'CLOCK_RESPONSE',
+      payload: {
+        gameId: 'g1',
+        requestId: heldId,
+        receivedAt: 20_000,
+        sentAt: 20_000,
+      },
+    })
+    expect(s.remote.link.clock.now()).toBeNull()
+  } finally {
+    s.remote.link.close()
+    s.keeper.close()
+  }
+})
+
+it('lets the handover callback inherit time and synchronously reactivate even the same peer', () => {
+  const s = setup()
+  s.remote.link.close()
+  let captured: number | null = null
+  const remote = createRemoteLink({
+    transport: s.net.transport('guest'),
+    keeperPeerId: 'host',
+    monotonicNow: s.mono,
+    onKeeperChanged() {
+      captured = remote.link.clock.now()
+      remote.setKeeper('host')
+    },
+  })
+  s.net.onDeliver('guest', remote.handleMessage)
+  try {
+    remote.activate('g1')
+    s.net.transport('host').send('guest', { type: 'KEEPER_CHANGED', payload: { keeperId: 'p2' } })
+    expect(captured).toBe(10_000)
+    expect(remote.link.clock.now()).toBe(10_000)
+    expect(vi.getTimerCount()).toBe(3)
+  } finally {
+    remote.link.close()
+    s.keeper.close()
+  }
+})
+
+it('delivers legacy projections without subtracting an untrusted client epoch', () => {
+  const s = setup()
+  s.net.onDeliver('host', () => {}) // an older keeper ignores clock requests
+  const received = vi.fn()
+  s.remote.link.subscribe(received)
+  try {
+    s.remote.activate('g1')
+    const payload = { view: s.ref.current.engine.project(s.ref.current.state, 'p2'), events: [] }
+    s.net.transport('host').send('guest', { type: 'SYNC', payload })
+    expect(received).toHaveBeenCalledTimes(1)
+    expect(s.remote.link.clock.now()).toBeNull()
+    s.net
+      .transport('host')
+      .send('guest', { type: 'SYNC', payload: { ...payload, gameId: 'old-game', keeperNow: 5000 } })
+    expect(received).toHaveBeenCalledTimes(1)
+    expect(s.remote.link.clock.now()).toBeNull()
+    s.keeper.resync()
+    expect(s.remote.link.clock.now()).toBe(10_000)
+  } finally {
+    s.remote.link.close()
+    s.keeper.close()
+  }
+})

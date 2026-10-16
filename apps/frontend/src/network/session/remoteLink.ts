@@ -54,6 +54,8 @@ export function createRemoteLink(args: {
   let keeperPeerId = args.keeperPeerId
   let activeGame: string | null = null
   let closed = false
+  let clockGeneration = 0
+  let clockActive = false
   const mono = args.monotonicNow ?? (() => performance.now())
   const clock = createRemoteClock(mono)
   const probe = createClockProbe({
@@ -91,14 +93,20 @@ export function createRemoteLink(args: {
     activate(gameId) {
       if (!closed) {
         activeGame = gameId
+        clockGeneration++
+        clockActive = true
         probe.activate(gameId)
       }
     },
     resetClock() {
+      clockGeneration++
+      clockActive = false
       probe.reset()
     },
     setKeeper(peerId) {
       keeperPeerId = peerId
+      clockGeneration++
+      clockActive = activeGame !== null && !closed
       probe.reset()
       if (activeGame && !closed) probe.activate(activeGame)
     },
@@ -116,11 +124,19 @@ export function createRemoteLink(args: {
         // (envelope.ts), and here the missing-payload default would be the
         // most destructive reading available: `keeperId: null` ends the game.
         if (!frame.payload || !('keeperId' in frame.payload)) return
+        // Let a successor capture inherited time before invalidating this
+        // generation. A synchronous callback may already install the new one.
+        const generation = clockGeneration
         args.onKeeperChanged?.(frame.payload.keeperId)
+        if (clockGeneration === generation) {
+          clockGeneration++
+          clockActive = false
+          probe.reset()
+        }
         return
       }
       if (frame.type === 'CLOCK_RESPONSE') {
-        probe.receive(frame.payload)
+        if (clockActive) probe.receive(frame.payload)
         return
       }
       if (frame.type !== 'SYNC') return
@@ -129,6 +145,7 @@ export function createRemoteLink(args: {
       if (!frame.payload?.view) return
       if (activeGame && frame.payload.gameId && frame.payload.gameId !== activeGame) return
       if (
+        clockActive &&
         activeGame &&
         frame.payload.gameId === activeGame &&
         typeof frame.payload.keeperNow === 'number'
