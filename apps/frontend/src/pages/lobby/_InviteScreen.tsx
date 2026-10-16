@@ -57,8 +57,9 @@ export default function InviteScreen() {
   const busy = connecting || connected
 
   // The action slot's status line — localized, never the raw PeerJS string.
+  const nameTaken = session.status === 'error' && session.errorKind === 'name-taken'
   const status =
-    session.status === 'error'
+    session.status === 'error' && !nameTaken
       ? session.errorKind === 'room-full'
         ? t('invite.fullStatus')
         : session.errorKind === 'not-found'
@@ -186,7 +187,7 @@ export default function InviteScreen() {
             name="name"
             label={t('invite.nicknameLabel')}
             placeholder={t('invite.nicknamePlaceholder')}
-            error=""
+            error={nameTaken ? t('playerSettings.nicknameTaken') : ''}
             maxLength={20}
             required
             plain

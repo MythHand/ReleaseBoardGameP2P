@@ -382,3 +382,13 @@ it('does not apply a previous room refusal to a different invitation', () => {
   expect(screen.getByText('invite.roleSpectator').closest('button')?.disabled).toBe(false)
   expect(screen.queryByText('invite.noSlotsNote')).toBeNull()
 })
+
+it('marks the nickname field when the host says it is taken', () => {
+  sessionValue = { ...base(), status: 'error', errorKind: 'name-taken', error: 'name-taken' }
+  renderScreen()
+  // Input surfaces `error` as aria-invalid (the prompt itself is a shake), not as text.
+  expect(
+    screen.getByPlaceholderText('invite.nicknamePlaceholder').getAttribute('aria-invalid'),
+  ).toBe('true')
+  expect(screen.queryByText('invite.connectError')).toBeNull()
+})
