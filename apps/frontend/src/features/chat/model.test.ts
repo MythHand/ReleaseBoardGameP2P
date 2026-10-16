@@ -113,3 +113,9 @@ describe('toChatMessages', () => {
     expect(messages[0]?.time).toBe('custom time')
   })
 })
+
+it('shows the author avatar while they are in the room', () => {
+  const withAvatar = { ...active, avatar: 'attack-bug' }
+  expect(map([entry], [withAvatar])[0]).toMatchObject({ avatar: 'attack-bug' })
+  expect(map([entry], [])[0]).not.toHaveProperty('avatar')
+})

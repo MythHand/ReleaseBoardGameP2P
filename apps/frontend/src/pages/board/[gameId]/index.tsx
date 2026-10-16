@@ -11,6 +11,7 @@ import { copyText } from '~/features/copy/copyText'
 import { useGame } from '~/features/play-game/useGame'
 import { useNow } from '~/features/play-game/useNow'
 import { RoomVoice, useRoomVoiceView } from '~/features/voice-chat/RoomVoice'
+import { useSpeaking } from '~/features/voice-chat/useSpeaking'
 import Board from './_Board'
 import styles from './index.module.css'
 
@@ -21,6 +22,7 @@ export default function BoardPage() {
   const session = useSession()
   const chat = useRoomChatView()
   const voice = useRoomVoiceView()
+  const speaking = useSpeaking()
   const game = useGame()
   const navigate = useNavigate()
   const { gameId } = useParams()
@@ -63,6 +65,8 @@ export default function BoardPage() {
       name: live?.name ?? seat.name,
       // A bot is always here: it has no connection to lose.
       connected: Boolean(live) || Boolean(seat.bot),
+      ...(seat.avatar ? { avatar: seat.avatar } : {}),
+      speaking: Boolean(live && speaking.has(live.memberId)),
     }
   })
 
@@ -73,7 +77,9 @@ export default function BoardPage() {
   // it never held a connection, so its absence from the roster means nothing.
   const disconnected = seats.filter((s) => !s.bot && !peerMap[s.peerId]).map((s) => s.playerId)
 
-  const spectators = Object.values(peerMap).filter((p) => p.role === 'guest')
+  const spectators = Object.values(peerMap)
+    .filter((p) => p.role === 'guest')
+    .map((p) => ({ id: p.id, name: p.name, speaking: speaking.has(p.memberId) }))
 
   // `toTableOver` renames the engine's `over.winner` — a playerId minted as
   // p1..pN (see ~/entities/game/seats) — but Table.tsx resolves `over.winnerId`

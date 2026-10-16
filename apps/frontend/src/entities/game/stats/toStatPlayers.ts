@@ -16,6 +16,8 @@ export function toStatPlayers(args: {
   tally: Record<PlayerId, PlayerTally>
   seats: Seat[]
   peers: Record<string, PeerInfo>
+  // memberIds whose ring is lit (features/voice-chat/useSpeaking)
+  speaking?: ReadonlySet<string>
 }): StatPlayer[] {
   return args.seats.map((seat) => {
     const peer = args.peers[seat.peerId]
@@ -29,6 +31,8 @@ export function toStatPlayers(args: {
       // disconnection, so `where` has no such member to read. A bot is the one
       // seat that is absent from the roster without having gone anywhere.
       location: seat.bot ? 'game' : (peer?.where ?? 'offline'),
+      ...(seat.avatar ? { avatar: seat.avatar } : {}),
+      speaking: Boolean(peer && args.speaking?.has(peer.memberId)),
       ...counts,
     }
   })
