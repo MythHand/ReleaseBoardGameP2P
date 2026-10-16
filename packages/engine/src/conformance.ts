@@ -1046,77 +1046,25 @@ export function describeEngine(
       })
 
       it('times the window at 15s on the first round and 10s after', () => {
-        // Fuzz-driven: a defended-and-reopened window is common enough in a
-        // long fuzz run for both round shapes to appear without forcing
-        // anything. Under this seed a round-2+ window opens by step 76.
-        //
-        // Seed 6, not the original seed 2: adding a card to FAKE_EVENTS (task
-        // "Inside, and the fuzz stream can resolve the new pending") shifts the
-        // events-deck shuffle length, which shifts createGame's returned
-        // rngCursor, which every later AI-trigger draw reads from — so the
-        // whole downstream event sequence for a fixed seed changes even though
-        // the main draw pile and opening hands do not. Under the reshuffled
-        // seed 2, no release-attack window is ever defended with a card before
-        // the game ends (confirmed by tracing: all `defended` events in that
-        // run go through the hand-defense path, not the window-reopening one),
-        // so a round-2+ window never appears within budget. This is a seed
-        // fragility in the test, not an engine defect — openWindow still
-        // unconditionally reopens at round+1 after a successful release-window
-        // defend.
-        //
-        // Seed 55 now, not 6: #61 slice B added Git Branch and Git Merge to
-        // FAKE_DECK, which moves the main shuffle the same way adding Inside
-        // moved the events one, and every seed the previous sweep found (6, 17,
-        // 19, 23, 24) stopped reaching a defended release window. Swept again
-        // against the current deck.
-        //
-        // Seed 1, not 55: #108 added Git Rebase to FAKE_DECK, the same class of
-        // shift again, and 55 stopped reaching a round-2+ defended window
-        // within budget. Swept again against the current deck.
-        //
-        // Seed 1 kept when #108 then added System Upgrade: the round-2+ window
-        // still arrives, at step 3136 (measured) instead of 76. Budget raised
-        // to 3600 rather than the seed swept a fourth time — the per-window
-        // deadline assertion inside the loop runs on every window the stream
-        // opens, so a longer run of the same trajectory checks strictly more
-        // than a shorter run of a new one.
-        //
-        // Seed 24, not 1: task C5 taught `resolvePendingAction` to answer a
-        // `systemUpgrade`, so the stream now resolves what it used to leave
-        // standing and no fixed seed keeps its old trajectory. Under 1 the game
-        // reaches `over` before any round-2+ window opens, so the raised budget
-        // above could not help. Swept again: 24 opens a round-1 window at step
-        // 38 and a round-2+ one at 44 (both measured), and runs to step 2759
-        // before the game ends — so the budget still bounds the loop rather
-        // than the witness.
-        //
-        // Seed 4, not 24: a reflected attack now keeps its defence on the table
-        // until the exchange ends instead of banking it at once, so the discard
-        // differs from that moment on and no fixed seed keeps its old
-        // trajectory — the same class of shift as every sweep above. Swept
-        // again: 4 sees both rounds and runs to step 2955 before the game ends,
-        // so the budget still bounds the loop rather than the witness.
-        //
-        // Seed 5, not 4: Base now starts with two draw piles, so BASE_SETUP —
-        // which leaves the setting to the engine — deals from a different pile
-        // shape and no fixed seed keeps its old trajectory. Under 4 no round-2+
-        // window opens. Swept 1-60 again: the deadline held on every window of
-        // every seed, and 5 sees both rounds and runs to step 3102 before the
-        // game ends, so the budget still bounds the loop rather than the witness.
+        // Successful-only release limits permit retries, changing the fuzz
+        // trajectory. Sweep a bounded set of games to witness both rounds
+        // instead of pinning this contract to one incidental shuffle.
         const engine = make()
-        let state = engine.createGame(configFor(options, 5))
         let sawRound1 = false
         let sawLaterRound = false
-        for (let n = 0; n < 3600 && !state.over; n += 1) {
-          const r = engine.reduce(state, fuzzAction(state, 6, n))
-          for (const e of r.events) {
-            if (e.type !== 'windowOpened') continue
-            const expected = e.round === 1 ? 15_000 : 10_000
-            expect(e.deadline - atFor(n)).toBe(expected)
-            if (e.round === 1) sawRound1 = true
-            else sawLaterRound = true
+        for (let seed = 0; seed < 32 && !sawLaterRound; seed += 1) {
+          let state = engine.createGame(configFor(options, seed))
+          for (let n = 0; n < 3600 && !state.over; n += 1) {
+            const r = engine.reduce(state, fuzzAction(state, seed + 1, n))
+            for (const e of r.events) {
+              if (e.type !== 'windowOpened') continue
+              const expected = e.round === 1 ? 15_000 : 10_000
+              expect(e.deadline - atFor(n)).toBe(expected)
+              if (e.round === 1) sawRound1 = true
+              else sawLaterRound = true
+            }
+            state = r.state
           }
-          state = r.state
         }
         expect(sawRound1).toBe(true)
         // Without this, a bug that always used the first-round duration would

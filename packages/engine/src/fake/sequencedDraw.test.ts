@@ -146,15 +146,17 @@ describe('a single-pile table is unchanged', () => {
 })
 
 describe('the obligation itself', () => {
-  // Asserted directly, not through a DRAW. Under Base one action covers every
-  // pile, so a partially-drawn turn is unreachable today and no reducer-level
-  // test can tell a strict rule from a lax one — the mutation that makes Base
-  // satisfied by any single pile passes every test above. Slice B is what makes
-  // the state reachable, by letting Git Branch add a pile mid-turn; pinning the
-  // rule here means slice B inherits it stated rather than assumed.
+  // A partial Base draw is a running sequence, not an obligation recomputed
+  // against whatever piles happen to exist after the action has completed.
   const partly = (gitBranch: string, drawnFrom: number[]): GameState => {
     const s = threePiles(gitBranch, [[A], [B], [C]])
-    return { ...s, turn: { ...s.turn, drawnFrom } }
+    const remaining = [0, 1, 2].filter((pile) => !drawnFrom.includes(pile))
+    return {
+      ...s,
+      turn: { ...s.turn, drawnFrom },
+      drawing:
+        gitBranch === 'base' && remaining.length > 0 ? { player: 'p1', piles: remaining } : null,
+    }
   }
 
   it('is unmet under Base while any stocked pile is still undrawn', () => {
