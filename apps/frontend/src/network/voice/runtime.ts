@@ -33,6 +33,7 @@ export interface VoiceSnapshot {
   settings: Record<string, ParticipantAudioSettings>
   issue: VoiceIssue | null
   unreachableMemberIds: string[]
+  speakingMemberIds: string[]
 }
 export interface VoiceRoomContext {
   roomCode: string
@@ -92,6 +93,7 @@ export function createRoomVoice(options: {
     settings: {},
     issue: null,
     unreachableMemberIds: [],
+    speakingMemberIds: [],
   }
   let context: VoiceRoomContext | null = null
   let authority: VoiceAuthority | undefined
@@ -104,6 +106,7 @@ export function createRoomVoice(options: {
   let releaseEnded: (() => void) | undefined
   let releasePermission: (() => void) | undefined
   let releaseOutput: (() => void) | undefined
+  let releaseSpeaking: (() => void) | undefined
   let finishOutput: ((ready: boolean) => void) | undefined
   let micAbort: AbortController | undefined
   let joining: Promise<void> | undefined
@@ -146,7 +149,7 @@ export function createRoomVoice(options: {
     roster?.participants.filter((p) => context?.peers[p.peerId]?.memberId === p.memberId) ?? []
   const refresh = () => {
     if (!wanted) {
-      publish({ status: 'off', issue: null, unreachableMemberIds: [] })
+      publish({ status: 'off', issue: null, unreachableMemberIds: [], speakingMemberIds: [] })
       return
     }
     const own = ownPresence()
@@ -323,6 +326,8 @@ export function createRoomVoice(options: {
     releasePermission = undefined
     releaseOutput?.()
     releaseOutput = undefined
+    releaseSpeaking?.()
+    releaseSpeaking = undefined
     releaseEnded?.()
     releaseEnded = undefined
     stopCalls()
@@ -336,7 +341,13 @@ export function createRoomVoice(options: {
     joining = undefined
     enabling = undefined
     microphoneIssue = null
-    publish({ status: 'off', micOff: true, issue: null, unreachableMemberIds: [] })
+    publish({
+      status: 'off',
+      micOff: true,
+      issue: null,
+      unreachableMemberIds: [],
+      speakingMemberIds: [],
+    })
   }
   const disconnect = () => {
     if (voiceSessionId) intent({ type: 'VOICE_LEAVE', payload: { voiceSessionId } })
@@ -368,6 +379,7 @@ export function createRoomVoice(options: {
       context = next
       if (!next) return
       publish({ selfMemberId: next.selfMemberId })
+      audio?.setSelfId(next.selfMemberId)
       const changedTransport =
         !previous ||
         roomChanged ||
@@ -461,6 +473,11 @@ export function createRoomVoice(options: {
           audio.setParticipant(id, setting)
         outputPending = true
         const ownedAudio = audio
+        audio.setSelfId(context?.selfMemberId ?? null)
+        releaseSpeaking = audio.subscribeSpeaking((ids) => {
+          if (audio !== ownedAudio || !wanted) return
+          publish({ speakingMemberIds: [...ids].sort() })
+        })
         releaseOutput = audio.subscribeState((ready) => {
           if (audio !== ownedAudio || !wanted) return
           audioReady = ready

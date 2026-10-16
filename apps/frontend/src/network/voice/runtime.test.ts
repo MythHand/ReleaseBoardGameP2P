@@ -395,3 +395,12 @@ it('reports a missing microphone as listener mode rather than permission denial'
   })
   runtime.dispose()
 })
+it('publishes the speaking set from the audio graph and clears it on exit', async () => {
+  const { runtime, emitSpeaking, audio } = setup()
+  await runtime.connect()
+  expect(audio.setSelfId).toHaveBeenCalledWith('a')
+  emitSpeaking(new Set(['b', 'a']))
+  expect(runtime.getSnapshot().speakingMemberIds).toEqual(['a', 'b'])
+  runtime.disconnect()
+  expect(runtime.getSnapshot().speakingMemberIds).toEqual([])
+})

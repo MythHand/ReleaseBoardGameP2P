@@ -45,6 +45,11 @@ function setup() {
   const output = Object.assign(new Node(), { stream: new Stream([silent]) })
   const gains: Node[] = []
   const sources: Node[] = []
+  const analysers: (Node & {
+    level: number
+    fftSize: number
+    getFloatTimeDomainData: (target: Float32Array) => void
+  })[] = []
   const context = Object.assign(new EventTarget(), {
     destination: new Node(),
     state: 'running',
@@ -56,6 +61,17 @@ function setup() {
       gains.push(node)
       return node
     },
+    createAnalyser: () => {
+      const node = Object.assign(new Node(), {
+        fftSize: 2048,
+        level: 0,
+        getFloatTimeDomainData(target: Float32Array) {
+          target.fill(this.level)
+        },
+      })
+      analysers.push(node)
+      return node
+    },
     createMediaStreamSource: () => {
       const node = new Node()
       sources.push(node)
@@ -63,22 +79,26 @@ function setup() {
     },
   })
   const audio = createVoiceAudio(context as unknown as AudioContext)
-  return { audio, silent, gains, sources, context, decoders }
+  return { audio, silent, gains, sources, analysers, context, decoders }
 }
 afterEach(() => vi.unstubAllGlobals())
-it('keeps a silent outgoing audio track and never plays the local microphone', () => {
-  const { audio, silent, sources } = setup()
+it('keeps a silent outgoing audio track and never plays the local microphone', async () => {
+  const { audio, silent, sources, analysers } = setup()
   expect(audio.getOutgoingStream().getAudioTracks()[0]).toBe(silent)
   const mic = new Track()
   audio.setMicrophone(new Stream([mic]) as unknown as MediaStream)
   audio.setMicOff(false)
   expect(audio.getOutgoingStream().getAudioTracks()[0]).toBe(mic)
   expect(mic.enabled).toBe(true)
-  expect(sources).toHaveLength(0)
+  // The microphone is analysed, never played: its source feeds the analyser alone.
+  expect(sources).toHaveLength(1)
+  expect(sources[0].connect).toHaveBeenCalledTimes(1)
+  expect(sources[0].connect).toHaveBeenCalledWith(analysers[0])
   audio.setMicOff(true)
   expect(mic.enabled).toBe(false)
   mic.stop()
   expect(audio.getOutgoingStream().getAudioTracks()[0]).toBe(silent)
+  await audio.dispose()
 })
 it('applies both percentages, keeps muted slider changes, and bounds invalid gains', () => {
   const { audio, gains } = setup()
@@ -105,11 +125,12 @@ it('replaces playback once and disposes only resources it owns', async () => {
   const release = audio.attach('m', new Stream([remote]) as unknown as MediaStream)
   audio.attach('m', new Stream([remote]) as unknown as MediaStream)
   release()
-  expect(sources[0].disconnect).toHaveBeenCalledOnce()
-  expect(sources[1].disconnect).not.toHaveBeenCalled()
-  await audio.dispose()
-  await audio.dispose()
+  // sources[0] is the microphone meter; participants follow.
   expect(sources[1].disconnect).toHaveBeenCalledOnce()
+  expect(sources[2].disconnect).not.toHaveBeenCalled()
+  await audio.dispose()
+  await audio.dispose()
+  expect(sources[2].disconnect).toHaveBeenCalledOnce()
   expect(silent.stop).toHaveBeenCalledOnce()
   expect(mic.stop).not.toHaveBeenCalled()
   expect(remote.stop).not.toHaveBeenCalled()
@@ -204,4 +225,47 @@ it('reports decoder playback refusal and ignores a late refusal after release', 
   await Promise.resolve()
   expect(listener).not.toHaveBeenCalled()
   await audio.dispose()
+})
+it('reports who is speaking from the analysers, mic included, and only on change', () => {
+  vi.useFakeTimers()
+  const { audio, analysers } = setup()
+  const listener = vi.fn()
+  audio.subscribeSpeaking(listener)
+  audio.setSelfId('me')
+  audio.setMicrophone(new Stream([new Track()]) as unknown as MediaStream)
+  audio.setMicOff(false)
+  audio.attach('bo', new Stream([new Track()]) as unknown as MediaStream)
+  const [mic, bo] = analysers
+  bo.level = 0.5
+  vi.advanceTimersByTime(100)
+  expect(listener).toHaveBeenLastCalledWith(new Set(['bo']))
+  mic.level = 0.5
+  vi.advanceTimersByTime(100)
+  expect(listener).toHaveBeenLastCalledWith(new Set(['bo', 'me']))
+  const calls = listener.mock.calls.length
+  vi.advanceTimersByTime(100)
+  expect(listener.mock.calls.length).toBe(calls)
+  vi.useRealTimers()
+})
+it('never reports me with the microphone off', () => {
+  vi.useFakeTimers()
+  const { audio, analysers } = setup()
+  const listener = vi.fn()
+  audio.subscribeSpeaking(listener)
+  audio.setSelfId('me')
+  audio.setMicrophone(new Stream([new Track()]) as unknown as MediaStream)
+  analysers[0].level = 0.5
+  vi.advanceTimersByTime(300)
+  expect(listener).not.toHaveBeenCalled()
+  vi.useRealTimers()
+})
+it('disconnects a participant analyser on release and stops polling on dispose', async () => {
+  vi.useFakeTimers()
+  const { audio, analysers } = setup()
+  const release = audio.attach('bo', new Stream([new Track()]) as unknown as MediaStream)
+  release()
+  expect(analysers[0].disconnect).toHaveBeenCalled()
+  await audio.dispose()
+  expect(vi.getTimerCount()).toBe(0)
+  vi.useRealTimers()
 })
