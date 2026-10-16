@@ -3,6 +3,7 @@ import {
   Badge,
   BugRunner,
   Button,
+  botNames,
   EmptySlot,
   GameSettings,
   HudBackground,
@@ -22,7 +23,6 @@ import { useSession } from '~/app/providers/SessionProvider'
 import { useNavigate } from '~/app/router'
 import { RoomChat, useRoomChatView } from '~/features/chat/RoomChat'
 import { copyText } from '~/features/copy/copyText'
-import { botNames } from '~/features/start-game/botNames'
 import { useStartGame } from '~/features/start-game/useStartGame'
 import { RoomVoice, useRoomVoiceView } from '~/features/voice-chat/RoomVoice'
 import { effectiveBots } from '~/network'

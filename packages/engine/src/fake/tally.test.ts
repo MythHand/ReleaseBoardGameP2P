@@ -31,6 +31,8 @@ it('starts every seat at zero', () => {
       err503: 0,
       cherryPick: 0,
       attackedInto: 0,
+      monitoring: 0,
+      gitBranch: 0,
     })
   }
 })

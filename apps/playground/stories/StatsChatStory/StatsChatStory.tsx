@@ -3,7 +3,7 @@ import ruCommon from '@release/translation/locales/ru/common.json'
 import { useState } from 'react'
 import Chat, { type ChatMessage } from '@/blocks/Chat'
 import VoiceChat from '@/blocks/VoiceChat'
-import { CHAT_SELF, makeChat } from '@/mocks/chat'
+import { CHAT_SELF, makeChat, withMockAvatars } from '@/mocks/chat'
 import { makeStats } from '@/mocks/stats'
 import Stats, { type StatPlayer } from '@/screens/Stats'
 import type { StatsCopy } from '@/screens/Stats/Stats'
@@ -37,6 +37,9 @@ const COPY: Record<'ru' | 'en', StatsCopy> = {
       err503: { title: 'Везучий', unit: 'ошибок 503 из колоды' },
       cherryPick: { title: 'Кладоискатель', unit: 'раз достал из сброса' },
       attackedInto: { title: 'Забагованный', unit: 'карт атаки прилетело' },
+      defense: { title: 'Решала', unit: 'карт обороны сыграно' },
+      monitoring: { title: 'Параноик', unit: 'раз поставил Monitoring' },
+      gitBranch: { title: 'Дровосек', unit: 'раз разделил колоду' },
     },
   },
   en: {
@@ -62,6 +65,9 @@ const COPY: Record<'ru' | 'en', StatsCopy> = {
       err503: { title: 'Lucky One', unit: 'Error 503s from deck' },
       cherryPick: { title: 'Treasure Hunter', unit: 'times pulled from discard' },
       attackedInto: { title: 'Bug Magnet', unit: 'attack cards taken' },
+      defense: { title: 'Fixer', unit: 'defense cards played' },
+      monitoring: { title: 'Paranoid', unit: 'times set up Monitoring' },
+      gitBranch: { title: 'Woodcutter', unit: 'times split a deck' },
     },
   },
 }
@@ -86,9 +92,9 @@ const NAMES: Record<NameSet, string[] | null> = {
   ],
 }
 
-// Ничья по показателю ачивку не отдаёт никому, поэтому пять плашек — это
+// Ничья по показателю ачивку не отдаёт никому, поэтому все восемь плашек — это
 // удачный случай, а не данность. Набор `ties` доводит до ничьей два показателя:
-// «Забагованный» (широкая плашка) и «Кладоискатель». Остаётся три плашки, и
+// «Забагованный» (широкая плашка) и «Кладоискатель». Остаётся шесть плашек, и
 // ряд обрывается на половине — так раскладку и надо смотреть.
 const TIES: Record<string, Partial<StatPlayer>> = {
   you: { attackedInto: 6 }, // вровень с p3
@@ -119,6 +125,8 @@ export default function StatsChatStory() {
   const swap = NAMES[names]
   const players = data.players.map((p, i) => ({
     ...p,
+    // who speaks is matched by the player's own nickname, before a set swaps it
+    speaking: voice.speaking.includes(p.name),
     ...(swap ? { name: swap[i] ?? p.name } : null),
     ...(ties ? TIES[p.id] : null),
   }))
@@ -165,7 +173,7 @@ export default function StatsChatStory() {
           bgTone={spectator ? 'neutral' : bg}
           chat={
             <Chat
-              messages={messages}
+              messages={withMockAvatars(messages)}
               copy={pick(lang, { ru: ruCommon.chat, en: enCommon.chat })}
               selfName={CHAT_SELF}
               onSend={send}

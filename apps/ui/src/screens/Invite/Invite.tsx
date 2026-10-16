@@ -37,7 +37,16 @@ export type CodeCheckState = 'ok' | 'checking' | 'error'
 //   failed      — подключение не удалось (красная строка + «повторить»)
 //   full        — «мест нет» как результат: к жёлтой подписи добавляется красная
 //   notFound    — игры по коду нет (красная строка)
-export type InviteState = 'form' | 'connecting' | 'connected' | 'failed' | 'full' | 'notFound'
+//   nameTaken   — хост отказал: такой ник уже в комнате (красная рамка у ника
+//                 и подпись под ним, не в слоте действия)
+export type InviteState =
+  | 'form'
+  | 'connecting'
+  | 'connected'
+  | 'failed'
+  | 'full'
+  | 'notFound'
+  | 'nameTaken'
 
 // Весь текст — пропсом (i18n-agnostic). Каталоги держит консьюмер.
 export interface InviteCopy {
@@ -56,6 +65,8 @@ export interface InviteCopy {
   nicknameLabel: string
   nicknamePlaceholder: string
   randomNick: string
+  // подпись под полем ника, когда хост отказал из-за занятого ника
+  nicknameTaken: string
   roleTitle: string
   rolePlayer: string
   roleSpectator: string
@@ -216,7 +227,7 @@ export default function Invite({
                     </Button>
                   }
                 />
-                <div className={styles.codeStatus} data-state={codeState}>
+                <div className={styles.fieldStatus} data-state={codeState}>
                   {codeState === 'checking' && (
                     <>
                       <Typography as="span" base="mono-xs">
@@ -274,6 +285,7 @@ export default function Invite({
                   maxLength={20}
                   plain
                   disabled={busy}
+                  error={state === 'nameTaken' ? copy.nicknameTaken : undefined}
                   trailing={
                     <Button
                       variant="icon"
@@ -285,6 +297,13 @@ export default function Invite({
                     </Button>
                   }
                 />
+                {state === 'nameTaken' && (
+                  <div className={styles.fieldStatus} data-state="error">
+                    <Typography as="span" base="mono-xs">
+                      {copy.nicknameTaken}
+                    </Typography>
+                  </div>
+                )}
               </div>
             </div>
 

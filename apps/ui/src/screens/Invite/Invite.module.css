@@ -157,10 +157,11 @@
   inline-size: 100%;
 }
 
-/* статус проверки кода под полем — зарезервированный слот фикс. высоты, чтобы
-   смена состояния не двигала поля ниже. ok — пусто; checking — жёлтым с бегущими
-   точками; error — красным «couldn't connect». Цвет несёт data-state. */
-.codeStatus {
+/* статус под полем. Под кодом — зарезервированный слот фикс. высоты, чтобы
+   смена состояния не двигала поля ниже: ok — пусто; checking — жёлтым с бегущими
+   точками; error — красным «couldn't connect». Под ником — только когда ник
+   занят (красным); место под него — запас контейнера полей. Цвет несёт data-state. */
+.fieldStatus {
   display: flex;
   align-items: center;
   min-block-size: 18px;
@@ -168,11 +169,11 @@
   line-height: 1.5;
 }
 
-.codeStatus[data-state='checking'] {
+.fieldStatus[data-state='checking'] {
   color: var(--cat-support);
 }
 
-.codeStatus[data-state='error'] {
+.fieldStatus[data-state='error'] {
   color: var(--cat-attack);
 }
 

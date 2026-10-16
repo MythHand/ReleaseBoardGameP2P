@@ -17,6 +17,7 @@ import MoveHistoryBlock from '../stories/blocks/MoveHistoryBlock'
 import ParticipantsBlock from '../stories/blocks/ParticipantsBlock'
 import PauseGameBlock from '../stories/blocks/PauseGameBlock'
 import PhysicalEditionBlock from '../stories/blocks/PhysicalEditionBlock'
+import PlayerSettingsBlock from '../stories/blocks/PlayerSettingsBlock'
 import PlayerSlotBlock from '../stories/blocks/PlayerSlotBlock'
 import ReconnectBlock from '../stories/blocks/ReconnectBlock'
 import ReleaseZoneBlock from '../stories/blocks/ReleaseZoneBlock'
@@ -246,6 +247,11 @@ const groups: Group[] = [
       { id: 'block-chat', title: 'Chat', render: () => <ChatBlock /> },
       { id: 'block-toast', title: 'Toast', render: () => <ToastBlock /> },
       { id: 'block-player-slot', title: 'Player slot', render: () => <PlayerSlotBlock /> },
+      {
+        id: 'block-player-settings',
+        title: 'Player settings',
+        render: () => <PlayerSettingsBlock />,
+      },
       { id: 'block-lobby-code', title: 'Lobby code', render: () => <LobbyCodeBlock /> },
       { id: 'block-bug-runner', title: 'Bug runner', render: () => <BugRunnerBlock /> },
       { id: 'block-lang-switcher', title: 'Lang switcher', render: () => <LangSwitcherBlock /> },

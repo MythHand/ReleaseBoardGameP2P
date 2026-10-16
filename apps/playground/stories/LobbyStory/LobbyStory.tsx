@@ -11,6 +11,8 @@ export default function LobbyStory() {
   const { lang } = useLang()
   const [role, setRole] = useState<'host' | 'guest'>('host')
   const [bg, setBg] = useState<'neutral' | 'positive' | 'problem'>('neutral')
+  // who "me" is as a guest — the host is always a player
+  const [me, setMe] = useState<'player' | 'spectator'>('player')
   return (
     <div className={styles.root}>
       <TechBar>
@@ -31,6 +33,17 @@ export default function LobbyStory() {
           value={bg}
           onChange={setBg}
         />
+        {role === 'guest' && (
+          <TechSwitch
+            label="me"
+            options={[
+              { value: 'player', label: 'player' },
+              { value: 'spectator', label: 'spectator' },
+            ]}
+            value={me}
+            onChange={setMe}
+          />
+        )}
       </TechBar>
       {/* стартовый язык лобби берём из языка плейграунда; дальше им управляет
           встроенный в лобби свитчер. key переинициализирует экран при смене
@@ -46,6 +59,8 @@ export default function LobbyStory() {
           gameModesCopy={{ ru: ruCommon.gameModes, en: enCommon.gameModes }}
           rulesBlockCopy={{ ru: ruCommon.rulesBlock, en: enCommon.rulesBlock }}
           lobbyScreenCopy={{ ru: ruCommon.lobbyScreen, en: enCommon.lobbyScreen }}
+          playerSettingsCopy={{ ru: ruCommon.playerSettings, en: enCommon.playerSettings }}
+          meSpectator={me === 'spectator'}
         />
       </div>
     </div>

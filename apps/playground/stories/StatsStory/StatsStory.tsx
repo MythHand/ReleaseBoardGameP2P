@@ -31,6 +31,9 @@ const COPY: Record<'ru' | 'en', StatsCopy> = {
       err503: { title: 'Везучий', unit: 'ошибок 503 из колоды' },
       cherryPick: { title: 'Кладоискатель', unit: 'раз достал из сброса' },
       attackedInto: { title: 'Забагованный', unit: 'карт атаки прилетело' },
+      defense: { title: 'Решала', unit: 'карт обороны сыграно' },
+      monitoring: { title: 'Параноик', unit: 'раз поставил Monitoring' },
+      gitBranch: { title: 'Дровосек', unit: 'раз разделил колоду' },
     },
   },
   en: {
@@ -56,6 +59,9 @@ const COPY: Record<'ru' | 'en', StatsCopy> = {
       err503: { title: 'Lucky One', unit: 'Error 503s from deck' },
       cherryPick: { title: 'Treasure Hunter', unit: 'times pulled from discard' },
       attackedInto: { title: 'Bug Magnet', unit: 'attack cards taken' },
+      defense: { title: 'Fixer', unit: 'defense cards played' },
+      monitoring: { title: 'Paranoid', unit: 'times set up Monitoring' },
+      gitBranch: { title: 'Woodcutter', unit: 'times split a deck' },
     },
   },
 }

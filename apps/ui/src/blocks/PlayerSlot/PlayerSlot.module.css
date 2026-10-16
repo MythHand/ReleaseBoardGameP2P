@@ -35,6 +35,45 @@
   color: var(--white-40);
 }
 
+/* avatar + name as one edit button — the same gap as the row, so the layout
+   does not move when the row becomes editable */
+.edit {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  min-inline-size: 0;
+  padding: 0;
+  color: inherit;
+  text-align: start;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+}
+
+.editAvatar {
+  position: relative;
+  display: flex;
+}
+
+/* the pencil over the avatar: a dim layer with the icon, the avatar stays under it */
+.editMark {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fg);
+  background: var(--black-50);
+  border-radius: 5%;
+  opacity: 0;
+  transition: opacity var(--t-fast) var(--ease-out);
+}
+
+.edit:hover .editMark,
+.edit:focus-visible .editMark {
+  opacity: 1;
+}
+
 /* правый край строки: статус + дропдаун «…» */
 .rowEnd {
   position: relative;

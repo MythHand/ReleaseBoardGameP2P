@@ -196,8 +196,12 @@
   min-block-size: 0;
 }
 
+/* The scroll reaches 1px past its place on every side and the list gives the 1px
+   back inside, so nothing moves — but a speaking ring, drawn 1px around the
+   avatar (Avatar.module.css), has room inside the scroll's clip. */
 .peopleScroll {
   min-block-size: 0;
+  margin: -1px;
 }
 
 /* the room under the overall volume's rule lives inside the scroll, not
@@ -227,14 +231,17 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 0;
+
+  /* the 1px the scroll reached out by (.peopleScroll) */
+  padding: 1px;
   margin: 0;
   list-style: none;
 }
 
-/* in the popover, the bottom padding it reached over, carried inside the scroll */
+/* in the popover, the bottom padding it reached over, carried inside the scroll —
+   plus the ring's 1px */
 .popoverBody .list {
-  padding-block-end: var(--pad-block);
+  padding-block-end: calc(var(--pad-block) + 1px);
 }
 
 .person {

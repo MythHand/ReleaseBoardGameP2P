@@ -91,6 +91,18 @@ export default function StatsPage() {
         title: t('stats.achievements.attackedInto.title'),
         unit: t('stats.achievements.attackedInto.unit'),
       },
+      defense: {
+        title: t('stats.achievements.defense.title'),
+        unit: t('stats.achievements.defense.unit'),
+      },
+      monitoring: {
+        title: t('stats.achievements.monitoring.title'),
+        unit: t('stats.achievements.monitoring.unit'),
+      },
+      gitBranch: {
+        title: t('stats.achievements.gitBranch.title'),
+        unit: t('stats.achievements.gitBranch.unit'),
+      },
     },
   }
 
