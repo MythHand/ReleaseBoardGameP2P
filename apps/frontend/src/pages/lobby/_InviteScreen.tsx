@@ -57,9 +57,20 @@ export default function InviteScreen() {
   const busy = connecting || connected
 
   // The action slot's status line — localized, never the raw PeerJS string.
-  const nameTaken = session.status === 'error' && session.errorKind === 'name-taken'
+  const refused = session.status === 'error' && session.errorKind === 'name-taken'
+  // The refusal is about the nickname that was sent, which is what the field
+  // held when it arrived. Remembered here, so the "taken" line goes away as
+  // soon as the field holds another one — the session error itself stays
+  // until the next join attempt replaces it.
+  const [refusedName, setRefusedName] = useState<string | null>(refused ? name : null)
+  const [sawRefusal, setSawRefusal] = useState(refused)
+  if (refused !== sawRefusal) {
+    setSawRefusal(refused)
+    setRefusedName(refused ? name : null)
+  }
+  const nameTaken = refused && name === refusedName
   const status =
-    session.status === 'error' && !nameTaken
+    session.status === 'error' && !refused
       ? session.errorKind === 'room-full'
         ? t('invite.fullStatus')
         : session.errorKind === 'not-found'
