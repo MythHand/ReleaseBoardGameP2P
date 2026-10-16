@@ -14,6 +14,7 @@ export function accumulateSync(previous: SyncSnapshot | null, incoming: Sync): S
   for (const event of received) byId.set(event.id, event)
   return {
     view: incoming.view,
+    presentation: incoming.presentation ?? previous?.presentation,
     rejections: [
       ...(previous?.rejections ?? []),
       ...incoming.events.filter((event) => event.type === 'rejected'),

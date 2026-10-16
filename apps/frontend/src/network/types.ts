@@ -1,5 +1,6 @@
 import type { Action, Event, GameState, GameView, PlayerId, Setup } from '@release/engine'
 import type { ChatEntry, MemberId } from '~/shared/chat/types'
+import type { PresentationId, PresentationRuntime } from './session/presentationGate'
 import type { VoiceMessage } from './voice/types'
 
 // A plain Omit over a union collapses it to its common members, so it has to
@@ -127,6 +128,7 @@ export type Message =
   // A seat has finished its opening animation and is ready for the game to
   // move. Addressed to the keeper, which holds the table until every seat has
   // said this (or the cap expires) — see session/startGate.ts.
+  | { type: 'PRESENTATION_READY'; payload: { presentation: PresentationId } }
   | { type: 'INTRO_READY'; payload: { gameId: string } }
   | { type: 'INTENT'; payload: { intent: Intent } }
   // A pick that has NOT been made — the card the actor's Cherry-pick surface is
@@ -149,9 +151,12 @@ export type Message =
   // visible log, handed to a peer that rejoined. It is folded into history and
   // the discard heap, and it is NOT animated: a reconnect drops straight to the
   // live board, exactly as `isOpening` already says it must.
-  | { type: 'SYNC'; payload: { view: GameView; events: Event[]; resync?: boolean } }
+  | {
+      type: 'SYNC'
+      payload: { view: GameView; events: Event[]; resync?: boolean; presentation?: PresentationId }
+    }
   // The only message carrying GameState, and only to a handover successor.
-  | { type: 'KEEPER_STATE'; payload: { state: GameState } }
+  | { type: 'KEEPER_STATE'; payload: { state: GameState; presentation?: PresentationRuntime } }
   // null is the death notice: the keeper is gone and the game cannot continue.
   | { type: 'KEEPER_CHANGED'; payload: { keeperId: PlayerId | null } }
 

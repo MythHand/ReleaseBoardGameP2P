@@ -110,10 +110,15 @@ it('plays a bot seat through to the human getting the turn back', () => {
   keeper.link.submit({ type: 'PUSH' })
   expect(ref.current.state.turn.player).toBe('p2')
 
-  // One action per tick, exactly as an absent seat has always been driven. The
+  // Model a board that immediately presents each state; bots still think for two seconds. The
   // budget is stated in time rather than in ticks, because what the bot's turn
   // can cost is a contest window's deadline — a duration the engine owns.
-  const budget = WINDOW_FIRST_MS + 5_000
+  keeper.link.subscribe((sync) => {
+    if (sync.presentation) keeper.link.presentationReady(sync.presentation)
+  })
+  if (ref.current.presentation?.wait)
+    keeper.link.presentationReady(ref.current.presentation.wait.id)
+  const budget = WINDOW_FIRST_MS * 5 + 30_000
   for (let i = 0; i < budget / 250 && ref.current.state.turn.player === 'p2'; i += 1) {
     ticker.fire()
   }
@@ -155,7 +160,12 @@ it('lets two bots finish after the connected human keeper is eliminated', () => 
   keeper.introReady('peer-me')
   keeper.link.submit({ type: 'DRAW' })
   expect(ref.current.state.eliminated).toEqual(['p1'])
-  for (let i = 0; i < 20 && !ref.current.state.over; i += 1) ticker.fire()
+  keeper.link.subscribe((sync) => {
+    if (sync.presentation) keeper.link.presentationReady(sync.presentation)
+  })
+  if (ref.current.presentation?.wait)
+    keeper.link.presentationReady(ref.current.presentation.wait.id)
+  for (let i = 0; i < 200 && !ref.current.state.over; i += 1) ticker.fire()
   expect(ref.current.log).toEqual(
     expect.arrayContaining([
       expect.objectContaining({ type: 'turnStarted', player: 'p2' }),

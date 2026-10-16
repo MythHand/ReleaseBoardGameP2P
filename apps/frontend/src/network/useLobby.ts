@@ -64,6 +64,7 @@ import {
   validSpectatorLimit,
 } from './lobby/state'
 import type { GameLink, Sync } from './session/link'
+import { restorePresentationRuntime } from './session/presentationGate'
 import { backoffMs, MAX_RECONNECT_ATTEMPTS, type ReconnectEvent } from './session/reconnect'
 import {
   adoptSession,
@@ -288,6 +289,7 @@ function normalizeLobbyConfig(value: unknown): NormalizedLobbyConfig | null {
 }
 
 interface NormalizedKeeperSnapshot {
+  presentation?: unknown
   gameId: string
   keeperId: PlayerId
   state: GameState
@@ -396,6 +398,7 @@ function normalizeKeeperSnapshot(
 
   return {
     gameId: snapshot.gameId,
+    presentation: snapshot.presentation,
     keeperId: snapshot.keeperId,
     state: restored,
     seats,
@@ -744,6 +747,7 @@ export function useLobby(): UseLobby {
     const lobby = stateRef.current
     pendingKeeperRef.current = {
       gameId: session.gameId,
+      presentation: session.presentation,
       keeperId: session.keeperId,
       state: session.state,
       seats: session.seats,
@@ -1191,7 +1195,11 @@ export function useLobby(): UseLobby {
           if (entry) {
             dispatch([{ to: 'broadcast', message: { type: 'CHAT_ENTRY', payload: { entry } } }])
           }
-        } else if (msg.type === 'INTENT' || msg.type === 'INTRO_READY') {
+        } else if (
+          msg.type === 'INTENT' ||
+          msg.type === 'INTRO_READY' ||
+          msg.type === 'PRESENTATION_READY'
+        ) {
           // The only party that calls into the engine. `applyIntent` resolves the
           // seat from the sender's peer id and stamps the player itself, so a
           // peer cannot act for anyone but itself however it labels the frame.
@@ -1790,6 +1798,12 @@ export function useLobby(): UseLobby {
       const restoredSeats = restoreSeats(normalized.seats, t.id, Date.now())
       const session = adoptSession({
         state: normalized.state,
+        presentation: restorePresentationRuntime(
+          normalized.presentation,
+          normalized.gameId,
+          crypto.randomUUID(),
+          Date.now(),
+        ),
         gameId: normalized.gameId,
         keeperId: normalized.keeperId,
         engine,

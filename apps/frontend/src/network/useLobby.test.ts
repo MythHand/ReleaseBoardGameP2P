@@ -1517,18 +1517,20 @@ it('drives a bot seat to completion once startGame has seated it', async () => {
     })
     expect(rendered.result.current.gameSync?.view.turn.player).toBe('p2')
 
-    // One action per tick, exactly as botPlay.test.ts drives the same seed —
+    // One paced action per presentation, exactly as botPlay.test.ts drives the same seed —
     // nothing here submits anything on the bot's behalf. The budget is a
     // duration rather than a tick count for the reason given there: a bot that
     // releases opens a contest window, and the window closes on elapsed time,
     // which only the keeper's own `tick` may spend.
-    const budget = WINDOW_FIRST_MS + 5_000
+    const budget = WINDOW_FIRST_MS * 5 + 30_000
     for (
       let i = 0;
       i < budget / 250 && rendered.result.current.gameSync?.view.turn.player === 'p2';
       i += 1
     ) {
       act(() => {
+        const id = rendered.result.current.gameSync?.presentation
+        if (id) rendered.result.current.gameLink?.presentationReady(id)
         vi.advanceTimersByTime(250)
       })
     }
@@ -1570,7 +1572,7 @@ it('host builds the game behind a gate covering every seat', async () => {
       from: GUEST,
     } as WireMessage)
   })
-  expect(syncs()).toBe(2)
+  expect(syncs()).toBe(3)
 })
 
 it('the opening projection carries the deal to every seat', async () => {
@@ -2418,7 +2420,7 @@ it('rejects intro readiness before and after invalid authentication, then accept
     } as WireMessage)
   })
 
-  expect(sentTo(GUEST).filter((message) => message.type === 'SYNC')).toHaveLength(beforeReady + 1)
+  expect(sentTo(GUEST).filter((message) => message.type === 'SYNC')).toHaveLength(beforeReady + 2)
 })
 
 it('tells the keeper about a dropped peer, not just the roster', async () => {
@@ -4427,7 +4429,9 @@ it('restores a host with a bot and continues its turn without human absence grac
     expect(result.current.gameSync?.view.turn.player).toBe('p2')
     expect(result.current.gameSync?.events).toEqual([])
     act(() => {
-      vi.advanceTimersByTime(250)
+      const id = result.current.gameSync?.presentation
+      if (id) result.current.gameLink?.presentationReady(id)
+      vi.advanceTimersByTime(2000)
     })
     expect(result.current.gameSync?.view.pending).toMatchObject({
       kind: 'discardForRelease',

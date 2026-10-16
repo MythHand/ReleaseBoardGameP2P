@@ -298,7 +298,7 @@ it('stamps a buffered intent with the clock at release, not at arrival', () => {
 
   clock = 9_000
   keeper.introReady('peer-a')
-  expect(reads).toEqual([9_000])
+  expect(reads).toEqual([9_000, 9_000])
   // And the buffered DRAW really was applied on release, not dropped.
   expect(ref.current.state.turn.drawnFrom.length).toBeGreaterThan(0)
 })
