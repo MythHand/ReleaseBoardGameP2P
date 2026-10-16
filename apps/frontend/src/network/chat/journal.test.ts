@@ -162,6 +162,7 @@ describe('chat runtime validation', () => {
       { kind: 'memberReconnected', memberId: 'member-a', name: 'Ann' },
       { kind: 'memberKicked', memberId: 'member-a', name: 'Ann' },
       { kind: 'roleChanged', memberId: 'member-a', name: 'Ann', role: 'spectator' },
+      { kind: 'memberRenamed', memberId: 'member-a', from: 'Ann', to: 'Anna' },
       { kind: 'modeChanged', setting: 'gitBranch', value: 'strategic' },
     ]
     const entries = events.map((event, index) => ({
@@ -173,6 +174,19 @@ describe('chat runtime validation', () => {
     }))
 
     expect(parseChatEntries(entries)).toEqual(entries)
+  })
+
+  it('refuses a memberRenamed event without both names', () => {
+    const entry = (event: unknown) => ({
+      kind: 'system',
+      id: 'chat-1',
+      sequence: 1,
+      createdAt: 0,
+      event,
+    })
+    expect(
+      parseChatEntries([entry({ kind: 'memberRenamed', memberId: 'm', from: 'A' })]),
+    ).toBeNull()
   })
 
   it('accepts a valid restored journal', () => {

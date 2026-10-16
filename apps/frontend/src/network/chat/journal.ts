@@ -189,6 +189,11 @@ function isSystemEvent(value: unknown): value is ChatSystemEvent {
   ) {
     return isNonEmptyString(value.memberId) && isNonEmptyString(value.name)
   }
+  if (value.kind === 'memberRenamed') {
+    return (
+      isNonEmptyString(value.memberId) && isNonEmptyString(value.from) && isNonEmptyString(value.to)
+    )
+  }
   return false
 }
 

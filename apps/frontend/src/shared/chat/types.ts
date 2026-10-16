@@ -13,6 +13,7 @@ export type ChatSystemEvent =
   | { kind: 'memberReconnected'; memberId: MemberId; name: string }
   | { kind: 'memberKicked'; memberId: MemberId; name: string }
   | { kind: 'roleChanged'; memberId: MemberId; name: string; role: ChatRole }
+  | { kind: 'memberRenamed'; memberId: MemberId; from: string; to: string }
   | { kind: 'modeChanged'; setting: string; value: string }
 
 interface ChatEntryBase {

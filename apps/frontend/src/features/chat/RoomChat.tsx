@@ -75,6 +75,8 @@ export function useRoomChatView(): RoomChatView {
           name: event.name,
           role: t(`chat.roles.${event.role}`),
         })
+      case 'memberRenamed':
+        return t('chat.system.memberRenamed', { from: event.from, to: event.to })
       case 'modeChanged': {
         const axis = modeCatalog[event.setting as keyof typeof modeCatalog]
         const option = axis ? (axis.options as Record<string, string>)[event.value] : undefined
