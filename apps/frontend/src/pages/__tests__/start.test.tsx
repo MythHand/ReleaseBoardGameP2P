@@ -37,6 +37,27 @@ it('renders the start screen with create and join actions', () => {
   expect(screen.getByText('start.joinGame')).toBeTruthy()
 })
 
+// The playground's Start screen has always had them; the app's start page was
+// rebuilt without them once (#10) and nobody noticed for months.
+it('credits the authors, each name a link to their GitHub', () => {
+  sessionValue = { status: 'idle', state: null, roomCode: null }
+  render(
+    <MemoryRouter>
+      <StartPage />
+    </MemoryRouter>,
+  )
+  expect(screen.getByText('start.authorDesign')).toBeTruthy()
+  expect(screen.getByText('start.authorDev')).toBeTruthy()
+  const links = screen.getAllByRole('link').map((a) => a.getAttribute('href'))
+  expect(links).toEqual(
+    expect.arrayContaining([
+      'https://github.com/dimbo-design',
+      'https://github.com/ditayler',
+      'https://github.com/anthropics/claude-code',
+    ]),
+  )
+})
+
 it('does not offer an active session on the start screen', () => {
   sessionValue = {
     status: 'in-lobby',

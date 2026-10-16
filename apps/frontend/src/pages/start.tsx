@@ -1,5 +1,5 @@
 import { useTranslation } from '@release/translation'
-import { Menu, MenuButton, MenuGroup, VideoPlayer } from '@release/ui'
+import { Credits, Menu, MenuButton, MenuGroup, VideoPlayer } from '@release/ui'
 import { useModalRoute } from '~/shared/ui/ModalRouter'
 import ScreenShell from '~/shared/ui/ScreenShell'
 import styles from './start.module.css'
@@ -16,6 +16,11 @@ export default function StartPage() {
       description={t('start.description')}
       corners={
         <>
+          {/* who made it — the bottom-left corner, names link to GitHub */}
+          <Credits
+            copy={{ authorDesign: t('start.authorDesign'), authorDev: t('start.authorDev') }}
+            className={styles.credits}
+          />
           {/* Video player — expands in place to an inline iframe */}
           <VideoPlayer
             src={VIDEO_URL}
