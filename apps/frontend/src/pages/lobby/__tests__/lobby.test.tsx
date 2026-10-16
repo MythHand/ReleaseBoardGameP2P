@@ -697,3 +697,22 @@ it('reopens the settings with the draft when the host refuses the nickname', () 
   )
   expect(screen.getByText('playerSettings.nicknameTaken')).toBeTruthy()
 })
+
+it('does not resend a refused nickname when the reopened settings close unedited', () => {
+  sessionValue = withAvatars()
+  const { rerender } = renderInRouter(<LobbyView />)
+  openMySettings()
+  fireEvent.change(screen.getByLabelText('playerSettings.nicknameLabel'), {
+    target: { value: 'Zed' },
+  })
+  fireEvent.keyDown(document, { key: 'Escape' })
+  expect(sessionValue.updateProfile).toHaveBeenCalledTimes(1)
+  sessionValue = { ...sessionValue, profileRejection: { reason: 'name-taken', seq: 1 } }
+  rerender(
+    <MemoryRouter>
+      <LobbyView />
+    </MemoryRouter>,
+  )
+  fireEvent.keyDown(document, { key: 'Escape' })
+  expect(sessionValue.updateProfile).toHaveBeenCalledTimes(1)
+})

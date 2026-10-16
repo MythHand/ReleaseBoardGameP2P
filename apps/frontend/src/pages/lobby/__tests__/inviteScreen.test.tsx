@@ -386,7 +386,7 @@ it('does not apply a previous room refusal to a different invitation', () => {
 it('marks the nickname field when the host says it is taken', () => {
   sessionValue = { ...base(), status: 'error', errorKind: 'name-taken', error: 'name-taken' }
   renderScreen()
-  // Input surfaces `error` as aria-invalid (the prompt itself is a shake), not as text.
+  expect(screen.getByText('playerSettings.nicknameTaken')).toBeTruthy()
   expect(
     screen.getByPlaceholderText('invite.nicknamePlaceholder').getAttribute('aria-invalid'),
   ).toBe('true')

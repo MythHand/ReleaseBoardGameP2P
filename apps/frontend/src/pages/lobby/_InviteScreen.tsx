@@ -183,28 +183,37 @@ export default function InviteScreen() {
             )}
           </div>
 
-          <FormField
-            name="name"
-            label={t('invite.nicknameLabel')}
-            placeholder={t('invite.nicknamePlaceholder')}
-            error={nameTaken ? t('playerSettings.nicknameTaken') : ''}
-            maxLength={20}
-            required
-            plain
-            disabled={busy}
-            value={name}
-            onChange={(e) => setName(sanitizeNickname(e.target.value))}
-            trailing={
-              <Button
-                variant="icon"
-                onClick={() => setName(randomNickname())}
-                aria-label={t('invite.randomNick')}
-                title={t('invite.randomNick')}
-              >
-                <DiceIcon />
-              </Button>
-            }
-          />
+          <div className={styles.fieldWrap}>
+            <FormField
+              name="name"
+              label={t('invite.nicknameLabel')}
+              placeholder={t('invite.nicknamePlaceholder')}
+              error={nameTaken ? t('playerSettings.nicknameTaken') : ''}
+              maxLength={20}
+              required
+              plain
+              disabled={busy}
+              value={name}
+              onChange={(e) => setName(sanitizeNickname(e.target.value))}
+              trailing={
+                <Button
+                  variant="icon"
+                  onClick={() => setName(randomNickname())}
+                  aria-label={t('invite.randomNick')}
+                  title={t('invite.randomNick')}
+                >
+                  <DiceIcon />
+                </Button>
+              }
+            />
+            <div className={styles.codeStatus} data-state={nameTaken ? 'error' : 'idle'}>
+              {nameTaken && (
+                <Typography as="span" base="mono-xs">
+                  {t('playerSettings.nicknameTaken')}
+                </Typography>
+              )}
+            </div>
+          </div>
         </div>
 
         <div className={styles.action}>

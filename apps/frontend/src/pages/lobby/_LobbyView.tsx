@@ -106,6 +106,8 @@ export default function LobbyView() {
   }
   const closeSettings = () => {
     setSettingsOpen(false)
+    // a refused draft is not resent until it is edited — else host and modal loop
+    if (refusedName) return
     const name = nicknameDraft.trim()
     if (!name || name === myPeer?.name || nameTaken(state, name, [state.selfId])) return
     session.updateProfile({ name })
