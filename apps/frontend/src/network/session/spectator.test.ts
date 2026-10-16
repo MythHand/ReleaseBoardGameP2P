@@ -90,6 +90,7 @@ it('delivers live human and clock changes through the keeper and stops after lea
     ref,
     transport: net.transport('host'),
     now: () => 1000,
+    monotonicNow: () => 0,
     ticker: {
       start(fn) {
         tick = fn

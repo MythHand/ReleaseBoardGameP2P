@@ -1,6 +1,8 @@
 import type { Event, PlayerId } from '@release/engine'
 import type { Transport } from '../transport/peer'
 import type { Intent, WireMessage } from '../types'
+import { createAuthorityClock, createRemoteClock } from './clock'
+import { createClockProbe } from './clockProbe'
 import { type GameLink, intervalTicker, type Sync, type Ticker } from './link'
 import { isPresentationId } from './presentationGate'
 import {
@@ -26,6 +28,8 @@ import type { StartGate } from './startGate'
 // frames arriving off the transport, and the keeper this link talks to.
 export interface RemoteHandle {
   link: GameLink
+  activate(gameId: string): void
+  resetClock(): void
   handleMessage(frame: WireMessage): void
   // Re-point the link at a new keeper after a handover. Separate from
   // `onKeeperChanged` because the announcement names a `PlayerId` and `submit`
@@ -47,16 +51,38 @@ export function createRemoteLink(args: {
   // `null` means the keeper is gone and the game cannot continue: the peer
   // should surface @release/ui's Reconnect screen and return to the lobby.
   onKeeperChanged?: (keeperId: PlayerId | null) => void
+  monotonicNow?: () => number
 }): RemoteHandle {
   const listeners = new Set<(sync: Sync) => void>()
   let keeperPeerId = args.keeperPeerId
+  let activeGame: string | null = null
+  let closed = false
+  let clockGeneration = 0
+  let clockActive = false
+  const mono = args.monotonicNow ?? (() => performance.now())
+  const clock = createRemoteClock(mono)
+  const probe = createClockProbe({
+    clock,
+    monotonicNow: mono,
+    send: (gameId, requestId) => {
+      args.transport.send(keeperPeerId, { type: 'CLOCK_REQUEST', payload: { gameId, requestId } })
+    },
+  })
+
+  const visible = () => {
+    if (document.visibilityState === 'visible') probe.refresh()
+  }
+  if (typeof document !== 'undefined') document.addEventListener('visibilitychange', visible)
 
   return {
     link: {
+      clock,
       presentationReady(presentation) {
+        if (closed) return
         args.transport.send(keeperPeerId, { type: 'PRESENTATION_READY', payload: { presentation } })
       },
       submit(intent: Intent) {
+        if (closed) return
         args.transport.send(keeperPeerId, { type: 'INTENT', payload: { intent } })
       },
       subscribe(listener) {
@@ -64,11 +90,32 @@ export function createRemoteLink(args: {
         return () => listeners.delete(listener)
       },
       close() {
+        closed = true
+        probe.close()
+        if (typeof document !== 'undefined')
+          document.removeEventListener('visibilitychange', visible)
         listeners.clear()
       },
     },
+    activate(gameId) {
+      if (!closed) {
+        activeGame = gameId
+        clockGeneration++
+        clockActive = true
+        probe.activate(gameId)
+      }
+    },
+    resetClock() {
+      clockGeneration++
+      clockActive = false
+      probe.reset()
+    },
     setKeeper(peerId) {
       keeperPeerId = peerId
+      clockGeneration++
+      clockActive = activeGame !== null && !closed
+      probe.reset()
+      if (activeGame && !closed) probe.activate(activeGame)
     },
     handleMessage(frame) {
       // Only the keeper speaks for the session, so a frame from anyone else is
@@ -77,20 +124,41 @@ export function createRemoteLink(args: {
       // — and end the game for the whole table, or forge a SYNC and replace a
       // victim's entire view with cards of the attacker's choosing. The guest
       // lobby path gates on `fromHost` for exactly this reason (useLobby.ts).
-      if (frame.from !== keeperPeerId) return
+      if (closed || frame.from !== keeperPeerId) return
 
       if (frame.type === 'KEEPER_CHANGED') {
         // `parseEnvelope` validates the envelope, never the payload
         // (envelope.ts), and here the missing-payload default would be the
         // most destructive reading available: `keeperId: null` ends the game.
         if (!frame.payload || !('keeperId' in frame.payload)) return
+        // Let a successor capture inherited time before invalidating this
+        // generation. A synchronous callback may already install the new one.
+        const generation = clockGeneration
         args.onKeeperChanged?.(frame.payload.keeperId)
+        if (clockGeneration === generation) {
+          clockGeneration++
+          clockActive = false
+          probe.reset()
+        }
+        return
+      }
+      if (frame.type === 'CLOCK_RESPONSE') {
+        if (clockActive) probe.receive(frame.payload)
         return
       }
       if (frame.type !== 'SYNC') return
       // Same reason: a frame that merely claims to be a SYNC must not reach a
       // subscriber as `undefined` and take the UI down with it.
       if (!frame.payload?.view) return
+      if (activeGame && frame.payload.gameId && frame.payload.gameId !== activeGame) return
+      if (
+        clockActive &&
+        activeGame &&
+        frame.payload.gameId === activeGame &&
+        typeof frame.payload.keeperNow === 'number'
+      ) {
+        clock.anchor(frame.payload.keeperNow, mono())
+      }
       for (const listener of listeners) listener(frame.payload)
     },
   }
@@ -138,6 +206,8 @@ export function attachKeeper(args: {
   transport: Transport
   now: () => number
   ticker?: Ticker
+  monotonicNow?: () => number
+  initialKeeperNow?: number
   // Absent, the keeper answers immediately — which is what solo play, the
   // playground and every test that predates the intro want.
   gate?: StartGate
@@ -147,8 +217,13 @@ export function attachKeeper(args: {
   // every existing caller and test is unaffected.
   onCommit?: (session: Session) => void
 }): KeeperHandle {
+  const clock = createAuthorityClock({
+    epochNow: args.now,
+    monotonicNow: args.monotonicNow ?? (() => performance.now()),
+    initialKeeperNow: args.initialKeeperNow,
+  })
   if (!args.gate || args.gate.open)
-    args.ref.current = enablePresentation(args.ref.current, args.now(), true)
+    args.ref.current = enablePresentation(args.ref.current, clock.now(), true)
   const ticker = args.ticker ?? intervalTicker()
   const listeners = new Set<(sync: Sync) => void>()
   // False once this handle has handed the session away or been closed. Every
@@ -158,7 +233,21 @@ export function attachKeeper(args: {
   // never sees, and the two SYNC streams would contradict each other.
   let keeping = true
 
-  const deliver = (outgoing: Outgoing) => {
+  const deliver = (untimed: Outgoing) => {
+    const outgoing: Outgoing =
+      untimed.message.type === 'SYNC'
+        ? {
+            ...untimed,
+            message: {
+              ...untimed.message,
+              payload: {
+                ...untimed.message.payload,
+                gameId: args.ref.current.gameId,
+                keeperNow: clock.now(),
+              },
+            },
+          }
+        : untimed
     if (outgoing.to === 'broadcast') {
       args.transport.broadcast(outgoing.message)
       return
@@ -189,14 +278,14 @@ export function attachKeeper(args: {
   const early: { peerId: string; intent: unknown }[] = []
 
   const applyNow = (peerId: string, intent: unknown) => {
-    save(applyIntent(args.ref.current, peerId, intent, args.now()))
+    save(applyIntent(args.ref.current, peerId, intent, clock.now()))
   }
 
   // Stamped at release, not at arrival: the game begins when the gate opens, so
   // an action cannot carry a timestamp from before the table was live.
   const flush = () => {
     if (!args.ref.current.presentation) {
-      args.ref.current = enablePresentation(args.ref.current, args.now())
+      args.ref.current = enablePresentation(args.ref.current, clock.now())
       save({ session: args.ref.current, outgoing: syncAll(args.ref.current, []) })
     }
     const queued = early.splice(0, early.length)
@@ -221,7 +310,7 @@ export function attachKeeper(args: {
     // The whole reason the gate exists: `driveUnattended` playing an absent seat
     // mid-animation is the move nobody at the table could see coming.
     if (gated()) return
-    const now = args.now()
+    const now = clock.now()
     save(advanceSession(args.ref.current, now))
   })
 
@@ -235,9 +324,10 @@ export function attachKeeper(args: {
 
   return {
     link: {
+      clock,
       presentationReady(id) {
         if (keeping)
-          save(acknowledgePresentation(args.ref.current, args.transport.id, id, args.now()))
+          save(acknowledgePresentation(args.ref.current, args.transport.id, id, clock.now()))
       },
       submit(intent) {
         if (!keeping) return
@@ -270,9 +360,35 @@ export function attachKeeper(args: {
               args.ref.current,
               frame.from,
               frame.payload.presentation,
-              args.now(),
+              clock.now(),
             ),
           )
+        return
+      }
+      if (frame.type === 'CLOCK_REQUEST') {
+        const value = frame.payload
+        if (
+          !value ||
+          value.gameId !== args.ref.current.gameId ||
+          !Number.isSafeInteger(value.requestId) ||
+          value.requestId < 1
+        )
+          return
+        if (
+          !seatOfPeer(args.ref.current, frame.from) &&
+          !args.ref.current.spectators.includes(frame.from)
+        )
+          return
+        const receivedAt = clock.now()
+        args.transport.send(frame.from, {
+          type: 'CLOCK_RESPONSE',
+          payload: {
+            gameId: value.gameId,
+            requestId: value.requestId,
+            receivedAt,
+            sentAt: clock.now(),
+          },
+        })
         return
       }
       if (frame.type === 'INTRO_READY') {
@@ -295,11 +411,11 @@ export function attachKeeper(args: {
     },
     peerLeft(peerId) {
       if (!keeping) return
-      save(disconnect(args.ref.current, peerId, args.now()))
+      save(disconnect(args.ref.current, peerId, clock.now()))
     },
     peerReturned(playerId, peerId) {
       if (!keeping) return
-      save(rebind(args.ref.current, playerId, peerId, args.now()))
+      save(rebind(args.ref.current, playerId, peerId, clock.now()))
     },
     handover(toPlayerId) {
       if (!keeping) return

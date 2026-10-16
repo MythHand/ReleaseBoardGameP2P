@@ -926,6 +926,7 @@ export function useLobby(): UseLobby {
         dispatch([{ to: 'broadcast', message: { type: 'PLAYER_KICKED', payload: { peerId } } }])
         if (entry) broadcastChatEntries([entry])
       } else if (peerId === current.hostId) {
+        remoteRef.current?.resetClock()
         refreshVoice(false)
         // The guest can't proceed without the host. Only call it "host left" if
         // we were actually connected; a channel that never opened means the
@@ -1198,7 +1199,8 @@ export function useLobby(): UseLobby {
         } else if (
           msg.type === 'INTENT' ||
           msg.type === 'INTRO_READY' ||
-          msg.type === 'PRESENTATION_READY'
+          msg.type === 'PRESENTATION_READY' ||
+          msg.type === 'CLOCK_REQUEST'
         ) {
           // The only party that calls into the engine. `applyIntent` resolves the
           // seat from the sender's peer id and stamps the player itself, so a
@@ -1321,6 +1323,7 @@ export function useLobby(): UseLobby {
           // running an older build — the page then falls back to seatsFor.
           applySeats(msg.payload.seats ?? [])
           gameIdRef.current = msg.payload.gameId
+          remoteRef.current?.activate(msg.payload.gameId)
           setGameId(msg.payload.gameId)
           rememberGame(msg.payload.gameId)
           break
@@ -1337,6 +1340,7 @@ export function useLobby(): UseLobby {
           )
           break
         }
+        case 'CLOCK_RESPONSE':
         case 'SYNC':
         case 'KEEPER_CHANGED':
           // The remote link re-checks the sender against the keeper it knows, so

@@ -11,6 +11,7 @@ import {
   seatOwing,
 } from '../state'
 import type { ReleaseView } from '../view'
+import { chooseAttack } from './botPolicy'
 
 // The order the rules give (see release.ts's `neutralizeOptions`): the
 // cheapest available answer first. Matched here so a bot forced to sacrifice
@@ -151,9 +152,13 @@ export function botAction(
   }
 
   if (view.turn.player === me) {
-    const playable = view.self.playable
-    if (playable.length > 0) {
-      const card = playable[0]
+    const attack = chooseAttack(view, random)
+    for (const card of view.self.playable) {
+      const held = view.self.hand.find((entry) => entry.uid === card)
+      if (held && rulesFor(held.id)?.kind === 'attack') {
+        if (attack) return { type: 'PLAY', player: me, ...attack, at }
+        continue
+      }
       const targets = engine.legalTargets(state, me, card)
       return targets.length > 0
         ? { type: 'PLAY', player: me, card, target: targets[0], at }

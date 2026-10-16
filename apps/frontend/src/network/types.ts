@@ -153,7 +153,19 @@ export type Message =
   // live board, exactly as `isOpening` already says it must.
   | {
       type: 'SYNC'
-      payload: { view: GameView; events: Event[]; resync?: boolean; presentation?: PresentationId }
+      payload: {
+        view: GameView
+        events: Event[]
+        resync?: boolean
+        presentation?: PresentationId
+        gameId?: string
+        keeperNow?: number
+      }
+    }
+  | { type: 'CLOCK_REQUEST'; payload: { gameId: string; requestId: number } }
+  | {
+      type: 'CLOCK_RESPONSE'
+      payload: { gameId: string; requestId: number; receivedAt: number; sentAt: number }
     }
   // The only message carrying GameState, and only to a handover successor.
   | { type: 'KEEPER_STATE'; payload: { state: GameState; presentation?: PresentationRuntime } }

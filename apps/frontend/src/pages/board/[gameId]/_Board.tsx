@@ -211,6 +211,7 @@ function BoardView({
   actions: liveActions,
   dock,
   now,
+  countdownReady = true,
   panel: panelProp,
   onPanelChange,
   intro,
@@ -432,7 +433,7 @@ function BoardView({
       : (state.shown ?? []).filter(
           (s) => s.player !== state.selfId || !staging.returning.has(s.uid),
         )
-  const derived = deriveDock({ ...state, shown: shownForDock }, state.selfId, now)
+  const derived = deriveDock({ ...state, shown: shownForDock }, state.selfId, now, countdownReady)
   // Nobody is on turn during the opening: the dock stands in its waiting state
   // and names the moment where it would name a player.
   const dockView: DockView = deal.active

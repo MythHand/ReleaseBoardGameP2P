@@ -31,6 +31,7 @@ function table() {
     ref,
     transport: net.transport('host'),
     now: () => now,
+    monotonicNow: () => now,
     ticker: {
       start(fn) {
         fire = fn
@@ -102,7 +103,9 @@ it('invalidates old keeper acknowledgements on replacement without extending the
   const successor = attachKeeper({
     ref: t.ref,
     transport: t.net.transport('host'),
-    now: () => 7000,
+    now: () => 9_000_000,
+    initialKeeperNow: 7000,
+    monotonicNow: () => 0,
     ticker: { start() {}, stop() {} },
   })
   const syncs: Sync[] = []
@@ -166,7 +169,9 @@ it('does not replenish an active allowance when a keeper restores its saved stat
   const restored = attachKeeper({
     ref: t.ref,
     transport: t.net.transport('host'),
-    now: () => 7000,
+    now: () => 9_000_000,
+    initialKeeperNow: 7000,
+    monotonicNow: () => 0,
     ticker: { start() {}, stop() {} },
   })
   expect(t.ref.current.state.turn.openedAt).toBe(1000)

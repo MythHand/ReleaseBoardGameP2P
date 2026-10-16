@@ -1,14 +1,16 @@
 import type { Event, PlayerView } from '@release/engine'
-import { render } from '@testing-library/react'
+import { act, render, renderHook } from '@testing-library/react'
 import { useLayoutEffect } from 'react'
 import { beforeEach, expect, it, vi } from 'vitest'
+import { createRemoteClock, type GameClock } from '~/network/session/clock'
 import { readLog, writeLog } from '~/shared/lib/persistence'
 import { type Game, useGame } from './useGame'
+import { useNow } from './useNow'
 
 // The hook reads the session through a provider; the tests drive that provider
 // directly so a sync can be handed over one render at a time.
 let session: {
-  gameLink: { submit: (i: unknown) => void } | null
+  gameLink: { submit: (i: unknown) => void; clock?: GameClock } | null
   gameSync: { view: PlayerView; events: Event[]; resync?: boolean } | null
   gameId: string | null
 }
@@ -292,4 +294,29 @@ it('hands this seat’s own refusals over apart from the feed, per game', () => 
   session = { gameLink: null, gameSync: { view: view(), events: [dealt('p1')] }, gameId: 'g2' }
   rerender(<Watch />)
   expect(seen.at(-1)?.rejections).toEqual([])
+})
+
+it('retains calibration across Board remount without replaying the feed on clock updates', () => {
+  let mono = 0
+  const clock = createRemoteClock(() => mono)
+  session = {
+    gameId: 'g1',
+    gameLink: { submit() {}, clock },
+    gameSync: { view: view(), events: [dealt('p1')], resync: true },
+  }
+  const probe = () => {
+    const game = useGame()
+    return { game, now: useNow(true, game.clock) }
+  }
+  const first = renderHook(probe)
+  act(() => clock.anchor(10_000, mono))
+  expect(first.result.current.now).toBe(10_000)
+  expect(first.result.current.game.events).toEqual([dealt('p1')])
+  expect(first.result.current.game.restoredThrough).toBe(1)
+  first.unmount()
+  mono = 500
+  const second = renderHook(probe)
+  expect(second.result.current.now).toBe(10_500)
+  expect(second.result.current.game.events).toEqual([dealt('p1')])
+  second.unmount()
 })
