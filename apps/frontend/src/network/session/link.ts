@@ -1,5 +1,6 @@
 import type { Event, GameView, PlayerId } from '@release/engine'
 import type { Intent } from '../types'
+import { createAuthorityClock, type GameClock } from './clock'
 import {
   advanceSession,
   applyIntent,
@@ -13,12 +14,15 @@ export interface Sync {
   view: GameView
   events: Event[]
   resync?: boolean
+  gameId?: string
+  keeperNow?: number
 }
 
 // The seam. `useGame` and the page hold this and nothing else, so they cannot
 // tell a local engine from a remote keeper — which is what lets solo play, the
 // playground, and every headless test exercise the same code the network does.
 export interface GameLink {
+  clock: GameClock
   submit(intent: Intent): void
   subscribe(listener: (sync: Sync) => void): () => void
   close(): void
@@ -56,6 +60,8 @@ const localAddress = (playerId: PlayerId) => `local:${playerId}`
 // link's `deliver` runs — without a shared registry each link would discard the
 // messages addressed to its peers and every seat but the actor would freeze.
 // Keyed weakly: a ref that goes out of scope takes its links with it.
+const clocksByRef = new WeakMap<SessionRef, GameClock & { now(): number }>()
+
 const linksByRef = new WeakMap<SessionRef, Set<(outgoing: Outgoing) => void>>()
 
 export function createLocalLink(args: {
@@ -63,7 +69,17 @@ export function createLocalLink(args: {
   me: PlayerId
   now: () => number
   ticker?: Ticker
+  monotonicNow?: () => number
+  initialKeeperNow?: number
 }): GameLink {
+  const clock =
+    clocksByRef.get(args.ref) ??
+    createAuthorityClock({
+      epochNow: args.now,
+      monotonicNow: args.monotonicNow ?? (() => performance.now()),
+      initialKeeperNow: args.initialKeeperNow,
+    })
+  clocksByRef.set(args.ref, clock)
   const ticker = args.ticker ?? intervalTicker()
   const listeners = new Set<(sync: Sync) => void>()
 
@@ -88,7 +104,12 @@ export function createLocalLink(args: {
     // SYNC producers so this guard doesn't silently drop them later.
     if (outgoing.to !== myPeerId() && outgoing.to !== 'broadcast') return
     if (outgoing.message.type !== 'SYNC') return
-    for (const listener of listeners) listener(outgoing.message.payload)
+    for (const listener of listeners)
+      listener({
+        ...outgoing.message.payload,
+        gameId: args.ref.current.gameId,
+        keeperNow: clock.now(),
+      })
   }
 
   const siblings = linksByRef.get(args.ref) ?? new Set<(outgoing: Outgoing) => void>()
@@ -102,15 +123,16 @@ export function createLocalLink(args: {
   }
 
   ticker.start(() => {
-    const now = args.now()
+    const now = clock.now()
     commit(args.ref, advanceSession(args.ref.current, now), deliver)
   })
 
   return {
+    clock,
     submit(intent) {
       const me = myPeerId()
       if (me === null) return
-      commit(args.ref, applyIntent(args.ref.current, me, intent, args.now()), deliver)
+      commit(args.ref, applyIntent(args.ref.current, me, intent, clock.now()), deliver)
     },
     subscribe(listener) {
       listeners.add(listener)
