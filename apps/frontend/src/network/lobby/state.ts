@@ -16,6 +16,11 @@ export interface LobbyState {
   peers: Record<string, PeerInfo>
 }
 
+// The rules seat 2–6 (docs/rules/general.md:13), so one human and five bots is
+// the largest table a lone host can ask for. Here rather than in host.ts
+// because profile.ts reserves every name a bot could ever take.
+export const MAX_BOTS = 5
+
 export function createLobbyState(args: {
   selfId: string
   hostId: string

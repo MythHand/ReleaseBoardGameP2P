@@ -481,3 +481,42 @@ it('enforces quotas on role changes and preserves connected player seats', () =>
 it.each([NaN, Infinity, 1.5])('rejects malformed player limits %s', (value) => {
   expect(setMaxPlayers(base(4), value).error).toBe('invalid-limit')
 })
+
+it('gives a joining player their free wish and a spectator nothing', () => {
+  const asPlayer = handleJoinRequest(base(4), 'p1', 'member-p1', 'Pam', {
+    matchRunning: false,
+    avatar: 'attack-bug',
+  })
+  expect(asPlayer.state.peers.p1.avatar).toBe('attack-bug')
+  const joined = asPlayer.outgoing.find((o) => o.message.type === 'PEER_JOINED')
+  expect(joined?.message.type === 'PEER_JOINED' && joined.message.payload.avatar).toBe('attack-bug')
+
+  const asSpectator = handleJoinRequest(base(4), 'g1', 'member-g1', 'Gus', {
+    matchRunning: false,
+    requestedRole: 'spectator',
+    avatar: 'attack-bug',
+  })
+  expect(asSpectator.state.peers.g1.avatar).toBeUndefined()
+})
+
+it('keeps the avatar on ready and whereabouts broadcasts', () => {
+  const joined = handleJoinRequest(base(4), 'p1', 'member-p1', 'Pam', {
+    matchRunning: false,
+    avatar: 'attack-bug',
+  }).state
+  const ready = handleReady(joined, 'p1').outgoing[0]
+  expect(ready.message.type === 'PEER_JOINED' && ready.message.payload.avatar).toBe('attack-bug')
+  const where = handleWhereabouts(joined, 'p1', 'stats').outgoing[0]
+  expect(where.message.type === 'PEER_JOINED' && where.message.payload.avatar).toBe('attack-bug')
+})
+
+it('frees the avatar of a player made spectator and deals one to a spectator made player', () => {
+  const joined = handleJoinRequest(base(4), 'p1', 'member-p1', 'Pam', {
+    matchRunning: false,
+    avatar: 'attack-bug',
+  }).state
+  const demoted = setParticipantRole(joined, 'p1', 'spectator', false).state
+  expect(demoted.peers.p1.avatar).toBeUndefined()
+  const promoted = setParticipantRole(demoted, 'p1', 'player', false).state
+  expect(promoted.peers.p1.avatar).toEqual(expect.any(String))
+})
