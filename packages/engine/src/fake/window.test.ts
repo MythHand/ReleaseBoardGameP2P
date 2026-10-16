@@ -59,7 +59,7 @@ const released = (extra: Partial<Record<'p1' | 'p2' | 'p3', CardInstance[]>> = {
 it('opens a 15s window on a bare release', () => {
   const s = released()
   expect(s.window).toEqual({
-    target: { player: 'p1', slot: 'frontend', card: FE.uid },
+    target: { player: 'p1', slot: 'frontend', card: FE.uid, fromHand: true },
     round: 1,
     openedAt: 1000,
     deadline: 1000 + WINDOW_FIRST_MS,

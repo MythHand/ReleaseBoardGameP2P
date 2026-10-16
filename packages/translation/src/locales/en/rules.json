@@ -22,7 +22,7 @@
         "note": "action / draw / action / end of turn",
         "body": [
           "Before and after drawing you may play any number of cards (including 0).",
-          "Draw — exactly one card from the top of the main deck (mandatory).",
+          "One mandatory draw per turn: one card from the top of each draw pile.",
           "End of turn is declared with the word \"PUSH\"; play passes clockwise."
         ]
       },
@@ -30,7 +30,7 @@
         "title": "Releasing cards",
         "body": [
           "Release zone — place for Release cards; one of each type.",
-          "Only one release per turn; when played, discard 1 card from hand.",
+          "Only one successful release per turn; failed attempts do not spend the allowance. When played, discard 1 card from hand.",
           "Opponents may immediately respond to a fresh release with a lightning attack (Bug, Out of Memory, Legacy Code, Security Bug).",
           "Code Review is played together with Release and makes it immune to these attacks (even with Sudo). Cannot be applied to an already-placed release."
         ]
@@ -93,7 +93,7 @@
       "turn.draw": {
         "title": "Drawing a card",
         "body": [
-          "You must take one card from the top of the main deck at any point during your turn. If the draw deck is split, the card is taken from all decks."
+          "You must perform one draw per turn, at any point during your turn. If the draw deck is split, take one card from each pile. Git Branch and Git Merge do not allow another draw after that draw has finished."
         ]
       },
       "turn.end": {
@@ -118,7 +118,7 @@
         "body": [
           "The release zone is the area in front of a player, meant for Release cards (Frontend, Backend, Database).",
           "The release zone can hold only one card of each type (you can’t lay two identical ones).",
-          "Only one Release card can be laid per turn.",
+          "Only one Release card can be successfully laid per turn. A release succeeds when it survives its reaction window and remains with the player who laid it; with Code Review, it succeeds immediately. Failed attempts do not spend the allowance, but losing an already successful release does not restore it.",
           "When laying a Release card, the player discards one card from hand (their choice) to the discard pile.",
           "When a player lays a Release card, other players may instantly attack it with lightning-icon cards (Bug, Out of Memory, Legacy Code, Security Bug)",
           "A Release card can be laid together with Code Review — this combo makes the release immune to attacks (Bug, Out of Memory, Legacy Code, Security Bug, even with Sudo). Code Review can’t be applied to an already-laid Release card."

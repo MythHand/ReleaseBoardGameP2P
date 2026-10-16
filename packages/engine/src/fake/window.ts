@@ -87,7 +87,12 @@ export function closeWindow(state: GameState, log: Log): GameState {
   const w = state.window
   if (!w) return { ...state, eventSeq: log.seq }
   log.add({ type: 'windowClosed', player: w.target.player, slot: w.target.slot })
-  return checkWin({ ...state, window: null, eventSeq: log.seq }, log)
+  const survived = state.players[w.target.player].release[w.target.slot]?.card.uid === w.target.card
+  const turn =
+    w.target.fromHand && w.target.player === state.turn.player && survived
+      ? { ...state.turn, releasesPlayed: state.turn.releasesPlayed + 1 }
+      : state.turn
+  return checkWin({ ...state, turn, window: null, eventSeq: log.seq }, log)
 }
 
 // Close the standing window WITHOUT settling the win, because another window is

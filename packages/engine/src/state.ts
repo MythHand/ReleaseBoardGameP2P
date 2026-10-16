@@ -70,7 +70,14 @@ export interface PlayerState {
 }
 
 export interface ReactionWindow {
-  target: { player: PlayerId; slot: ReleaseSlot; card: CardUid }
+  target: {
+    player: PlayerId
+    slot: ReleaseSlot
+    card: CardUid
+    // Only a release played from hand can spend the turn's allowance. This
+    // survives repelled attacks, but is not inherited by a thief's window.
+    fromHand?: true
+  }
   // 1 -> 15s, 2+ -> 10s. A repelled attack reopens the window at round + 1.
   round: number
   // The `at` of the action that opened this window — the other end of the
@@ -416,11 +423,11 @@ export interface GameState {
   turn: {
     player: PlayerId
     index: number
-    // Which piles this turn has drawn from. A boolean cannot say "two of three
-    // piles are done", and under Base the obligation runs over every pile
-    // (rules decisions answer 1). Whether it is satisfied is a question about
-    // the mode, answered by `drawObligationMet`, not a flag stored here.
+    // Historical sources of this turn's draws. `drawing` carries any remaining
+    // steps; later pile splits/merges cannot reopen a completed draw.
     drawnFrom: number[]
+    // Successful releases from hand, counted after their reaction window (or
+    // immediately with Code Review). Failed attempts do not spend the quota.
     releasesPlayed: number
     // The inactivity clock on the player on turn — app timing, not a rule
     // (docs/rules/README.md, "Что правилом НЕ является"). Restarted by every
