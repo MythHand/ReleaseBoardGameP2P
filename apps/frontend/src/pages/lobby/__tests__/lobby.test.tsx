@@ -1,4 +1,4 @@
-import { botNames } from '@release/ui'
+import { botNames, PRESET_AVATARS } from '@release/ui'
 import { fireEvent, render, screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router'
@@ -619,4 +619,81 @@ it('keeps spectator admission adjustable below occupancy and player capacity abo
   fireEvent.change(quota, { target: { value: '0' } })
   expect(sessionValue.setMaxSpectators).toHaveBeenCalledWith(0)
   expect(screen.getByText('Watcher')).toBeTruthy()
+})
+
+// Avatar labels are proper names; the mocked language resolves to 'ru'.
+const avatarLabel = (id: string) => {
+  const found = PRESET_AVATARS.find((a) => a.id === id)
+  if (!found) throw new Error(`unknown avatar ${id}`)
+  return found.label.ru
+}
+
+function withAvatars(): UseLobby {
+  const s = inSession()
+  if (!s.state) throw new Error('no state')
+  return {
+    ...s,
+    state: {
+      ...s.state,
+      peers: {
+        h: { ...s.state.peers.h, name: 'Ann', avatar: 'attack-bug' },
+        p1: { ...s.state.peers.p1, name: 'Bo', avatar: 'defense-hotfix' },
+      },
+    },
+  }
+}
+
+const openMySettings = () => fireEvent.click(screen.getByRole('button', { name: /Ann/ }))
+
+it('shows avatars and opens my settings from my own row', () => {
+  sessionValue = withAvatars()
+  renderInRouter(<LobbyView />)
+  openMySettings()
+  expect(screen.getByText('lobbyScreen.playerSettingsTitle')).toBeTruthy()
+})
+
+it('sends a picked avatar at once and a new nickname on close', () => {
+  sessionValue = withAvatars()
+  renderInRouter(<LobbyView />)
+  openMySettings()
+  fireEvent.click(screen.getByRole('button', { name: avatarLabel('ai-hallucination') }))
+  expect(sessionValue.updateProfile).toHaveBeenCalledWith({ avatar: 'ai-hallucination' })
+  fireEvent.change(screen.getByLabelText('playerSettings.nicknameLabel'), {
+    target: { value: 'Anna' },
+  })
+  expect(sessionValue.updateProfile).toHaveBeenCalledTimes(1)
+  fireEvent.keyDown(document, { key: 'Escape' })
+  expect(sessionValue.updateProfile).toHaveBeenLastCalledWith({ name: 'Anna' })
+})
+
+it('does not send a taken nickname and marks the field', () => {
+  sessionValue = withAvatars()
+  renderInRouter(<LobbyView />)
+  openMySettings()
+  fireEvent.change(screen.getByLabelText('playerSettings.nicknameLabel'), {
+    target: { value: 'bo' },
+  })
+  expect(screen.getByText('playerSettings.nicknameTaken')).toBeTruthy()
+  fireEvent.keyDown(document, { key: 'Escape' })
+  expect(sessionValue.updateProfile).not.toHaveBeenCalled()
+})
+
+it('reopens the settings with the draft when the host refuses the nickname', () => {
+  sessionValue = withAvatars()
+  const { rerender } = renderInRouter(<LobbyView />)
+  openMySettings()
+  fireEvent.change(screen.getByLabelText('playerSettings.nicknameLabel'), {
+    target: { value: 'Zed' },
+  })
+  fireEvent.keyDown(document, { key: 'Escape' })
+  sessionValue = { ...sessionValue, profileRejection: { reason: 'name-taken', seq: 1 } }
+  rerender(
+    <MemoryRouter>
+      <LobbyView />
+    </MemoryRouter>,
+  )
+  expect((screen.getByLabelText('playerSettings.nicknameLabel') as HTMLInputElement).value).toBe(
+    'Zed',
+  )
+  expect(screen.getByText('playerSettings.nicknameTaken')).toBeTruthy()
 })

@@ -1,5 +1,6 @@
 export { checkRoom } from './lobby/checkRoom'
 export { MAX_BOTS } from './lobby/host'
+export { nameTaken } from './lobby/profile'
 export { effectiveBots, type LobbyState } from './lobby/state'
 export { MAX_RECONNECT_ATTEMPTS, type ReconnectEvent } from './session/reconnect'
 export type {

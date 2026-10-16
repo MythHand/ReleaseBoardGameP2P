@@ -11,21 +11,24 @@ import {
   LobbyCode,
   MAX_SPECTATORS,
   Modal,
+  PlayerSettings,
   PlayerSlot,
+  PRESET_AVATARS,
   ScrollArea,
   Slider,
   spectatorLimitColor,
   Toggle,
   Typography,
 } from '@release/ui'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSession } from '~/app/providers/SessionProvider'
 import { useNavigate } from '~/app/router'
 import { RoomChat, useRoomChatView } from '~/features/chat/RoomChat'
 import { copyText } from '~/features/copy/copyText'
 import { useStartGame } from '~/features/start-game/useStartGame'
 import { RoomVoice, useRoomVoiceView } from '~/features/voice-chat/RoomVoice'
-import { effectiveBots } from '~/network'
+import { useSpeaking } from '~/features/voice-chat/useSpeaking'
+import { effectiveBots, nameTaken } from '~/network'
 import type { PeerInfo } from '~/network/types'
 import { BASE_URL } from '~/shared/config'
 import AppLogo from '~/shared/ui/AppLogo'
@@ -45,12 +48,38 @@ export default function LobbyView() {
 
   const [disbandOpen, setDisbandOpen] = useState(false)
   const [leaveOpen, setLeaveOpen] = useState(false)
+  const speaking = useSpeaking()
+  // The settings modal edits my own row. The nickname is a local draft until
+  // the modal closes; the avatar is sent on click and shown optimistically
+  // until the roster confirms it or the host refuses it.
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [nicknameDraft, setNicknameDraft] = useState('')
+  const [pendingAvatar, setPendingAvatar] = useState<string | null>(null)
+  const [refusedName, setRefusedName] = useState(false)
+  const lastRejection = useRef(session.profileRejection?.seq ?? 0)
 
   // Where this peer is, for everyone else's results table.
   const { setWhere } = session
   useEffect(() => {
     setWhere('lobby')
   }, [setWhere])
+
+  const rejection = session.profileRejection
+  useEffect(() => {
+    if (!rejection || rejection.seq === lastRejection.current) return
+    lastRejection.current = rejection.seq
+    if (rejection.reason === 'avatar-taken') setPendingAvatar(null)
+    if (rejection.reason === 'name-taken' || rejection.reason === 'name-invalid') {
+      // The draft is still in state: reopen on it, with the reason under the field.
+      setRefusedName(true)
+      setSettingsOpen(true)
+    }
+  }, [rejection])
+
+  // Leaving for the board closes the modal without sending anything.
+  useEffect(() => {
+    if (session.gameId) setSettingsOpen(false)
+  }, [session.gameId])
 
   const state = session.state
   if (!state) return null
@@ -63,6 +92,28 @@ export default function LobbyView() {
   const spectators = Object.values(state.peers).filter((p) => p.role === 'guest')
   // me, when I hold a seat — a spectator has no readiness to give
   const me = players.find((p) => p.id === state.selfId)
+  const myPeer = state.peers[state.selfId]
+  const lang = i18n.resolvedLanguage === 'ru' ? 'ru' : 'en'
+  // the roster caught up with my click — drop the optimistic pick
+  if (pendingAvatar && myPeer?.avatar === pendingAvatar) setPendingAvatar(null)
+  const takenAvatars = players.flatMap((p) => (p.id !== state.selfId && p.avatar ? [p.avatar] : []))
+  const draftTaken =
+    refusedName || (nicknameDraft.trim() !== '' && nameTaken(state, nicknameDraft, [state.selfId]))
+  const openSettings = () => {
+    setNicknameDraft(myPeer?.name ?? '')
+    setRefusedName(false)
+    setSettingsOpen(true)
+  }
+  const closeSettings = () => {
+    setSettingsOpen(false)
+    const name = nicknameDraft.trim()
+    if (!name || name === myPeer?.name || nameTaken(state, name, [state.selfId])) return
+    session.updateProfile({ name })
+  }
+  const pickAvatar = (avatar: string) => {
+    setPendingAvatar(avatar)
+    session.updateProfile({ avatar })
+  }
   const capacity = state.maxPlayers
   const minCapacity = Math.max(2, players.length)
   // What the table can actually give right now — capped by the free seats — as
@@ -188,8 +239,8 @@ export default function LobbyView() {
             copy={t('lobbyCode', { returnObjects: true })}
           />
           <LangSwitcher
-            value={i18n.resolvedLanguage === 'ru' ? 'ru' : 'en'}
-            onChange={(lang) => i18n.changeLanguage(lang)}
+            value={lang}
+            onChange={(next) => i18n.changeLanguage(next)}
             label={t('lobbyScreen.language')}
           />
         </div>
@@ -246,6 +297,9 @@ export default function LobbyView() {
                   <PlayerSlot
                     key={key}
                     name={p.name}
+                    avatar={p.avatar}
+                    speaking={speaking.has(p.memberId)}
+                    onEdit={p.id === state.selfId ? openSettings : undefined}
                     me={p.id === state.selfId}
                     youLabel={t('lobbyScreen.you')}
                     badge={
@@ -327,6 +381,8 @@ export default function LobbyView() {
                 <PlayerSlot
                   key={s.id}
                   name={s.name}
+                  speaking={speaking.has(s.memberId)}
+                  onEdit={s.id === state.selfId ? openSettings : undefined}
                   me={s.id === state.selfId}
                   youLabel={t('lobbyScreen.you')}
                   status={<Badge tone="muted">{t('lobbyScreen.roleGuest')}</Badge>}
@@ -403,6 +459,40 @@ export default function LobbyView() {
             {t('lobbyScreen.leave')}
           </Button>
         </div>
+      </Modal>
+
+      <Modal
+        open={settingsOpen}
+        onClose={closeSettings}
+        title={t('lobbyScreen.playerSettingsTitle')}
+        // a player picks an avatar too; a spectator has only the nickname
+        wide={Boolean(me)}
+      >
+        <PlayerSettings
+          avatars={
+            me
+              ? {
+                  items: PRESET_AVATARS.map((a) => ({ id: a.id, label: a.label[lang] })),
+                  selected: pendingAvatar ?? me.avatar ?? null,
+                  taken: takenAvatars,
+                  onChange: pickAvatar,
+                }
+              : undefined
+          }
+          nickname={nicknameDraft}
+          onNicknameChange={(name) => {
+            setRefusedName(false)
+            setNicknameDraft(name)
+          }}
+          nicknameTaken={draftTaken}
+          copy={{
+            avatars: t('playerSettings.avatars'),
+            nicknameLabel: t('playerSettings.nicknameLabel'),
+            nicknamePlaceholder: t('playerSettings.nicknamePlaceholder'),
+            randomNick: t('playerSettings.randomNick'),
+            nicknameTaken: t('playerSettings.nicknameTaken'),
+          }}
+        />
       </Modal>
     </div>
   )
