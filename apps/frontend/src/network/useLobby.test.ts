@@ -23,6 +23,7 @@ import {
   writeChat,
   writeSession,
 } from '~/shared/lib/persistence'
+import { AVATAR_IDS } from './lobby/profile'
 import { backoffMs, MAX_RECONNECT_ATTEMPTS } from './session/reconnect'
 import { createSession, type Seat as RefereeSeat } from './session/referee'
 import { INTRO_CAP_MS } from './session/startGate'
@@ -3242,6 +3243,44 @@ it('normalizes restored private seats before sending rejoin seating', async () =
   })
   expect(JSON.stringify(sentTo(RETURNED))).not.toContain('nested-private-token')
   expect(JSON.stringify(sentTo(RETURNED))).not.toContain('nested-legacy-credential')
+})
+
+// The seating is frozen at the deal, avatar included (#233): a host reload
+// mid-match re-sends it from the snapshot, so a seat's avatar must survive the
+// normalization — and an id that is not a preset must not.
+it('keeps seat avatars through a host restore', async () => {
+  storedHostSession('g1')
+  const snapshot = storedKeeperSnapshot('peer0')
+  const [hostSeat, guestSeat] = snapshot.privateSeats as PrivateSeat[]
+  snapshot.privateSeats = [
+    { ...hostSeat, seat: { ...hostSeat.seat, avatar: AVATAR_IDS[0] } },
+    { ...guestSeat, seat: { ...guestSeat.seat, avatar: 'not-a-preset' } },
+  ]
+  sessionStorage.setItem(KEEPER_KEY, JSON.stringify(snapshot))
+
+  const { result } = renderHook(() => useLobby())
+  await act(async () => {
+    await Promise.resolve()
+  })
+  act(() => {
+    transports[0].onMessage?.({
+      type: 'JOIN_REQUEST',
+      payload: { name: 'Bo', resumeToken: GUEST_RESUME_TOKEN },
+      from: RETURNED,
+    } as WireMessage)
+  })
+
+  expect(sentTo(RETURNED)).toContainEqual({
+    type: 'GAME_STARTING',
+    payload: {
+      gameId: result.current.gameId,
+      seats: [
+        { playerId: 'p1', peerId: 'peer0', name: 'Dimbo', avatar: AVATAR_IDS[0] },
+        { playerId: 'p2', peerId: RETURNED, name: 'Bo' },
+      ],
+    },
+  })
+  expect(result.current.seats[0]?.avatar).toBe(AVATAR_IDS[0])
 })
 
 // From the outside, a session that adopted no log plays identically to one

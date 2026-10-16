@@ -54,7 +54,13 @@ import {
   setParticipantRole as setParticipantRoleFn,
   transferHost as transferHostFn,
 } from './lobby/host'
-import { firstAvatar, handleProfileUpdate, nameTaken, parseProfilePatch } from './lobby/profile'
+import {
+  firstAvatar,
+  handleProfileUpdate,
+  isAvatarId,
+  nameTaken,
+  parseProfilePatch,
+} from './lobby/profile'
 import {
   applyConfig,
   applyPeerJoined,
@@ -205,11 +211,12 @@ function normalizePrivateSeats(value: unknown): PrivateSeat[] | null {
     if (typeof entry !== 'object' || entry === null) return null
     const { seat, resumeToken } = entry as { seat?: unknown; resumeToken?: unknown }
     if (typeof seat !== 'object' || seat === null) return null
-    const { playerId, peerId, name, bot } = seat as {
+    const { playerId, peerId, name, bot, avatar } = seat as {
       playerId?: unknown
       peerId?: unknown
       name?: unknown
       bot?: unknown
+      avatar?: unknown
     }
     if (bot !== undefined && typeof bot !== 'boolean') return null
     if (bot ? resumeToken !== null : !isNonEmptyString(resumeToken)) return null
@@ -221,7 +228,15 @@ function normalizePrivateSeats(value: unknown): PrivateSeat[] | null {
     peerIds.add(peerId)
     if (typeof resumeToken === 'string') resumeTokens.add(resumeToken)
     privateSeats.push({
-      seat: { playerId, peerId, name, ...(bot ? { bot: true } : {}) },
+      // The avatar was frozen with the seating (#233), so a restore re-sends it;
+      // an id that is not a preset is dropped, not trusted.
+      seat: {
+        playerId,
+        peerId,
+        name,
+        ...(bot ? { bot: true } : {}),
+        ...(isAvatarId(avatar) ? { avatar } : {}),
+      },
       resumeToken: typeof resumeToken === 'string' ? resumeToken : null,
     })
   }
