@@ -75,6 +75,7 @@ export interface ReactionWindow {
   round: number
   // The `at` of the action that opened this window — the other end of the
   // deadline span, so a countdown can be exact rather than assumed.
+  awaitingPresentation?: true
   openedAt: number
   deadline: number
   // Revocable: passing only means "fine, close early". A passer may still attack.
@@ -129,6 +130,7 @@ export type Pending =
       canDefendWith: CardUid[]
       // The `at` of the action that opened this pending — the other end of the
       // deadline span, so a countdown can be exact rather than assumed.
+      awaitingPresentation?: true
       openedAt: number
       deadline: number
       // 'release' answers a reaction window; 'hand' answers an attack on the
@@ -171,6 +173,7 @@ export type Pending =
       target: PlayerId
       slots: CardUid[]
       context: HandAttackContext
+      awaitingPresentation?: true
       openedAt: number
       deadline: number
     }
@@ -179,6 +182,7 @@ export type Pending =
       player: PlayerId
       target: PlayerId
       context?: HandAttackContext
+      awaitingPresentation?: true
       openedAt?: number
       deadline?: number
     }
@@ -188,6 +192,7 @@ export type Pending =
       requested: CardId
       attacker: PlayerId
       context?: HandAttackContext
+      awaitingPresentation?: true
       openedAt?: number
       deadline?: number
     }
@@ -423,6 +428,7 @@ export interface GameState {
     // window, a pending or a running draw owns the wait — and before the
     // keeper's first CLOCK_STARTED, because createGame has no timestamp.
     // Both ends of the span, like the window's, so a countdown is exact.
+    awaitingPresentation?: true
     openedAt?: number
     deadline?: number
   }

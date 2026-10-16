@@ -178,7 +178,8 @@ export function onWindowExpired(
   if (state.pending?.kind === 'defend') return reject(state, action, 'a defence is pending')
   // The deadline is authoritative, not the caller's say-so: an early expiry would
   // let one peer cut everyone else's reaction time short.
-  if (action.at < w.deadline) return reject(state, action, 'the window has not expired')
+  if (w.awaitingPresentation || action.at < w.deadline)
+    return reject(state, action, 'the window has not expired')
 
   const log = createLog(state.eventSeq)
   // the deadline that ran out was the Sudo's own, not the release's

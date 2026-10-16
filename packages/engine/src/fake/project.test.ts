@@ -994,3 +994,26 @@ describe('public spectator projection', () => {
     expect(view.tally?.p1).not.toBe(state.tally.p1)
   })
 })
+
+it.each([
+  3, 4, 5, 6,
+])('rotates the immutable %i-player circle without reordering eliminated or renamed seats', (count) => {
+  const ids = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'].slice(0, count)
+  const s = createGame({ ...config(), players: ids.map((id) => ({ id, name: 'same name' })) })
+  s.eliminated = ['p2']
+  const expected = [
+    ['p2', 'p3', 'p4', 'p5', 'p6', 'p1'],
+    ['p3', 'p4', 'p5', 'p6', 'p1', 'p2'],
+    ['p4', 'p5', 'p6', 'p1', 'p2', 'p3'],
+    ['p5', 'p6', 'p1', 'p2', 'p3', 'p4'],
+    ['p6', 'p1', 'p2', 'p3', 'p4', 'p5'],
+    ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'],
+  ]
+  for (const [i, id] of ids.entries()) {
+    expect(project(s, id).opponents.map((p) => p.id)).toEqual(
+      expected[i].filter((other) => other !== id && ids.includes(other)),
+    )
+  }
+  expect(spectate(s).opponents.map((p) => p.id)).toEqual(ids)
+  expect(s.seating).toEqual(ids)
+})
