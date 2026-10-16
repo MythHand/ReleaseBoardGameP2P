@@ -28,3 +28,5 @@ export { useTransferBeat } from './transferBeat'
 export { useUpgradeBeat } from './upgradeBeat'
 export type { Beats } from './useBeats'
 export { useBeats } from './useBeats'
+
+export { usePresentationAck } from './usePresentationAck'

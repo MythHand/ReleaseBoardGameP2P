@@ -57,6 +57,7 @@ export type TablePending =
       attackCard: string
       sudo: boolean
       options: string[]
+      awaitingPresentation?: true
       openedAt: number
       deadline: number
       scope: 'release' | 'hand'
@@ -91,6 +92,7 @@ export type TablePending =
       cover?: string
       coverSudo?: boolean
       coverBy?: string
+      awaitingPresentation?: true
       openedAt: number
       deadline: number
     }
@@ -103,6 +105,7 @@ export type TablePending =
       cover?: string
       coverSudo?: boolean
       coverBy?: string
+      awaitingPresentation?: true
       openedAt?: number
       deadline?: number
     }
@@ -116,6 +119,7 @@ export type TablePending =
       cover?: string
       coverSudo?: boolean
       coverBy?: string
+      awaitingPresentation?: true
       openedAt?: number
       deadline?: number
     }
@@ -188,6 +192,7 @@ export interface TableWindow {
   slot: ReleaseSlotId
   round: number
   // Both ends of the span, so the ring's sweep is exact rather than assumed.
+  awaitingPresentation?: true
   openedAt: number
   deadline: number
   passed: string[]

@@ -87,7 +87,7 @@ import type {
   RequestPickHandoff,
   StagedHandoff,
 } from '~/entities/game/board/types'
-import { useBeats, useEliminationPreload } from '~/features/board-beats'
+import { useBeats, useEliminationPreload, usePresentationAck } from '~/features/board-beats'
 import { useDealIntro } from '~/features/game-intro/useDealIntro'
 import { useHandOrder } from '~/features/hand-order/useHandOrder'
 import { trace, tracing } from '~/shared/lib/debugTrace'
@@ -331,6 +331,11 @@ function BoardView({
   // still cursor and the preview blinks.
   const { slotProps: previewProps, overlay: previewOverlay } = useCardPreview({
     quiet: beats.running,
+  })
+  usePresentationAck({
+    presentation: playback?.presentation,
+    settled: beats.settled && (intro == null || introOver),
+    onReady: playback?.onPresented,
   })
   const entering = intro != null && !introOver
   const enter = entering ? opening.enter : undefined

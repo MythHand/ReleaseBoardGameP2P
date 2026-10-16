@@ -2,7 +2,7 @@ import type { Event } from '@release/engine'
 import type { CardData } from '@release/ui'
 import { cardById } from '@release/ui'
 import { scatterAt } from '@release/ui/animations'
-import { act, fireEvent, render } from '@testing-library/react'
+import { act, fireEvent, render, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import type { BoardAnchors, BoardState, IntroBeat, PlayerBoardState } from '~/entities/game/board'
 import { ELIM_DELAY } from './eliminateBeat'
@@ -401,10 +401,7 @@ it('runs a hand-limit discard and drains', async () => {
 
   // nextFrames + GATHER_HOLD (1500): by this point the registered runner has
   // built the grid and reached useDiscardExit, where the mock parks it.
-  await act(async () => {
-    await new Promise((r) => setTimeout(r, 1700))
-  })
-  expect(sent.calls).toHaveLength(1)
+  await waitFor(() => expect(sent.calls).toHaveLength(1), { timeout: 4000 })
 
   // Let the exit land. The queue must drain back to the arrived projection.
   sent.hang = false
