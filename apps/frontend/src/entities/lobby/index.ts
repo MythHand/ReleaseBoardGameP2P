@@ -5,6 +5,7 @@ export type {
   ErrorKind,
   JoinRole,
   PeerInfo,
+  ProfileRejection,
   ReconnectEvent,
   ReconnectState,
   Role,

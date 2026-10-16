@@ -95,6 +95,8 @@ function makeSession(over: Partial<UseLobby> = {}): UseLobby {
     startGame: vi.fn(),
     introReady: vi.fn(),
     transferHost: vi.fn(),
+    updateProfile: vi.fn(),
+    profileRejection: null,
     setSetup: vi.fn(),
     disband: vi.fn(),
     leaveSession: vi.fn(),

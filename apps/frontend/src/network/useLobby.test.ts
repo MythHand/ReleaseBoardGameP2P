@@ -5,6 +5,11 @@ import type { PrivateSeat } from '~/entities/game/seats'
 import { useGame } from '~/features/play-game/useGame'
 import type { ChatSystemEvent, UserChatEntry } from '~/shared/chat/types'
 import {
+  clearAvatarPreference,
+  readAvatarPreference,
+  writeAvatarPreference,
+} from '~/shared/lib/avatarPreference'
+import {
   clearChat,
   clearKeeper,
   clearSession,
@@ -131,6 +136,7 @@ beforeEach(() => {
   clearSession()
   clearKeeper()
   clearChat()
+  clearAvatarPreference()
 })
 
 function userChatEntry(input: Pick<UserChatEntry, 'id' | 'sequence' | 'text'>): UserChatEntry {
@@ -826,7 +832,9 @@ it('host startGame broadcasts GAME_STARTING and records the game id', async () =
   })
 
   const hostId = result.current.state?.hostId
-  const expectedSeats = [{ playerId: 'p1', peerId: hostId, name: 'Dimbo' }]
+  // The host's own avatar is frozen into its seat at the deal.
+  const avatar = result.current.state?.peers[hostId ?? ''].avatar
+  const expectedSeats = [{ playerId: 'p1', peerId: hostId, name: 'Dimbo', avatar }]
   expect(transports[0].broadcast).toHaveBeenCalledWith({
     type: 'GAME_STARTING',
     payload: {
@@ -1472,8 +1480,14 @@ it('drops an empty resume token without poisoning game start', async () => {
       result.current.startGame([])
     })
   }).not.toThrow()
+  const hostId = result.current.state?.hostId ?? ''
   expect(result.current.seats).toEqual([
-    { playerId: 'p1', peerId: result.current.state?.hostId, name: 'Dimbo' },
+    {
+      playerId: 'p1',
+      peerId: hostId,
+      name: 'Dimbo',
+      avatar: result.current.state?.peers[hostId].avatar,
+    },
   ])
 })
 
@@ -4955,4 +4969,189 @@ it('answers availability checks without admitting or announcing the visitor', as
   expect(result.current.chat.entries).toBe(entries)
   expect(transports[0].authenticate).not.toHaveBeenCalled()
   expect(transports[0].broadcast).not.toHaveBeenCalled()
+})
+
+it('opens the room under the remembered avatar', async () => {
+  writeAvatarPreference('attack-bug')
+  const { result } = renderHook(() => useLobby())
+  await act(async () => result.current.createRoom('Ann', 4))
+  const self = result.current.state?.selfId ?? ''
+  expect(result.current.state?.peers[self].avatar).toBe('attack-bug')
+})
+
+it('remembers the avatar a new host was dealt', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => result.current.createRoom('Ann', 4))
+  const self = result.current.state?.selfId ?? ''
+  expect(readAvatarPreference()).toBe(result.current.state?.peers[self].avatar)
+})
+
+it('a guest asks for its remembered avatar on join', async () => {
+  writeAvatarPreference('defense-hotfix')
+  const { result } = renderHook(() => useLobby())
+  await act(async () => result.current.joinRoom('ABC-23D', 'Bo'))
+  act(() => transports[0].onConnection?.('abc23d'))
+  expect(transports[0].send).toHaveBeenCalledWith(
+    'abc23d',
+    expect.objectContaining({
+      type: 'JOIN_REQUEST',
+      payload: expect.objectContaining({ avatar: 'defense-hotfix' }),
+    }),
+  )
+})
+
+it('refuses a join under a nickname already in the room', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => result.current.createRoom('Ann', 4))
+  act(() =>
+    transports[0].onMessage?.({
+      type: 'JOIN_REQUEST',
+      payload: { name: ' ANN ', resumeToken: 'client-b' },
+      from: 'peer-b',
+      seq: 1,
+    }),
+  )
+  expect(result.current.state?.peers['peer-b']).toBeUndefined()
+  expect(transports[0].disconnectPeer).toHaveBeenCalledWith('peer-b', {
+    type: 'JOIN_REJECTED',
+    payload: { reason: 'name-taken', availability: { player: true, spectator: true } },
+  })
+})
+
+it('does not name-check a returning seat', async () => {
+  const { result } = await hostWithGuest()
+  act(() => result.current.startGame([]))
+  act(() =>
+    transports[0].onMessage?.({
+      type: 'JOIN_REQUEST',
+      payload: { name: 'Bo', resumeToken: GUEST_RESUME_TOKEN },
+      from: 'peer-b-reloaded',
+      seq: 2,
+    }),
+  )
+  expect(result.current.state?.peers['peer-b-reloaded']?.name).toBe('Bo')
+})
+
+it('applies a guest rename, broadcasts the row and logs memberRenamed', async () => {
+  const { result } = await hostWithGuest()
+  transports[0].broadcast.mockClear()
+  act(() =>
+    transports[0].onMessage?.({
+      type: 'PROFILE_UPDATE',
+      payload: { name: 'Neo' },
+      from: GUEST,
+      seq: 5,
+    }),
+  )
+  expect(result.current.state?.peers[GUEST].name).toBe('Neo')
+  expect(transports[0].broadcast).toHaveBeenCalledWith({
+    type: 'PEER_JOINED',
+    payload: result.current.state?.peers[GUEST],
+  })
+  expect(systemEvents(result.current).at(-1)).toMatchObject({
+    kind: 'memberRenamed',
+    from: 'Bo',
+    to: 'Neo',
+  })
+})
+
+it('answers a taken nickname to the sender alone', async () => {
+  const { result } = await hostWithGuest()
+  act(() =>
+    transports[0].onMessage?.({
+      type: 'PROFILE_UPDATE',
+      payload: { name: 'dimbo' },
+      from: GUEST,
+      seq: 5,
+    }),
+  )
+  expect(result.current.state?.peers[GUEST].name).toBe('Bo')
+  expect(transports[0].send).toHaveBeenCalledWith(GUEST, {
+    type: 'PROFILE_REJECTED',
+    payload: { reason: 'name-taken' },
+  })
+})
+
+it('the host edits its own profile without the network', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => result.current.createRoom('Ann', 4))
+  act(() => result.current.updateProfile({ name: 'Anna', avatar: 'ai-inside' }))
+  const self = result.current.state?.selfId ?? ''
+  expect(result.current.state?.peers[self]).toMatchObject({ name: 'Anna', avatar: 'ai-inside' })
+  expect(readSession()?.name).toBe('Anna')
+  expect(readAvatarPreference()).toBe('ai-inside')
+})
+
+it('a host rejection of its own edit surfaces as profileRejection', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => result.current.createRoom('Ann', 4))
+  act(() => result.current.updateProfile({ name: '   ' }))
+  expect(result.current.profileRejection).toEqual({ reason: 'name-invalid', seq: 1 })
+  act(() => result.current.updateProfile({ name: '   ' }))
+  expect(result.current.profileRejection).toEqual({ reason: 'name-invalid', seq: 2 })
+})
+
+it('a guest sends its edit to the host and applies the confirmed row', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => result.current.joinRoom('ABC-23D', 'Bo'))
+  act(() => acceptGuest(transports[0], 'abc23d'))
+  act(() => result.current.updateProfile({ avatar: 'attack-bug' }))
+  expect(transports[0].send).toHaveBeenCalledWith('abc23d', {
+    type: 'PROFILE_UPDATE',
+    payload: { avatar: 'attack-bug' },
+  })
+  act(() =>
+    transports[0].onMessage?.({
+      type: 'PEER_JOINED',
+      from: 'abc23d',
+      seq: 2,
+      payload: {
+        id: transports[0].id,
+        memberId: transports[0].id,
+        name: 'Neo',
+        role: 'player',
+        ready: false,
+        where: 'lobby',
+        avatar: 'attack-bug',
+      },
+    }),
+  )
+  // writes the confirmed nickname to the stored session
+  expect(readSession()?.name).toBe('Neo')
+  expect(readAvatarPreference()).toBe('attack-bug')
+})
+
+it('a guest records a host rejection', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => result.current.joinRoom('ABC-23D', 'Bo'))
+  act(() => acceptGuest(transports[0], 'abc23d'))
+  act(() =>
+    transports[0].onMessage?.({
+      type: 'PROFILE_REJECTED',
+      from: 'abc23d',
+      seq: 3,
+      payload: { reason: 'avatar-taken' },
+    }),
+  )
+  expect(result.current.profileRejection).toEqual({ reason: 'avatar-taken', seq: 1 })
+})
+
+it('treats name-taken as terminal', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => result.current.joinRoom('ABC-23D', 'Bo'))
+  const dial = transports[0]
+  act(() => {
+    dial.onConnection?.('abc23d')
+    dial.onMessage?.({
+      type: 'JOIN_REJECTED',
+      from: 'abc23d',
+      seq: 1,
+      payload: { reason: 'name-taken', availability: { player: true, spectator: true } },
+    })
+    dial.onDisconnect?.('abc23d')
+    dial.onConnection?.('abc23d')
+  })
+  expect(result.current.status).toBe('error')
+  expect(result.current.errorKind).toBe('name-taken')
+  expect(transports).toHaveLength(1)
 })

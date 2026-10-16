@@ -17,6 +17,7 @@ import {
   seatsFor,
 } from '~/entities/game/seats'
 import type { ChatEntry, ChatRole } from '~/shared/chat/types'
+import { readAvatarPreference, writeAvatarPreference } from '~/shared/lib/avatarPreference'
 import {
   clearKeeper,
   clearLog,
@@ -53,6 +54,7 @@ import {
   setParticipantRole as setParticipantRoleFn,
   transferHost as transferHostFn,
 } from './lobby/host'
+import { firstAvatar, handleProfileUpdate, nameTaken, parseProfilePatch } from './lobby/profile'
 import {
   applyConfig,
   applyPeerJoined,
@@ -83,6 +85,8 @@ import type {
   JoinRequestPayload,
   JoinRole,
   PeerInfo,
+  ProfilePatch,
+  ProfileRejectReason,
   Seat,
   Setup,
   Where,
@@ -174,7 +178,14 @@ export type LobbyStatus = 'idle' | 'connecting' | 'in-lobby' | 'kicked' | 'disba
 // copy instead of the raw English PeerJS string. 'not-found' is specifically
 // "no host answers to this code" (PeerJS `peer-unavailable`); everything else
 // is a connection problem.
-export type ErrorKind = 'not-found' | 'connection' | 'room-full' | null
+export type ErrorKind = 'not-found' | 'connection' | 'room-full' | 'name-taken' | null
+
+// The host refused this peer's own profile edit. `seq` grows with every
+// refusal, so a consumer's effect fires again on a repeat of the same reason.
+export interface ProfileRejection {
+  reason: ProfileRejectReason
+  seq: number
+}
 
 function classify(type?: string): Exclude<ErrorKind, null> {
   return type === 'peer-unavailable' ? 'not-found' : 'connection'
@@ -495,6 +506,11 @@ export interface UseLobby {
   // far as it fits — see `effectiveBots`.
   setBots(n: number): void
   transferHost(id: string): void
+  // Edit my own nickname and/or avatar. The host applies its own directly; a
+  // guest asks and learns the outcome from the PEER_JOINED or PROFILE_REJECTED
+  // that comes back.
+  updateProfile(patch: ProfilePatch): void
+  profileRejection: ProfileRejection | null
   setSetup(setup: Setup): void
   // `botNames` is display copy, so it arrives from the features layer rather
   // than being built here: `network/` may not import i18next.
@@ -550,6 +566,19 @@ export function useLobby(): UseLobby {
   const [errorKind, setErrorKind] = useState<ErrorKind>(null)
   const [joinAvailability, setJoinAvailability] = useState<JoinAvailability | null>(null)
   const [lobbyActionError, setLobbyActionError] = useState<LobbyActionError | null>(null)
+  const [profileRejection, setProfileRejection] = useState<ProfileRejection | null>(null)
+  const rejectProfile = useCallback((reason: ProfileRejectReason) => {
+    setProfileRejection((prev) => ({ reason, seq: (prev?.seq ?? 0) + 1 }))
+  }, [])
+
+  // What this browser keeps of its own row once the host has confirmed it: the
+  // avatar as next join's wish, and the nickname in the session — the host
+  // refuses a reconnect whose name differs from the one it remembers.
+  const rememberOwnProfile = useCallback((peer: PeerInfo) => {
+    if (peer.avatar) writeAvatarPreference(peer.avatar)
+    const stored = readSession()
+    if (stored && stored.name !== peer.name) writeSession({ ...stored, name: peer.name })
+  }, [])
   const [gameId, setGameId] = useState<string | null>(null)
   const [gameLink, setGameLink] = useState<GameLink | null>(null)
   const [gameSync, setGameSync] = useState<SyncSnapshot | null>(null)
@@ -887,6 +916,36 @@ export function useLobby(): UseLobby {
     [dispatch],
   )
 
+  // The host's half of a profile edit, its own or a guest's. A refusal goes back
+  // to whoever asked — locally for the host, as PROFILE_REJECTED for a guest.
+  const applyProfile = useCallback(
+    (fromId: string, patch: ProfilePatch) => {
+      const current = stateRef.current
+      if (!current) return
+      const r = handleProfileUpdate(current, fromId, patch, Boolean(gameIdRef.current))
+      if (r.error) {
+        if (fromId === current.selfId) rejectProfile(r.error)
+        else dispatch(r.outgoing)
+        return
+      }
+      if (r.state === current) return
+      commit(r.state)
+      dispatch(r.outgoing)
+      const peer = r.state.peers[fromId]
+      if (fromId === current.selfId) rememberOwnProfile(peer)
+      if (r.renamed)
+        broadcastChatEntries([
+          chatSession.appendSystem({
+            kind: 'memberRenamed',
+            memberId: peer.memberId,
+            from: r.renamed.from,
+            to: r.renamed.to,
+          }),
+        ])
+    },
+    [broadcastChatEntries, chatSession, commit, dispatch, rejectProfile, rememberOwnProfile],
+  )
+
   // A peer (or the host) dropping its DataChannel must update the roster, or the
   // lobby keeps counting a ghost player toward canStart()/turn rotation.
   // `onDisconnect` is defined above `runGuestReconnect` and has to reach it, so
@@ -1014,12 +1073,28 @@ export function useLobby(): UseLobby {
             returningSeat: privateSeat?.seat,
             returningLobbyPeer: replacedLobbyPeer,
             requestedRole: payload.requestedRole,
+            avatar: payload.avatar,
           }
           const decision = resolveJoinAdmission(joinState, msg.from, options)
           if (!decision.accepted) {
             void transportRef.current?.disconnectPeer(msg.from, {
               type: 'JOIN_REJECTED',
               payload: { reason: decision.reason, availability: decision.availability },
+            })
+            return
+          }
+          // A returning seat keeps the name its match was dealt under, and its
+          // stale peer may still be in the roster under that very name.
+          if (
+            !privateSeat &&
+            nameTaken(joinState, payload.name, [msg.from, ...(priorId ? [priorId] : [])])
+          ) {
+            void transportRef.current?.disconnectPeer(msg.from, {
+              type: 'JOIN_REJECTED',
+              payload: {
+                reason: 'name-taken',
+                availability: getJoinAvailability(joinState, msg.from, options),
+              },
             })
             return
           }
@@ -1174,6 +1249,9 @@ export function useLobby(): UseLobby {
           const r = handleReady(current, msg.from)
           commit(r.state)
           dispatch(r.outgoing)
+        } else if (msg.type === 'PROFILE_UPDATE') {
+          const patch = parseProfilePatch((msg as { payload?: unknown }).payload)
+          if (patch) applyProfile(msg.from, patch)
         } else if (msg.type === 'WHEREABOUTS') {
           if (!['lobby', 'game', 'stats'].includes(msg.payload?.where)) return
           if (msg.payload.where === 'lobby' && current.peers[msg.from]?.role === 'guest')
@@ -1261,9 +1339,14 @@ export function useLobby(): UseLobby {
                 participantRole: peer.role === 'guest' ? 'spectator' : 'player',
                 where: peer.where,
               })
+            // After the write above: it re-reads the session, so both land.
+            rememberOwnProfile(peer)
           }
           break
         }
+        case 'PROFILE_REJECTED':
+          if (fromHost) rejectProfile(msg.payload.reason)
+          break
         case 'LOBBY_CONFIG_UPDATED':
           if (fromHost) commit(applyConfig(current, msg.payload))
           break
@@ -1357,6 +1440,9 @@ export function useLobby(): UseLobby {
       captureGameSync,
       voiceRuntime,
       refreshVoice,
+      applyProfile,
+      rejectProfile,
+      rememberOwnProfile,
     ],
   )
 
@@ -1402,6 +1488,8 @@ export function useLobby(): UseLobby {
         const hostMemberId = chatSession.startHost(nextRoomCode, hostResumeToken)
         resumeTokensRef.current = new Map([[t.id, hostResumeToken]])
         privateSeatsRef.current = []
+        const hostAvatar = firstAvatar(readAvatarPreference())
+        writeAvatarPreference(hostAvatar)
         const initial = createLobbyState({
           selfId: t.id,
           hostId: t.id,
@@ -1415,6 +1503,7 @@ export function useLobby(): UseLobby {
               role: 'host',
               ready: true,
               where: 'lobby',
+              avatar: hostAvatar,
             },
           ],
         })
@@ -1489,7 +1578,7 @@ export function useLobby(): UseLobby {
             if (
               msg.from === hostId &&
               msg.type === 'JOIN_REJECTED' &&
-              msg.payload?.reason === 'room-full'
+              (msg.payload?.reason === 'room-full' || msg.payload?.reason === 'name-taken')
             ) {
               voiceRuntime.updateRoom(null)
               voiceIdentityRef.current = null
@@ -1502,11 +1591,11 @@ export function useLobby(): UseLobby {
                 stateRef.current = null
                 setState(null)
               }
-              setError('room-full')
-              setErrorKind('room-full')
+              setError(msg.payload.reason)
+              setErrorKind(msg.payload.reason)
               setJoinAvailability(msg.payload.availability)
               setStatus('error')
-              onDialOutcome?.({ ok: false, error: { type: 'room-full' } })
+              onDialOutcome?.({ ok: false, error: { type: msg.payload.reason } })
               return
             }
             if (msg.type === 'PEER_LIST') {
@@ -1545,6 +1634,7 @@ export function useLobby(): UseLobby {
             // may not be open after a single macrotask. Admission remains pending
             // until the host confirms this participant in PEER_LIST.
             if (peerId === hostId) {
+              const wish = readAvatarPreference()
               owner?.send(hostId, {
                 type: 'JOIN_REQUEST',
                 payload: {
@@ -1552,6 +1642,7 @@ export function useLobby(): UseLobby {
                   resumeToken: getResumeToken(nextRoomCode),
                   requestedRole,
                   ...(resume ? { resume } : {}),
+                  ...(wish ? { avatar: wish } : {}),
                 },
               })
             }
@@ -1754,6 +1845,7 @@ export function useLobby(): UseLobby {
               // Readiness is not persisted; restoring a room must not approve a rematch.
               ready: false,
               where: 'lobby',
+              avatar: firstAvatar(readAvatarPreference()),
             },
           ],
         })
@@ -1833,6 +1925,7 @@ export function useLobby(): UseLobby {
               role: 'host',
               ready: true,
               where: 'game',
+              avatar: firstAvatar(readAvatarPreference()),
             },
           ],
         }),
@@ -1930,7 +2023,8 @@ export function useLobby(): UseLobby {
         alreadySettled = true
         if (outcome.ok) resolveAttempt?.()
         else {
-          terminal = (outcome.error as { type?: string })?.type === 'room-full'
+          const type = (outcome.error as { type?: string })?.type
+          terminal = type === 'room-full' || type === 'name-taken'
           rejectAttempt?.(outcome.error)
         }
       }
@@ -2225,6 +2319,17 @@ export function useLobby(): UseLobby {
       dispatch(r.outgoing)
     },
     [dispatch],
+  )
+
+  const updateProfile = useCallback(
+    (patch: ProfilePatch) => {
+      const current = stateRef.current
+      const t = transportRef.current
+      if (!current || !t) return
+      if (isHostRef.current) applyProfile(current.selfId, patch)
+      else t.send(current.hostId, { type: 'PROFILE_UPDATE', payload: patch })
+    },
+    [applyProfile],
   )
 
   // Tear the session down: close the PeerJS transport and reset to idle. Without
@@ -2589,6 +2694,8 @@ export function useLobby(): UseLobby {
       setParticipantRole,
       setBots,
       transferHost,
+      updateProfile,
+      profileRejection,
       setSetup,
       startGame,
       introReady,
@@ -2632,6 +2739,8 @@ export function useLobby(): UseLobby {
       setParticipantRole,
       setBots,
       transferHost,
+      updateProfile,
+      profileRejection,
       setSetup,
       startGame,
       introReady,

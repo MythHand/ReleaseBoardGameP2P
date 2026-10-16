@@ -18,6 +18,8 @@ vi.mock('~/network', () => ({
     kick: vi.fn(),
     setMaxPlayers: vi.fn(),
     transferHost: vi.fn(),
+    updateProfile: vi.fn(),
+    profileRejection: null,
   }),
 }))
 

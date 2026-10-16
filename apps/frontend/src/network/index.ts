@@ -2,11 +2,22 @@ export { checkRoom } from './lobby/checkRoom'
 export { MAX_BOTS } from './lobby/host'
 export { effectiveBots, type LobbyState } from './lobby/state'
 export { MAX_RECONNECT_ATTEMPTS, type ReconnectEvent } from './session/reconnect'
-export type { Intent, JoinAvailability, JoinRole, PeerInfo, Role, Seat, Where } from './types'
+export type {
+  Intent,
+  JoinAvailability,
+  JoinRole,
+  PeerInfo,
+  ProfilePatch,
+  ProfileRejectReason,
+  Role,
+  Seat,
+  Where,
+} from './types'
 export {
   type ErrorKind,
   formatRoomCode,
   type LobbyStatus,
+  type ProfileRejection,
   parseRoomCode,
   type ReconnectState,
   type UseLobby,
