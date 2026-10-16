@@ -1576,8 +1576,8 @@ const ISSUES: Issue[] = [
       en: 'Bots outrun the animations and the displayed turn clock',
     },
     problem: {
-      ru: 'PR #142: бот принимает решение каждые 250 мс, а доска проигрывает события последовательно, по 1–4 с. Ход человека может начаться и частично истечь, пока доска ещё показывает ботов. Объединение SYNC сохраняет события, но не решает темп. Нужно отдельно ограничить действия ботов или согласовать готовность доски; общий тикер также обслуживает дедлайны и ожидание отключённых игроков.',
-      en: 'PR #142: bots act every 250ms while board beats take roughly 1–4s each. A human turn can start and partly expire while the board still shows bots. Combining SYNC events prevents event loss but does not solve pacing. Pace bot actions separately or coordinate board readiness; the shared ticker also owns deadlines and disconnected-seat grace.',
+      ru: '#226: реализованы минимум 2 с между действиями ботов, подтверждения завершения показа от подключённых игроков и предел ожидания 12 с. Новые часы решения запускаются после показа; общий тикер остаётся 250 мс. Автопроверки и независимое ревью пройдены. Реальная non-host WebRTC-приёмка пока не подтверждена: локальный DataChannel остаётся connecting, ICE checking, STUN/TURN DNS 701. Открыто до браузерной проверки; docs/verification/2026-10-16-issue-226.md.',
+      en: '#226 implements a 2s minimum between bot actions, presentation acknowledgements from connected players, and a 12s wait cap. New decision clocks start after presentation; the shared ticker stays at 250ms. Automated checks and independent review passed. Real non-host WebRTC acceptance remains unverified: local DataChannel connecting, ICE checking, STUN/TURN DNS 701. Open until browser acceptance; docs/verification/2026-10-16-issue-226.md.',
     },
     where: {
       ru: 'network/session/referee.ts + remoteLink.ts; features/board-beats/useBeats.ts',

@@ -4,7 +4,9 @@ Date: 2026-10-15
 
 Issue: https://github.com/MythHand/ReleaseBoardGameP2P/issues/226
 
-Status: written specification approved by the owner; implementation plan awaiting review.
+Status: specification and plan approved; implementation and automated checks complete.
+Real non-host WebRTC acceptance remains unverified; see
+[verification evidence](../verification/2026-10-16-issue-226.md).
 
 ## Intent and success criteria
 
