@@ -3,6 +3,7 @@ import { VoiceChat, type VoiceChatCopy, VoicePanel } from '@release/ui'
 import type { ComponentProps } from 'react'
 import { useSession } from '~/app/providers/SessionProvider'
 import { toVoiceParticipants } from './model'
+import { useSpeaking } from './useSpeaking'
 
 export type RoomVoiceView = ComponentProps<typeof VoiceChat>
 export function useRoomVoiceView(): RoomVoiceView {
@@ -24,7 +25,8 @@ export function useRoomVoiceView(): RoomVoiceView {
     micMuted: t('voiceChat.micMuted'),
     close: t('voiceChat.close'),
   }
-  const participants = toVoiceParticipants(voice, session.state?.peers ?? {})
+  const speaking = useSpeaking()
+  const participants = toVoiceParticipants(voice, session.state?.peers ?? {}, speaking)
   const names = participants
     .filter((p) => voice.unreachableMemberIds.includes(p.id))
     .map((p) => p.name)
