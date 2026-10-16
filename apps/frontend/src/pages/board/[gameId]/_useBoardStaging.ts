@@ -930,9 +930,12 @@ export function useBoardStaging({
       if (costOptions.length > 0 && !costGone)
         return costOptions.includes(item.uid) ? 'playable' : 'idle'
       if (costOptions.length > 0) return 'idle'
+      // DDoS blocks replaying this release, but it may still pay a cost
+      // when the engine offers it above.
+      if (state.frozen.includes(item.uid)) return 'disabled'
       return accentAt(index) ? 'selected' : 'idle'
     },
-    [enabled, handItems, costOptions, costGone, accentAt],
+    [enabled, handItems, costOptions, costGone, accentAt, state.frozen],
   )
 
   // STAGING A RELEASE — the one play that stands at the STAGE slot rather than
