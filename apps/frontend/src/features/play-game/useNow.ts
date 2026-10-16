@@ -1,17 +1,18 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
+import type { GameClock } from '~/network/session/clock'
 
-// The consumer's clock for the kit's countdown. It ticks only while something
-// is actually counting down: `deriveDock` reads `now` for deadline arithmetic
-// and nothing else, so a stale value between windows is never observed.
-export function useNow(active: boolean, intervalMs = 250): number {
-  const [now, setNow] = useState(() => Date.now())
+const subscribeNone = () => () => {}
+const uncalibrated = () => 0
 
+// Calibration belongs to the link, so it survives Board remounts. Read time
+// on render as well as ticks: a new deadline cannot paint with stale time.
+export function useNow(active: boolean, clock: GameClock | null, intervalMs = 250): number | null {
+  useSyncExternalStore(clock?.subscribe ?? subscribeNone, clock?.getSnapshot ?? uncalibrated)
+  const [, tick] = useState(0)
   useEffect(() => {
     if (!active) return
-    setNow(Date.now())
-    const id = setInterval(() => setNow(Date.now()), intervalMs)
+    const id = setInterval(() => tick((value) => value + 1), intervalMs)
     return () => clearInterval(id)
   }, [active, intervalMs])
-
-  return now
+  return clock?.now() ?? null
 }

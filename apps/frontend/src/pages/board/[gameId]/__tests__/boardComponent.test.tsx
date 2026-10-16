@@ -439,3 +439,43 @@ it('lays the history panel out to fill the drawer, so its own list can scroll', 
   fireEvent.click(getByRole('button', { name: props.copy.table.tabHistory }))
   expect(getByTestId('panel-history').className).toContain(kit.panelFill)
 })
+
+it.each([
+  'turn',
+  'window',
+  'pending',
+] as const)('keeps a live %s numberless until calibrated, with its action enabled', (phase) => {
+  const base = makeBoardProps()
+  const state = {
+    ...base.state,
+    turn: base.state.selfId,
+    turnClock: { openedAt: 1000, deadline: 31000 },
+  }
+  if (phase === 'window')
+    state.window = {
+      player: 'p2',
+      slot: 'frontend',
+      round: 1,
+      openedAt: 1000,
+      deadline: 16000,
+      passed: [],
+      canAttackWith: [base.state.you.hand[0]?.uid ?? 'x'],
+    }
+  if (phase === 'pending')
+    state.pending = {
+      kind: 'defend',
+      player: state.selfId,
+      attacker: 'p2',
+      attackCard: 'attack-bug',
+      sudo: false,
+      options: [],
+      openedAt: 1000,
+      deadline: 16000,
+      scope: 'hand',
+    }
+  const { rerender } = render(<Board {...base} state={state} now={0} countdownReady={false} />)
+  expect(screen.queryByTestId('ring-value')).toBeNull()
+  expect((screen.getByTestId('dock-key') as HTMLButtonElement).disabled).toBe(false)
+  rerender(<Board {...base} state={state} now={6000} countdownReady />)
+  expect(screen.getByTestId('ring-value').textContent).toBe(phase === 'turn' ? '25' : '10')
+})

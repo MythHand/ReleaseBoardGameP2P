@@ -18,6 +18,7 @@ import { createRoot } from 'react-dom/client'
 import { toBoardOver, toBoardState } from '~/entities/game/board'
 import { useNow } from '~/features/play-game/useNow'
 import { forViewer, rejectionsIn } from '~/network/session/audience'
+import { createAuthorityClock } from '~/network/session/clock'
 import Board from '~/pages/board/[gameId]/_Board'
 import { useDebugCopy } from './copy'
 import { type Recorder, useRecorder } from './recorder'
@@ -136,16 +137,19 @@ function ScenarioRun({
   // the last seeded event: everything at or below it is the starting table
   const [seeded] = useState(() => run.events.at(-1)?.id ?? 0)
   const [ready, setReady] = useState(false)
-  const now = useNow(ready)
+  const [clock] = useState(() =>
+    createAuthorityClock({ epochNow: () => Date.now(), monotonicNow: () => performance.now() }),
+  )
+  const now = useNow(ready, clock) ?? clock.now()
   const send = useCallback(
     (intent: Intent) => {
-      const action: Action = { ...intent, at: Date.now() }
+      const action: Action = { ...intent, at: clock.now() }
       const next = reduceRun(runRef.current, action)
       runRef.current = next
       note('action', { action, events: next.last?.events, table: tableOf(next.state) })
       setRun(next)
     },
-    [note],
+    [clock, note],
   )
   const onIntroDone = useCallback(() => {
     setReady(true)

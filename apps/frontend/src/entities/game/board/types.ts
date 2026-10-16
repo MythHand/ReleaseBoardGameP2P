@@ -415,6 +415,7 @@ export interface BoardProps {
   // default, which is the shape that hid the missing `pending` and `window`
   // copy — a page that built cleanly and showed a dead ring.
   now: number
+  countdownReady?: boolean
   // Controlled/uncontrolled: omit both and Table owns the open panel. Supply
   // `panel` and Table renders exactly what it is told, reporting intent through
   // `onPanelChange` — which is how the page binds the drawer to the URL.
