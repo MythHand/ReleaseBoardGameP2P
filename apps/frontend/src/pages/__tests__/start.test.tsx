@@ -48,6 +48,10 @@ it('credits the authors, each name a link to their GitHub', () => {
   )
   expect(screen.getByText('start.authorDesign')).toBeTruthy()
   expect(screen.getByText('start.authorDev')).toBeTruthy()
+  // the version under them: the root package.json's, as the build puts it in
+  expect(screen.getByText('start.version')).toBeTruthy()
+  expect(import.meta.env.VITE_APP_VERSION).toMatch(/^\d+\.\d+\.\d+/)
+  expect(screen.getByText(import.meta.env.VITE_APP_VERSION ?? '')).toBeTruthy()
   const links = screen.getAllByRole('link').map((a) => a.getAttribute('href'))
   expect(links).toEqual(
     expect.arrayContaining([

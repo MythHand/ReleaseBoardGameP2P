@@ -29,6 +29,7 @@
     "randomNick": "случайный ник",
     "authorDesign": "Game & Design:",
     "authorDev": "Development:",
+    "version": "Version:",
     "required": "Обязательное поле"
   },
   "invite": {

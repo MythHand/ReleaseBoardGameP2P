@@ -33,6 +33,7 @@ const COPY: Record<'ru' | 'en', StartCopy> = {
     rulesTitle: 'Правила',
     authorDesign: 'Game & Design:',
     authorDev: 'Development:',
+    version: 'Version:',
     modes: ruCommon.gameModes,
   },
   en: {
@@ -63,6 +64,7 @@ const COPY: Record<'ru' | 'en', StartCopy> = {
     rulesTitle: 'Rules',
     authorDesign: 'Game & Design:',
     authorDev: 'Development:',
+    version: 'Version:',
     modes: enCommon.gameModes,
   },
 }
@@ -73,6 +75,8 @@ export default function StartStory() {
     <div className={styles.root}>
       <Start
         copy={pick(lang, COPY)}
+        // the root package.json's, put in by vite.config.ts — the same as the app's
+        version={import.meta.env.VITE_APP_VERSION}
         physicalEditionCopy={pick(lang, {
           ru: ruCommon.physicalEdition,
           en: enCommon.physicalEdition,

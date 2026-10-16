@@ -15,6 +15,11 @@
   opacity: 0.4;
 }
 
+/* the version — the names' colour, but it is not a link */
+.value {
+  color: var(--white-72);
+}
+
 .link {
   color: var(--white-72);
   text-decoration: none;

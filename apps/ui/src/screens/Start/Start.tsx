@@ -53,6 +53,8 @@ export interface StartCopy {
   // подписи авторства в левом нижнем углу
   authorDesign: string
   authorDev: string
+  // подпись строки версии под авторством
+  version?: string
   // текст режимов партии (заголовки + описания опций)
   modes: GameModesCopy
 }
@@ -72,10 +74,13 @@ interface StartProps {
   // Каталоги экран не держит (i18n-agnostic) — copy свапает консьюмер.
   lang?: SwitchLang
   onLangChange?: (lang: SwitchLang) => void
+  // версия игры — её знает сборка консьюмера, не кит
+  version?: string
 }
 
 export default function Start({
   copy,
+  version,
   physicalEditionCopy,
   onCreate,
   onJoin,
@@ -172,7 +177,12 @@ export default function Start({
 
       {/* авторство — левый нижний угол экрана; имена ведут на профили GitHub */}
       <Credits
-        copy={{ authorDesign: copy.authorDesign, authorDev: copy.authorDev }}
+        copy={{
+          authorDesign: copy.authorDesign,
+          authorDev: copy.authorDev,
+          version: copy.version,
+        }}
+        version={version}
         className={styles.credits}
       />
 

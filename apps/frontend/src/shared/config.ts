@@ -18,6 +18,10 @@ export const BASE_URL = import.meta.env.BASE_URL
 // (e.g. surfacing raw error detail) behind this.
 export const IS_DEV = import.meta.env.DEV
 
+// The game's version — the root package.json at build time (vite.config.ts),
+// which a release bumps before deploying. Shown on the start page.
+export const APP_VERSION = import.meta.env.VITE_APP_VERSION
+
 // ─── P2P signaling (PeerServer) ─────────────────────────────────────────────
 
 // Custom PeerJS signaling broker (a hosted/self-hosted PeerServer). When unset,

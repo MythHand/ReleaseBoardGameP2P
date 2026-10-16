@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { fileURLToPath, URL } from 'node:url'
 import generouted from '@generouted/react-router/plugin'
@@ -12,6 +13,13 @@ const translationSrc = fileURLToPath(
   new URL('../../packages/translation/src/index.ts', import.meta.url),
 )
 const debugLogs = fileURLToPath(new URL('./debug/logs', import.meta.url))
+
+// The game's version: the root package.json, which a release bumps before the
+// deploy builds from its tag (.github/workflows/release.yml), so a deployed
+// build always shows the version it was released as. Read in shared/config.ts.
+const { version } = JSON.parse(
+  readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
+) as { version: string }
 
 // THE DEBUG STAND'S RECORDINGS land in the project, not in the browser's
 // downloads (#168): a recording is there to be read by whoever is working on the
@@ -47,6 +55,7 @@ function debugLogSink(): Plugin {
 
 export default defineConfig({
   base: process.env.VITE_BASE_URL ?? '/',
+  define: { 'import.meta.env.VITE_APP_VERSION': JSON.stringify(version) },
   plugins: [
     debugLogSink(),
     react(),

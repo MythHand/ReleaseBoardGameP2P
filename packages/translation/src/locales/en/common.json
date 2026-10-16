@@ -29,6 +29,7 @@
     "randomNick": "random name",
     "authorDesign": "Game & Design:",
     "authorDev": "Development:",
+    "version": "Version:",
     "required": "Required"
   },
   "invite": {

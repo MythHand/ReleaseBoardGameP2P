@@ -7,6 +7,9 @@
 // The authoritative description of each lives next to its constant
 // (network/config.ts, shared/config.ts); keep this to types only.
 interface ImportMetaEnv {
+  // --- Build ---
+  // Not an env var: vite.config.ts puts the root package.json's version here.
+  readonly VITE_APP_VERSION?: string
   // --- P2P signaling (PeerServer) ---
   readonly VITE_PEER_HOST?: string
   readonly VITE_PEER_PORT?: string
