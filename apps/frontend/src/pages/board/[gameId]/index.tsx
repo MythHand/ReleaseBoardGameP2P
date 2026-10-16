@@ -106,7 +106,7 @@ export default function BoardPage() {
   // asked from the same predicate the ring is derived from. Restating that rule
   // here would let the two drift, and the countdown would freeze for whichever
   // state they stopped agreeing about.
-  const now = useNow(state ? isCounting(state, state.selfId) : false)
+  const now = useNow(state ? isCounting(state, state.selfId) : false, game.clock)
   const notificationEntryIds = new Set(chat.notificationEntryIds)
   const toastItems = chat.messages
     .filter((message) =>
@@ -155,7 +155,8 @@ export default function BoardPage() {
       <Board
         state={state}
         over={over}
-        now={now}
+        now={now ?? 0}
+        countdownReady={now !== null}
         panel={panel}
         onPanelChange={setPanel}
         playback={{ events: game.events, restoredThrough: game.restoredThrough }}

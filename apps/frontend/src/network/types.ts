@@ -149,7 +149,21 @@ export type Message =
   // visible log, handed to a peer that rejoined. It is folded into history and
   // the discard heap, and it is NOT animated: a reconnect drops straight to the
   // live board, exactly as `isOpening` already says it must.
-  | { type: 'SYNC'; payload: { view: GameView; events: Event[]; resync?: boolean } }
+  | {
+      type: 'SYNC'
+      payload: {
+        view: GameView
+        events: Event[]
+        resync?: boolean
+        gameId?: string
+        keeperNow?: number
+      }
+    }
+  | { type: 'CLOCK_REQUEST'; payload: { gameId: string; requestId: number } }
+  | {
+      type: 'CLOCK_RESPONSE'
+      payload: { gameId: string; requestId: number; receivedAt: number; sentAt: number }
+    }
   // The only message carrying GameState, and only to a handover successor.
   | { type: 'KEEPER_STATE'; payload: { state: GameState } }
   // null is the death notice: the keeper is gone and the game cannot continue.

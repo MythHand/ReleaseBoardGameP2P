@@ -77,6 +77,7 @@ function botGame(botCount: number) {
     ref,
     transport: fakeTransport(),
     now: () => clock.at,
+    monotonicNow: () => clock.at,
     ticker,
     gate,
   })

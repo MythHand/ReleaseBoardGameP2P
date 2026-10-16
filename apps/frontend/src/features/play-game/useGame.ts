@@ -2,10 +2,12 @@ import type { Choice, Event, GameView, Target } from '@release/engine'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSession } from '~/app/providers/SessionProvider'
 import type { Intent } from '~/network'
+import type { GameClock } from '~/network/session/clock'
 import { clearLog, readLog, writeLog } from '~/shared/lib/persistence'
 import { mergeEvents } from './mergeEvents'
 
 export interface Game {
+  clock: GameClock | null
   // Null until the first private or public projection arrives.
   view: GameView | null
   events: Event[]
@@ -175,6 +177,7 @@ export function useGame(): Game {
   )
 
   return {
+    clock: link?.clock ?? null,
     view: sync?.view ?? null,
     events: pending.length > 0 ? mergeEvents(carried, pending) : carried,
     restoredThrough: restoredNow,

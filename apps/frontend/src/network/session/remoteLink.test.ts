@@ -14,6 +14,7 @@ function keeperWith(
   opts: {
     gate?: StartGate
     ticker?: Ticker
+    monotonicNow?: () => number
     now?: () => number
     players?: { playerId: PlayerId; peerId: string | null; name: string }[]
   } = {},
@@ -39,6 +40,7 @@ function keeperWith(
     ref,
     transport: net.transport('peer-a'),
     now: opts.now ?? (() => (clock += 100)),
+    monotonicNow: opts.monotonicNow ?? opts.now ?? (() => clock),
     ticker: opts.ticker ?? { start: () => {}, stop: () => {} },
     gate: opts.gate,
   })
@@ -282,23 +284,19 @@ it('releases buffered intents in arrival order', () => {
 
 it('stamps a buffered intent with the clock at release, not at arrival', () => {
   const gate = createStartGate({ expect: ['a'], schedule: noCap })
-  const reads: number[] = []
   let clock = 1_000
   const { keeper, ref } = keeperWith({
     gate,
-    now: () => {
-      reads.push(clock)
-      return clock
-    },
+    now: () => clock,
+    monotonicNow: () => clock,
   })
   keeper.link.submit({ type: 'DRAW' })
-  // The game begins when the gate opens, so the clock is not read at all while
-  // the intent sits in the buffer.
-  expect(reads).toEqual([])
+  // Anchoring the authority clock must not apply a buffered intent early.
+  expect(ref.current.state.turn.drawnFrom).toEqual([])
 
   clock = 9_000
   keeper.introReady('peer-a')
-  expect(reads).toEqual([9_000])
+  expect(ref.current.state.turn.openedAt).toBe(9_000)
   // And the buffered DRAW really was applied on release, not dropped.
   expect(ref.current.state.turn.drawnFrom.length).toBeGreaterThan(0)
 })

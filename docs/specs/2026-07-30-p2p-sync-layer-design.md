@@ -133,14 +133,16 @@ The keeper never trusts what a frame claims about itself:
 - **`action.player` is overwritten** with the `PlayerId` bound to the connection the
   frame arrived on. A peer cannot act as another seat.
 - **`at` is stamped by the keeper**, so a peer cannot lie about time and every rules
-  decision reads one clock. Display is a separate question: `WindowView.deadline` and
-  `PendingView.deadline` are absolute keeper-epoch milliseconds and they ship inside
-  every `SYNC`, so a peer that renders `deadline - Date.now()` is off by the two
-  machines' clock skew — a fast local clock shows a reaction window already at zero
-  while the keeper still accepts attacks, a slow one closes it mid-decision. The UI
-  work owns this: derive the countdown from a keeper-relative offset (the remaining
-  duration, or the skew measured against a `SYNC`'s own stamp) rather than from the
-  absolute value.
+  decision reads one monotonic authority clock. Deadlines stay in that keeper time
+  domain. Session links expose the same clock to the Board; remote links estimate
+  it through game-scoped `CLOCK_REQUEST` / `CLOCK_RESPONSE` round trips and advance
+  the estimate with local monotonic time. Additive `SYNC.gameId` / `SYNC.keeperNow`
+  metadata provides an initial trusted anchor. Responses require the current
+  keeper, active game and an outstanding request; requests require a seated player
+  or registered spectator. Before any anchor, countdown rings have no number.
+  Clock traffic never enters the reducer or changes a deadline. See the
+  [keeper-clock design](./2026-10-15-keeper-clock-sync-design.md) for sampling,
+  lifecycle, compatibility and browser acceptance limits.
 - **`WINDOW_EXPIRED` is never sent by a peer.** The keeper owns the deadline timer
   and fires it itself. The engine's constraint — that `WINDOW_EXPIRED` carries no
   player identity and must not acquire an owner-only rule — is satisfied by
