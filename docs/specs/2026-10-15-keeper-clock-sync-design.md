@@ -2,7 +2,8 @@
 
 Issue: [#228](https://github.com/MythHand/ReleaseBoardGameP2P/issues/228)
 
-Status: proposed design, awaiting written-spec approval.
+Status: implemented; automated and browser memory-transport validation complete.
+Real WebRTC acceptance remains environment-blocked (see below).
 
 ## Intent and scope
 
@@ -197,3 +198,51 @@ after wake, obtain fresh samples/state before claiming a synchronized countdown.
 Implementation remains one #228 branch/PR. The clock model, link lifecycle,
 wire routing and page hookup are inseparable parts of the same fix; unrelated
 network orchestration refactoring is excluded.
+
+## Verification record — 2026-10-16
+
+The regression diagnostic reproduced 3553 seconds for a client 3523 seconds
+behind and zero for a client 60 seconds ahead before the fix. Clock, probe,
+link, hook and Board regressions now cover calibration, unavailable time,
+forged/late replies, lifecycle resets and preserved authoritative deadlines.
+Integration tests use the real reducer and delayed memory transport for turns,
+release windows and defense decisions at client epoch shifts 0, ±60000 and
+−3523000 ms. Symmetric 100 ms paths agree exactly under deterministic time;
+50/150 ms paths produce the expected −50 ms estimation error. Lower-level
+adoption preserves a live turn deadline across different keeper epochs.
+
+A Chromium probe used the real Board, keeper/remote links and delayed **memory
+transport**. Guest wall-clock shifts −3523000 → 0 → +60000 ms displayed 29 →
+28 → 28 seconds against the same turn deadline, with estimated keeper-time
+error below 1 ms after calibration. A release window and defense showed 15
+seconds. After switching away and returning, then explicitly resetting and
+reactivating calibration, defense showed 13 seconds and retained its original
+window deadline. The temporary browser entry points were removed afterward.
+This reactivation tests clock recovery, not a real PeerJS reconnection.
+
+Two separate browser clients also attempted local PeerJS signaling. Signaling
+completed, but the guest ICE connection failed and the DataChannel never opened.
+Consequently real WebRTC countdown agreement, background recovery and reconnect
+acceptance are **unverified**. No transport or TURN changes were made for #228.
+
+An independent whole-branch review found one lifecycle defect: `KEEPER_CHANGED`
+left the old calibration/probes alive. The fix invalidates that generation after
+the callback can capture inherited time, while preserving a synchronously
+installed replacement generation. Regression tests hold a real outstanding reply
+and reject it after departure; the reviewer rechecked the correction.
+
+Implementation decisions: sibling local links share one authority per SessionRef;
+independent anchors could disagree within one session. The authority clock return
+type uses `Omit<GameClock, 'now'>` with a non-null `now()` signature to avoid a
+nullable intersection overload. Tests that advance the injected epoch also
+advance monotonic time explicitly, because the authority samples epoch once.
+These choices cost, respectively, local timer consistency, TypeScript nullability
+and fixture clock coordination if revisited.
+
+Final checks passed: `pnpm -r --workspace-concurrency=1 run test --maxWorkers=2`
+(2622 tests: peerserver 6, engine 511, UI 272, frontend 1830, playground 3),
+`pnpm typecheck`, `pnpm lint`, `pnpm build` and `git diff --check`.
+Build retains the existing large-chunk warnings. Earlier runs under higher
+concurrency hit a 5-second engine-test timeout and a 700 ms Sudo animation
+assertion; the affected defense/clock files passed separately (37 tests), and
+the final complete two-worker run passed without changing those animation tests.
