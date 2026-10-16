@@ -5057,18 +5057,41 @@ it('refuses a join under a nickname already in the room', async () => {
   })
 })
 
-it('does not name-check a returning seat', async () => {
+// The case the `!privateSeat` gate exists for: while Bo's seat sits empty its
+// name is free in the live roster, so a spectator may take it — and Bo coming
+// back to the seat must still be admitted, not refused for a taken name.
+it('does not name-check a returning seat whose name a spectator took meanwhile', async () => {
   const { result } = await hostWithGuest()
   act(() => result.current.startGame([]))
+  act(() => transports[0].onDisconnect?.(GUEST))
+  expect(result.current.state?.peers[GUEST]).toBeUndefined()
+  act(() =>
+    transports[0].onMessage?.({
+      type: 'JOIN_REQUEST',
+      payload: { name: 'Bo', resumeToken: 'watcher-token', requestedRole: 'spectator' },
+      from: 'watcher-peer',
+      seq: 2,
+    }),
+  )
+  expect(result.current.state?.peers['watcher-peer']).toMatchObject({ name: 'Bo', role: 'guest' })
+  transports[0].disconnectPeer.mockClear()
   act(() =>
     transports[0].onMessage?.({
       type: 'JOIN_REQUEST',
       payload: { name: 'Bo', resumeToken: GUEST_RESUME_TOKEN },
       from: 'peer-b-reloaded',
-      seq: 2,
+      seq: 3,
     }),
   )
-  expect(result.current.state?.peers['peer-b-reloaded']?.name).toBe('Bo')
+  expect(transports[0].disconnectPeer).not.toHaveBeenCalledWith(
+    'peer-b-reloaded',
+    expect.anything(),
+  )
+  expect(result.current.state?.peers['peer-b-reloaded']).toMatchObject({
+    name: 'Bo',
+    role: 'player',
+  })
+  expect(result.current.seats.find((seat) => seat.name === 'Bo')?.peerId).toBe('peer-b-reloaded')
 })
 
 it('applies a guest rename, broadcasts the row and logs memberRenamed', async () => {
