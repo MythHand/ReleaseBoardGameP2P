@@ -716,3 +716,22 @@ it('does not resend a refused nickname when the reopened settings close unedited
   fireEvent.keyDown(document, { key: 'Escape' })
   expect(sessionValue.updateProfile).toHaveBeenCalledTimes(1)
 })
+
+it('rolls the picked avatar back to my roster avatar when the host refuses it', () => {
+  sessionValue = withAvatars()
+  const { rerender } = renderInRouter(<LobbyView />)
+  openMySettings()
+  const pressed = (id: string) =>
+    screen.getByRole('button', { name: avatarLabel(id) }).getAttribute('aria-pressed')
+  fireEvent.click(screen.getByRole('button', { name: avatarLabel('ai-hallucination') }))
+  expect(sessionValue.updateProfile).toHaveBeenCalledWith({ avatar: 'ai-hallucination' })
+  expect(pressed('ai-hallucination')).toBe('true')
+  sessionValue = { ...sessionValue, profileRejection: { reason: 'avatar-taken', seq: 1 } }
+  rerender(
+    <MemoryRouter>
+      <LobbyView />
+    </MemoryRouter>,
+  )
+  expect(pressed('ai-hallucination')).toBe('false')
+  expect(pressed('attack-bug')).toBe('true')
+})
