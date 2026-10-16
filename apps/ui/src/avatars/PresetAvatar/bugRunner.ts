@@ -1,0 +1,22 @@
+import background from '@/assets/bug-runner/avatar-background.svg'
+import bug from '@/assets/bug-runner/avatar-bug.svg'
+import hotfix from '@/assets/bug-runner/avatar-hotfix.svg'
+import monitoring from '@/assets/bug-runner/avatar-monitoring.svg'
+import server from '@/assets/bug-runner/avatar-server.svg'
+
+// The Bug Runner avatars: the mini-game's pixel art on black, as images built
+// from its sprites (assets/bug-runner/make.mjs). The same layers a card avatar
+// has — background, dim, illustration — with no dim: the black is the
+// background itself.
+export interface AvatarLayers {
+  background: string
+  dim: number
+  illustration: string
+}
+
+export const BUG_RUNNER_AVATARS: Record<string, AvatarLayers> = {
+  'bug-runner-bug': { background, dim: 0, illustration: bug },
+  'bug-runner-server': { background, dim: 0, illustration: server },
+  'bug-runner-hotfix': { background, dim: 0, illustration: hotfix },
+  'bug-runner-monitoring': { background, dim: 0, illustration: monitoring },
+}

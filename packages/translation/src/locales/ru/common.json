@@ -108,6 +108,10 @@
       "gitBranch": {
         "title": "Дровосек",
         "unit": "раз разделил колоду"
+      },
+      "bugRunner": {
+        "title": "Bug Runner",
+        "unit": "очков"
       }
     }
   },

@@ -40,6 +40,8 @@ export interface BugRunnerProps {
   // what the block is, for a screen reader — the kit carries no copy of its own
   label: string
   className?: string
+  // a run has just ended above the best this block has seen — the new best
+  onBest?: (best: number) => void
 }
 
 // The colours come from the design tokens, read off the element: the canvas
@@ -125,8 +127,11 @@ const BONUS_HOLD = 600
 // A dinosaur game with the Bug as its hero, for the lobby's header: it sits
 // until clicked, then runs — jump the hotfixes on the road, stay down under the
 // monitors in the air. Transparent, and as wide as the room it is given.
-export default function BugRunner({ label, className = '' }: BugRunnerProps) {
+export default function BugRunner({ label, className = '', onBest }: BugRunnerProps) {
   const rootRef = useRef<HTMLButtonElement>(null)
+  // read at the end of a run, not captured by the frame loop
+  const onBestRef = useRef(onBest)
+  onBestRef.current = onBest
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const game = useRef<Game>(newGame(0))
   const palette = useRef<Palette | null>(null)
@@ -184,6 +189,7 @@ export default function BugRunner({ label, className = '' }: BugRunnerProps) {
     const tick = (now: number) => {
       const g = step(game.current, (now - last) / 1000, Math.random, now)
       last = now
+      const before = game.current.best
       if (g.paid !== game.current.paid) setPaid(g.paid)
       game.current = g
       paint()
@@ -191,6 +197,7 @@ export default function BugRunner({ label, className = '' }: BugRunnerProps) {
       if (g.phase !== 'running') {
         setBest(g.best)
         setPhase(g.phase)
+        if (g.best > before) onBestRef.current?.(g.best)
         return
       }
       raf = requestAnimationFrame(tick)

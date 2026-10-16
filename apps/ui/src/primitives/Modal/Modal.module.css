@@ -86,3 +86,9 @@
   gap: 20px;
   padding: 26px;
 }
+
+/* a height cap from the consumer (`maxBlockSize`): the body may shrink under
+   its content, so a scrolling area inside it takes the overflow */
+.bounded .body {
+  min-block-size: 0;
+}

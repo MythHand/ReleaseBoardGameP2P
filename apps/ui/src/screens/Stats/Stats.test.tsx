@@ -24,6 +24,7 @@ const copy: StatsCopy = {
     monitoring: { title: 'Paranoid', unit: 'times set up Monitoring' },
     gitBranch: { title: 'Woodcutter', unit: 'times split a deck' },
   },
+  bugRunner: { title: 'Bug Runner', unit: 'points' },
 }
 
 const players: StatPlayer[] = [
@@ -77,6 +78,7 @@ const PLATE_TITLES = [
   'King of DDoS',
   'Paranoid',
   'Woodcutter',
+  'Bug Runner',
 ]
 
 const platesInOrder = (container: HTMLElement): string[] =>
@@ -162,6 +164,56 @@ it('still awards a plate to a lone player who actually scored', () => {
   const { getByText } = render(<Stats winnerId="a" copy={copy} players={alone} />)
 
   expect(getByText('King of DDoS')).toBeTruthy()
+})
+
+// The lobby's mini-game plate: the room's, not the match's. Its holder can be
+// a spectator — someone with no row in the table — and it follows the same two
+// rules as every other plate.
+it('gives the Bug Runner plate to the room’s sole best, a spectator with no row included', () => {
+  const { getByText, queryAllByText } = render(
+    <Stats
+      winnerId="a"
+      copy={copy}
+      players={players}
+      bugRunner={[
+        { id: 'a', name: 'Ann', score: 964 },
+        { id: 'z', name: 'Zed', score: 2315 },
+      ]}
+    />,
+  )
+  expect(getByText('Bug Runner')).toBeTruthy()
+  expect(getByText('2315')).toBeTruthy()
+  // Zed holds it and has no row: the name appears on the plate alone
+  expect(queryAllByText('Zed')).toHaveLength(1)
+})
+
+it('gives a shared best Bug Runner run to nobody', () => {
+  const { queryByText, getByText } = render(
+    <Stats
+      winnerId="a"
+      copy={copy}
+      players={players}
+      bugRunner={[
+        { id: 'a', name: 'Ann', score: 2315 },
+        { id: 'z', name: 'Zed', score: 2315 },
+      ]}
+    />,
+  )
+  expect(queryByText('Bug Runner')).toBeNull()
+  // the control: the match's plates still render
+  expect(getByText('Bug Magnet')).toBeTruthy()
+})
+
+it('puts the Bug Runner plate after the match’s own', () => {
+  const { container } = render(
+    <Stats
+      winnerId="a"
+      copy={copy}
+      players={players}
+      bugRunner={[{ id: 'b', name: 'Bo', score: 120 }]}
+    />,
+  )
+  expect(platesInOrder(container).at(-1)).toBe('Bug Runner')
 })
 
 it('renders the plates in their designed order, the wide ones first', () => {

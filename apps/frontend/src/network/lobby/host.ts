@@ -145,6 +145,23 @@ export function handleReady(state: LobbyState, fromId: string): Result {
   }
 }
 
+// A member's best run in the lobby's mini-game, for the results screen's Bug
+// Runner plate. Shaped like handleReady: the host keeps it on the member's row
+// and re-broadcasts the row. Anyone in the room plays, a spectator too, so no
+// role is turned away. Only a better run moves it — the room's best is the one
+// to beat, and a later, lower report must not take it back.
+export function handleBugRunnerScore(state: LobbyState, fromId: string, score: unknown): Result {
+  const existing = state.peers[fromId]
+  if (!existing || !Number.isSafeInteger(score) || (score as number) <= 0)
+    return { state, outgoing: [] }
+  if ((score as number) <= (existing.bugRunner ?? 0)) return { state, outgoing: [] }
+  const updated: PeerInfo = { ...existing, bugRunner: score as number }
+  return {
+    state: applyPeerJoined(state, updated),
+    outgoing: [{ to: 'broadcast', message: { type: 'PEER_JOINED', payload: updated } }],
+  }
+}
+
 // The presence half of the roster, shaped exactly like handleReady: the host is
 // the only authority for who is where, so a guest's announcement arrives here
 // and leaves as the host's own broadcast.

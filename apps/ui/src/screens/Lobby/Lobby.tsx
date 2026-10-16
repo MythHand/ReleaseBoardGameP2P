@@ -559,6 +559,8 @@ export default function Lobby({
         title={copy.playerSettingsTitle}
         // a player picks an avatar too; a spectator has only the nickname
         wide={Boolean(me)}
+        // the avatar column scrolls past this, the modal never grows over it
+        maxBlockSize="78vh"
       >
         <PlayerSettings
           avatars={

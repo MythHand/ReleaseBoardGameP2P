@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { makeStats } from '@/mocks/stats'
 import Stats from '@/screens/Stats'
-import type { StatsCopy } from '@/screens/Stats/Stats'
+import type { BugRunnerScore, StatsCopy } from '@/screens/Stats/Stats'
 import { pick, useLang } from '../../Playground/lang'
 import TechBar from '../controls/TechBar'
 import { TechSwitch } from '../controls/TechControls'
@@ -35,6 +35,7 @@ const COPY: Record<'ru' | 'en', StatsCopy> = {
       monitoring: { title: 'Параноик', unit: 'раз поставил Monitoring' },
       gitBranch: { title: 'Дровосек', unit: 'раз разделил колоду' },
     },
+    bugRunner: { title: 'Bug Runner', unit: 'очков' },
   },
   en: {
     title: 'Match results',
@@ -63,6 +64,7 @@ const COPY: Record<'ru' | 'en', StatsCopy> = {
       monitoring: { title: 'Paranoid', unit: 'times set up Monitoring' },
       gitBranch: { title: 'Woodcutter', unit: 'times split a deck' },
     },
+    bugRunner: { title: 'Bug Runner', unit: 'points' },
   },
 }
 
@@ -86,10 +88,26 @@ const NAMES: Record<NameSet, string[] | null> = {
   ],
 }
 
+// Who holds the mini-game's plate. The mock's best is a spectator's — no row in
+// the table; `you` puts the local player on top (the "you" mark on the plate);
+// `tie` shares the best, and a shared best is nobody's; `none` — nobody played.
+type RunnerSet = 'spectator' | 'you' | 'tie' | 'none'
+
+const runnerScores = (set: RunnerSet, base: BugRunnerScore[]): BugRunnerScore[] => {
+  if (set === 'none') return []
+  if (set === 'you') return base.map((s) => (s.id === 'you' ? { ...s, score: 3070 } : s))
+  if (set === 'tie') {
+    const top = Math.max(...base.map((s) => s.score))
+    return base.map((s) => (s.id === 'p2' ? { ...s, score: top } : s))
+  }
+  return base
+}
+
 export default function StatsStory() {
   const { lang, setLang } = useLang()
   const [bg, setBg] = useState<'neutral' | 'positive'>('neutral')
   const [names, setNames] = useState<NameSet>('mixed')
+  const [runner, setRunner] = useState<RunnerSet>('spectator')
   const data = makeStats()
   const swap = NAMES[names]
   const players = swap
@@ -116,11 +134,23 @@ export default function StatsStory() {
           value={names}
           onChange={setNames}
         />
+        <TechSwitch
+          label="bug runner"
+          options={[
+            { value: 'spectator', label: 'spectator' },
+            { value: 'you', label: 'you' },
+            { value: 'tie', label: 'tie' },
+            { value: 'none', label: 'none' },
+          ]}
+          value={runner}
+          onChange={setRunner}
+        />
       </TechBar>
       <div className={styles.stage}>
         <Stats
           {...data}
           players={players}
+          bugRunner={runnerScores(runner, data.bugRunner)}
           copy={pick(lang, COPY)}
           lang={lang}
           onLangChange={setLang}

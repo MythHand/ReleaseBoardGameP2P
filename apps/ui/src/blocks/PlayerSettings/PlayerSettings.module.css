@@ -2,8 +2,16 @@
    own width, the nickname takes the rest behind a divider */
 .grid {
   display: grid;
+  flex: 1;
+  grid-template-rows: minmax(0, 1fr);
   grid-template-columns: max-content minmax(0, 1fr);
   align-items: start;
+  min-block-size: 0;
+}
+
+/* the avatar column: as tall as its avatars, at most the row the modal leaves */
+.avatarsScroll {
+  max-block-size: 100%;
 }
 
 /* a <fieldset>: its default border, padding and margin are cleared */

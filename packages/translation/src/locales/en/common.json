@@ -108,6 +108,10 @@
       "gitBranch": {
         "title": "Woodcutter",
         "unit": "times split a deck"
+      },
+      "bugRunner": {
+        "title": "Bug Runner",
+        "unit": "points"
       }
     }
   },

@@ -1,6 +1,7 @@
 import {
   canStart,
   disbandLobby,
+  handleBugRunnerScore,
   handleJoinRequest,
   handleReady,
   handleWhereabouts,
@@ -519,4 +520,38 @@ it('frees the avatar of a player made spectator and deals one to a spectator mad
   expect(demoted.peers.p1.avatar).toBeUndefined()
   const promoted = setParticipantRole(demoted, 'p1', 'player', false).state
   expect(promoted.peers.p1.avatar).toEqual(expect.any(String))
+})
+
+// The results screen's Bug Runner plate reads the room's best runs off the
+// roster, so the host is the one that keeps them there.
+it('keeps a best Bug Runner run on the member’s row and tells the room — a spectator’s too', () => {
+  // one seat, held by the host: the joiner is a spectator
+  const joined = handleJoinRequest(base(1), 'p1', 'member-p1', 'Pam', { matchRunning: false }).state
+  expect(joined.peers.p1.role).toBe('guest')
+  const { state, outgoing } = handleBugRunnerScore(joined, 'p1', 1840)
+  expect(state.peers.p1.bugRunner).toBe(1840)
+  const broadcast = outgoing.find((o) => o.message.type === 'PEER_JOINED')
+  expect(broadcast?.to).toBe('broadcast')
+  expect(broadcast?.message.type === 'PEER_JOINED' && broadcast.message.payload.bugRunner).toBe(
+    1840,
+  )
+})
+
+it('does not let a later, lower run take the room’s best back', () => {
+  const joined = handleJoinRequest(base(4), 'p1', 'member-p1', 'Pam', { matchRunning: false }).state
+  const best = handleBugRunnerScore(joined, 'p1', 1840).state
+  for (const score of [964, 1840]) {
+    const { state, outgoing } = handleBugRunnerScore(best, 'p1', score)
+    expect(state).toBe(best)
+    expect(outgoing).toEqual([])
+  }
+  expect(handleBugRunnerScore(best, 'p1', 2315).state.peers.p1.bugRunner).toBe(2315)
+})
+
+it('ignores a Bug Runner score that is not a positive whole number, or from nobody in the room', () => {
+  const joined = handleJoinRequest(base(4), 'p1', 'member-p1', 'Pam', { matchRunning: false }).state
+  for (const score of [0, -5, 12.5, Number.NaN, '900', undefined]) {
+    expect(handleBugRunnerScore(joined, 'p1', score).state).toBe(joined)
+  }
+  expect(handleBugRunnerScore(joined, 'stranger', 900).state).toBe(joined)
 })

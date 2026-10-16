@@ -232,7 +232,11 @@ export default function LobbyView() {
           </Typography>
         </div>
         {/* the room between the two sides of the header is the mini-game's */}
-        <BugRunner label={t('lobbyScreen.bugRunner')} className={styles.runner} />
+        <BugRunner
+          label={t('lobbyScreen.bugRunner')}
+          className={styles.runner}
+          onBest={session.reportBugRunner}
+        />
         <div className={styles.headRight}>
           <LobbyCode
             onCopy={copyText}
@@ -469,6 +473,8 @@ export default function LobbyView() {
         title={t('lobbyScreen.playerSettingsTitle')}
         // a player picks an avatar too; a spectator has only the nickname
         wide={Boolean(me)}
+        // the avatar column scrolls past this, the modal never grows over it
+        maxBlockSize="78vh"
       >
         <PlayerSettings
           avatars={

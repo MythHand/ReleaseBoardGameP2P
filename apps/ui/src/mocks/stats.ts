@@ -1,10 +1,11 @@
-import type { StatPlayer } from '@/screens/Stats'
+import type { BugRunnerScore, StatPlayer } from '@/screens/Stats'
 import { mockAvatar } from './chat'
 
 export interface StatsData {
   winnerId: string
   selfId: string
   players: StatPlayer[]
+  bugRunner: BugRunnerScore[]
 }
 
 // Each player carries the avatar the chat mock gives them — attached here, by the
@@ -82,5 +83,12 @@ export function makeStats(): StatsData {
         gitBranch: 0,
       },
     ]),
+    // Best runs in the lobby's mini-game. The best is a spectator's — someone
+    // with no row in the table above, which is the case the plate exists for.
+    bugRunner: [
+      { id: 'you', name: 'deadlock', score: 964 },
+      { id: 'p2', name: 'TabsOverSpaces', score: 1840 },
+      { id: 'spectator', name: 'LazyLoader', score: 2315 },
+    ],
   }
 }

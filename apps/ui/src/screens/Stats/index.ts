@@ -1,2 +1,2 @@
-export type { StatPlayer, StatsCopy } from './Stats'
+export type { AchievementCopy, BugRunnerScore, StatPlayer, StatsCopy } from './Stats'
 export { default } from './Stats'
