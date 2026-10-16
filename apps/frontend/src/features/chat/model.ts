@@ -38,6 +38,7 @@ export function toChatMessages(args: {
       time: args.formatTime(entry.createdAt),
       role: peer ? toChatRole(peer.role) : (latestRole?.role ?? entry.author.role),
       gone: !peer,
+      ...(peer?.avatar ? { avatar: peer.avatar } : {}),
     }
   })
 }

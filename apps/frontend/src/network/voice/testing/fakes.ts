@@ -77,6 +77,7 @@ export function fakeAudio() {
   let selected = silent
   const observers = new Set<(ready: boolean) => void>()
   const releases: ReturnType<typeof vi.fn>[] = []
+  const speakingListeners = new Set<(ids: ReadonlySet<string>) => void>()
   const audio: VoiceAudio = {
     resume: vi.fn().mockResolvedValue(undefined),
     subscribeState(listener) {
@@ -101,6 +102,13 @@ export function fakeAudio() {
       releases.push(release)
       return release
     }),
+    subscribeSpeaking(listener) {
+      speakingListeners.add(listener)
+      return () => {
+        speakingListeners.delete(listener)
+      }
+    },
+    setSelfId: vi.fn(),
     setMasterVolume: vi.fn(),
     setParticipant: vi.fn(),
     dispose: vi.fn(() => {
@@ -108,7 +116,15 @@ export function fakeAudio() {
       return Promise.resolve()
     }),
   }
-  return { audio, silent, releases, observers }
+  return {
+    audio,
+    silent,
+    releases,
+    observers,
+    emitSpeaking: (ids: ReadonlySet<string>) => {
+      for (const l of [...speakingListeners]) l(ids)
+    },
+  }
 }
 export function fakeTransport(media?: VoiceMediaPort): Transport {
   return {

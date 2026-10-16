@@ -23,7 +23,15 @@ it('resolves stable members, accepted roles and saved local settings while voice
     settings: { member: { volume: 175, muted: true } },
   })
   expect(toVoiceParticipants(snapshot, { 'new-peer': peer })).toEqual([
-    { id: 'member', name: 'Viewer', role: 'spectator', micOff: true, volume: 175, muted: true },
+    {
+      id: 'member',
+      name: 'Viewer',
+      role: 'spectator',
+      micOff: true,
+      speaking: false,
+      volume: 175,
+      muted: true,
+    },
   ])
 })
 it('provides every voice issue in both locales', () => {
@@ -47,4 +55,23 @@ it('provides every voice issue in both locales', () => {
       expect(copy?.text).toBeTruthy()
       if (issue === 'peersUnreachable') expect(copy?.title).toContain('{{names}}')
     }
+})
+it('carries the avatar and the speaking ring', () => {
+  const snapshot = {
+    ...createFakeVoiceFacade(),
+    roster: [{ memberId: 'm', peerId: 'p', voiceSessionId: 'v', micOff: false }],
+  }
+  const peer = {
+    id: 'p',
+    memberId: 'm',
+    name: 'Bo',
+    role: 'player' as const,
+    ready: true,
+    where: 'lobby' as const,
+    avatar: 'attack-bug',
+  }
+  expect(toVoiceParticipants(snapshot, { p: peer }, new Set(['m']))[0]).toMatchObject({
+    avatar: 'attack-bug',
+    speaking: true,
+  })
 })

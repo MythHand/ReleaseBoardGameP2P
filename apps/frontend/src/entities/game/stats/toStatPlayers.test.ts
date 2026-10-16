@@ -188,3 +188,17 @@ it('reports a bot seat as being in the game, not offline', () => {
   expect(rows.map((r) => r.location)).toEqual(['stats', 'game'])
   expect(rows[1].name).toBe('Бот 1')
 })
+
+it('carries the seat avatar and the speaking ring', () => {
+  const avatarSeats = [{ playerId: 'p1', peerId: 'a', name: 'Ann', avatar: 'attack-bug' }]
+  const avatarPeers: Record<string, PeerInfo> = {
+    a: { id: 'a', memberId: 'ma', name: 'Ann', role: 'host', ready: true, where: 'stats' },
+  }
+  const [row] = toStatPlayers({
+    tally: {},
+    seats: avatarSeats,
+    peers: avatarPeers,
+    speaking: new Set(['ma']),
+  })
+  expect(row).toMatchObject({ avatar: 'attack-bug', speaking: true })
+})

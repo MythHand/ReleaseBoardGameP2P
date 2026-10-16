@@ -65,6 +65,8 @@ function base(): UseLobby {
     startGame: vi.fn(),
     introReady: vi.fn(),
     transferHost: vi.fn(),
+    updateProfile: vi.fn(),
+    profileRejection: null,
     setSetup: vi.fn(),
     disband: vi.fn(),
     leaveSession: vi.fn(),
@@ -379,4 +381,26 @@ it('does not apply a previous room refusal to a different invitation', () => {
   expect(screen.getByText('invite.rolePlayer').closest('button')?.disabled).toBe(false)
   expect(screen.getByText('invite.roleSpectator').closest('button')?.disabled).toBe(false)
   expect(screen.queryByText('invite.noSlotsNote')).toBeNull()
+})
+
+// The refusal names the nickname that was sent; once the field holds another
+// one, the "taken" line has nothing left to say about it.
+it('drops the taken mark once the nickname is edited', () => {
+  sessionValue = { ...base(), status: 'error', errorKind: 'name-taken', error: 'name-taken' }
+  renderAtLobby('F96-NMT', 'Ann')
+  expect(screen.getByText('playerSettings.nicknameTaken')).toBeTruthy()
+  const field = screen.getByPlaceholderText('invite.nicknamePlaceholder')
+  fireEvent.change(field, { target: { value: 'Anna' } })
+  expect(screen.queryByText('playerSettings.nicknameTaken')).toBeNull()
+  expect(field.getAttribute('aria-invalid')).not.toBe('true')
+})
+
+it('marks the nickname field when the host says it is taken', () => {
+  sessionValue = { ...base(), status: 'error', errorKind: 'name-taken', error: 'name-taken' }
+  renderScreen()
+  expect(screen.getByText('playerSettings.nicknameTaken')).toBeTruthy()
+  expect(
+    screen.getByPlaceholderText('invite.nicknamePlaceholder').getAttribute('aria-invalid'),
+  ).toBe('true')
+  expect(screen.queryByText('invite.connectError')).toBeNull()
 })

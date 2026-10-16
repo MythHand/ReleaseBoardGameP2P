@@ -12,6 +12,8 @@ export type RoomVoiceFacade = VoiceSnapshot &
     | 'setVolume'
     | 'setParticipantVolume'
     | 'setParticipantMuted'
+    | 'getSpeaking'
+    | 'subscribeSpeaking'
   >
 
 export function useRoomVoice(): { runtime: RoomVoice; view: RoomVoiceFacade } {
@@ -43,6 +45,10 @@ export function useRoomVoice(): { runtime: RoomVoice; view: RoomVoiceFacade } {
       setVolume: runtime.setVolume,
       setParticipantVolume: runtime.setParticipantVolume,
       setParticipantMuted: runtime.setParticipantMuted,
+      // The runtime's own methods, so they keep their identity across
+      // snapshots: a speaking change reaches only the readers subscribed to it.
+      getSpeaking: runtime.getSpeaking,
+      subscribeSpeaking: runtime.subscribeSpeaking,
     }),
     [runtime, snapshot],
   )

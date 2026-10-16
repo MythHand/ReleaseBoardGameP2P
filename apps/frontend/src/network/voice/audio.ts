@@ -1,3 +1,5 @@
+import { createSpeakingDetector, rms, SPEAKING_POLL_MS } from './levels'
+
 export interface ParticipantAudioSettings {
   volume: number
   muted: boolean
@@ -12,6 +14,10 @@ export interface VoiceAudio {
   attach(memberId: string, stream: MediaStream): () => void
   setMasterVolume(volume: number): void
   setParticipant(memberId: string, settings: ParticipantAudioSettings): void
+  // Who is audible right now — every attached participant and, while the
+  // microphone is live and on, me under `setSelfId`. Called only on change.
+  subscribeSpeaking(listener: (ids: ReadonlySet<string>) => void): () => void
+  setSelfId(memberId: string | null): void
   dispose(): Promise<void>
 }
 export function clampVolume(value: number): number {
@@ -35,6 +41,45 @@ export function createVoiceAudio(context: AudioContext): VoiceAudio {
   let microphone: MediaStreamTrack | undefined
   let micOff = true
   let disposal: Promise<void> | undefined
+  // Level meters, one per audible stream. Each taps its source BEFORE the
+  // participant's gain, so volume and a local mute never hide who is talking —
+  // whether that is shown is the display's call (features/voice-chat/useSpeaking).
+  const meters = new Map<string, AnalyserNode>()
+  let micMeter: { source: MediaStreamAudioSourceNode; analyser: AnalyserNode } | undefined
+  let selfId: string | null = null
+  const speakingListeners = new Set<(ids: ReadonlySet<string>) => void>()
+  const detector = createSpeakingDetector()
+  let poll: ReturnType<typeof setInterval> | undefined
+  let frame = new Float32Array(512)
+  const meter = (source: AudioNode) => {
+    const analyser = context.createAnalyser()
+    analyser.fftSize = 512
+    source.connect(analyser)
+    return analyser
+  }
+  const sample = () => {
+    const levels = new Map<string, number>()
+    const read = (id: string, analyser: AnalyserNode) => {
+      if (frame.length !== analyser.fftSize) frame = new Float32Array(analyser.fftSize)
+      analyser.getFloatTimeDomainData(frame)
+      levels.set(id, rms(frame))
+    }
+    for (const [id, analyser] of meters) read(id, analyser)
+    if (micMeter && selfId && !micOff && microphone?.readyState === 'live')
+      read(selfId, micMeter.analyser)
+    const changed = detector.update(levels, Date.now())
+    if (changed) for (const listener of [...speakingListeners]) listener(changed)
+  }
+  // Polling runs only while there is something to measure.
+  const syncPoll = () => {
+    const needed = meters.size > 0 || micMeter !== undefined
+    if (needed && poll === undefined) poll = setInterval(sample, SPEAKING_POLL_MS)
+    if (!needed && poll !== undefined) {
+      clearInterval(poll)
+      poll = undefined
+      sample()
+    }
+  }
   const selectedTrack = () => (microphone?.readyState === 'live' ? microphone : silentTrack)
   return {
     async resume() {
@@ -59,6 +104,15 @@ export function createVoiceAudio(context: AudioContext): VoiceAudio {
     setMicrophone(stream) {
       microphone = stream?.getAudioTracks().find((track) => track.readyState === 'live')
       if (microphone) microphone.enabled = !micOff
+      micMeter?.source.disconnect()
+      micMeter?.analyser.disconnect()
+      micMeter = undefined
+      if (microphone) {
+        // Measured, never played: the source feeds the analyser and nothing else.
+        const source = context.createMediaStreamSource(new MediaStream([microphone]))
+        micMeter = { source, analyser: meter(source) }
+      }
+      syncPoll()
       return selectedTrack()
     },
     setMicOff(off) {
@@ -80,6 +134,9 @@ export function createVoiceAudio(context: AudioContext): VoiceAudio {
       const setting = settings.get(memberId) ?? { volume: 100, muted: false }
       gain.gain.value = setting.muted ? 0 : clampVolume(setting.volume) / 100
       source.connect(gain)
+      const analyser = meter(source)
+      meters.set(memberId, analyser)
+      syncPoll()
       gain.connect(master)
       let released = false
       const entry = {
@@ -90,6 +147,9 @@ export function createVoiceAudio(context: AudioContext): VoiceAudio {
           decoder.pause()
           decoder.srcObject = null
           source.disconnect()
+          analyser.disconnect()
+          if (meters.get(memberId) === analyser) meters.delete(memberId)
+          syncPoll()
           gain.disconnect()
           if (failedDecoders.delete(entry)) notifyOutput()
           if (playback.get(memberId) === entry) playback.delete(memberId)
@@ -102,6 +162,15 @@ export function createVoiceAudio(context: AudioContext): VoiceAudio {
         notifyOutput()
       })
       return entry.release
+    },
+    subscribeSpeaking(listener) {
+      speakingListeners.add(listener)
+      return () => {
+        speakingListeners.delete(listener)
+      }
+    },
+    setSelfId(memberId) {
+      selfId = memberId
     },
     setMasterVolume(volume) {
       master.gain.value = clampVolume(volume) / 100
@@ -119,6 +188,13 @@ export function createVoiceAudio(context: AudioContext): VoiceAudio {
       silentTrack.stop()
       silentNode.disconnect()
       master.disconnect()
+      micMeter?.source.disconnect()
+      micMeter?.analyser.disconnect()
+      micMeter = undefined
+      meters.clear()
+      clearInterval(poll)
+      poll = undefined
+      speakingListeners.clear()
       settings.clear()
       disposal = context.close().catch(() => {})
       return disposal

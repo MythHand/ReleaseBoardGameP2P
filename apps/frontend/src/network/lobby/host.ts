@@ -1,15 +1,19 @@
 import type { JoinRole, Message, PeerInfo, Where } from '../types'
 import { type JoinAdmission, type JoinOptions, resolveJoinAdmission } from './admission'
+import { pickAvatar } from './profile'
 import {
   applyConfig,
   applyPeerJoined,
   applyPeerLeft,
   effectiveBots,
   type LobbyState,
+  MAX_BOTS,
   playerCount,
   spectatorCount,
   validSpectatorLimit,
 } from './state'
+
+export { MAX_BOTS } from './state'
 
 export interface Outgoing {
   to: string | 'broadcast'
@@ -58,6 +62,8 @@ export function handleJoinRequest(
     }
   const { role } = admission
 
+  const avatar =
+    role === 'guest' ? undefined : pickAvatar(state, options.avatar, fromId, options.random)
   const peer: PeerInfo = {
     id: fromId,
     memberId,
@@ -71,6 +77,7 @@ export function handleJoinRequest(
         options.returningLobbyPeer?.where === 'lobby' &&
         options.returningLobbyPeer.ready,
     where: options.returningSeat ? 'game' : 'lobby',
+    ...(avatar ? { avatar } : {}),
   }
   const next = applyPeerJoined(state, peer)
 
@@ -99,10 +106,7 @@ export function handleJoinRequest(
       },
       {
         to: 'broadcast',
-        message: {
-          type: 'PEER_JOINED',
-          payload: { id: fromId, memberId, name, role, ready: peer.ready, where: peer.where },
-        },
+        message: { type: 'PEER_JOINED', payload: peer },
       },
       // Everyone else holds the seating with this seat's dead peer id in it.
       ...(options.returningSeat
@@ -134,14 +138,7 @@ export function handleReady(state: LobbyState, fromId: string): Result {
         to: 'broadcast',
         message: {
           type: 'PEER_JOINED',
-          payload: {
-            id: updated.id,
-            memberId: updated.memberId,
-            name: updated.name,
-            role: updated.role,
-            ready: updated.ready,
-            where: updated.where,
-          },
+          payload: updated,
         },
       },
     ],
@@ -171,14 +168,7 @@ export function handleWhereabouts(state: LobbyState, fromId: string, where: Wher
         to: 'broadcast',
         message: {
           type: 'PEER_JOINED',
-          payload: {
-            id: updated.id,
-            memberId: updated.memberId,
-            name: updated.name,
-            role: updated.role,
-            ready: updated.ready,
-            where: updated.where,
-          },
+          payload: updated,
         },
       },
     ],
@@ -216,10 +206,6 @@ export function transferHost(state: LobbyState, newHostId: string): Result {
     outgoing: [{ to: 'broadcast', message: { type: 'TRANSFER_HOST', payload: { newHostId } } }],
   }
 }
-
-// The rules seat 2–6 (docs/rules/general.md:13), so one human and five bots is
-// the largest table a lone host can ask for.
-export const MAX_BOTS = 5
 
 export function setBots(state: LobbyState, bots: number): Result {
   const clamped = Math.min(MAX_BOTS, Math.max(0, Math.trunc(bots)))
@@ -278,6 +264,13 @@ export function setParticipantRole(
   if (assigned === 'player' && playerCount(state) >= state.maxPlayers)
     return { state, outgoing: [], error: 'players-full' }
   const updated: PeerInfo = { ...peer, role: assigned, ready: false }
+  // A seat comes with an avatar and a spectator gives theirs back. The wish is
+  // not known here (it arrives only with a join), so a promotion rolls a free
+  // one; the player can change it in the settings.
+  if (assigned === 'player') {
+    const avatar = pickAvatar(state, undefined, peerId)
+    if (avatar) updated.avatar = avatar
+  } else delete updated.avatar
   return {
     state: applyPeerJoined(state, updated),
     outgoing: [{ to: 'broadcast', message: { type: 'PEER_JOINED', payload: updated } }],

@@ -8,6 +8,7 @@ import { toStatPlayers } from '~/entities/game/stats'
 import { RoomChat, useRoomChatView } from '~/features/chat/RoomChat'
 import { useGame } from '~/features/play-game/useGame'
 import { RoomVoice, useRoomVoiceView } from '~/features/voice-chat/RoomVoice'
+import { useSpeaking } from '~/features/voice-chat/useSpeaking'
 import styles from './stats.module.css'
 
 export default function StatsPage() {
@@ -17,6 +18,7 @@ export default function StatsPage() {
   const leaveMatch = useLeaveMatch()
   const chat = useRoomChatView()
   const voice = useRoomVoiceView()
+  const speaking = useSpeaking()
 
   // Tell the table where this peer went, so everyone else's results table can
   // say so. Announced once per mount; the host ignores a repeat of what it
@@ -40,7 +42,7 @@ export default function StatsPage() {
   // rows of zeros would claim a match in which nobody did anything, and the
   // roster alone is enough to build those rows, so this guard is what stops it.
   const tally = game.view?.tally
-  const players = tally ? toStatPlayers({ tally, seats, peers }) : []
+  const players = tally ? toStatPlayers({ tally, seats, peers, speaking }) : []
 
   // The engine names the winning SEAT; the screen compares against peer ids.
   // The board carries a paragraph about this crossing for the same lookup, and

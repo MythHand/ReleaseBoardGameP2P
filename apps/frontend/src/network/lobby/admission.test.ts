@@ -77,3 +77,15 @@ it('counts a live connection replacement once at a full spectator quota', () => 
     availability: { player: true, spectator: false },
   })
 })
+
+it('carries a string avatar wish and drops anything else', () => {
+  expect(parseJoinRequestPayload({ name: 'Bo', resumeToken: 't', avatar: 'attack-bug' })).toEqual({
+    name: 'Bo',
+    resumeToken: 't',
+    avatar: 'attack-bug',
+  })
+  expect(parseJoinRequestPayload({ name: 'Bo', resumeToken: 't', avatar: 7 })).toEqual({
+    name: 'Bo',
+    resumeToken: 't',
+  })
+})

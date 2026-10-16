@@ -110,3 +110,20 @@ it('gives a bot an address nothing can dial', () => {
 it('asks for no seats when no bots were asked for', () => {
   expect(botSeats(0, 2, [])).toEqual([])
 })
+
+it('freezes a player avatar into the seat', () => {
+  const seats = seatsFor({
+    a: {
+      id: 'a',
+      memberId: 'ma',
+      name: 'Ann',
+      role: 'host',
+      ready: true,
+      where: 'lobby',
+      avatar: 'attack-bug',
+    },
+    b: { id: 'b', memberId: 'mb', name: 'Bo', role: 'player', ready: true, where: 'lobby' },
+  })
+  expect(seats[0].avatar).toBe('attack-bug')
+  expect(seats[1]).not.toHaveProperty('avatar')
+})

@@ -48,3 +48,10 @@
   color: var(--white-35);
   background: var(--white-05);
 }
+
+/* the ring still comes and goes, it just does not fade */
+@media (prefers-reduced-motion: reduce) {
+  .avatar::after {
+    transition: none;
+  }
+}

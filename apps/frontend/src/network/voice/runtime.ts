@@ -48,6 +48,11 @@ export interface VoiceRoomContext {
 export interface RoomVoice {
   getSnapshot(): VoiceSnapshot
   subscribe(listener: () => void): () => void
+  // Who the audio graph hears right now, sorted; the same array until the set
+  // changes. Kept off the snapshot on purpose: it changes at the rate of speech,
+  // and every snapshot change re-renders each session consumer (the board too).
+  getSpeaking(): readonly string[]
+  subscribeSpeaking(listener: () => void): () => void
   updateRoom(context: VoiceRoomContext | null): void
   handleMessage(frame: WireMessage): boolean
   connect(): Promise<void>
@@ -93,6 +98,8 @@ export function createRoomVoice(options: {
     issue: null,
     unreachableMemberIds: [],
   }
+  const speakingListeners = new Set<() => void>()
+  let speaking: readonly string[] = []
   let context: VoiceRoomContext | null = null
   let authority: VoiceAuthority | undefined
   let roster: VoiceRosterPayload | undefined
@@ -104,6 +111,7 @@ export function createRoomVoice(options: {
   let releaseEnded: (() => void) | undefined
   let releasePermission: (() => void) | undefined
   let releaseOutput: (() => void) | undefined
+  let releaseSpeaking: (() => void) | undefined
   let finishOutput: ((ready: boolean) => void) | undefined
   let micAbort: AbortController | undefined
   let joining: Promise<void> | undefined
@@ -129,6 +137,11 @@ export function createRoomVoice(options: {
     snapshot = { ...snapshot, ...patch }
     for (const listener of [...listeners]) listener()
   }
+  const publishSpeaking = (ids: readonly string[]) => {
+    if (ids.length === speaking.length && ids.every((id, index) => id === speaking[index])) return
+    speaking = ids
+    for (const listener of [...speakingListeners]) listener()
+  }
   const clearJoinWait = () => {
     clearTimeout(joinTimer)
     joinTimer = undefined
@@ -147,6 +160,7 @@ export function createRoomVoice(options: {
   const refresh = () => {
     if (!wanted) {
       publish({ status: 'off', issue: null, unreachableMemberIds: [] })
+      publishSpeaking([])
       return
     }
     const own = ownPresence()
@@ -323,6 +337,8 @@ export function createRoomVoice(options: {
     releasePermission = undefined
     releaseOutput?.()
     releaseOutput = undefined
+    releaseSpeaking?.()
+    releaseSpeaking = undefined
     releaseEnded?.()
     releaseEnded = undefined
     stopCalls()
@@ -336,7 +352,13 @@ export function createRoomVoice(options: {
     joining = undefined
     enabling = undefined
     microphoneIssue = null
-    publish({ status: 'off', micOff: true, issue: null, unreachableMemberIds: [] })
+    publish({
+      status: 'off',
+      micOff: true,
+      issue: null,
+      unreachableMemberIds: [],
+    })
+    publishSpeaking([])
   }
   const disconnect = () => {
     if (voiceSessionId) intent({ type: 'VOICE_LEAVE', payload: { voiceSessionId } })
@@ -344,6 +366,13 @@ export function createRoomVoice(options: {
   }
   const runtime: RoomVoice = {
     getSnapshot: () => snapshot,
+    getSpeaking: () => speaking,
+    subscribeSpeaking(listener) {
+      speakingListeners.add(listener)
+      return () => {
+        speakingListeners.delete(listener)
+      }
+    },
     subscribe(listener) {
       listeners.add(listener)
       return () => {
@@ -368,6 +397,7 @@ export function createRoomVoice(options: {
       context = next
       if (!next) return
       publish({ selfMemberId: next.selfMemberId })
+      audio?.setSelfId(next.selfMemberId)
       const changedTransport =
         !previous ||
         roomChanged ||
@@ -461,6 +491,11 @@ export function createRoomVoice(options: {
           audio.setParticipant(id, setting)
         outputPending = true
         const ownedAudio = audio
+        audio.setSelfId(context?.selfMemberId ?? null)
+        releaseSpeaking = audio.subscribeSpeaking((ids) => {
+          if (audio !== ownedAudio || !wanted) return
+          publishSpeaking([...ids].sort())
+        })
         releaseOutput = audio.subscribeState((ready) => {
           if (audio !== ownedAudio || !wanted) return
           audioReady = ready
@@ -568,6 +603,7 @@ export function createRoomVoice(options: {
       runtime.updateRoom(null)
       disposed = true
       listeners.clear()
+      speakingListeners.clear()
     },
   }
   return runtime

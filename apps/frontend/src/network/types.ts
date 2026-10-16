@@ -31,6 +31,18 @@ export interface JoinRequestPayload {
   resumeToken: string
   requestedRole?: JoinRole
   resume?: { where: Where; lastGameId: string | null }
+  // The avatar this person picked last time (shared/lib/avatarPreference). A
+  // wish, not a claim: the host grants it only while no other player holds it.
+  avatar?: string
+}
+
+export type JoinRejectReason = 'room-full' | 'name-taken'
+export type ProfileRejectReason = 'name-taken' | 'name-invalid' | 'avatar-taken' | 'not-in-lobby'
+// A lobby member's own edit of how the room sees them. Either field may come
+// alone: the avatar is sent on click, the nickname when the settings close.
+export interface ProfilePatch {
+  name?: string
+  avatar?: string
 }
 
 export type Role = 'host' | 'player' | 'guest'
@@ -47,6 +59,9 @@ export interface PeerInfo {
   role: Role
   ready: boolean
   where: Where
+  // Preset avatar id (PRESET_AVATARS). Only a host or player has one; a
+  // spectator and a bot never do.
+  avatar?: string
 }
 
 // One seat at the table, minted by `seatsFor` (~/entities/game/seats) when the
@@ -63,6 +78,9 @@ export interface Seat {
   // the difference. It rides GAME_STARTING with the rest of the seating, so
   // every peer learns it at the same moment.
   bot?: boolean
+  // The avatar the seat was dealt with — frozen with the rest of the seating,
+  // so the results still show it after the player has left the roster.
+  avatar?: string
 }
 
 // Discriminated union of every protocol message ({ type, payload }).
@@ -72,20 +90,20 @@ export type Message =
   | { type: 'ROOM_CHECK'; payload: Record<string, never> }
   | { type: 'ROOM_AVAILABILITY'; payload: JoinAvailability }
   | { type: 'JOIN_REQUEST'; payload: JoinRequestPayload }
-  | { type: 'JOIN_REJECTED'; payload: { reason: 'room-full'; availability: JoinAvailability } }
-  | { type: 'PEER_LIST'; payload: { peers: PeerInfo[]; yourRole: Role } }
   | {
-      type: 'PEER_JOINED'
-      payload: {
-        id: string
-        memberId: MemberId
-        name: string
-        role: Role
-        ready: boolean
-        where: Where
-      }
+      type: 'JOIN_REJECTED'
+      payload: { reason: JoinRejectReason; availability: JoinAvailability }
     }
+  | { type: 'PEER_LIST'; payload: { peers: PeerInfo[]; yourRole: Role } }
+  // The whole row, as the host now holds it: the same shape as PeerInfo, so a
+  // new field (the avatar) cannot be dropped by a sender that lists fields.
+  | { type: 'PEER_JOINED'; payload: PeerInfo }
   | { type: 'PLAYER_READY'; payload: Record<string, never> }
+  // A member editing its own nickname and/or avatar. Addressed to the host,
+  // which checks it (lobby/profile.ts) and answers with a PEER_JOINED for
+  // everyone or a PROFILE_REJECTED for the sender alone.
+  | { type: 'PROFILE_UPDATE'; payload: ProfilePatch }
+  | { type: 'PROFILE_REJECTED'; payload: { reason: ProfileRejectReason } }
   // A peer announcing which screen it is on, so the results table can say where
   // everyone went. Addressed to the host, which applies it and re-broadcasts the
   // updated PeerInfo — exactly the path PLAYER_READY takes.
