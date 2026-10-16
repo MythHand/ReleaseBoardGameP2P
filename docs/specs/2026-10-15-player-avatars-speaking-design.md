@@ -133,7 +133,11 @@
 
 ### 5.3 Снимок
 
-`VoiceSnapshot.speakingMemberIds: string[]`. `runtime.ts` подписывается на `audio.subscribeSpeaking` и публикует набор через существующий `subscribe` — до `useRoomVoice` без новых каналов. Сигнал и правила показа разделены: правила — в `useSpeaking` (4.4).
+Набор говорящих — **не** в `VoiceSnapshot`, а в отдельном канале рантайма: `RoomVoice.getSpeaking(): readonly string[]` (отсортированный; тот же массив, пока набор не изменился) и `RoomVoice.subscribeSpeaking(listener: () => void): () => void`. `runtime.ts` подписывается на `audio.subscribeSpeaking` и публикует набор в этот канал — только пока аудио его и голос включён; при каждом выходе из голоса набор сбрасывается в `[]`. `useRoomVoice` отдаёт оба метода в `RoomVoiceFacade` как есть — методы рантайма, их идентичность не меняется от снимка к снимку.
+
+Почему отдельно: набор меняется с частотой речи, а каждый новый снимок голоса — это новое значение `useLobby`, то есть перерисовка всех потребителей `useSession()`, доска в том числе. Через свой канал речь перерисовывает только тех, кто рисует кольцо: `useSpeaking` читает id через `useSyncExternalStore(voice.subscribeSpeaking, voice.getSpeaking, …)`.
+
+Сигнал и правила показа разделены: правила — в `useSpeaking` (4.4), чистой функцией `speakingMembers(voice, ids)`.
 
 ### 5.4 Анимация
 
