@@ -1,4 +1,12 @@
-import type { JoinAvailability, JoinRequestPayload, JoinRole, PeerInfo, Role, Seat } from '../types'
+import type {
+  JoinAvailability,
+  JoinRejectReason,
+  JoinRequestPayload,
+  JoinRole,
+  PeerInfo,
+  Role,
+  Seat,
+} from '../types'
 import type { LobbyState } from './state'
 
 export interface JoinOptions {
@@ -6,11 +14,14 @@ export interface JoinOptions {
   returningSeat?: Seat
   returningLobbyPeer?: Pick<PeerInfo, 'role' | 'ready' | 'where'> & { id?: string }
   requestedRole?: JoinRole
+  // the joiner's avatar wish, and the dice for a free one (injected by tests)
+  avatar?: string
+  random?: () => number
 }
 
 export type JoinAdmission =
   | { accepted: true; role: Role }
-  | { accepted: false; reason: 'room-full'; availability: JoinAvailability }
+  | { accepted: false; reason: JoinRejectReason; availability: JoinAvailability }
 
 export function parseJoinRequestPayload(value: unknown): JoinRequestPayload | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
@@ -42,6 +53,7 @@ export function parseJoinRequestPayload(value: unknown): JoinRequestPayload | nu
     resumeToken: payload.resumeToken,
     ...(payload.requestedRole === undefined ? {} : { requestedRole: payload.requestedRole }),
     ...(resume ? { resume } : {}),
+    ...(typeof payload.avatar === 'string' ? { avatar: payload.avatar } : {}),
   }
 }
 
