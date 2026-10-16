@@ -242,13 +242,21 @@ function onClockStarted(state: GameState, action: Action & { type: 'CLOCK_STARTE
   // with nobody able to act on it. Restarting it is the deferred expiry being
   // handed back to its owner, and the keeper is the only party who can ask
   // (CLOCK_STARTED is not a peer intent — session/referee.ts).
-  if (state.turn.deadline !== undefined && action.at < state.turn.deadline) {
+  if (
+    state.turn.awaitingPresentation ||
+    (state.turn.deadline !== undefined && action.at < state.turn.deadline)
+  ) {
     return reject(state, action, 'the turn clock is already running')
   }
   return {
     state: {
       ...state,
-      turn: { ...state.turn, openedAt: action.at, deadline: action.at + TURN_ACTION_MS },
+      turn: {
+        ...state.turn,
+        awaitingPresentation: undefined,
+        openedAt: action.at,
+        deadline: action.at + TURN_ACTION_MS,
+      },
     },
     events: [],
   }
@@ -273,9 +281,25 @@ function stampTurnClock(state: GameState, at: number): GameState {
   const idle = !state.over && (!state.pending || costPending) && !state.window && !state.drawing
   if (!idle) {
     if (state.turn.deadline === undefined && state.turn.openedAt === undefined) return state
-    return { ...state, turn: { ...state.turn, openedAt: undefined, deadline: undefined } }
+    return {
+      ...state,
+      turn: {
+        ...state.turn,
+        awaitingPresentation: undefined,
+        openedAt: undefined,
+        deadline: undefined,
+      },
+    }
   }
-  return { ...state, turn: { ...state.turn, openedAt: at, deadline: at + TURN_ACTION_MS } }
+  return {
+    ...state,
+    turn: {
+      ...state.turn,
+      awaitingPresentation: undefined,
+      openedAt: at,
+      deadline: at + TURN_ACTION_MS,
+    },
+  }
 }
 
 function onResolve(state: GameState, action: Action & { type: 'RESOLVE' }): Reduction {

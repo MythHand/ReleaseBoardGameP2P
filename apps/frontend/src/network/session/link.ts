@@ -1,10 +1,13 @@
 import type { Event, GameView, PlayerId } from '@release/engine'
 import type { Intent } from '../types'
 import { createAuthorityClock, type GameClock } from './clock'
+import type { PresentationId } from './presentationGate'
 import {
+  acknowledgePresentation,
   advanceSession,
   applyIntent,
   commit,
+  enablePresentation,
   type Outgoing,
   rebind,
   type SessionRef,
@@ -13,6 +16,7 @@ import {
 export interface Sync {
   view: GameView
   events: Event[]
+  presentation?: PresentationId
   resync?: boolean
   gameId?: string
   keeperNow?: number
@@ -23,6 +27,7 @@ export interface Sync {
 // playground, and every headless test exercise the same code the network does.
 export interface GameLink {
   clock: GameClock
+  presentationReady(id: PresentationId): void
   submit(intent: Intent): void
   subscribe(listener: (sync: Sync) => void): () => void
   close(): void
@@ -98,6 +103,8 @@ export function createLocalLink(args: {
     args.ref.current = rebind(args.ref.current, args.me, localAddress(args.me), 0).session
   }
 
+  args.ref.current = enablePresentation(args.ref.current, clock.now())
+
   const receive = (outgoing: Outgoing) => {
     // 'broadcast' is unreachable for SYNC today (only GAME_STARTED broadcasts,
     // and the type check below filters that out) — kept for future broadcast
@@ -129,6 +136,15 @@ export function createLocalLink(args: {
 
   return {
     clock,
+    presentationReady(id) {
+      const peerId = myPeerId()
+      if (peerId)
+        commit(
+          args.ref,
+          acknowledgePresentation(args.ref.current, peerId, id, clock.now()),
+          deliver,
+        )
+    },
     submit(intent) {
       const me = myPeerId()
       if (me === null) return

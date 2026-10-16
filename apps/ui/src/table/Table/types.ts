@@ -53,7 +53,7 @@ interface TablePayload {
   // the span, like the window's, so the dock's countdown is exact. Absent
   // while a window/pending owns the wait, and before the keeper starts the
   // first turn's clock.
-  turnClock?: { openedAt: number; deadline: number } | null
+  turnClock?: { awaitingPresentation?: true; openedAt: number; deadline: number } | null
   // the local player's id, as the projection names it (`PlayerView.self.id`)
   history: HistoryEntry[]
   setup: Setup

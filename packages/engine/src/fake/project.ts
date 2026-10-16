@@ -212,8 +212,13 @@ export function spectate(state: GameState): SpectatorView {
 
 function publicView(state: GameState, viewerId: PlayerId | null): Omit<PlayerView, 'self'> {
   const top = state.decks.discard[state.decks.discard.length - 1]
+  const index = viewerId === null ? -1 : state.seating.indexOf(viewerId)
+  const circle =
+    index < 0
+      ? state.seating
+      : [...state.seating.slice(index + 1), ...state.seating.slice(0, index)]
   return {
-    opponents: state.seating
+    opponents: circle
       .filter((id) => id !== viewerId)
       .map((id) => ({
         id,
@@ -235,6 +240,7 @@ function publicView(state: GameState, viewerId: PlayerId | null): Omit<PlayerVie
       // The kit asks one question — is a draw still owed — so the answer
       // crosses as the boolean it always was, not as the raw pile list.
       hasDrawn: drawObligationMet(state),
+      awaitingPresentation: state.turn.awaitingPresentation,
       openedAt: state.turn.openedAt,
       deadline: state.turn.deadline,
     },
@@ -242,6 +248,7 @@ function publicView(state: GameState, viewerId: PlayerId | null): Omit<PlayerVie
       player: state.window.target.player,
       slot: state.window.target.slot,
       round: state.window.round,
+      awaitingPresentation: state.window.awaitingPresentation,
       openedAt: state.window.openedAt,
       deadline: state.window.deadline,
       passed: [...state.window.passed],

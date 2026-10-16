@@ -159,7 +159,12 @@ export default function BoardPage() {
         countdownReady={now !== null}
         panel={panel}
         onPanelChange={setPanel}
-        playback={{ events: game.events, restoredThrough: game.restoredThrough }}
+        playback={{
+          events: game.events,
+          restoredThrough: game.restoredThrough,
+          presentation: game.presentation,
+          onPresented: (id) => session.gameLink?.presentationReady(id),
+        }}
         intro={{
           gameId: session.gameId,
           view: game.view,

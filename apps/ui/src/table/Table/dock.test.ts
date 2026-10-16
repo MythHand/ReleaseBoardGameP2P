@@ -359,3 +359,18 @@ it('ticks the clock in exactly the states that draw a counting ring', () => {
     ),
   ).toBe(false)
 })
+
+it('does not spend decision time while presentation is pending', () => {
+  const state: PlayerTableState = {
+    ...base,
+    turn: 'you',
+    hasDrawn: false,
+    turnClock: { openedAt: 1000, deadline: 31000, awaitingPresentation: true },
+  }
+  expect(isCounting(state, 'you')).toBe(false)
+  expect(deriveDock(state, 'you', 15000)).toMatchObject({ progress: 1 })
+  expect(deriveDock(state, 'you', 15000).seconds).toBeUndefined()
+  const reaction = { ...state, pending: { ...defendPending, awaitingPresentation: true as const } }
+  expect(isCounting(reaction, 'you')).toBe(false)
+  expect(deriveDock(reaction, 'you', 15000).seconds).toBeUndefined()
+})

@@ -63,3 +63,5 @@ export const FAKE_EVENTS: DeckEntry[] = [
 export function createFakeEngine(): Engine {
   return { createGame, setupEvents, reduce, project, spectate, legalTargets }
 }
+
+export { activatePresentedClocks, deferNewClocks } from './presentationClock'

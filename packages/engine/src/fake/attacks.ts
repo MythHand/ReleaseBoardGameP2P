@@ -458,6 +458,7 @@ export function pendingView(state: GameState, viewerId: PlayerId | null): Pendin
         attackCard: p.attackId,
         sudo: p.sudo,
         options: mine ? [...p.canDefendWith] : [],
+        awaitingPresentation: p.awaitingPresentation,
         openedAt: p.openedAt,
         deadline: p.deadline,
         scope: p.scope,
@@ -493,6 +494,7 @@ export function pendingView(state: GameState, viewerId: PlayerId | null): Pendin
         attack: p.context.attack.id,
         sudo: !!p.context.combo,
         ...coverView(p.context),
+        awaitingPresentation: p.awaitingPresentation,
         openedAt: p.openedAt,
         deadline: p.deadline,
       }
@@ -504,6 +506,7 @@ export function pendingView(state: GameState, viewerId: PlayerId | null): Pendin
         ...(p.context
           ? { attack: p.context.attack.id, sudo: !!p.context.combo, ...coverView(p.context) }
           : {}),
+        awaitingPresentation: p.awaitingPresentation,
         openedAt: p.openedAt,
         deadline: p.deadline,
       }
@@ -516,6 +519,7 @@ export function pendingView(state: GameState, viewerId: PlayerId | null): Pendin
         ...(p.context
           ? { attack: p.context.attack.id, sudo: !!p.context.combo, ...coverView(p.context) }
           : {}),
+        awaitingPresentation: p.awaitingPresentation,
         openedAt: p.openedAt,
         deadline: p.deadline,
       }

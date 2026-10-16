@@ -3,11 +3,13 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSession } from '~/app/providers/SessionProvider'
 import type { Intent } from '~/network'
 import type { GameClock } from '~/network/session/clock'
+import type { PresentationId } from '~/network/session/presentationGate'
 import { clearLog, readLog, writeLog } from '~/shared/lib/persistence'
 import { mergeEvents } from './mergeEvents'
 
 export interface Game {
   clock: GameClock | null
+  presentation?: PresentationId
   // Null until the first private or public projection arrives.
   view: GameView | null
   events: Event[]
@@ -178,6 +180,7 @@ export function useGame(): Game {
 
   return {
     clock: link?.clock ?? null,
+    presentation: sync?.presentation,
     view: sync?.view ?? null,
     events: pending.length > 0 ? mergeEvents(carried, pending) : carried,
     restoredThrough: restoredNow,

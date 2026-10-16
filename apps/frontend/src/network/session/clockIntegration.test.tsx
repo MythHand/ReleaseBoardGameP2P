@@ -7,6 +7,7 @@ import { useNow } from '~/features/play-game/useNow'
 import type { Transport } from '../transport/peer'
 import type { Sync } from './link'
 import { createMemoryNetwork } from './memoryNetwork'
+import { type PresentationId, samePresentation } from './presentationGate'
 import { createSession } from './referee'
 import { attachKeeper, createRemoteLink } from './remoteLink'
 
@@ -59,11 +60,33 @@ function setup(forward = 100, reverse = 100) {
   })
   net.onDeliver('host', keeper.handleMessage)
   net.onDeliver('guest', remote.handleMessage)
+  // This test exercises countdown rendering, so each board reports itself
+  // settled on receiving a new presentation. Repeated clock-only SYNCs carry
+  // the same revision and must not cause an acknowledgement loop.
+  let hostPresented: PresentationId | undefined
+  let guestPresented: PresentationId | undefined
+  keeper.link.subscribe((value) => {
+    if (
+      value.presentation &&
+      (!hostPresented || !samePresentation(hostPresented, value.presentation))
+    ) {
+      hostPresented = value.presentation
+      keeper.link.presentationReady(value.presentation)
+    }
+  })
   let sync: Sync | null = null
   remote.link.subscribe((value) => {
     sync = value
+    if (
+      value.presentation &&
+      (!guestPresented || !samePresentation(guestPresented, value.presentation))
+    ) {
+      guestPresented = value.presentation
+      remote.link.presentationReady(value.presentation)
+    }
   })
   remote.activate('g1')
+  keeper.resync()
   return {
     ref,
     keeper,
@@ -94,11 +117,11 @@ it.each([
     expect(dock().seconds).toBe(30)
     expect(s.remote.link.clock.now()).toBe(s.keeper.link.clock.now())
     s.remote.link.submit({ type: 'PLAY', card: 'release' })
-    act(() => vi.advanceTimersByTime(250))
+    act(() => vi.advanceTimersByTime(500))
     expect(s.ref.current.state.window).not.toBeNull()
     expect(dock().seconds).toBe(15)
     s.keeper.link.submit({ type: 'ATTACK', card: 'attack' })
-    act(() => vi.advanceTimersByTime(250))
+    act(() => vi.advanceTimersByTime(500))
     expect(s.ref.current.state.pending).toMatchObject({ kind: 'defend', player: 'p1' })
     expect(dock().seconds).toBe(15)
     act(() => vi.advanceTimersByTime(1000))

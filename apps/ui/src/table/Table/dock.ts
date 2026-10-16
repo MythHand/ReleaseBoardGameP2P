@@ -38,6 +38,14 @@ function countdown(
   return { seconds, progress }
 }
 
+function awaitingPresentation(state: TableState): boolean {
+  const pending = state.pending
+  if (pending && pending.kind !== 'discardForRelease')
+    return 'awaitingPresentation' in pending && pending.awaitingPresentation === true
+  if (state.window) return state.window.awaitingPresentation === true
+  return state.turnClock?.awaitingPresentation === true
+}
+
 // Whether any deadline is running for this viewer — the states where
 // `deriveDock` draws a counting ring, and so the only states where a
 // consumer's clock has to tick. Exported because a consumer that ticks on a
@@ -48,7 +56,7 @@ export function isCounting(state: TableState, selfId: string | null, timers = tr
   if (selfId === null || state.you === null) return false
   // The table's clocks switched off by the host: every ring that could have
   // counted is simply full, so there is nothing anywhere to tick.
-  if (!timers) return false
+  if (!timers || awaitingPresentation(state)) return false
   // A release's own price is not a state of the table (#101) — see `deriveDock`
   // below. It is one action inside a turn, so it falls through to the turn's
   // own clock rather than answering here, exactly as the ring it mirrors does.
@@ -123,7 +131,7 @@ export function deriveDock(
   const yours = state.turn === selfId
   const activePlayer = state.opponents.find((o) => o.id === state.turn)?.name
   const pending = state.pending
-  const clock = timers ? countdown : () => FULL_RING
+  const clock = timers && !awaitingPresentation(state) ? countdown : () => FULL_RING
   if (selfId === null || state.you === null) {
     return { state: 'waiting', danger: false, progress: 0, activePlayer }
   }

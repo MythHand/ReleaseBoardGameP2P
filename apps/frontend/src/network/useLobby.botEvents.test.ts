@@ -44,14 +44,16 @@ async function startWithBot() {
 }
 
 // Separate SYNCs in one timer callback lose the first batch to React batching.
-it('keeps window closure in the host feed when the bot acts on the same tick', async () => {
+it('keeps window closure in the host feed before the next paced bot action', async () => {
   const { result, unmount } = await startWithBot()
   try {
     act(() => result.current.game.draw())
     act(() => result.current.game.push())
     expect(result.current.game.view?.turn.player).toBe('p2')
-    for (let i = 0; i < 100 && result.current.game.view?.turn.player === 'p2'; i++) {
+    for (let i = 0; i < 500 && result.current.game.view?.turn.player === 'p2'; i++) {
       await act(async () => {
+        const id = result.current.game.presentation
+        if (id) result.current.lobby.gameLink?.presentationReady(id)
         await vi.advanceTimersByTimeAsync(250)
       })
     }
@@ -67,8 +69,10 @@ it('keeps window closure in the host feed when the bot acts on the same tick', a
 it('keeps the timed-out human draw and turn change before the next bot action', async () => {
   const { result, unmount } = await startWithBot()
   try {
-    for (let i = 0; i < 125 && result.current.game.view?.turn.player === 'p1'; i++) {
+    for (let i = 0; i < 200 && result.current.game.view?.turn.player === 'p1'; i++) {
       await act(async () => {
+        const id = result.current.game.presentation
+        if (id) result.current.lobby.gameLink?.presentationReady(id)
         await vi.advanceTimersByTimeAsync(250)
       })
     }

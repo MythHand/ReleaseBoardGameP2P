@@ -4,11 +4,14 @@ import type { Intent, WireMessage } from '../types'
 import { createAuthorityClock, createRemoteClock } from './clock'
 import { createClockProbe } from './clockProbe'
 import { type GameLink, intervalTicker, type Sync, type Ticker } from './link'
+import { isPresentationId } from './presentationGate'
 import {
+  acknowledgePresentation,
   advanceSession,
   applyIntent,
   commit,
   disconnect,
+  enablePresentation,
   handover,
   type Outgoing,
   rebind,
@@ -74,6 +77,10 @@ export function createRemoteLink(args: {
   return {
     link: {
       clock,
+      presentationReady(presentation) {
+        if (closed) return
+        args.transport.send(keeperPeerId, { type: 'PRESENTATION_READY', payload: { presentation } })
+      },
       submit(intent: Intent) {
         if (closed) return
         args.transport.send(keeperPeerId, { type: 'INTENT', payload: { intent } })
@@ -215,6 +222,8 @@ export function attachKeeper(args: {
     monotonicNow: args.monotonicNow ?? (() => performance.now()),
     initialKeeperNow: args.initialKeeperNow,
   })
+  if (!args.gate || args.gate.open)
+    args.ref.current = enablePresentation(args.ref.current, clock.now(), true)
   const ticker = args.ticker ?? intervalTicker()
   const listeners = new Set<(sync: Sync) => void>()
   // False once this handle has handed the session away or been closed. Every
@@ -275,6 +284,10 @@ export function attachKeeper(args: {
   // Stamped at release, not at arrival: the game begins when the gate opens, so
   // an action cannot carry a timestamp from before the table was live.
   const flush = () => {
+    if (!args.ref.current.presentation) {
+      args.ref.current = enablePresentation(args.ref.current, clock.now())
+      save({ session: args.ref.current, outgoing: syncAll(args.ref.current, []) })
+    }
     const queued = early.splice(0, early.length)
     for (const e of queued) applyNow(e.peerId, e.intent)
   }
@@ -312,6 +325,10 @@ export function attachKeeper(args: {
   return {
     link: {
       clock,
+      presentationReady(id) {
+        if (keeping)
+          save(acknowledgePresentation(args.ref.current, args.transport.id, id, clock.now()))
+      },
       submit(intent) {
         if (!keeping) return
         // Addressed by the keeper's own peer id, exactly as a remote seat's
@@ -336,6 +353,18 @@ export function attachKeeper(args: {
     },
     handleMessage(frame) {
       if (!keeping) return
+      if (frame.type === 'PRESENTATION_READY') {
+        if (isPresentationId(frame.payload?.presentation))
+          save(
+            acknowledgePresentation(
+              args.ref.current,
+              frame.from,
+              frame.payload.presentation,
+              clock.now(),
+            ),
+          )
+        return
+      }
       if (frame.type === 'CLOCK_REQUEST') {
         const value = frame.payload
         if (

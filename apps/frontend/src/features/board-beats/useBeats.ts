@@ -112,6 +112,7 @@ interface Beat {
 }
 
 export interface Beats {
+  settled: boolean
   /** the pile a split has mounted but not yet flown in — drawn invisible until
    * the flight that brings it starts, so it is never seen standing where it has
    * not arrived */
@@ -825,10 +826,15 @@ export function useBeats(args: {
   // A non-animated batch never starts a runner, so it must show live now;
   // there would be no later queue render to release a preview shadow.
   const awaitingBatch =
-    unqueued.length > 0 && planBeats(unqueued, settled.current, live.pending).length > 0
+    enabled &&
+    !reduced &&
+    !running &&
+    (unqueued.length > 0 || Boolean(settled.current.centreOperation)) &&
+    planBeats(unqueued, settled.current, live.pending).length > 0
 
   return {
     /** the pile a split has mounted but not yet flown in — it stays invisible */
+    settled: enabled && !running && !awaitingBatch,
     splittingPile: decks.splitting,
     discardOut: decks.discardOut,
     // The shadow is what the running beat has published, or its own base while

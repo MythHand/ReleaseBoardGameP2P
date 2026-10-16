@@ -127,6 +127,32 @@ it('allows registered spectators and stops replying after close', () => {
   }
 })
 
+it.each([
+  'host',
+  'guest',
+])('starts presentation-held clocks in keeper time when %s acknowledges last', (last) => {
+  const s = setup()
+  try {
+    s.remote.activate('g1')
+    const id = s.ref.current.presentation?.wait?.id
+    if (!id) throw new Error('missing presentation')
+    const firstLink = last === 'host' ? s.remote.link : s.keeper.link
+    const lastLink = last === 'host' ? s.keeper.link : s.remote.link
+    firstLink.presentationReady(id)
+    expect(s.ref.current.state.turn.awaitingPresentation).toBe(true)
+    s.advance(500)
+    s.wall(-9_000_000)
+    lastLink.presentationReady(id)
+    expect(s.ref.current.state.turn.openedAt).toBe(10_500)
+    expect(s.ref.current.state.turn.deadline).toBe(40_500)
+    expect(s.remote.link.clock.now()).toBe(10_500)
+    expect(s.keeper.link.clock.now()).toBe(10_500)
+  } finally {
+    s.remote.link.close()
+    s.keeper.close()
+  }
+})
+
 it('preserves an adopted deadline when the successor has a different epoch', () => {
   const s = setup()
   const extras: (() => void)[] = []
@@ -134,6 +160,10 @@ it('preserves an adopted deadline when the successor has a different epoch', () 
     s.ref.current.state.decks.main = [[{ uid: 'draw', id: 'defense-hotfix' }]]
     s.remote.activate('g1')
     s.keeper.link.submit({ type: 'DRAW' })
+    const shown = s.ref.current.presentation?.wait?.id
+    if (!shown) throw new Error('missing presentation')
+    s.keeper.link.presentationReady(shown)
+    s.remote.link.presentationReady(shown)
     const deadline = s.ref.current.state.turn.deadline
     expect(deadline).toBe(40_000)
     s.advance(5000)
@@ -148,6 +178,7 @@ it('preserves an adopted deadline when the successor has a different epoch', () 
         keeperId: 'p2',
         engine: s.ref.current.engine,
         seats: s.ref.current.seats,
+        presentation: s.ref.current.presentation,
       }),
     }
     const ticks: (() => void)[] = []

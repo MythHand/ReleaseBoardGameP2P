@@ -37,6 +37,7 @@ export interface WindowView {
   slot: ReleaseSlot
   round: number
   // Both ends of the span, so the ring's sweep is exact rather than assumed.
+  awaitingPresentation?: true
   openedAt: number
   deadline: number
   passed: PlayerId[]
@@ -61,6 +62,7 @@ export type PendingView =
       attackCard: CardId
       sudo: boolean
       options: CardUid[]
+      awaitingPresentation?: true
       openedAt: number
       deadline: number
       scope: 'release' | 'hand'
@@ -103,6 +105,7 @@ export type PendingView =
       cover?: CardId
       coverSudo?: boolean
       coverBy?: PlayerId
+      awaitingPresentation?: true
       openedAt: number
       deadline: number
     }
@@ -115,6 +118,7 @@ export type PendingView =
       cover?: CardId
       coverSudo?: boolean
       coverBy?: PlayerId
+      awaitingPresentation?: true
       openedAt?: number
       deadline?: number
     }
@@ -128,6 +132,7 @@ export type PendingView =
       cover?: CardId
       coverSudo?: boolean
       coverBy?: PlayerId
+      awaitingPresentation?: true
       openedAt?: number
       deadline?: number
     }
@@ -237,6 +242,7 @@ export interface PlayerView {
     // and how long is left. Absent while a window, a pending or a running draw
     // owns the wait (and before the keeper starts the first turn's clock).
     // Both ends of the span, so a countdown is exact rather than assumed.
+    awaitingPresentation?: true
     openedAt?: number
     deadline?: number
   }

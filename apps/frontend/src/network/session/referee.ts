@@ -1,8 +1,24 @@
 import type { Action, DeckEntry, Engine, Event, GameState, PlayerId, Setup } from '@release/engine'
-import { botAction, drawObligationMet, HAND_CHOICE_MS } from '@release/engine/fake'
+import {
+  activatePresentedClocks,
+  botAction,
+  deferNewClocks,
+  drawObligationMet,
+  HAND_CHOICE_MS,
+} from '@release/engine/fake'
 import { IS_DEV } from '~/shared/config'
 import type { Intent, Message } from '../types'
 import { forViewer, rejectionsIn } from './audience'
+import {
+  ackPresentation,
+  beginPresentation,
+  botReady,
+  dropPresentationPeer,
+  type PresentationId,
+  type PresentationRuntime,
+  presentationReady,
+  restorePresentationRuntime,
+} from './presentationGate'
 
 export interface Seat {
   playerId: PlayerId
@@ -27,6 +43,7 @@ export interface Session {
   // reduce, fan out and forget — which is precisely why a peer that missed a
   // batch could never be told what was in it.
   log: Event[]
+  presentation?: PresentationRuntime
 }
 
 // The session is immutable and every entry point returns a new one, so the
@@ -57,6 +74,7 @@ export function syncMessage(
     payload: {
       view: session.engine.project(session.state, playerId),
       events: forViewer(events, playerId),
+      presentation: session.presentation?.wait?.id,
       ...(resync ? { resync: true } : {}),
     },
   }
@@ -162,7 +180,16 @@ export function disconnect(session: Session, peerId: string, now: number): Sessi
   const seats = session.seats.map((s) =>
     s.peerId === peerId ? { ...s, peerId: null, absentSince: now } : s,
   )
-  return { session: { ...session, seats }, outgoing: [] }
+  return {
+    session: {
+      ...session,
+      seats,
+      presentation: session.presentation
+        ? dropPresentationPeer(session.presentation, peerId)
+        : undefined,
+    },
+    outgoing: [],
+  }
 }
 
 export function rebind(
@@ -202,7 +229,12 @@ export function rebind(
   // blinking the connection extends nothing. The first clock stays the
   // ticker's to start — an undefined deadline is not an expired one.
   const { turn } = next.state
-  if (turn.player === playerId && turn.deadline !== undefined && now >= turn.deadline) {
+  if (
+    turn.player === playerId &&
+    turn.deadline !== undefined &&
+    !turn.awaitingPresentation &&
+    now >= turn.deadline
+  ) {
     const { state, events } = next.engine.reduce(next.state, { type: 'CLOCK_STARTED', at: now })
     if (state !== next.state) {
       const restamped: Session = { ...next, state, log: [...next.log, ...events] }
@@ -216,13 +248,17 @@ export function rebind(
       // seat's ordinary unmarked delta while giving the rejoiner the one
       // resync it is owed — built from `restamped.log`, which already carries
       // this CLOCK_STARTED's own events, rather than `next.log`, which does not.
-      return {
-        session: restamped,
-        outgoing: [
-          ...syncAll(restamped, events).filter((o) => o.to !== peerId),
-          { to: peerId, message: syncMessage(restamped, playerId, restamped.log, true) },
-        ],
-      }
+      return presentResult(
+        session,
+        {
+          session: restamped,
+          outgoing: [
+            ...syncAll(restamped, events).filter((o) => o.to !== peerId),
+            { to: peerId, message: syncMessage(restamped, playerId, restamped.log, true) },
+          ],
+        },
+        now,
+      )
     }
   }
 
@@ -379,8 +415,109 @@ export function driveUnattended(session: Session, now: number): SessionResult {
 // Publish one final projection with both event batches: React consumers keep
 // only the last state update from that callback. syncAll still filters each
 // recipient's events through the normal audience boundary.
+// Shells opt into presentation when attaching a real local or network board.
+// Pure referee/engine callers remain deterministic without a renderer.
+export function enablePresentation(session: Session, now: number, replaceKeeper = false): Session {
+  if (session.presentation) {
+    if (!replaceKeeper) return session
+    const restored = restorePresentationRuntime(
+      session.presentation,
+      session.gameId,
+      crypto.randomUUID(),
+      now,
+    )
+    return {
+      ...session,
+      presentation: {
+        ...restored,
+        wait: restored.wait ? { ...restored.wait, waitingPeers: presentationPeers(session) } : null,
+      },
+    }
+  }
+  const runtime: PresentationRuntime = {
+    incarnation: crypto.randomUUID(),
+    revision: 0,
+    wait: null,
+    botNotBefore: now + 2000,
+  }
+  const started = session.engine.reduce(session.state, { type: 'CLOCK_STARTED', at: now }).state
+  return {
+    ...session,
+    state: deferNewClocks(session.state, started),
+    presentation: beginPresentation(runtime, session.gameId, presentationPeers(session), now),
+  }
+}
+
+function presentationPeers(session: Session): string[] {
+  return session.seats.flatMap((seat) => (!seat.bot && seat.peerId ? [seat.peerId] : []))
+}
+
+function presentResult(before: Session, result: SessionResult, now: number): SessionResult {
+  if (
+    !before.presentation ||
+    result.session.state === before.state ||
+    result.session.presentation?.revision !== before.presentation.revision
+  )
+    return result
+  const next = {
+    ...result.session,
+    state: deferNewClocks(before.state, result.session.state),
+    presentation: beginPresentation(
+      before.presentation,
+      before.gameId,
+      presentationPeers(result.session),
+      now,
+    ),
+  }
+  const outgoing = result.outgoing.map((item): Outgoing => {
+    if (item.message.type !== 'SYNC') return item
+    const seat = seatOfPeer(next, item.to)
+    const { events, resync } = item.message.payload
+    return {
+      to: item.to,
+      message: seat
+        ? syncMessage(next, seat.playerId, events, resync)
+        : spectatorSyncMessage(next, events, resync),
+    }
+  })
+  return { session: next, outgoing }
+}
+
+export function acknowledgePresentation(
+  session: Session,
+  peerId: string,
+  id: PresentationId,
+  now: number,
+): SessionResult {
+  if (!session.presentation || !seatOfPeer(session, peerId)) return { session, outgoing: [] }
+  const presentation = ackPresentation(session.presentation, peerId, id)
+  const next = presentation === session.presentation ? session : { ...session, presentation }
+  return releasePresentation(next, now)
+}
+
+function releasePresentation(session: Session, now: number): SessionResult {
+  if (!session.presentation || !presentationReady(session.presentation, now))
+    return { session, outgoing: [] }
+  const state = activatePresentedClocks(session.state, now)
+  if (state === session.state) return { session, outgoing: [] }
+  const next = { ...session, state }
+  return { session: next, outgoing: syncAll(next, []) }
+}
+
 export function advanceSession(session: Session, now: number): SessionResult {
-  const timed = tick(session, now)
+  const released = releasePresentation(session, now)
+  if (released.session !== session) {
+    if (released.session.presentation && botReady(released.session.presentation, now)) {
+      const driven = presentResult(released.session, driveUnattended(released.session, now), now)
+      if (driven.session.state !== released.session.state) return driven
+    }
+    return released
+  }
+  const timed = presentResult(session, tick(session, now), now)
+  if (session.presentation) {
+    if (timed.session.state !== session.state || !botReady(session.presentation, now)) return timed
+    return presentResult(session, driveUnattended(session, now), now)
+  }
   const driven = driveUnattended(timed.session, now)
   if (driven.session === timed.session) return timed
   if (timed.session === session) return driven
@@ -460,7 +597,7 @@ export function applyIntent(
   }
 
   const next: Session = { ...session, state, log: [...session.log, ...events] }
-  return { session: next, outgoing: syncAll(next, events) }
+  return presentResult(session, { session: next, outgoing: syncAll(next, events) }, now)
 }
 
 // Voluntary only. A keeper that crashes takes GameState and the seed with it,
@@ -484,7 +621,10 @@ export function handover(session: Session, toPlayerId: PlayerId): SessionResult 
     outgoing: [
       {
         to: successor.peerId,
-        message: { type: 'KEEPER_STATE', payload: { state: session.state } },
+        message: {
+          type: 'KEEPER_STATE',
+          payload: { state: session.state, presentation: session.presentation },
+        },
       },
       { to: 'broadcast', message: { type: 'KEEPER_CHANGED', payload: { keeperId: toPlayerId } } },
     ],
@@ -497,6 +637,7 @@ export function handover(session: Session, toPlayerId: PlayerId): SessionResult 
 // caller has the match's own log in hand (read back from storage) and passes
 // it through.
 export function adoptSession(args: {
+  presentation?: PresentationRuntime
   state: GameState
   gameId: string
   keeperId: PlayerId
@@ -516,6 +657,19 @@ export function adoptSession(args: {
     seats: args.seats,
     log: args.log ?? [],
     spectators: [],
+    presentation: args.presentation
+      ? {
+          ...args.presentation,
+          wait: args.presentation.wait
+            ? {
+                ...args.presentation.wait,
+                waitingPeers: args.seats.flatMap((seat) =>
+                  !seat.bot && seat.peerId ? [seat.peerId] : [],
+                ),
+              }
+            : null,
+        }
+      : undefined,
   }
 }
 
@@ -550,7 +704,12 @@ export function tick(session: Session, now: number): SessionResult {
   // and the wrong one: `handLimit` and `crush` (state.ts) carry no deadline of
   // their own, so one of those coexisting with an open window would hold that
   // window open for as long as the pending seat stayed silent.
-  if (window && pending?.kind !== 'defend' && now >= window.deadline) {
+  if (
+    window &&
+    !window.awaitingPresentation &&
+    pending?.kind !== 'defend' &&
+    now >= window.deadline
+  ) {
     const { state, events } = session.engine.reduce(session.state, {
       type: 'WINDOW_EXPIRED',
       at: now,
@@ -563,7 +722,7 @@ export function tick(session: Session, now: number): SessionResult {
   // A stalled defence blocks every other player, which is why the engine gives
   // it a deadline — but it gives no expiry action, so the keeper answers with
   // the passive default on the owing player's behalf.
-  if (pending?.kind === 'defend' && now >= pending.deadline) {
+  if (pending?.kind === 'defend' && !pending.awaitingPresentation && now >= pending.deadline) {
     const seat = session.seats.find((s) => s.playerId === pending.player)
     // A disconnected owing seat has nobody to resolve on: the stalled defence
     // simply waits for that seat to reconnect rather than being force-resolved.
@@ -601,6 +760,7 @@ export function tick(session: Session, now: number): SessionResult {
     pending &&
     (pending.kind === 'stealCard' || pending.kind === 'requestCard') &&
     pending.deadline !== undefined &&
+    !pending.awaitingPresentation &&
     now >= pending.deadline
   ) {
     const seat = session.seats.find((s) => s.playerId === pending.player)
@@ -634,7 +794,7 @@ export function tick(session: Session, now: number): SessionResult {
       return { session: next, outgoing: syncAll(next, events) }
     }
 
-    if (now >= turn.deadline) {
+    if (!turn.awaitingPresentation && now >= turn.deadline) {
       // The same rule as the stalled defence above: a deadline never fires
       // against a seat with nobody in it — driveUnattended's grace period owns a
       // disconnected seat's forward progress.
@@ -712,6 +872,7 @@ export function spectatorSyncMessage(session: Session, events: Event[], resync =
     payload: {
       view: session.engine.spectate(session.state),
       events: forViewer(events, null),
+      presentation: session.presentation?.wait?.id,
       ...(resync ? { resync: true } : {}),
     },
   }

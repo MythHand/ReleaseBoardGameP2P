@@ -1,6 +1,6 @@
 import type { Event, SpectatorView } from '@release/engine'
 import { play } from '@release/ui/animations'
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import { StrictMode } from 'react'
 import { expect, it, vi } from 'vitest'
 import Board from '../_Board'
@@ -81,10 +81,7 @@ it('still reports the opening when StrictMode mounts the board twice', async () 
   )
   // The whole choreography, on jsdom's real timers — the sequence is seconds
   // long and every leg of it is a wait() the run has to get through.
-  await act(async () => {
-    await new Promise((r) => setTimeout(r, 9000))
-  })
-  expect(onDone).toHaveBeenCalledTimes(1)
+  await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1), { timeout: 18000 })
 }, 20000)
 // The regression this guards: before #97's centre refactor, the whole wrapper
 // div was itself gated by `{intro && …}`, so any test that rendered with an

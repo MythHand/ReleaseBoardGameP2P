@@ -141,7 +141,9 @@ it('drops observer intents before the intro queue even if that peer later takes 
   }
   gate.ready('a')
   gate.ready('b')
-  expect(ref.current.state).toBe(state)
+  expect(ref.current.state.decks).toBe(state.decks)
+  expect(ref.current.state.players).toBe(state.players)
+  expect(ref.current.state.turn.drawnFrom).toEqual(state.turn.drawnFrom)
   keeper.close()
 })
 

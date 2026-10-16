@@ -193,6 +193,7 @@ export interface StoredLobbyConfig {
 }
 
 export interface StoredKeeper {
+  presentation?: unknown
   gameId: string
   keeperId: string
   state: unknown

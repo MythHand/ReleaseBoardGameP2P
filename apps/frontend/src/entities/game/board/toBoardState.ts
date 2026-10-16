@@ -757,7 +757,11 @@ export function toBoardState(view: GameView, log: Event[], labels: HistoryLabels
     // a bound that does not exist.
     turnClock:
       view.turn.openedAt !== undefined && view.turn.deadline !== undefined
-        ? { openedAt: view.turn.openedAt, deadline: view.turn.deadline }
+        ? {
+            awaitingPresentation: view.turn.awaitingPresentation,
+            openedAt: view.turn.openedAt,
+            deadline: view.turn.deadline,
+          }
         : null,
     history,
     setup: view.setup,
