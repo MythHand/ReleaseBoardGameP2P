@@ -179,6 +179,33 @@ const withAiEvent = (event: CardInstance, hand: CardInstance[] = []): GameState 
   }
 }
 
+for (const monitoring of [
+  MON,
+  { uid: 'ai-monitoring#e1', id: 'protection-monitoring', event: 'ai-monitoring' } as CardInstance,
+]) {
+  it(`automatically neutralizes ai-error-503 with standing ${monitoring.event ?? monitoring.id}`, () => {
+    const event: CardInstance = { uid: 'ai-error-503#e0', id: 'ai-error-503' }
+    const s = withAiEvent(event, [DBG])
+    const guarded: GameState = {
+      ...s,
+      players: {
+        ...s.players,
+        p1: { ...s.players.p1, release: { monitoring } },
+      },
+    }
+
+    const drawn = reduce(guarded, { type: 'DRAW', player: 'p1', at: 1000 })
+    expect(drawn.state.pending).toBeNull()
+    expect(drawn.events).toContainEqual(
+      expect.objectContaining({ type: 'neutralized', player: 'p1', method: 'monitoring' }),
+    )
+    expect(drawn.state.players.p1.release.monitoring).toEqual(monitoring)
+    expect(drawn.state.players.p1.hand).toContainEqual(DBG)
+    expect(drawn.state.decks.events).toEqual([event])
+    expect(drawn.state.decks.discard).not.toContainEqual(event)
+  })
+}
+
 it('sends the ai-error-503 mimic home to the events deck, never to the discard', () => {
   // `resolveAiEvent`'s `ai-error-503` branch sets `card: null` on the
   // `neutralize503` pending it raises: `fireTrigger`'s `trigger-ai` branch has
@@ -197,6 +224,7 @@ it('sends the ai-error-503 mimic home to the events deck, never to the discard',
   expect(drawn.state.pending).toMatchObject({
     kind: 'neutralize503',
     card: null,
+    methods: ['debugger'],
     source: 'ai-error-503',
   })
 
