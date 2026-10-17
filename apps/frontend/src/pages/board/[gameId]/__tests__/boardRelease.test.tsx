@@ -466,6 +466,35 @@ function faceOf(cardId: string): HTMLElement | null {
   return document.querySelector<HTMLElement>(`[data-hand-slot] [data-card="${cardId}"]`)
 }
 
+it('dims a DDoS-frozen release until it thaws, without dimming other releases', () => {
+  const base = makeBoardProps()
+  const frozenUid = 'release-frontend#0'
+  const hand = [
+    { uid: frozenUid, card: frontend },
+    // biome-ignore lint/style/noNonNullAssertion: a known catalogue entry
+    { uid: 'release-backend#0', card: cardById('release-backend')! },
+  ]
+  const props = makeBoardProps({
+    state: {
+      ...base.state,
+      you: { ...base.state.you, hand },
+      frozen: [frozenUid],
+      playable: ['release-backend#0'],
+    },
+  })
+  const { rerender } = render(<Board {...props} />)
+  const stateOf = (uid: string) =>
+    document.querySelector(`[data-hand-slot="${uid}"] > [data-state]`)?.getAttribute('data-state')
+
+  expect(stateOf(frozenUid)).toBe('disabled')
+  expect(stateOf('release-backend#0')).toBe('idle')
+
+  rerender(
+    <Board {...props} state={{ ...props.state, frozen: [], playable: hand.map((c) => c.uid) }} />,
+  )
+  expect(stateOf(frozenUid)).toBe('idle')
+})
+
 it('lights exactly the cards that may pay the cost, in the loss hue', () => {
   render(costLitBoard(['attack-bug#0']))
   const payer = faceOf('attack-bug')
