@@ -373,7 +373,7 @@ function TableView({
                 label={copy.table.deck}
                 deck="base"
                 count={count}
-                width={you === null ? 80 : PILE_WIDTH}
+                width={PILE_WIDTH}
                 countPos="tl"
               />
             ))}
@@ -383,7 +383,7 @@ function TableView({
                   label={copy.table.events}
                   deck="ai"
                   count={decks.events}
-                  width={you === null ? 80 : 150}
+                  width={150}
                   countPos="tl"
                 />
               </div>
@@ -400,7 +400,7 @@ function TableView({
             heapShow={HEAP_SHOW}
             topCard={decks.discard}
             count={decks.discardCount}
-            width={you === null ? 80 : 116}
+            width={116}
           />
         </div>
 
@@ -434,7 +434,6 @@ function TableView({
         {/* служебный док хода — низ слева, под колодами, слева от руки */}
         <div className={styles.turnDock}>
           <TurnDock
-            spectatorLabel={you === null ? copy.participants.spectator : undefined}
             state={dockView.state}
             danger={dockView.danger}
             seconds={dockView.seconds}
@@ -442,7 +441,9 @@ function TableView({
             activePlayer={dockView.activePlayer}
             passed={dockView.passed}
             passes={dockView.passes}
-            copy={copy.turnDock}
+            copy={
+              you === null ? { ...copy.turnDock, turnOf: copy.turnDock.playerTurn } : copy.turnDock
+            }
             paused={paused}
             onDraw={actions?.onDraw ? () => actions.onDraw?.() : undefined}
             onPush={actions?.onPush}

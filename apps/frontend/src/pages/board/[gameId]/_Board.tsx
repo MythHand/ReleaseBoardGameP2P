@@ -2209,7 +2209,6 @@ function BoardView({
       <div className={kit.turnDock}>
         <div className={enter} ref={anchors.dock}>
           <TurnDock
-            spectatorLabel={you === null ? copy.participants.spectator : undefined}
             state={dockView.state}
             danger={dockView.danger}
             seconds={dockView.seconds}
