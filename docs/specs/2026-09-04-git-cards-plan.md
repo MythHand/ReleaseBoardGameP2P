@@ -22,7 +22,7 @@ the projection with beats that animate only arrivals.
 (`TablePending`, `PendingPrompt`, `@release/ui/animations`).
 
 **Spec:** [`docs/specs/2026-09-04-git-cards-design.md`](./2026-09-04-git-cards-design.md)
-**Rules answers:** [`docs/specs/2026-09-04-git-cards-rules-decisions.md`](./2026-09-04-git-cards-rules-decisions.md)
+**Rules answers:** [`docs/rules/decisions/2026-09-04-git-cards-rules-decisions.md`](../rules/decisions/2026-09-04-git-cards-rules-decisions.md)
 
 ## Global Constraints
 

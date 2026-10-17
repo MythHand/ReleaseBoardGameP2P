@@ -97,10 +97,11 @@ function CardOption({
 // The guess space for `requestCard`: every card that can actually BE in a
 // hand, which is not the whole catalogue. Two groups are excluded, and the
 // rules say so outright rather than leaving it to inference:
-//   • triggers — `docs/rules/cards.md:320` («Обе карты нельзя держать в руке»)
-//     and `:339` («В руку триггер не попадает ни на мгновение»): they resolve
-//     at the moment they are drawn and never reach a hand.
-//   • the events deck — `docs/rules/general.md:189`: each of its cards is at
+//   • triggers — `docs/rules/cards.md`, section «trigger — срабатывают при
+//     доборе» («Обе карты нельзя держать в руке»), and its Error 503 section
+//     («В руку триггер не попадает ни на мгновение»): they resolve at the
+//     moment they are drawn and never reach a hand.
+//   • the events deck — `docs/rules/general.md` §6.4: each of its cards is at
 //     any time «либо в колоде, либо на столе», so none passes through a hand.
 // Offering them made a guess that cannot possibly hit look like a legal one —
 // worse than a missing option, because nothing rejects it and the request just

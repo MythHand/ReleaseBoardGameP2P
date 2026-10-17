@@ -18,8 +18,8 @@ the story.
 > `_useInsideStaging.tsx` (#106). Nothing here rebuilds any of them.
 >
 > Rules answers used by slices B and C are in
-> [`2026-09-04-git-cards-rules-decisions.md`](./2026-09-04-git-cards-rules-decisions.md); the earlier
-> Git set is in [`2026-08-02-git-operations-rules-decisions.md`](./2026-08-02-git-operations-rules-decisions.md).
+> [`2026-09-04-git-cards-rules-decisions.md`](../rules/decisions/2026-09-04-git-cards-rules-decisions.md); the earlier
+> Git set is in [`2026-08-01-git-operations-open-questions.md`](../rules/decisions/2026-08-01-git-operations-open-questions.md).
 
 ## The goal
 

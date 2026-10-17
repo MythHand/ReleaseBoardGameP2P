@@ -110,10 +110,11 @@ it('resolves requestCard with a real catalogue card id, not a release slot', () 
 it('offers only cards that can actually be in a hand', () => {
   // The guess space is not the whole catalogue. Two groups can never be held,
   // and the rules say so outright rather than leaving it to be inferred:
-  //   • triggers — docs/rules/cards.md:320 «Обе карты нельзя держать в руке»
-  //     and :339 «В руку триггер не попадает ни на мгновение»; they resolve at
-  //     the moment they are drawn.
-  //   • the events deck — docs/rules/general.md:189, every one of its cards is
+  //   • triggers — docs/rules/cards.md, section «trigger — срабатывают при
+  //     доборе» («Обе карты нельзя держать в руке»), and its Error 503 section
+  //     («В руку триггер не попадает ни на мгновение»); they resolve at the
+  //     moment they are drawn.
+  //   • the events deck — docs/rules/general.md §6.4, every one of its cards is
   //     "либо в колоде, либо на столе", so none of them passes through a hand.
   // Offering them makes a guess that cannot possibly hit look like a legal
   // one, which is worse than a missing option: nothing rejects it, the request

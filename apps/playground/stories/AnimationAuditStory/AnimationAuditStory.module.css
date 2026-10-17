@@ -96,6 +96,24 @@
   inline-size: 38vw;
 }
 
+/* The divergence table: column 2 is a list of places, not the prose column the
+   other tables keep there, so it takes an equal share instead of 38vw. */
+.divTable th:nth-child(2),
+.divTable td:nth-child(2) {
+  inline-size: auto;
+}
+
+/* the game situation a run of divergence rows belongs to */
+.table .groupRow td {
+  padding-block: 18px 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--white-50);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border-block-end: 1px solid var(--white-14);
+}
+
 .table tr:hover td {
   background: var(--white-03);
 }
@@ -211,4 +229,29 @@
    а это ровно то, ради чего колонка и заведена */
 .playgroundOnly {
   color: var(--white-30);
+}
+
+/* the link to the register entry — one short word, so a narrow column */
+.finding {
+  inline-size: 110px;
+}
+
+/* a link between a divergence row and its register entry */
+.ref {
+  color: var(--brand-green);
+  text-decoration: none;
+}
+
+.ref:hover {
+  text-decoration: underline;
+}
+
+/* a group heading does not light up under the cursor like a row of content */
+.table .groupRow:hover td {
+  background: none;
+}
+
+/* a row reached by its link lands clear of the page's top edge */
+.anchored {
+  scroll-margin-block-start: 24px;
 }

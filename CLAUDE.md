@@ -11,7 +11,7 @@ what happens, in what order, under which card id: `general` (frame of a match), 
 with its id, print run, effect, what cancels it), `resolution` (order of resolution — windows,
 priority, when a win is final), `modes` (the five mode axes), `backlog` (disputed and undecided),
 `decisions/` (the questions put to the rules owner and his answers, which the spec is built on —
-moving here from `docs/specs/` in parts; the `*-rules-decisions.md` files are still there).
+each question and its answer in one record).
 Do not "improve" the rules text from the spec; a disagreement means the text wins and the finding
 goes to `docs/rules/backlog.md`.
 
@@ -205,7 +205,7 @@ fix/158-history-panel-scroll
 
 - Анимации собираются **из модулей**, а не пишутся полётами вручную. Словарь и хелперы — в `apps/ui/src/animations/`: пресеты через `play('name', el, params)` плюс `jitter`, `wait`, `nextFrames`. Нужен новый кусочек — оформляй его модулем, потом используй.
 - **Источник состояния работы с анимациями — страница плейграунда `Interaction audit`** (`apps/playground/stories/AnimationAuditStory`): какие модули готовы (со статусами), какие сценарии из них собраны, и реестр находок. Перед работой над анимациями сверяй актуальные статусы там; при изменениях вписывай их обратно в эту страницу. Живой каталог самого словаря — соседняя страница `Animations`: каждый пресет показан в своей форме и запускается.
-- **Письменная пара этих страниц — [`docs/animations/`](./docs/animations/)**, спека под чтение агентом: `README` (модель и инварианты I1–I10), `recipes` (последовательности по игровым ситуациям), `reference` (вызываемое: пресеты, хелперы, шаги), `glossary` (параметры и значения), `extending` (как добавить своё), `backlog` (находки развёрнуто). Страница показывает состояние, спека объясняет применение — это не дубли, а разные потребители. Часть синхронности проверяется машиной: пресет без строки в `reference.md` роняет тест (`apps/ui/src/animations/docs.test.ts`).
+- **Письменная пара этих страниц — [`docs/animations/`](./docs/animations/)**, спека под чтение агентом: `README` (модель и инварианты I1–I12), `recipes` (последовательности по игровым ситуациям), `reference` (вызываемое: пресеты, хелперы, шаги), `glossary` (параметры и значения), `extending` (как добавить своё), `backlog` (находки развёрнуто). Страница показывает состояние, спека объясняет применение — это не дубли, а разные потребители. Часть синхронности проверяется машиной: пресет без строки в `reference.md` роняет тест (`apps/ui/src/animations/docs.test.ts`).
 - **Наткнулся на дыру — заноси её, а не обходи.** Нет модуля под нужное движение, значение недостижимо, правило не решено — запись идёт в реестр находок на странице аудита (видно), развёрнуто — в `docs/animations/backlog.md` (чем грозит и что закроет). Местный обход, о котором никто не узнал, — это то, из-за чего одно движение оказывается написанным трижды.
 
 ---
