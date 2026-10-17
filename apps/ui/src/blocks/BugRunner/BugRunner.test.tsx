@@ -73,3 +73,28 @@ it('reports both ends of every run, the score of a run that only matches the bes
   expect(onRunEnd).toHaveBeenCalledTimes(2)
   expect(onRunEnd.mock.calls[1]?.[0]).toBe(score)
 })
+
+it('reports a run taken away in the middle with the score it stood at, and only once', () => {
+  const onRunEnd = vi.fn()
+  const { getByRole, unmount } = render(<BugRunner label="bug runner" onRunEnd={onRunEnd} />)
+  fireEvent.pointerDown(getByRole('button', { name: 'bug runner' }))
+  // a second of running, short of the first hotfix
+  for (let i = 0; i < 60; i += 1) {
+    const frame = frames.shift()
+    clock += 16
+    act(() => frame?.(clock))
+  }
+  expect(onRunEnd).not.toHaveBeenCalled()
+  unmount()
+  expect(onRunEnd).toHaveBeenCalledTimes(1)
+  expect(onRunEnd.mock.calls[0]?.[0]).toBeGreaterThan(0)
+})
+
+it('does not report a run that has already ended when the block goes', () => {
+  const onRunEnd = vi.fn()
+  const { getByRole, unmount } = render(<BugRunner label="bug runner" onRunEnd={onRunEnd} />)
+  fireEvent.pointerDown(getByRole('button', { name: 'bug runner' }))
+  runToTheEnd()
+  unmount()
+  expect(onRunEnd).toHaveBeenCalledTimes(1)
+})

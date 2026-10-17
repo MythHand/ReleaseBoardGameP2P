@@ -211,6 +211,15 @@ export default function BugRunner({ label, className = '', onRunStart, onRunEnd 
     return () => cancelAnimationFrame(raf)
   }, [phase, paint])
 
+  // A run the block is taken away in the middle of — the lobby giving way to a
+  // match — ends where it stood, and is reported as any other run's end.
+  useEffect(
+    () => () => {
+      if (game.current.phase === 'running') onRunEndRef.current?.(scoreOf(game.current))
+    },
+    [],
+  )
+
   // A payment shows as "+n" beside the score for a moment: popIn, a hold,
   // popOut. A new one while the last is still up takes its place and starts over.
   useEffect(() => {

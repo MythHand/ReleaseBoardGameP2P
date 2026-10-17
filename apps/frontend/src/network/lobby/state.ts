@@ -92,7 +92,11 @@ export function applyPeerJoined(state: LobbyState, peer: PeerInfo): LobbyState {
 export function applyPeerLeft(state: LobbyState, peerId: string): LobbyState {
   const peers = { ...state.peers }
   delete peers[peerId]
-  return { ...state, peers }
+  if (state.bugRunner?.started[peerId] === undefined) return { ...state, peers }
+  // a run the peer left in the middle of has no end coming: its start goes with
+  // the peer, while the member's record stays for their return
+  const { [peerId]: _, ...started } = state.bugRunner.started
+  return { ...state, peers, bugRunner: { ...state.bugRunner, started } }
 }
 
 export function applyConfig(

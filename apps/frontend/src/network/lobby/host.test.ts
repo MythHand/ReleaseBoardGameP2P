@@ -578,9 +578,27 @@ it('turns away a score with no run the host heard start, or above what the run�
   // the number the review typed in, after a minute's run
   expect(bugRun(joined, 'p1', Number.MAX_SAFE_INTEGER).state.peers.p1.bugRunner).toBeUndefined()
   // one point over the ceiling for a ten-second run, with the network's slack
-  const over = maxBugRunnerScore(10 + 3) + 1
+  const over = maxBugRunnerScore(10 + 1) + 1
   expect(bugRun(joined, 'p1', over, 10).state.peers.p1.bugRunner).toBeUndefined()
   expect(bugRun(joined, 'p1', over - 1, 10).state.peers.p1.bugRunner).toBe(over - 1)
+})
+
+// A run of a few seconds — cut short by the bug's first crash, or by the match
+// starting — is timed as the short run it was: its own score passes, a long
+// run's does not.
+it('takes a short run’s score, and holds it to a short run’s ceiling', () => {
+  const joined = handleJoinRequest(base(4), 'p1', 'member-p1', 'Pam', { matchRunning: false }).state
+  expect(bugRun(joined, 'p1', 90, 3).state.peers.p1.bugRunner).toBe(90)
+  expect(bugRun(joined, 'p1', 1840, 3).state.peers.p1.bugRunner).toBeUndefined()
+})
+
+it('drops a run’s start when its runner leaves, and keeps the member’s record', () => {
+  const joined = handleJoinRequest(base(4), 'p1', 'member-p1', 'Pam', { matchRunning: false }).state
+  const scored = bugRun(joined, 'p1', 2315).state
+  const running = handleBugRunnerStart(scored, 'p1', T0).state
+  const gone = applyPeerLeft(running, 'p1')
+  expect(gone.bugRunner?.started).toEqual({})
+  expect(gone.bugRunner?.best['member-p1']).toBe(2315)
 })
 
 it('closes a run with its score, so one start does not time a second score', () => {

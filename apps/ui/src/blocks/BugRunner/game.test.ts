@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   BONUS,
+  BUG,
   BUG_X,
   type Game,
   MONITOR_Y,
@@ -204,18 +205,41 @@ describe('maxScoreWithin', () => {
       return s / 4294967296
     }
   }
+  // jumps when a hotfix comes within an eighth of a second of the bug's front
   const jumpsHotfixes = (g: Game) =>
-    g.obstacles.some((o) => o.kind === 'hotfix' && o.x > BUG_X && o.x - BUG_X < 14)
+    g.obstacles.some((o) => {
+      const ahead = o.x - (BUG_X + BUG.w)
+      return o.kind === 'hotfix' && ahead >= 0 && ahead < g.speed * 0.12
+    })
+  // a run of `seconds`, each frame handed to `check`
+  const run = (seed: number, seconds: number, check: (g: Game) => void = () => {}) => {
+    const rng = seeded(seed)
+    let g = press(newGame(240), 0)
+    for (let frame = 0; frame < 60 * seconds && g.phase === 'running'; frame++) {
+      const now = (frame * 1000) / 60
+      if (jumpsHotfixes(g)) g = press(g, now)
+      g = step(g, 1 / 60, rng, now)
+      check(g)
+    }
+    return g
+  }
+  const seeds = [1, 7, 42, 2024, 31337]
 
   it('is never beaten by a real run, at any moment of it', () => {
-    for (const seed of [1, 7, 42, 2024, 31337]) {
-      const rng = seeded(seed)
-      let g = press(newGame(240), 0)
-      for (let frame = 0; frame < 60 * 180 && g.phase === 'running'; frame++) {
-        if (jumpsHotfixes(g)) g = press(g, frame)
-        g = step(g, 1 / 60, rng, frame)
-        expect(scoreOf(g)).toBeLessThanOrEqual(maxScoreWithin(g.t))
-      }
+    for (const seed of seeds) {
+      const g = run(seed, 180, (frame) => {
+        expect(scoreOf(frame)).toBeLessThanOrEqual(maxScoreWithin(frame.t))
+      })
+      // the runs go the distance: the servers and the top pace are checked too
+      expect(g.phase).toBe('running')
+      expect(g.served).toBeGreaterThanOrEqual(5)
+      expect(g.pace).toBe(150)
+    }
+  })
+
+  it('keeps a real minute’s score out of a three-second run’s reach', () => {
+    for (const seed of seeds) {
+      expect(scoreOf(run(seed, 60))).toBeGreaterThan(maxScoreWithin(3))
     }
   })
 

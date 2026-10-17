@@ -152,8 +152,9 @@ export function handleReady(state: LobbyState, fromId: string): Result {
 
 // How late a run's two messages may reach the host relative to each other: the
 // start can travel slower than the end, and the time the host measures is then
-// shorter than the run was.
-const BUG_RUNNER_SLACK_S = 3
+// shorter than the run was. Only the difference of the two delays counts, so a
+// second covers it, and a short run's ceiling stays a short run's.
+const BUG_RUNNER_SLACK_S = 1
 
 const bugRunnerBooks = (state: LobbyState) => state.bugRunner ?? { best: {}, started: {} }
 
