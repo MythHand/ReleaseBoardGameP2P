@@ -177,6 +177,7 @@
   "turnDock": {
     "yourTurn": "ваш ход",
     "turnOf": "ход соперника",
+    "playerTurn": "ход игрока",
     "reaction": "реакция",
     "reactionDanger": "error 503",
     "attack": "атака",

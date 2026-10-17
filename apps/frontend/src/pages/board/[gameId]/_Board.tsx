@@ -363,7 +363,9 @@ function BoardView({
   const { you, opponents, decks, turn, history, setup } = state
   const dockCopy = deal.active
     ? { ...copy.turnDock, turnOf: copy.turnDock.gameStart }
-    : copy.turnDock
+    : you === null
+      ? { ...copy.turnDock, turnOf: copy.turnDock.playerTurn }
+      : copy.turnDock
   const {
     role = 'guest',
     code,
@@ -1462,7 +1464,7 @@ function BoardView({
                   label={copy.table.deck}
                   deck="base"
                   count={count}
-                  width={you === null ? 80 : pileWidthFor(decks.main.length)}
+                  width={pileWidthFor(decks.main.length)}
                   countPos="tl"
                   boxRef={(el) => anchors.bindPile(i, el)}
                   // A PILE ANSWERS THE ARROW THE WAY A CARD DOES. `pickable`
@@ -1499,7 +1501,7 @@ function BoardView({
                 label={copy.table.events}
                 deck="ai"
                 count={decks.events}
-                width={you === null ? 80 : 150}
+                width={150}
                 countPos="tl"
                 boxRef={anchors.eventsBox}
               />
@@ -1542,7 +1544,7 @@ function BoardView({
             // The one case where the number is carried rather than shown.
             showCount={!beats.discardOut}
             gathered={beats.discardOut === 'gathering' || undefined}
-            width={you === null ? 80 : 116}
+            width={116}
             boxRef={anchors.discardBox}
           />
         </div>
@@ -2209,7 +2211,6 @@ function BoardView({
       <div className={kit.turnDock}>
         <div className={enter} ref={anchors.dock}>
           <TurnDock
-            spectatorLabel={you === null ? copy.participants.spectator : undefined}
             state={dockView.state}
             danger={dockView.danger}
             seconds={dockView.seconds}
