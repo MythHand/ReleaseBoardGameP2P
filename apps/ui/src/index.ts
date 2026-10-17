@@ -14,7 +14,7 @@ export {
   type PresetAvatarItem,
 } from './avatars/PresetAvatar'
 export type { BugRunnerProps } from './blocks/BugRunner'
-export { default as BugRunner } from './blocks/BugRunner'
+export { default as BugRunner, maxBugRunnerScore } from './blocks/BugRunner'
 export type { ChatCopy, ChatMessage, ChatRole } from './blocks/Chat'
 export { default as Chat } from './blocks/Chat'
 export type { CreditsCopy } from './blocks/Credits'
@@ -32,7 +32,10 @@ export type {
   PlayerSettingsAvatars,
   PlayerSettingsCopy,
 } from './blocks/PlayerSettings'
-export { default as PlayerSettings } from './blocks/PlayerSettings'
+export {
+  default as PlayerSettings,
+  PLAYER_SETTINGS_MAX_BLOCK_SIZE,
+} from './blocks/PlayerSettings'
 export { default as PlayerSlot, EmptySlot } from './blocks/PlayerSlot'
 export type { RulesCopy, RulesProps, RulesSection } from './blocks/Rules'
 export { default as Rules } from './blocks/Rules'

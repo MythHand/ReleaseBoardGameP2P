@@ -10,6 +10,11 @@ import styles from './PlayerSettings.module.css'
 // Side of one avatar in the grid, in px.
 const AVATAR_SIZE = 88
 
+// How tall the modal holding this block may grow, for every place that opens
+// it: past this the avatar column scrolls inside, and the modal never grows
+// over the screen. One value, so the lobbies that open it cannot drift apart.
+export const PLAYER_SETTINGS_MAX_BLOCK_SIZE = '78vh'
+
 export interface PlayerSettingsCopy {
   // names the avatar grid for assistive tech
   avatars: string

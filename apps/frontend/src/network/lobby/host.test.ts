@@ -1,7 +1,9 @@
+import { maxBugRunnerScore } from '@release/ui'
 import {
   canStart,
   disbandLobby,
   handleBugRunnerScore,
+  handleBugRunnerStart,
   handleJoinRequest,
   handleReady,
   handleWhereabouts,
@@ -12,7 +14,7 @@ import {
   setMaxSpectators,
   setParticipantRole,
 } from './host'
-import { createLobbyState, type LobbyState, playerCount } from './state'
+import { applyPeerLeft, createLobbyState, type LobbyState, playerCount } from './state'
 
 const host = {
   id: 'h',
@@ -523,12 +525,22 @@ it('frees the avatar of a player made spectator and deals one to a spectator mad
 })
 
 // The results screen's Bug Runner plate reads the room's best runs off the
-// roster, so the host is the one that keeps them there.
+// roster, so the host is the one that keeps them there. A run reaches it as two
+// messages — its start, then its score — and the host times it between them.
+const T0 = 1_000_000
+const bugRun = (state: LobbyState, peer: string, score: unknown, seconds = 60) =>
+  handleBugRunnerScore(
+    handleBugRunnerStart(state, peer, T0).state,
+    peer,
+    score,
+    T0 + seconds * 1000,
+  )
+
 it('keeps a best Bug Runner run on the member’s row and tells the room — a spectator’s too', () => {
   // one seat, held by the host: the joiner is a spectator
   const joined = handleJoinRequest(base(1), 'p1', 'member-p1', 'Pam', { matchRunning: false }).state
   expect(joined.peers.p1.role).toBe('guest')
-  const { state, outgoing } = handleBugRunnerScore(joined, 'p1', 1840)
+  const { state, outgoing } = bugRun(joined, 'p1', 1840)
   expect(state.peers.p1.bugRunner).toBe(1840)
   const broadcast = outgoing.find((o) => o.message.type === 'PEER_JOINED')
   expect(broadcast?.to).toBe('broadcast')
@@ -539,19 +551,51 @@ it('keeps a best Bug Runner run on the member’s row and tells the room — a s
 
 it('does not let a later, lower run take the room’s best back', () => {
   const joined = handleJoinRequest(base(4), 'p1', 'member-p1', 'Pam', { matchRunning: false }).state
-  const best = handleBugRunnerScore(joined, 'p1', 1840).state
+  const best = bugRun(joined, 'p1', 1840).state
   for (const score of [964, 1840]) {
-    const { state, outgoing } = handleBugRunnerScore(best, 'p1', score)
-    expect(state).toBe(best)
+    const { state, outgoing } = bugRun(best, 'p1', score)
+    expect(state.peers.p1.bugRunner).toBe(1840)
     expect(outgoing).toEqual([])
   }
-  expect(handleBugRunnerScore(best, 'p1', 2315).state.peers.p1.bugRunner).toBe(2315)
+  expect(bugRun(best, 'p1', 2315).state.peers.p1.bugRunner).toBe(2315)
 })
 
 it('ignores a Bug Runner score that is not a positive whole number, or from nobody in the room', () => {
   const joined = handleJoinRequest(base(4), 'p1', 'member-p1', 'Pam', { matchRunning: false }).state
   for (const score of [0, -5, 12.5, Number.NaN, '900', undefined]) {
-    expect(handleBugRunnerScore(joined, 'p1', score).state).toBe(joined)
+    const { state, outgoing } = bugRun(joined, 'p1', score)
+    expect(state.peers.p1.bugRunner).toBeUndefined()
+    expect(outgoing).toEqual([])
   }
-  expect(handleBugRunnerScore(joined, 'stranger', 900).state).toBe(joined)
+  expect(bugRun(joined, 'stranger', 900).state).toBe(joined)
+})
+
+// #241 review: any guest could send any number from devtools and take the plate.
+it('turns away a score with no run the host heard start, or above what the run’s time allows', () => {
+  const joined = handleJoinRequest(base(4), 'p1', 'member-p1', 'Pam', { matchRunning: false }).state
+  // no start: nothing to time it against
+  expect(handleBugRunnerScore(joined, 'p1', 900, T0).state.peers.p1.bugRunner).toBeUndefined()
+  // the number the review typed in, after a minute's run
+  expect(bugRun(joined, 'p1', Number.MAX_SAFE_INTEGER).state.peers.p1.bugRunner).toBeUndefined()
+  // one point over the ceiling for a ten-second run, with the network's slack
+  const over = maxBugRunnerScore(10 + 3) + 1
+  expect(bugRun(joined, 'p1', over, 10).state.peers.p1.bugRunner).toBeUndefined()
+  expect(bugRun(joined, 'p1', over - 1, 10).state.peers.p1.bugRunner).toBe(over - 1)
+})
+
+it('closes a run with its score, so one start does not time a second score', () => {
+  const joined = handleJoinRequest(base(4), 'p1', 'member-p1', 'Pam', { matchRunning: false }).state
+  const once = bugRun(joined, 'p1', 900).state
+  expect(handleBugRunnerScore(once, 'p1', 1200, T0 + 120_000).state.peers.p1.bugRunner).toBe(900)
+})
+
+// #241 review: a reload dropped the record with the old row, and the plate went
+// to somebody else. The host keeps it by member, apart from the roster.
+it('keeps a member’s Bug Runner record across a reload', () => {
+  const joined = handleJoinRequest(base(4), 'p1', 'member-p1', 'Pam', { matchRunning: false }).state
+  const scored = bugRun(joined, 'p1', 2315).state
+  // the old channel drops first, then the member comes back on a new peer id
+  const gone = applyPeerLeft(scored, 'p1')
+  const back = handleJoinRequest(gone, 'p1-again', 'member-p1', 'Pam', { matchRunning: false })
+  expect(back.state.peers['p1-again'].bugRunner).toBe(2315)
 })

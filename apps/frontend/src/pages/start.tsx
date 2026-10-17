@@ -15,6 +15,8 @@ export default function StartPage() {
     <ScreenShell
       tags={[t('start.tagOpenP2P'), t('start.tagBoardCard')]}
       description={t('start.description')}
+      // the credits sit in the bottom corner: the column tightens to clear them
+      fitHeight
       corners={
         <>
           {/* who made it — the bottom-left corner, names link to GitHub */}

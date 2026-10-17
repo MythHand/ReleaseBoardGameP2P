@@ -14,6 +14,12 @@ export interface LobbyState {
   bots: number
   setup: Setup
   peers: Record<string, PeerInfo>
+  // THE HOST'S OWN BOOKS of the lobby's mini-game, never sent anywhere. `best`
+  // is each member's best run by `memberId`, kept apart from `peers`: the roster
+  // drops a row the instant its channel does, and a reload would lose the record
+  // before the member is back. `started` is when the host heard a run begin, by
+  // peer id, so the score that ends it is timed on the host's own clock.
+  bugRunner?: { best: Record<string, number>; started: Record<string, number> }
 }
 
 // The rules seat 2–6 (docs/rules/general.md:13), so one human and five bots is
@@ -62,7 +68,7 @@ export function assignRole(state: LobbyState): 'player' | 'guest' {
 }
 
 export function applyPeerList(state: LobbyState, peers: PeerInfo[]): LobbyState {
-  return createLobbyState({
+  const next = createLobbyState({
     selfId: state.selfId,
     hostId: state.hostId,
     maxPlayers: state.maxPlayers,
@@ -75,6 +81,8 @@ export function applyPeerList(state: LobbyState, peers: PeerInfo[]): LobbyState 
     setup: state.setup,
     peers,
   })
+  // …and the same for the mini-game's books, which createLobbyState knows nothing of
+  return state.bugRunner ? { ...next, bugRunner: state.bugRunner } : next
 }
 
 export function applyPeerJoined(state: LobbyState, peer: PeerInfo): LobbyState {

@@ -1,7 +1,8 @@
-import { readFileSync } from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vitest/config'
+// the same version the app is built with
+import { appVersionDefine } from '../../app-version'
 
 const uiSrc = fileURLToPath(new URL('../ui/src', import.meta.url))
 const appSrc = fileURLToPath(new URL('./src', import.meta.url))
@@ -11,14 +12,9 @@ const translationSrc = fileURLToPath(
   new URL('../../packages/translation/src/index.ts', import.meta.url),
 )
 
-// the same version the app is built with (vite.config.ts)
-const { version } = JSON.parse(
-  readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
-) as { version: string }
-
 export default defineConfig({
   plugins: [react()],
-  define: { 'import.meta.env.VITE_APP_VERSION': JSON.stringify(version) },
+  define: appVersionDefine,
   resolve: {
     alias: [
       // Must precede the '@' alias: these imports are matched by their suffix,

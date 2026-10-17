@@ -72,3 +72,32 @@ it('returns empty when sender is the only non-host peer', () => {
 it('never forwards a peer-authored join rejection', () => {
   expect(isRelayable('JOIN_REJECTED')).toBe(false)
 })
+
+it('never forwards what is addressed to the host alone', () => {
+  // The host answers each of these in its own branch; a forwarded copy has no
+  // reader. Listed, the guarantee does not rest on the order of those branches
+  // (#241 review: the Bug Runner score).
+  for (const type of [
+    'ROOM_CHECK',
+    'JOIN_REQUEST',
+    'PLAYER_READY',
+    'PROFILE_UPDATE',
+    'BUG_RUNNER_START',
+    'BUG_RUNNER_SCORE',
+    'WHEREABOUTS',
+    'PRESENTATION_READY',
+    'CLOCK_REQUEST',
+  ] as const)
+    expect(isRelayable(type)).toBe(false)
+})
+
+it('never forwards the host`s word to one party or to all', () => {
+  // A relayed frame reaches guests wearing the host's id.
+  for (const type of [
+    'ROOM_AVAILABILITY',
+    'PROFILE_REJECTED',
+    'CLOCK_RESPONSE',
+    'TRANSFER_HOST',
+  ] as const)
+    expect(isRelayable(type)).toBe(false)
+})

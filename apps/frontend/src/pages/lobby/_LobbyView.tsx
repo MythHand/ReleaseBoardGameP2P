@@ -11,6 +11,7 @@ import {
   LobbyCode,
   MAX_SPECTATORS,
   Modal,
+  PLAYER_SETTINGS_MAX_BLOCK_SIZE,
   PlayerSettings,
   PlayerSlot,
   PRESET_AVATARS,
@@ -235,7 +236,8 @@ export default function LobbyView() {
         <BugRunner
           label={t('lobbyScreen.bugRunner')}
           className={styles.runner}
-          onBest={session.reportBugRunner}
+          onRunStart={session.startBugRunner}
+          onRunEnd={session.reportBugRunner}
         />
         <div className={styles.headRight}>
           <LobbyCode
@@ -473,8 +475,7 @@ export default function LobbyView() {
         title={t('lobbyScreen.playerSettingsTitle')}
         // a player picks an avatar too; a spectator has only the nickname
         wide={Boolean(me)}
-        // the avatar column scrolls past this, the modal never grows over it
-        maxBlockSize="78vh"
+        maxBlockSize={PLAYER_SETTINGS_MAX_BLOCK_SIZE}
       >
         <PlayerSettings
           avatars={

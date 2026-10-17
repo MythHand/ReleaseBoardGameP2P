@@ -4,6 +4,7 @@ import {
   BUG_X,
   type Game,
   MONITOR_Y,
+  maxScoreWithin,
   newGame,
   press,
   STARTER_BONUS,
@@ -187,5 +188,42 @@ describe('the servers', () => {
     const met = play(press(running({ served: 1, obstacles: [server] }), 0), 0.3)
     expect(met.phase).toBe('running')
     expect(met.meal).not.toBeNull()
+  })
+})
+
+// THE CEILING THE HOST CHECKS A SCORE AGAINST. It is only worth anything if no
+// real run ever goes over it, so real runs are played here: the game's own
+// randomness from a fixed seed, a jumper that clears hotfixes, the loop's frame
+// length — and every frame of every run is held against the ceiling for the
+// time it has run.
+describe('maxScoreWithin', () => {
+  const seeded = (seed: number) => {
+    let s = seed
+    return () => {
+      s = (s * 1664525 + 1013904223) % 4294967296
+      return s / 4294967296
+    }
+  }
+  const jumpsHotfixes = (g: Game) =>
+    g.obstacles.some((o) => o.kind === 'hotfix' && o.x > BUG_X && o.x - BUG_X < 14)
+
+  it('is never beaten by a real run, at any moment of it', () => {
+    for (const seed of [1, 7, 42, 2024, 31337]) {
+      const rng = seeded(seed)
+      let g = press(newGame(240), 0)
+      for (let frame = 0; frame < 60 * 180 && g.phase === 'running'; frame++) {
+        if (jumpsHotfixes(g)) g = press(g, frame)
+        g = step(g, 1 / 60, rng, frame)
+        expect(scoreOf(g)).toBeLessThanOrEqual(maxScoreWithin(g.t))
+      }
+    }
+  })
+
+  it('grows with the time a run has had, and stays a number a run can mean', () => {
+    expect(maxScoreWithin(0)).toBeGreaterThan(0)
+    expect(maxScoreWithin(30)).toBeGreaterThan(maxScoreWithin(10))
+    expect(maxScoreWithin(600)).toBeGreaterThan(maxScoreWithin(60))
+    // the number the review typed into devtools is out of reach of any run
+    expect(maxScoreWithin(24 * 3600)).toBeLessThan(Number.MAX_SAFE_INTEGER)
   })
 })

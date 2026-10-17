@@ -32,6 +32,16 @@ import type { MessageType } from '../types'
 // follows that peer id, so the forger would start receiving another seat's
 // projection, hand included.
 //
+// Addressed to the host alone: what a member asks of the room — to be let in,
+// to be ready, a new name or avatar, where it is, a mini-game run — and what a
+// seat tells the keeper — its intro played, a clock reading asked for. The host
+// answers each in its own branch, and the answer, where there is one, is the
+// host's own broadcast. A relayed copy has no reader; listed, the guarantee
+// stops depending on the order the host's branches happen to be written in.
+// The host's word to one party or to all — whether a room can be joined, a
+// profile turned down, a clock reading, a new host — belongs with the first
+// group: a peer-originated copy forwarded would wear the host's id.
+//
 // Nothing legitimate is lost. The keeper is the host, so every game frame
 // travels a direct connection in both directions and never reaches the relay.
 // A keeper sitting behind the host needs the opposite of a type-only rule — a
@@ -57,6 +67,21 @@ const NEVER_RELAYED: ReadonlySet<MessageType> = new Set<MessageType>([
   'SYNC',
   'KEEPER_STATE',
   'KEEPER_CHANGED',
+  // addressed to the host alone
+  'ROOM_CHECK',
+  'JOIN_REQUEST',
+  'PLAYER_READY',
+  'PROFILE_UPDATE',
+  'BUG_RUNNER_START',
+  'BUG_RUNNER_SCORE',
+  'WHEREABOUTS',
+  'PRESENTATION_READY',
+  'CLOCK_REQUEST',
+  // the host's word
+  'ROOM_AVAILABILITY',
+  'PROFILE_REJECTED',
+  'CLOCK_RESPONSE',
+  'TRANSFER_HOST',
 ])
 
 export function isRelayable(type: MessageType): boolean {
