@@ -3,11 +3,17 @@ import { randomNickname, sanitizeNickname } from '@/game/nicknames'
 import DiceIcon from '@/icons/DiceIcon'
 import Button from '@/primitives/Button'
 import Input from '@/primitives/Input'
+import ScrollArea from '@/primitives/ScrollArea'
 import Typography from '@/primitives/Typography'
 import styles from './PlayerSettings.module.css'
 
 // Side of one avatar in the grid, in px.
 const AVATAR_SIZE = 88
+
+// How tall the modal holding this block may grow, for every place that opens
+// it: past this the avatar column scrolls inside, and the modal never grows
+// over the screen. One value, so the lobbies that open it cannot drift apart.
+export const PLAYER_SETTINGS_MAX_BLOCK_SIZE = '78vh'
 
 export interface PlayerSettingsCopy {
   // names the avatar grid for assistive tech
@@ -93,25 +99,29 @@ export default function PlayerSettings({
   const taken = avatars.taken ?? []
   return (
     <div className={styles.grid}>
-      <fieldset className={styles.avatars} aria-label={copy.avatars}>
-        {avatars.items.map(({ id, label }) => {
-          const locked = taken.includes(id)
-          const selected = id === avatars.selected
-          return (
-            <button
-              key={id}
-              type="button"
-              className={`${styles.cell}${selected ? ` ${styles.selected}` : ''}`}
-              aria-label={label}
-              aria-pressed={selected}
-              disabled={locked}
-              onClick={() => avatars.onChange(id)}
-            >
-              <PresetAvatar id={id} size={AVATAR_SIZE} muted={locked} />
-            </button>
-          )
-        })}
-      </fieldset>
+      {/* the avatars scroll on their own once the modal is held to a height —
+          the nickname beside them stays where it is */}
+      <ScrollArea className={styles.avatarsScroll}>
+        <fieldset className={styles.avatars} aria-label={copy.avatars}>
+          {avatars.items.map(({ id, label }) => {
+            const locked = taken.includes(id)
+            const selected = id === avatars.selected
+            return (
+              <button
+                key={id}
+                type="button"
+                className={`${styles.cell}${selected ? ` ${styles.selected}` : ''}`}
+                aria-label={label}
+                aria-pressed={selected}
+                disabled={locked}
+                onClick={() => avatars.onChange(id)}
+              >
+                <PresetAvatar id={id} size={AVATAR_SIZE} muted={locked} />
+              </button>
+            )
+          })}
+        </fieldset>
+      </ScrollArea>
 
       <div className={styles.nickname}>{field}</div>
     </div>

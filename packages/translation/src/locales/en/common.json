@@ -29,6 +29,7 @@
     "randomNick": "random name",
     "authorDesign": "Game & Design:",
     "authorDev": "Development:",
+    "version": "Version:",
     "required": "Required"
   },
   "invite": {
@@ -108,6 +109,10 @@
       "gitBranch": {
         "title": "Woodcutter",
         "unit": "times split a deck"
+      },
+      "bugRunner": {
+        "title": "Bug Runner",
+        "unit": "points"
       }
     }
   },

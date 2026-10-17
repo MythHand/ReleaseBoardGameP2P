@@ -59,6 +59,12 @@ export default function StatsPage() {
   }
   const winnerId = winnerSeat?.peerId ?? ''
   const selfId = session.state?.selfId ?? ''
+  // The mini-game's plate is the room's, not the match's: whoever is in the
+  // room now, spectators included, with the best run each has had in it. Read
+  // from the live roster on purpose — someone who has left is not shown.
+  const bugRunner = Object.values(peers).flatMap((p) =>
+    p.bugRunner ? [{ id: p.id, name: p.name, score: p.bugRunner }] : [],
+  )
 
   const copy: StatsCopy = {
     title: t('stats.title'),
@@ -106,6 +112,10 @@ export default function StatsPage() {
         unit: t('stats.achievements.gitBranch.unit'),
       },
     },
+    bugRunner: {
+      title: t('stats.achievements.bugRunner.title'),
+      unit: t('stats.achievements.bugRunner.unit'),
+    },
   }
 
   return (
@@ -116,6 +126,7 @@ export default function StatsPage() {
         winnerId={winnerId}
         selfId={selfId}
         players={players}
+        bugRunner={bugRunner}
         copy={copy}
         // The story's own pair. Winning lights the HUD; everyone else gets the
         // calm one, which is what you want on a screen you sit and read.

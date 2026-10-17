@@ -157,6 +157,37 @@ export function press(g: Game, now: number): Game {
 // speed, so every gap can be cleared.
 const nextGap = (speed: number, rng: () => number) => speed * 0.75 + 16 + rng() * 90
 
+// THE MOST A RUN CAN SCORE IN `seconds`, read off the rules of this file rather
+// than measured. The host checks a reported score against it, timing the run on
+// its own clock, so a number typed into devtools — or any score no run of that
+// length could reach — is turned away. A ceiling, never a prediction: the bug
+// keeps the pace the whole time and never stops for a meal, every gap is the
+// shortest one, and every obstacle pays the larger bonus.
+export function maxScoreWithin(seconds: number): number {
+  const t = Math.max(0, seconds)
+  // the pace climbs from SPEED_START at SPEED_GAIN until SPEED_MAX, and the bug
+  // never runs faster than the pace
+  const climb = (SPEED_MAX - SPEED_START) / SPEED_GAIN
+  const rising = Math.min(t, climb)
+  const distance =
+    SPEED_START * rising + (SPEED_GAIN * rising * rising) / 2 + SPEED_MAX * Math.max(0, t - climb)
+  const obstacles = Math.floor(distance / nextGap(SPEED_START, () => 0)) + 1
+  const plain = Math.floor(distance / 10) + obstacles * BONUS.hotfix + STARTER_BONUS
+  // a server waits at every mark the score reaches, and what it pays can bring
+  // the next mark within reach — so the marks are counted until they settle
+  let score = plain
+  for (;;) {
+    let served = 0
+    let pay = 0
+    while (serverAt(served + 1) <= score) {
+      served += 1
+      pay += serverBonus(served)
+    }
+    if (plain + pay === score) return score
+    score = plain + pay
+  }
+}
+
 // A server is met, not dodged: the bug's front reaching it is enough, at any
 // height — a bug in the air eats it too, and lands while it does.
 const reaches = (o: Obstacle) => o.kind === 'server' && o.x + 1 < BUG_X + BUG.w - 1

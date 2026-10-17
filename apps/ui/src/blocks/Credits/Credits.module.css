@@ -1,0 +1,32 @@
+/* two lines, one under the other — where they stand is the consumer's */
+.credits {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.credit {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.label {
+  opacity: 0.4;
+}
+
+/* the version — the names' colour, but it is not a link */
+.value {
+  color: var(--white-72);
+}
+
+.link {
+  color: var(--white-72);
+  text-decoration: none;
+  transition: color var(--t-fast) var(--ease-out);
+}
+
+.link:hover {
+  color: var(--brand-green);
+  text-decoration: underline;
+}

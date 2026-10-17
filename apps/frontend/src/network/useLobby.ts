@@ -41,6 +41,8 @@ import {
 import {
   canStart as canStartFn,
   disbandLobby as disbandLobbyFn,
+  handleBugRunnerScore,
+  handleBugRunnerStart,
   handleJoinRequest,
   handleReady,
   handleWhereabouts,
@@ -529,6 +531,11 @@ export interface UseLobby {
   // that comes back.
   updateProfile(patch: ProfilePatch): void
   profileRejection: ProfileRejection | null
+  // A run of mine in the lobby's mini-game has started, and one has ended with
+  // this score. The host times the run between the two and keeps the room's best
+  // on my row, for the results screen's Bug Runner plate.
+  startBugRunner(): void
+  reportBugRunner(score: number): void
   setSetup(setup: Setup): void
   // `botNames` is display copy, so it arrives from the features layer rather
   // than being built here: `network/` may not import i18next.
@@ -1272,6 +1279,13 @@ export function useLobby(): UseLobby {
         } else if (msg.type === 'PROFILE_UPDATE') {
           const patch = parseProfilePatch((msg as { payload?: unknown }).payload)
           if (patch) applyProfile(msg.from, patch)
+        } else if (msg.type === 'BUG_RUNNER_SCORE') {
+          // the score is checked by the handler: `parseEnvelope` never reads payloads
+          const r = handleBugRunnerScore(current, msg.from, msg.payload?.score, Date.now())
+          commit(r.state)
+          dispatch(r.outgoing)
+        } else if (msg.type === 'BUG_RUNNER_START') {
+          commit(handleBugRunnerStart(current, msg.from, Date.now()).state)
         } else if (msg.type === 'WHEREABOUTS') {
           if (!['lobby', 'game', 'stats'].includes(msg.payload?.where)) return
           if (msg.payload.where === 'lobby' && current.peers[msg.from]?.role === 'guest')
@@ -2365,6 +2379,30 @@ export function useLobby(): UseLobby {
     [applyProfile],
   )
 
+  // Both ends of a run go the same way: the host books its own directly, a
+  // guest's travel to the host, which times the run between them.
+  const startBugRunner = useCallback(() => {
+    const current = stateRef.current
+    const t = transportRef.current
+    if (!current || !t) return
+    if (isHostRef.current) commit(handleBugRunnerStart(current, current.selfId, Date.now()).state)
+    else t.send(current.hostId, { type: 'BUG_RUNNER_START' })
+  }, [commit])
+
+  const reportBugRunner = useCallback(
+    (score: number) => {
+      const current = stateRef.current
+      const t = transportRef.current
+      if (!current || !t) return
+      if (isHostRef.current) {
+        const r = handleBugRunnerScore(current, current.selfId, score, Date.now())
+        commit(r.state)
+        dispatch(r.outgoing)
+      } else t.send(current.hostId, { type: 'BUG_RUNNER_SCORE', payload: { score } })
+    },
+    [commit, dispatch],
+  )
+
   // Tear the session down: close the PeerJS transport and reset to idle. Without
   // this, navigating away leaves the connection open and the state alive, so the
   // user is bounced back into their old session. `flushMs` defers only the
@@ -2729,6 +2767,8 @@ export function useLobby(): UseLobby {
       transferHost,
       updateProfile,
       profileRejection,
+      startBugRunner,
+      reportBugRunner,
       setSetup,
       startGame,
       introReady,
@@ -2774,6 +2814,8 @@ export function useLobby(): UseLobby {
       transferHost,
       updateProfile,
       profileRejection,
+      startBugRunner,
+      reportBugRunner,
       setSetup,
       startGame,
       introReady,

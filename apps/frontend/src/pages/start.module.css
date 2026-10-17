@@ -7,3 +7,11 @@
   inline-size: 300px;
   margin-inline-start: -11px;
 }
+
+/* the credits — the bottom-left corner, where the playground's Start has them */
+.credits {
+  position: absolute;
+  inset-block-end: 30px;
+  inset-inline-start: 76px;
+  z-index: 2;
+}

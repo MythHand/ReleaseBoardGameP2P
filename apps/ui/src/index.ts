@@ -14,9 +14,11 @@ export {
   type PresetAvatarItem,
 } from './avatars/PresetAvatar'
 export type { BugRunnerProps } from './blocks/BugRunner'
-export { default as BugRunner } from './blocks/BugRunner'
+export { default as BugRunner, maxBugRunnerScore } from './blocks/BugRunner'
 export type { ChatCopy, ChatMessage, ChatRole } from './blocks/Chat'
 export { default as Chat } from './blocks/Chat'
+export type { CreditsCopy } from './blocks/Credits'
+export { default as Credits } from './blocks/Credits'
 export { default as GameSettings } from './blocks/GameSettings'
 export type { SwitchLang } from './blocks/LangSwitcher'
 export { default as LangSwitcher } from './blocks/LangSwitcher'
@@ -30,7 +32,10 @@ export type {
   PlayerSettingsAvatars,
   PlayerSettingsCopy,
 } from './blocks/PlayerSettings'
-export { default as PlayerSettings } from './blocks/PlayerSettings'
+export {
+  default as PlayerSettings,
+  PLAYER_SETTINGS_MAX_BLOCK_SIZE,
+} from './blocks/PlayerSettings'
 export { default as PlayerSlot, EmptySlot } from './blocks/PlayerSlot'
 export type { RulesCopy, RulesProps, RulesSection } from './blocks/Rules'
 export { default as Rules } from './blocks/Rules'
@@ -121,7 +126,7 @@ export { default as Invite } from './screens/Invite'
 export { default as Lobby } from './screens/Lobby'
 export { default as Start } from './screens/Start'
 export type { StartCopy } from './screens/Start/Start'
-export type { StatPlayer, StatsCopy } from './screens/Stats'
+export type { AchievementCopy, BugRunnerScore, StatPlayer, StatsCopy } from './screens/Stats'
 export { default as Stats } from './screens/Stats'
 export type { CardCatalogProps } from './table/CardCatalog'
 export { default as CardCatalog } from './table/CardCatalog'

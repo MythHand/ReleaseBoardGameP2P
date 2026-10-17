@@ -40,6 +40,12 @@ export interface BugRunnerProps {
   // what the block is, for a screen reader — the kit carries no copy of its own
   label: string
   className?: string
+  // A run has started, and one has ended with this score — every run, not only
+  // one that beats the best: a report lost on the way is followed by the next
+  // run's, and the room keeps the best of what reaches it. Both ends are told,
+  // so whoever keeps the room's record can time the run on its own clock.
+  onRunStart?: () => void
+  onRunEnd?: (score: number) => void
 }
 
 // The colours come from the design tokens, read off the element: the canvas
@@ -125,8 +131,13 @@ const BONUS_HOLD = 600
 // A dinosaur game with the Bug as its hero, for the lobby's header: it sits
 // until clicked, then runs — jump the hotfixes on the road, stay down under the
 // monitors in the air. Transparent, and as wide as the room it is given.
-export default function BugRunner({ label, className = '' }: BugRunnerProps) {
+export default function BugRunner({ label, className = '', onRunStart, onRunEnd }: BugRunnerProps) {
   const rootRef = useRef<HTMLButtonElement>(null)
+  // read at the ends of a run, not captured by the frame loop
+  const onRunStartRef = useRef(onRunStart)
+  onRunStartRef.current = onRunStart
+  const onRunEndRef = useRef(onRunEnd)
+  onRunEndRef.current = onRunEnd
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const game = useRef<Game>(newGame(0))
   const palette = useRef<Palette | null>(null)
@@ -191,6 +202,7 @@ export default function BugRunner({ label, className = '' }: BugRunnerProps) {
       if (g.phase !== 'running') {
         setBest(g.best)
         setPhase(g.phase)
+        onRunEndRef.current?.(scoreOf(g))
         return
       }
       raf = requestAnimationFrame(tick)
@@ -198,6 +210,15 @@ export default function BugRunner({ label, className = '' }: BugRunnerProps) {
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
   }, [phase, paint])
+
+  // A run the block is taken away in the middle of — the lobby giving way to a
+  // match — ends where it stood, and is reported as any other run's end.
+  useEffect(
+    () => () => {
+      if (game.current.phase === 'running') onRunEndRef.current?.(scoreOf(game.current))
+    },
+    [],
+  )
 
   // A payment shows as "+n" beside the score for a moment: popIn, a hold,
   // popOut. A new one while the last is still up takes its place and starts over.
@@ -218,9 +239,11 @@ export default function BugRunner({ label, className = '' }: BugRunnerProps) {
   const act = useCallback(() => {
     const g = press(game.current, performance.now())
     if (g === game.current) return
+    const started = g.phase === 'running' && game.current.phase !== 'running'
     game.current = g
     setPhase(g.phase)
     paint()
+    if (started) onRunStartRef.current?.()
   }, [paint])
 
   // The up arrow jumps from anywhere on the page, not only with the block in

@@ -29,6 +29,7 @@
     "randomNick": "случайный ник",
     "authorDesign": "Game & Design:",
     "authorDev": "Development:",
+    "version": "Version:",
     "required": "Обязательное поле"
   },
   "invite": {
@@ -108,6 +109,10 @@
       "gitBranch": {
         "title": "Дровосек",
         "unit": "раз разделил колоду"
+      },
+      "bugRunner": {
+        "title": "Bug Runner",
+        "unit": "очков"
       }
     }
   },

@@ -62,6 +62,9 @@ export interface PeerInfo {
   // Preset avatar id (PRESET_AVATARS). Only a host or player has one; a
   // spectator and a bot never do.
   avatar?: string
+  // Best run in the lobby's mini-game while in this room — anyone, spectator
+  // included. Absent until the first run ends with points.
+  bugRunner?: number
 }
 
 // One seat at the table, minted by `seatsFor` (~/entities/game/seats) when the
@@ -104,6 +107,12 @@ export type Message =
   // everyone or a PROFILE_REJECTED for the sender alone.
   | { type: 'PROFILE_UPDATE'; payload: ProfilePatch }
   | { type: 'PROFILE_REJECTED'; payload: { reason: ProfileRejectReason } }
+  // A run of the lobby's mini-game has started, and one has ended with this
+  // score. Both addressed to the host: it times the run between the two on its
+  // own clock, turns away a score no run of that length could reach, and keeps
+  // the better of the rest on the member's row and re-broadcasts the row.
+  | { type: 'BUG_RUNNER_START' }
+  | { type: 'BUG_RUNNER_SCORE'; payload: { score: number } }
   // A peer announcing which screen it is on, so the results table can say where
   // everyone went. Addressed to the host, which applies it and re-broadcasts the
   // updated PeerInfo — exactly the path PLAYER_READY takes.

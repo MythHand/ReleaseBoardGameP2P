@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
   BONUS,
+  BUG,
   BUG_X,
   type Game,
   MONITOR_Y,
+  maxScoreWithin,
   newGame,
   press,
   STARTER_BONUS,
@@ -187,5 +189,65 @@ describe('the servers', () => {
     const met = play(press(running({ served: 1, obstacles: [server] }), 0), 0.3)
     expect(met.phase).toBe('running')
     expect(met.meal).not.toBeNull()
+  })
+})
+
+// THE CEILING THE HOST CHECKS A SCORE AGAINST. It is only worth anything if no
+// real run ever goes over it, so real runs are played here: the game's own
+// randomness from a fixed seed, a jumper that clears hotfixes, the loop's frame
+// length — and every frame of every run is held against the ceiling for the
+// time it has run.
+describe('maxScoreWithin', () => {
+  const seeded = (seed: number) => {
+    let s = seed
+    return () => {
+      s = (s * 1664525 + 1013904223) % 4294967296
+      return s / 4294967296
+    }
+  }
+  // jumps when a hotfix comes within an eighth of a second of the bug's front
+  const jumpsHotfixes = (g: Game) =>
+    g.obstacles.some((o) => {
+      const ahead = o.x - (BUG_X + BUG.w)
+      return o.kind === 'hotfix' && ahead >= 0 && ahead < g.speed * 0.12
+    })
+  // a run of `seconds`, each frame handed to `check`
+  const run = (seed: number, seconds: number, check: (g: Game) => void = () => {}) => {
+    const rng = seeded(seed)
+    let g = press(newGame(240), 0)
+    for (let frame = 0; frame < 60 * seconds && g.phase === 'running'; frame++) {
+      const now = (frame * 1000) / 60
+      if (jumpsHotfixes(g)) g = press(g, now)
+      g = step(g, 1 / 60, rng, now)
+      check(g)
+    }
+    return g
+  }
+  const seeds = [1, 7, 42, 2024, 31337]
+
+  it('is never beaten by a real run, at any moment of it', () => {
+    for (const seed of seeds) {
+      const g = run(seed, 180, (frame) => {
+        expect(scoreOf(frame)).toBeLessThanOrEqual(maxScoreWithin(frame.t))
+      })
+      // the runs go the distance: the servers and the top pace are checked too
+      expect(g.phase).toBe('running')
+      expect(g.served).toBeGreaterThanOrEqual(5)
+      expect(g.pace).toBe(150)
+    }
+  })
+
+  it('keeps a real minute’s score out of a three-second run’s reach', () => {
+    for (const seed of seeds) {
+      expect(scoreOf(run(seed, 60))).toBeGreaterThan(maxScoreWithin(3))
+    }
+  })
+
+  it('grows with the time a run has had, and stays a number a run can mean', () => {
+    expect(maxScoreWithin(0)).toBeGreaterThan(0)
+    expect(maxScoreWithin(30)).toBeGreaterThan(maxScoreWithin(10))
+    expect(maxScoreWithin(600)).toBeGreaterThan(maxScoreWithin(60))
+    // the number the review typed into devtools is out of reach of any run
+    expect(maxScoreWithin(24 * 3600)).toBeLessThan(Number.MAX_SAFE_INTEGER)
   })
 })

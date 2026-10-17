@@ -4,6 +4,8 @@ import generouted from '@generouted/react-router/plugin'
 import react from '@vitejs/plugin-react'
 import { defineConfig, type Plugin } from 'vite'
 import svgr from 'vite-plugin-svgr'
+// the game's version, read once for every config (Read in shared/config.ts)
+import { appVersionDefine } from '../../app-version'
 
 const uiSrc = fileURLToPath(new URL('../ui/src', import.meta.url))
 const appSrc = fileURLToPath(new URL('./src', import.meta.url))
@@ -47,6 +49,7 @@ function debugLogSink(): Plugin {
 
 export default defineConfig({
   base: process.env.VITE_BASE_URL ?? '/',
+  define: appVersionDefine,
   plugins: [
     debugLogSink(),
     react(),

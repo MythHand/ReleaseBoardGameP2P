@@ -68,7 +68,14 @@
   display: flex;
   align-items: flex-start; /* контент от верхнего края, без центрирования */
   block-size: 100%;
-  padding-block-start: 72px;
+
+  /* На невысоком экране ритм колонки сжимается, чтобы меню не наезжало на
+     авторство в нижнем углу. От 956px высоты — полный макет; ниже верхний
+     отступ, отступ тегов и отступ описания вместе отдают ровно столько, сколько
+     не хватает высоты, в долях 56 : 22 : 72 от того, что каждый может отдать, —
+     до своих минимумов (16 / 16 / 24) примерно на 806px. Логотип и текст свой
+     размер не меняют. Тот же расчёт — в ScreenShell фронта. */
+  padding-block-start: clamp(16px, calc(72px - (956px - 100vh) * 0.3733), 72px);
   padding-inline-start: 76px;
 }
 
@@ -93,7 +100,9 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin-block-end: 38px; /* ощутимый отступ до описания */
+
+  /* ощутимый отступ до описания; на невысоком экране сжимается (см. .content) */
+  margin-block-end: clamp(16px, calc(38px - (956px - 100vh) * 0.1467), 38px);
 }
 
 .tag {
@@ -104,7 +113,7 @@
 
 .desc {
   composes: body-lg from '../../design/typography.module.css';
-  margin: 0 0 96px;
+  margin: 0 0 clamp(24px, calc(96px - (956px - 100vh) * 0.48), 96px);
   line-height: 1.65; /* нюанс интерлиньяжа описания — плотнее базового 1.6 */
   opacity: 0.85;
 }
@@ -118,38 +127,13 @@
   margin-inline-start: -11px;
 }
 
-/* авторство — прижато к левому нижнему углу экрана */
+/* авторство (блок Credits) — прижато к левому нижнему углу экрана; здесь только
+   позиция, вид строк живёт в блоке */
 .credits {
   position: absolute;
   inset-block-end: 30px;
   inset-inline-start: 76px;
   z-index: 2;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.credit {
-  composes: mono-sm tk-04 from '../../design/typography.module.css';
-  display: flex;
-  gap: 10px;
-  align-items: baseline;
-}
-
-.creditLabel {
-  composes: label tk-16 from '../../design/typography.module.css';
-  opacity: 0.4;
-}
-
-.creditLink {
-  color: var(--white-72);
-  text-decoration: none;
-  transition: color var(--t-fast) var(--ease-out);
-}
-
-.creditLink:hover {
-  color: var(--brand-green);
-  text-decoration: underline;
 }
 
 /* ===== печатная версия (блок PhysicalEdition) — правый нижний угол ===== только
