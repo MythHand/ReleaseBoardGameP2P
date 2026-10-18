@@ -66,9 +66,11 @@ export interface Game {
   // the score the next sudo card comes at — drawn on the run's first frame,
   // and none while a card is on the road or its protection is held; whether
   // the bug holds one; how many seconds into the blink of taking or spending
-  // it; and the obstacle it last broke, while its pieces fly
+  // it; and the obstacle it last broke, while its pieces fly. How many
+  // protections the run has spent sets how far off the next card is.
   sudoAt: number | null
   shielded: boolean
+  spent: number
   flash: number | null
   wreck: Wreck | null
   best: number
@@ -96,9 +98,10 @@ const SIZE: Record<Kind, { w: number; h: number }> = {
 }
 
 // A jump peaks at about 15 units, over a hotfix with room to spare, and lasts
-// 0.64 s: v²/2g for the height, 2v/g for the time. Both have a ceiling: past
-// ~16 units the bug leaves the top of the world, past ~0.75 s a jump outlasts
-// the shortest gap `nextGap` allows.
+// 0.64 s at the start's speed: v²/2g for the height, 2v/g for the time. Both
+// have a ceiling: past ~16 units the bug leaves the top of the world, past
+// ~0.75 s a jump outlasts the shortest gap `nextGap` allows. It quickens with
+// the world — see `jumpScale` — and the shortest gap shortens with it.
 const GRAVITY = 300
 const JUMP = 96
 // the monitors fly in a lane a standing bug passes under and a jumping one
@@ -110,6 +113,26 @@ export const SUDO_Y = 7
 const SPEED_START = 64
 const SPEED_MAX = 150
 const SPEED_GAIN = 2.5
+
+// THE JUMP QUICKENS WITH THE WORLD, so a faster run is a harder one. A jump of
+// one length in time would cross a hotfix with more and more to spare as the
+// world sped up — at full speed, three times the start's. So the jump keeps its
+// height and gets shorter in time: of the spare time the speed would add, it
+// keeps SPARE_KEPT — about a tenth of a second at the start, two at full speed.
+// Keeping none held the start's tenth all the way and made it too hard (owner).
+// The bug is over a hotfix while above the height `hits` clears it at, and has
+// to stay there for the road it overlaps one on — both with `hits`' slack.
+const CLEAR = SIZE.hotfix.h - 2
+const SPAN = BUG.w + SIZE.hotfix.w - 4
+// how long the start's jump stays above that height: 2√(v² − 2gh)/g
+const ABOVE = (2 * Math.sqrt(JUMP * JUMP - 2 * GRAVITY * CLEAR)) / GRAVITY
+const SPARE = ABOVE - SPAN / SPEED_START
+const SPARE_KEPT = 0.5
+// the spare time over a hotfix a jump leaves at this speed
+const spareAt = (speed: number) => SPARE + SPARE_KEPT * (SPAN / SPEED_START - SPAN / speed)
+// how many times quicker a jump is at this speed: its time ÷ this, its take-off
+// speed × this, its gravity × this² — the height stays
+export const jumpScale = (speed: number) => ABOVE / (spareAt(speed) + SPAN / speed)
 // how fast a bug slowed by a meal catches up with the pace: two to three
 // seconds for the drop a meal costs, the largest one included
 const CATCH_UP = 12
@@ -141,11 +164,14 @@ const BITE = 0.23
 const BITES = SERVER_BITES.length
 const SPEED_LOSS = 0.3
 // The first sudo card comes at a score each run draws between 600 and 700; the
-// next, 1200 points after its protection is spent. One at a time: none comes
-// while a card is on the road or the bug holds one.
+// next, 1200 points after its protection is spent, and each one after that 600
+// further than the last: 1200, 1800, 2400… One at a time: none comes while a
+// card is on the road or the bug holds one.
 const SUDO_FIRST = 600
 const SUDO_SPREAD = 100
 const SUDO_AGAIN = 1200
+const SUDO_STEP = 600
+export const sudoAgain = (spent: number) => SUDO_AGAIN + SUDO_STEP * (spent - 1)
 // taking or spending the protection blinks the bug between its two colours for
 // this long, a colour per BLINK; a broken obstacle's pieces fly for WRECK_S
 export const FLASH_S = 0.6
@@ -173,6 +199,7 @@ export function newGame(width: number, best = 0): Game {
     meal: null,
     sudoAt: null,
     shielded: false,
+    spent: 0,
     flash: null,
     wreck: null,
     best,
@@ -186,14 +213,24 @@ export const resize = (g: Game, width: number): Game => ({ ...g, width })
 // on the ground and not eating, and starts a new run once the last one is over.
 export function press(g: Game, now: number): Game {
   if (g.phase === 'idle') return { ...g, phase: 'running', vy: JUMP }
-  if (g.phase === 'running') return g.y === 0 && g.meal === null ? { ...g, vy: JUMP } : g
+  if (g.phase === 'running') {
+    return g.y === 0 && g.meal === null ? { ...g, vy: JUMP * jumpScale(g.speed) } : g
+  }
   if (now - g.overAt < RESTART_LOCK_MS) return g
   return { ...newGame(g.width, g.best), phase: 'running', vy: JUMP }
 }
 
-// The distance to the next obstacle: never shorter than a jump covers at this
-// speed, so every gap can be cleared.
-const nextGap = (speed: number, rng: () => number) => speed * 0.75 + 16 + rng() * 90
+// The distance to the next obstacle: never shorter than the jump covers at this
+// speed — the quickened jump, so a faster road can be fuller — and so every gap
+// can be cleared, and up to GAP_SPREAD longer. The extra is mostly short and now
+// and then long — obstacles come in bunches with breathers between, not on a
+// beat — and as long on average as an even spread of 90 would be. A spread in
+// time rather than road emptied the road at speed (owner: one obstacle a screen
+// past 800 points). The shortest gap grows with the speed, so the start's is
+// the shortest of all: the host's ceiling counts on it.
+const GAP_SPREAD = 135
+export const nextGap = (speed: number, rng: () => number) =>
+  (speed * 0.75) / jumpScale(speed) + 16 + GAP_SPREAD * rng() ** 2
 
 // THE MOST A RUN CAN SCORE IN `seconds`, read off the rules of this file rather
 // than measured. The host checks a reported score against it, timing the run on
@@ -288,7 +325,8 @@ export function step(g: Game, dt: number, rng: () => number, now: number): Game 
   const d = Math.min(dt, MAX_DT)
   const t = g.t + d
 
-  let vy = g.vy - GRAVITY * d
+  const lift = jumpScale(g.speed)
+  let vy = g.vy - GRAVITY * lift * lift * d
   let y = g.y + vy * d
   if (y <= 0) {
     y = 0
@@ -386,14 +424,16 @@ export function step(g: Game, dt: number, rng: () => number, now: number): Game 
   }
   if (hit) {
     // the protection takes the hit: the obstacle breaks and pays nothing, the
-    // bug blinks back to itself, and the next card is set 1200 points on
+    // bug blinks back to itself, and the next card is set further on than the last
+    const spent = g.spent + 1
     return {
       ...next,
       obstacles: obstacles.filter((o) => o !== hit),
       shielded: false,
+      spent,
       flash: 0,
       wreck: { kind: hit.kind, x: hit.x, y: hit.y, age: 0 },
-      sudoAt: scoreOf(next) + SUDO_AGAIN,
+      sudoAt: scoreOf(next) + sudoAgain(spent),
     }
   }
   return obstacles.some(reaches) ? { ...next, meal: 0 } : next

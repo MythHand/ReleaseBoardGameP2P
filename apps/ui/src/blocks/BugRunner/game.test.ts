@@ -5,9 +5,11 @@ import {
   BUG_X,
   FLASH_S,
   type Game,
+  jumpScale,
   MONITOR_Y,
   maxScoreWithin,
   newGame,
+  nextGap,
   press,
   STARTER_BONUS,
   SUDO_Y,
@@ -15,6 +17,7 @@ import {
   serverAt,
   serverBonus,
   step,
+  sudoAgain,
   WRECK_S,
 } from './game'
 import {
@@ -124,6 +127,81 @@ describe('the bug runner', () => {
     expect(spawned.obstacles[0]?.x).toBe(200)
     const gone = step(running({ obstacles: [{ kind: 'hotfix', x: -9.5, y: 0 }] }), 1 / 60, never, 0)
     expect(gone.obstacles).toHaveLength(0)
+  })
+})
+
+describe('a faster run is a harder one', () => {
+  // how long the moment to jump over a hotfix lasts at this speed: every
+  // distance the jump is taken from is tried, and the ones that clear it counted
+  const spareAt = (speed: number) => {
+    const stride = 0.25
+    let cleared = 0
+    for (let ahead = 0; ahead < 200; ahead += stride) {
+      const hotfix = { kind: 'hotfix' as const, x: BUG_X + ahead, y: 0 }
+      const g = play(press(running({ speed, pace: speed, obstacles: [hotfix] }), 0), 1.5)
+      if (g.phase === 'running' && g.bonus === BONUS.hotfix) cleared += stride
+    }
+    return cleared / speed
+  }
+
+  it('leaves the start’s jump as it was', () => {
+    expect(jumpScale(64)).toBe(1)
+  })
+
+  // a jump at this speed, played out in fine frames: how high, and how long
+  const jumpAt = (speed: number) => {
+    let g = press(running({ speed, pace: speed }), 0)
+    let peak = 0
+    let time = 0
+    do {
+      g = step(g, 1 / 600, never, 0)
+      peak = Math.max(peak, g.y)
+      time += 1 / 600
+    } while (g.y > 0)
+    return { peak, time }
+  }
+
+  it('quickens the jump with the world: the same height, less time', () => {
+    const start = jumpAt(64)
+    const full = jumpAt(150)
+    expect(full.peak).toBeCloseTo(start.peak, 0)
+    expect(full.time).toBeCloseTo(start.time / jumpScale(150), 1)
+    expect(full.time).toBeLessThan(start.time)
+  })
+
+  it('lets the moment to jump a hotfix grow with the speed by half as much as it would', () => {
+    // about a tenth of a second at the start, two tenths at full speed — an
+    // unquickened jump left three, and one quickened all the way left the start's
+    const start = spareAt(64)
+    expect(start).toBeGreaterThan(0.05)
+    expect(spareAt(150)).toBeCloseTo(start + 0.1, 1)
+  })
+
+  it('lets the road fill up as the jump quickens: the shortest gap is the jump’s length', () => {
+    const start = nextGap(64, () => 0)
+    for (const speed of [64, 80, 100, 120, 150]) {
+      const shortest = nextGap(speed, () => 0)
+      // every gap can still be cleared: none is shorter than a jump goes
+      expect(shortest).toBeGreaterThan(speed * jumpAt(speed).time)
+      // and the start's is the shortest of all — the host's ceiling counts on it
+      expect(shortest).toBeGreaterThanOrEqual(start)
+    }
+    // at full speed, shorter than the unquickened jump allowed
+    expect(nextGap(150, () => 0)).toBeLessThan(150 * 0.75 + 16)
+  })
+
+  it('keeps the road as full as ever, but the rhythm uneven: bunches and breathers', () => {
+    // every die the game could roll, evenly
+    const rolls = Array.from({ length: 1000 }, (_, i) => (i + 0.5) / 1000)
+    for (const speed of [64, 100, 150]) {
+      const shortest = nextGap(speed, () => 0)
+      const extras = rolls.map((r) => nextGap(speed, () => r) - shortest)
+      // as long on average as the even spread of 90 that came before
+      expect(extras.reduce((a, b) => a + b, 0) / extras.length).toBeCloseTo(45, 0)
+      // but mostly short, and now and then half as long again as the longest was
+      expect(extras.filter((e) => e < 45).length).toBeGreaterThan(extras.length * 0.55)
+      expect(Math.max(...extras)).toBeGreaterThan(130)
+    }
   })
 })
 
@@ -257,6 +335,14 @@ describe('the sudo card', () => {
     const jumped = play(press(running({ shielded: true, obstacles: [above] }), 0), 0.6)
     expect(jumped.phase).toBe('running')
     expect(jumped.shielded).toBe(false)
+  })
+
+  it('comes 600 points further off after each protection spent: 1200, 1800, 2400…', () => {
+    expect([1, 2, 3].map(sudoAgain)).toEqual([1200, 1800, 2400])
+    let g = running({ shielded: true, spent: 2, obstacles: [ahead] })
+    while (g.shielded) g = step(g, 1 / 60, never, 0)
+    expect(g.spent).toBe(3)
+    expect(g.sudoAt).toBe(scoreOf(g) + 2400)
   })
 
   it('takes one hit only: the next one ends the run', () => {
