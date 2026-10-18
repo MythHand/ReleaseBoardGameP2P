@@ -103,6 +103,8 @@ export function passiveAction(
   }
 
   if (!pending && view.turn.player === me) {
+    // No `pile`: under Strategic Git Branch the engine takes pile 0. Which pile
+    // a passive seat should pick is an open rules question (docs/rules/backlog.md).
     return view.turn.hasDrawn ? { type: 'PUSH', player: me, at } : { type: 'DRAW', player: me, at }
   }
 
