@@ -41,8 +41,17 @@ interface Layer {
   width: number | string | undefined
 }
 
+// a width as CSS reads it — one reading for the panel and its layers, so the
+// two never part
+const lengthOf = (width: number | string) => (typeof width === 'number' ? `${width}px` : width)
+
 const sizeOf = (width: number | string | undefined): CSSProperties | undefined =>
-  width == null ? undefined : { inlineSize: typeof width === 'number' ? `${width}px` : width }
+  width == null ? undefined : { inlineSize: lengthOf(width) }
+
+// A layer's width is handed to its CSS, which leaves the panel's border out of
+// it (Drawer.module.css `.layer`).
+const layerSizeOf = (width: number | string | undefined): CSSProperties | undefined =>
+  width == null ? undefined : ({ '--layer-width': lengthOf(width) } as CSSProperties)
 
 // Тупая controlled-поверхность: знает только сторону, ширину и открыт/закрыт.
 // Оркестрацию (что показывать, когда открывать) держит консьюмер.
@@ -128,7 +137,7 @@ export default function Drawer({
         <div
           key={String(leaving.key)}
           className={`${styles.layer} ${styles.leaving}`}
-          style={sizeOf(leaving.width)}
+          style={layerSizeOf(leaving.width)}
           aria-hidden
           inert
           onAnimationEnd={endLeaving}
@@ -140,7 +149,7 @@ export default function Drawer({
         <div
           key={String(contentKey)}
           className={`${styles.layer} ${leaving ? styles.entering : ''}`}
-          style={sizeOf(width)}
+          style={layerSizeOf(width)}
         >
           {children}
         </div>
@@ -162,7 +171,7 @@ export default function Drawer({
             <div
               key={`prebuilt:${key}`}
               className={`${styles.layer} ${state}`}
-              style={sizeOf(tab.width)}
+              style={layerSizeOf(tab.width)}
               aria-hidden={!active}
               inert={!active}
               onAnimationEnd={fading ? endLeaving : undefined}

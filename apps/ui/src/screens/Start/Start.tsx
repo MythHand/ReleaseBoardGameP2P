@@ -16,6 +16,7 @@ import Button from '@/primitives/Button'
 import HudBackground from '@/primitives/HudBackground'
 import Input from '@/primitives/Input'
 import Modal from '@/primitives/Modal'
+import ScrollArea from '@/primitives/ScrollArea'
 import styles from './Start.module.css'
 
 // внешние ссылки (открываются в новой вкладке)
@@ -205,9 +206,10 @@ export default function Start({
         {/* biome-ignore lint/a11y/noStaticElementInteractions: arrow-key focus
             nav layered over Tab; the handler only moves focus, never activates */}
         <div className={styles.createGrid} onKeyDown={spatialNav}>
-          <div className={styles.createMods}>
+          {/* the modes scroll on their own; the column beside them stays */}
+          <ScrollArea className={styles.createMods} contentClassName={styles.createModsFlow}>
             <GameSettings setup={setup} onChange={setMode} copy={copy.modes} />
-          </div>
+          </ScrollArea>
           <div className={styles.createTech}>
             <h4 className={styles.techTitle}>{copy.lobbyParams}</h4>
 
@@ -279,7 +281,7 @@ export default function Start({
         </div>
       </Modal>
 
-      <Modal open={modal === 'rules'} onClose={close} title={copy.rulesTitle} wide>
+      <Modal open={modal === 'rules'} onClose={close} title={copy.rulesTitle} wide holdHeight>
         <Rules copy={rulesCopy} />
       </Modal>
     </div>

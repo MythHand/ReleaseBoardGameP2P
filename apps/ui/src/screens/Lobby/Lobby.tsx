@@ -341,13 +341,18 @@ export default function Lobby({
       <div className={`${styles.grid} ${chat == null && voice == null ? '' : styles.gridChat}`}>
         {/* слева — режимы */}
         <section className={styles.modes}>
-          <h2 className={styles.h}>
-            {copy.modes}
-            {!isHost && <span className={styles.lockTag}>{copy.modesLockedHint}</span>}
+          <div className={styles.modesHead}>
+            <h2 className={styles.h}>{copy.modes}</h2>
+            {!isHost && (
+              // the host tag of a player row, in grey — beside the heading, not in it
+              <Badge tone="muted" size="sm" outlined>
+                {copy.modesLockedHint}
+              </Badge>
+            )}
             <Button variant="tech" className={styles.rulesBtn} onClick={() => setRulesOpen(true)}>
               {copy.rules}
             </Button>
-          </h2>
+          </div>
           <ScrollArea className={styles.modeList} contentClassName={styles.modeListFlow}>
             <GameSettings setup={setup} onChange={setMode} readOnly={!isHost} copy={modesCopy} />
           </ScrollArea>
@@ -528,7 +533,13 @@ export default function Lobby({
         )}
       </div>
 
-      <Modal open={rulesOpen} onClose={() => setRulesOpen(false)} title={copy.rulesTitle} wide>
+      <Modal
+        open={rulesOpen}
+        onClose={() => setRulesOpen(false)}
+        title={copy.rulesTitle}
+        wide
+        holdHeight
+      >
         <Rules copy={rulesCopy} />
       </Modal>
 

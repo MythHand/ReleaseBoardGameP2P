@@ -8,6 +8,13 @@
   /* one clock for the slide, the width and the content's fade */
   --drawer-t: 320ms;
 
+  /* The window's own measures, said once and read by what stands in it — the
+     same two a modal says: its padding and its fill. And the border on its
+     rail side, which a layer's width leaves out. */
+  --window-gutter: 20px;
+  --window-fill: color-mix(in srgb, var(--surface-1) 92%, var(--bg));
+  --drawer-edge: 1px;
+
   position: absolute;
   inset-block: 0;
   z-index: var(--z-drawer);
@@ -15,7 +22,7 @@
   /* The panel is a mask over its content (owner, 25.09): what lies past its
      edge while the width travels is hidden, not squeezed in. */
   overflow: hidden;
-  background: color-mix(in srgb, var(--surface-1) 92%, var(--bg));
+  background: var(--window-fill);
 
   /* inline-size анимируется вместе со сдвигом — край панели открывает и
      закрывает содержимое, которое стоит на месте (`.layer`). box-shadow
@@ -43,8 +50,13 @@
   inset-block: 0;
   display: flex;
   flex-direction: column;
-  inline-size: 100%;
-  padding: 20px;
+
+  /* The width it is shown at (`--layer-width`, from Drawer.tsx), less the
+     border on the rail side: the layer stands inside that border, and at the
+     panel's full width its first pixel went under it and was cut off. With no
+     width given, the panel's own. */
+  inline-size: calc(var(--layer-width, calc(100% + var(--drawer-edge))) - var(--drawer-edge));
+  padding: var(--window-gutter);
 }
 
 .right .layer {
@@ -94,14 +106,14 @@
    arrival that had already begun outside the table. */
 .right {
   inset-inline-end: var(--drawer-offset, 0);
-  border-inline-start: 1px solid var(--white-10);
+  border-inline-start: var(--drawer-edge) solid var(--white-10);
   box-shadow: -24px 0 48px var(--black-55);
   transform: translateX(100%);
 }
 
 .left {
   inset-inline-start: var(--drawer-offset, 0);
-  border-inline-end: 1px solid var(--white-10);
+  border-inline-end: var(--drawer-edge) solid var(--white-10);
   box-shadow: 24px 0 48px var(--black-55);
   transform: translateX(-100%);
 }

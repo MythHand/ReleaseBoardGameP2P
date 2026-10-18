@@ -18,6 +18,8 @@ export const PRESET_AVATARS: PresetAvatarItem[] = [
   { id: 'bug-runner-server', label: { ru: 'Пиксельный Сервер', en: 'Pixel Server' } },
   { id: 'bug-runner-hotfix', label: { ru: 'Пиксельный Хотфикс', en: 'Pixel Hotfix' } },
   { id: 'bug-runner-monitoring', label: { ru: 'Пиксельный Мониторинг', en: 'Pixel Monitoring' } },
+  { id: 'bug-runner-sudo', label: { ru: 'Пиксельный Судо', en: 'Pixel Sudo' } },
+  { id: 'bug-runner-duck', label: { ru: 'Пиксельная Уточка', en: 'Pixel Rubber Ducky' } },
   { id: 'release-frontend', label: { ru: 'Фронтенд', en: 'Frontend' } },
   { id: 'release-backend', label: { ru: 'Бэкенд', en: 'Backend' } },
   { id: 'release-database', label: { ru: 'База данных', en: 'Database' } },

@@ -1361,7 +1361,7 @@ function BoardView({
   // board render — every beat of every animation. One element per copy.
   const rulesPanel = useMemo(
     () => (
-      <ScrollArea className={kit.scrollPanel}>
+      <ScrollArea className={kit.scrollPanel} contentClassName={kit.scrollPanelFlow}>
         <Rules copy={copy.rules} />
       </ScrollArea>
     ),

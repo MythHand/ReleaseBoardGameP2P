@@ -11,7 +11,8 @@ export default function AppModals() {
       routes={{
         create: { title: t('start.createTitle'), wide: true, children: <CreateLobbyForm /> },
         join: { title: t('start.joinTitle'), children: <JoinLobbyForm /> },
-        rules: { title: t('start.rulesTitle'), children: <Rules /> },
+        // a search filters the rules: the modal keeps the height it opened at
+        rules: { title: t('start.rulesTitle'), wide: true, children: <Rules />, holdHeight: true },
       }}
     />
   )

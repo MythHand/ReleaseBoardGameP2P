@@ -103,10 +103,18 @@
   color: var(--white-45);
 }
 
-.lockTag {
-  composes: mono-xs tk-10 from '../../design/typography.module.css';
-  color: var(--white-40);
-  text-transform: none; /* сброс капса родителя .h (заголовок uppercase) */
+/* the modes heading row: the heading, the guest's "set by host" tag and the
+   rules button side by side on one middle line — the tag is not part of the
+   heading, so it takes nothing from it */
+.modesHead {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin: 0 0 20px;
+}
+
+.modesHead .h {
+  margin: 0;
 }
 
 /* правила игры — вторичное действие в строке заголовка, прижато к правому краю */

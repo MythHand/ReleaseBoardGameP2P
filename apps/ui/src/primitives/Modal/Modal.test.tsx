@@ -142,3 +142,41 @@ it('has aria-modal="true" and aria-labelledby pointing to the title', () => {
   expect(labelId).toBeTruthy()
   expect(document.getElementById(labelId)?.textContent).toBe('My Modal')
 })
+
+// The rules modal: a search filters what is inside, and the modal must not
+// shrink with it. jsdom lays nothing out, so the opened height is given.
+it('keeps the height it opened at with holdHeight, and sets none without it', () => {
+  vi.useFakeTimers()
+  const height = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(640)
+  const { rerender, unmount } = render(
+    <Modal open onClose={() => {}} holdHeight>
+      <p>rules</p>
+    </Modal>,
+  )
+  act(() => {
+    vi.runAllTimers()
+  })
+  const dialog = document.querySelector('dialog') as HTMLDialogElement
+  expect(dialog.style.blockSize).toBe('640px')
+  // the content changes and lays out shorter: the height stays
+  height.mockReturnValue(300)
+  rerender(
+    <Modal open onClose={() => {}} holdHeight>
+      <p>a few</p>
+    </Modal>,
+  )
+  expect(dialog.style.blockSize).toBe('640px')
+  unmount()
+
+  render(
+    <Modal open onClose={() => {}}>
+      <p>plain</p>
+    </Modal>,
+  )
+  act(() => {
+    vi.runAllTimers()
+  })
+  expect((document.querySelector('dialog') as HTMLDialogElement).style.blockSize).toBe('')
+  height.mockRestore()
+  vi.useRealTimers()
+})

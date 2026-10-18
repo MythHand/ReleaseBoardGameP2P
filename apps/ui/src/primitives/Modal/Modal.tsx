@@ -15,6 +15,10 @@ interface ModalProps {
   // it the body is held to the cap too, so content that can scroll on its own
   // (a ScrollArea in it) does, instead of the whole modal.
   maxBlockSize?: string
+  // Keep the height the modal opened at while it stays open, so content that
+  // changes inside (the rules filtered by a search) does not shrink it. The
+  // modal's height cap still applies.
+  holdHeight?: boolean
 }
 
 export default function Modal({
@@ -24,9 +28,12 @@ export default function Modal({
   children,
   wide = false,
   maxBlockSize,
+  holdHeight = false,
 }: ModalProps) {
   const [mounted, setMounted] = useState(open)
   const [shown, setShown] = useState(false)
+  // the height it opened at, once taken (`holdHeight`)
+  const [held, setHeld] = useState<number | null>(null)
   const dialogRef = useRef<HTMLDialogElement>(null)
   const returnRef = useRef<HTMLElement | null>(null)
   const titleId = useId()
@@ -45,6 +52,7 @@ export default function Modal({
   useEffect(() => {
     if (open) {
       returnRef.current = document.activeElement as HTMLElement
+      setHeld(null)
       setMounted(true)
       let r2: number
       const r1 = requestAnimationFrame(() => {
@@ -66,6 +74,13 @@ export default function Modal({
     }, 380)
     return () => clearTimeout(t)
   }, [open])
+
+  // The height it opened at, taken once it is visible — its layout height, which
+  // the opening transform does not touch
+  useEffect(() => {
+    if (!shown || !holdHeight || !dialogRef.current) return
+    setHeld(dialogRef.current.offsetHeight)
+  }, [shown, holdHeight])
 
   // Move focus into the modal once it is visible
   useEffect(() => {
@@ -118,8 +133,11 @@ export default function Modal({
     >
       <dialog
         ref={dialogRef}
-        className={`${styles.modal} ${wide ? styles.wide : ''} ${maxBlockSize ? styles.bounded : ''}`}
-        style={maxBlockSize ? { maxBlockSize } : undefined}
+        className={`${styles.modal} ${wide ? styles.wide : ''}`}
+        style={{
+          ...(maxBlockSize ? { maxBlockSize } : {}),
+          ...(held ? { blockSize: held } : {}),
+        }}
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
         aria-labelledby={titleId}

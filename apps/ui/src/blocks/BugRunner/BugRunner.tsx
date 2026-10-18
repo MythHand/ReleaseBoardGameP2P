@@ -12,11 +12,13 @@ import { wait } from '@/animations/timing'
 import Typography from '@/primitives/Typography'
 import styles from './BugRunner.module.css'
 import {
+  BLINK,
   BUG,
   BUG_X,
   FADE,
   type Game,
   GROUND,
+  type Kind,
   newGame,
   type Paid,
   type Phase,
@@ -25,15 +27,19 @@ import {
   scoreOf,
   step,
   WORLD_H,
+  WRECK_S,
+  type Wreck,
 } from './game'
 import {
   BUG_RUN_A,
   BUG_RUN_B,
   BUG_SIT,
+  DUCK,
   HOTFIX,
   MONITOR,
   SERVER_BITES,
   type Sprite,
+  SUDO,
 } from './sprites'
 
 export interface BugRunnerProps {
@@ -56,6 +62,7 @@ interface Palette {
   hotfix: string
   monitor: string
   server: string
+  sudo: string
   ground: string
 }
 
@@ -68,6 +75,7 @@ function readPalette(el: Element): Palette {
     hotfix: token('--cat-defense'),
     monitor: token('--cat-protection'),
     server: token('--cat-release'),
+    sudo: token('--cat-support'),
     ground: token('--white-18'),
   }
 }
@@ -90,6 +98,47 @@ function drawSprite(
   })
 }
 
+// how far a broken obstacle's pieces fly in a second, and the directions they
+// fly in: eight, around its middle
+const WRECK_SPEED = 40
+const PIECES = Array.from({ length: 8 }, (_, i) => {
+  const a = ((i + 0.5) * Math.PI) / 4
+  return { x: Math.cos(a), y: Math.sin(a) }
+})
+
+// An obstacle the protection broke: its pieces fly out from where its middle
+// was, in its colour, and fade as they go.
+function drawWreck(ctx: CanvasRenderingContext2D, w: Wreck, ground: number, colour: string) {
+  const cx = w.x + w.w / 2
+  const cy = ground - w.y - w.h / 2
+  const out = w.age * WRECK_SPEED
+  ctx.globalAlpha = 1 - w.age / WRECK_S
+  ctx.fillStyle = colour
+  for (const d of PIECES) {
+    ctx.fillRect(Math.round(cx + d.x * out) - 1, Math.round(cy + d.y * out) - 1, 2, 2)
+  }
+  ctx.globalAlpha = 1
+}
+
+// The colour an obstacle is drawn in — asked only for a broken one's pieces.
+// A rubber ducky is a defence card, as a hotfix is; a roaming monitor is a
+// monitor all the same.
+function colourOf(kind: Kind, p: Palette): string {
+  switch (kind) {
+    case 'hotfix':
+    case 'double':
+    case 'duck':
+      return p.hotfix
+    case 'monitor':
+    case 'roaming':
+      return p.monitor
+    case 'server':
+      return p.server
+    case 'sudo':
+      return p.sudo
+  }
+}
+
 function draw(ctx: CanvasRenderingContext2D, g: Game, p: Palette) {
   const ground = WORLD_H - GROUND
   ctx.clearRect(0, 0, g.width, WORLD_H)
@@ -100,15 +149,29 @@ function draw(ctx: CanvasRenderingContext2D, g: Game, p: Palette) {
   const offset = g.distance % 6
   for (let x = -offset; x < g.width; x += 6) ctx.fillRect(Math.round(x), ground, 3, 1)
 
+  // what flies bobs a pixel as it goes
+  const bob = Math.floor(g.t * 4) % 2
   for (const o of g.obstacles) {
     if (o.kind === 'hotfix') {
       drawSprite(ctx, HOTFIX, o.x, ground - o.y - HOTFIX.length, p.hotfix, p.dark)
+    } else if (o.kind === 'double') {
+      // two hotfixes, the second as far on as the pair's overlap leaves it
+      const second = o.x + HOTFIX[0].length - (o.overlap ?? 0)
+      drawSprite(ctx, HOTFIX, o.x, ground - o.y - HOTFIX.length, p.hotfix, p.dark)
+      drawSprite(ctx, HOTFIX, second, ground - o.y - HOTFIX.length, p.hotfix, p.dark)
+    } else if (o.kind === 'duck') {
+      drawSprite(ctx, DUCK, o.x, ground - o.y - DUCK.length, p.hotfix, p.dark)
+    } else if (o.kind === 'roaming') {
+      // on a whole pixel: its height runs through the ones between the lanes
+      const top = ground - Math.round(o.y) - MONITOR.length - bob
+      drawSprite(ctx, MONITOR, o.x, top, p.monitor, p.dark)
     } else if (o.kind === 'server') {
       const server = SERVER_BITES[o.bites ?? 0] ?? []
       drawSprite(ctx, server, o.x, ground - o.y - server.length, p.server, p.dark)
+    } else if (o.kind === 'sudo') {
+      // a sudo card flies too, and bobs the way a monitor does
+      drawSprite(ctx, SUDO, o.x, ground - o.y - SUDO.length - bob, p.sudo, p.dark)
     } else {
-      // a monitor flies: it bobs a pixel as it goes
-      const bob = Math.floor(g.t * 4) % 2
       drawSprite(ctx, MONITOR, o.x, ground - o.y - MONITOR.length - bob, p.monitor, p.dark)
     }
   }
@@ -121,7 +184,14 @@ function draw(ctx: CanvasRenderingContext2D, g: Game, p: Palette) {
         : Math.floor(g.distance / 6) % 2
           ? BUG_RUN_B
           : BUG_RUN_A
-  drawSprite(ctx, bug, BUG_X, ground - Math.round(g.y) - BUG.h, p.bug, p.dark)
+  // yellow while it holds a sudo card; taking one or spending it blinks the bug
+  // between its two colours, starting from the one it leaves
+  const own = g.shielded ? p.sudo : p.bug
+  const other = g.shielded ? p.bug : p.sudo
+  const accent = g.flash !== null && Math.floor(g.flash / BLINK) % 2 === 0 ? other : own
+  drawSprite(ctx, bug, BUG_X, ground - Math.round(g.y) - BUG.h, accent, p.dark)
+
+  if (g.wreck) drawWreck(ctx, g.wreck, ground, colourOf(g.wreck.kind, p))
 }
 
 const pad = (n: number) => String(n).padStart(5, '0')

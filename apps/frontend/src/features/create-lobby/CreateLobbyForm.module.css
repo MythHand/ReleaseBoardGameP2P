@@ -1,24 +1,54 @@
 /* apps/frontend/src/features/create-lobby/CreateLobbyForm.module.css */
 
 /* Ported from apps/ui/src/screens/Start/Start.module.css (create modal). */
-.createGrid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 0.85fr);
-  align-items: stretch;
+
+/* the form hands the modal body's height on to the grid */
+.form {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-block-size: 0;
 }
 
+.createGrid {
+  display: grid;
+  flex: 1;
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.85fr);
+  align-items: stretch;
+
+  /* as tall as the modal's body and no taller: the columns scroll each on its
+     own, the body does not */
+  min-block-size: 0;
+}
+
+/* the modes column — a scrolling area: only its place here. It reaches over
+   the window's padding (`--window-gutter`, said by the Modal) to the head's
+   line and the window's foot, so the modes scroll right under the head, as
+   the whole body did before; the padding goes inside, to the modes */
 .createMods {
+  min-block-size: 0;
+  padding-inline-end: 36px;
+  margin-block: calc(-1 * var(--window-gutter, 0px));
+}
+
+/* the modes inside the area */
+.createModsFlow {
   display: flex;
   flex-direction: column;
   gap: 26px;
-  padding-inline-end: 36px;
+  padding-block: var(--window-gutter, 0);
 }
 
+/* stays where it is while the modes scroll; scrolls on its own only on a
+   screen too short for it */
 .createTech {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  min-block-size: 0;
   padding-inline-start: 36px;
+  overflow: auto;
   border-inline-start: 1px solid var(--white-08);
 }
 

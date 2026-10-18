@@ -200,12 +200,21 @@
   min-block-size: 0;
 }
 
-/* контент, который сам по себе длинный (правила) — прокручивается внутри
-   drawer. Прокрутку и полосу над содержимым ведёт ScrollArea; sticky-строка
-   поиска внутри правил остаётся липкой — она внутри того же прокручиваемого
-   viewport'а. */
+/* Content long on its own (the rules) scrolls inside the drawer; ScrollArea
+   carries the scrolling. Its area covers the whole panel, over the drawer's
+   padding (`--window-gutter`, said by the Drawer), so the rules' sticky search
+   can sit at the panel's top edge across its width. The padding goes inside,
+   to the rules — inside the scrolling content, not on the scrolling box, so
+   the search's sticky top needs no pulling back (`--rules-stick`). */
 .scrollPanel {
+  --rules-stick: 0px;
+
   min-block-size: 0;
+  margin: calc(-1 * var(--window-gutter));
+}
+
+.scrollPanelFlow {
+  padding: var(--window-gutter);
 }
 
 /* всплывающие плашки — правый нижний угол: отступ на рейл (56px) плюс зазор.

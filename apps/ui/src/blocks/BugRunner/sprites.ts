@@ -51,6 +51,33 @@ export const MONITOR: Sprite = [
   '...aaaaaa...',
 ]
 
+// Rubber Ducky — the card's duck, turned to face the bug it runs at: the beak on
+// the left, the tail up on the right, a wing line along its side.
+export const DUCK: Sprite = [
+  '..aaaa......',
+  '.adddda.....',
+  '.adadda...aa',
+  'aaddddaaaada',
+  'aaadddddddda',
+  '.adddddddda.',
+  '.adddaaadda.',
+  '.addddddda..',
+  '..adddddda..',
+  '...aaaaaa...',
+]
+
+// Sudo — the card's access card: the chip at its corner, the stripe across it.
+export const SUDO: Sprite = [
+  'aaaaaaaaaaaa',
+  'adddddddddda',
+  'adaaddddddda',
+  'adaaddddddda',
+  'adddddddddda',
+  'aaaaaaaaaaaa',
+  'adddddddddda',
+  'aaaaaaaaaaaa',
+]
+
 // Server — a system unit on its feet: two drive bays, a light, a vent. The bug
 // eats it from the left, the side it runs in from; every bite keeps a neon edge.
 export const SERVER: Sprite = [

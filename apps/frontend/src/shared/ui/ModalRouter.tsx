@@ -7,6 +7,8 @@ interface RouteConfig {
   title: ReactNode
   children: ReactNode
   wide?: boolean
+  // keep the height the modal opened at (Modal `holdHeight`)
+  holdHeight?: boolean
 }
 
 interface ModalRouterProps {
@@ -44,7 +46,13 @@ export default function ModalRouter({ param = 'modal', routes }: ModalRouterProp
   const current = lastConfig.current
 
   return (
-    <Modal open={!!config} onClose={close} title={current?.title} wide={current?.wide}>
+    <Modal
+      open={!!config}
+      onClose={close}
+      title={current?.title}
+      wide={current?.wide}
+      holdHeight={current?.holdHeight}
+    >
       {current?.children ?? null}
     </Modal>
   )

@@ -372,7 +372,9 @@ interface ZoomCard {
 
 // Hover-zoom overlay — an enlarged, parallax card portaled to <body> and fixed at
 // the reference slot, so no ancestor's overflow (the Rules modal scrolls) can clip
-// it. Grows ×2 from the slot centre on mount, shrinks back before unmounting.
+// it. Grows ×2 from the slot centre on mount, shrinks back before unmounting. It
+// starts as the slot's LOD card and rebuilds into the full one as it grows — and
+// back as it shrinks — so the hover lifts the same card, never swaps it.
 function CardZoomOverlay({ card, onClose }: { card: ZoomCard; onClose: () => void }) {
   const [grown, setGrown] = useState(false)
   const closing = useRef(false)
@@ -396,11 +398,26 @@ function CardZoomOverlay({ card, onClose }: { card: ZoomCard; onClose: () => voi
         closing.current = true
         setGrown(false)
       }}
+      // back on a card still shrinking: it grows again from where it is
+      onMouseEnter={() => {
+        closing.current = false
+        setGrown(true)
+      }}
       onTransitionEnd={(e) => {
-        if (closing.current && e.propertyName === 'transform') onClose()
+        // its own shrink only: the card's layers ease their transforms too
+        // (the tilt, the LOD rebuild), and theirs bubble up here
+        if (closing.current && e.target === e.currentTarget && e.propertyName === 'transform') {
+          onClose()
+        }
       }}
     >
-      <CardParallax config={card.config} content={card.content} width={rect.width} interactive />
+      <CardParallax
+        config={card.config}
+        content={card.content}
+        width={rect.width}
+        interactive
+        lod={!grown}
+      />
     </div>,
     document.body,
   )
@@ -421,8 +438,14 @@ const splitSudo = (desc: string) => {
 // выделяется ярче; стрелки / Enter переключают активное и скроллят к нему.
 export default function Rules({ copy, lang = 'ru' }: RulesProps) {
   const sections = useMemo(() => buildSections(RULES, copy), [copy])
-  // hovered card lifted into the top-layer zoom overlay (null = none)
-  const [zoom, setZoom] = useState<ZoomCard | null>(null)
+  // Hovered cards lifted into the top-layer zoom overlay: the one under the
+  // pointer, last and on top, and those still shrinking back to their slots —
+  // a card the pointer has left finishes its way down while the next one rises,
+  // rather than vanishing the moment another is hovered.
+  const [zooms, setZooms] = useState<ZoomCard[]>([])
+  const lift = (card: ZoomCard) =>
+    setZooms((list) => [...list.filter((z) => z.id !== card.id), card])
+  const drop = (id: string) => setZooms((list) => list.filter((z) => z.id !== id))
   const meta = copy.meta
   const searchPlaceholder = copy.searchPlaceholder
   const notFoundText = copy.notFound
@@ -544,7 +567,7 @@ export default function Rules({ copy, lang = 'ru' }: RulesProps) {
                     key={card.id}
                     className={styles.cardZoom}
                     onMouseEnter={(e) =>
-                      setZoom({
+                      lift({
                         id: card.id,
                         rect: e.currentTarget.getBoundingClientRect(),
                         config,
@@ -557,6 +580,7 @@ export default function Rules({ copy, lang = 'ru' }: RulesProps) {
                       content={content}
                       width={REF_CARD_W}
                       interactive={false}
+                      lod
                     />
                   </div>
                 )
@@ -685,7 +709,9 @@ export default function Rules({ copy, lang = 'ru' }: RulesProps) {
       ))}
 
       {query && shown.length === 0 && <p className={styles.empty}>{notFoundText}</p>}
-      {zoom && <CardZoomOverlay key={zoom.id} card={zoom} onClose={() => setZoom(null)} />}
+      {zooms.map((z) => (
+        <CardZoomOverlay key={z.id} card={z} onClose={() => drop(z.id)} />
+      ))}
     </div>
   )
 }
