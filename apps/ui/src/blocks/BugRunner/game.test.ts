@@ -3,6 +3,8 @@ import {
   BONUS,
   BUG,
   BUG_X,
+  DOUBLE_OVERLAP,
+  DUCK_RUSH,
   FLASH_S,
   type Game,
   jumpScale,
@@ -11,6 +13,8 @@ import {
   newGame,
   nextGap,
   press,
+  roamingShare,
+  rushOf,
   STARTER_BONUS,
   SUDO_Y,
   scoreOf,
@@ -19,11 +23,13 @@ import {
   step,
   sudoAgain,
   WRECK_S,
+  widthOf,
 } from './game'
 import {
   BUG_RUN_A,
   BUG_RUN_B,
   BUG_SIT,
+  DUCK,
   HOTFIX,
   MONITOR,
   SERVER_BITES,
@@ -33,13 +39,15 @@ import {
 
 // no obstacle of its own unless a test places one
 const never = () => 0.99
-// the opening server and the sudo cards are left out unless a test asks for them
+// the opening server, the sudo cards and the early rubber ducky are left out
+// unless a test asks for them
 const running = (over: Partial<Game> = {}): Game => ({
   ...newGame(200),
   phase: 'running',
   gap: 1e9,
   starter: false,
   sudoAt: Number.POSITIVE_INFINITY,
+  duckAt: Number.POSITIVE_INFINITY,
   ...over,
 })
 // run `seconds` of play in frames, the way the loop does
@@ -57,6 +65,7 @@ describe('the sprites', () => {
     ['hotfix', HOTFIX],
     ['monitor', MONITOR],
     ['sudo', SUDO],
+    ['rubber ducky', DUCK],
     ...SERVER_BITES.map((s, i): [string, Sprite] => [`server after ${i} bites`, s]),
   ] as [string, Sprite][])('%s is a rectangle', (_, sprite) => {
     expect(new Set(sprite.map((row) => row.length)).size).toBe(1)
@@ -352,11 +361,160 @@ describe('the sudo card', () => {
   })
 })
 
+// the dice the game rolls, one after another, and the last one from then on
+const dice = (...rolls: number[]) => {
+  let i = 0
+  return () => rolls[Math.min(i++, rolls.length - 1)] ?? 0
+}
+// a slot coming up now, at this score and speed, with the opening server, the
+// first server mark and the sudo cards out of the way
+const slot = (score: number, speed = 100, over: Partial<Game> = {}) =>
+  running({ gap: 0, distance: score * 10, served: 99, speed, pace: speed, t: 30, ...over })
+
+describe('roaming monitors', () => {
+  it('join at 1000 points as 5% and grow to 30% by 3000', () => {
+    expect(roamingShare(999)).toBe(0)
+    expect(roamingShare(1000)).toBeCloseTo(0.05)
+    expect(roamingShare(2000)).toBeCloseTo(0.175)
+    expect(roamingShare(3000)).toBeCloseTo(0.3)
+    expect(roamingShare(9000)).toBeCloseTo(0.3)
+  })
+
+  it('take their share half from the monitors and half from the hotfixes', () => {
+    // at 3000: 30% roaming, 34 − 15 = 19% monitors, 15% rubber duckies, and the
+    // rest — 66 − 15 − 15 = 36% — hotfixes
+    const kindAt = (roll: number) => step(slot(3000), 1 / 60, dice(roll, 0.9), 0).obstacles[0]?.kind
+    expect(kindAt(0.29)).toBe('roaming')
+    expect(kindAt(0.31)).toBe('monitor')
+    expect(kindAt(0.48)).toBe('monitor')
+    expect(kindAt(0.5)).toBe('duck')
+    expect(kindAt(0.65)).toBe('hotfix')
+  })
+
+  it('settle halfway to the bug, and swing as slowly at any speed: 0.8 s a swing', () => {
+    for (const speed of [100, 150]) {
+      const o = step(slot(3000, speed, { width: 250 }), 1 / 60, dice(0, 0.2, 0.9), 0).obstacles[0]
+      expect(o?.settle).toBeCloseTo(BUG_X + (250 - BUG_X) / 2, 6)
+      // the road one swing takes, at the speed it came in at
+      expect((o?.wave ?? 0) / speed).toBeCloseTo(0.8, 2)
+    }
+  })
+
+  it('swing between the lanes while far off, and hold their own for the last half', () => {
+    for (const [roll, lane, y] of [
+      [0.2, 'low', 0],
+      [0.8, 'high', MONITOR_Y],
+    ] as const) {
+      let g = step(slot(3000, 100, { width: 250 }), 1 / 60, dice(0, roll, 0.9), 0)
+      const o = g.obstacles[0]
+      expect(o).toMatchObject({ kind: 'roaming', lane })
+      const heights = new Set<number>()
+      while ((g.obstacles[0]?.x ?? 0) > (o?.settle ?? 0)) {
+        heights.add(Math.round(g.obstacles[0]?.y ?? 0))
+        g = step({ ...g, gap: 1e9 }, 1 / 60, never, 0)
+      }
+      // it has been on both lanes and between them on the way
+      expect(heights.size).toBeGreaterThan(5)
+      for (let i = 0; i < 10; i++) {
+        g = step({ ...g, gap: 1e9 }, 1 / 60, never, 0)
+        if (g.obstacles[0]) expect(g.obstacles[0].y).toBe(y)
+      }
+    }
+  })
+
+  it('are jumped on the low lane, run under on the high one, and pay 50 either way', () => {
+    // settled long before: both are on their lanes already
+    const low = { kind: 'roaming' as const, x: BUG_X + 23, y: 0, lane: 'low' as const, settle: 999 }
+    const high = { ...low, y: MONITOR_Y, lane: 'high' as const }
+    expect(play(running({ obstacles: [low] }), 0.6).phase).toBe('over')
+    expect(play(press(running({ obstacles: [low] }), 0), 0.6).bonus).toBe(50)
+    expect(play(press(running({ obstacles: [high] }), 0), 0.6).phase).toBe('over')
+    expect(play(running({ obstacles: [high] }), 0.6).bonus).toBe(50)
+  })
+})
+
+describe('a pair of hotfixes', () => {
+  it('comes only above a speed of 138, as one hotfix in five', () => {
+    // the speed creeps up within the frame, so the one below the line is a step off it
+    expect(step(slot(500, 137), 1 / 60, dice(0.9, 0.1, 0.5), 0).obstacles[0]?.kind).toBe('hotfix')
+    expect(step(slot(500, 139), 1 / 60, dice(0.9, 0.1, 0.5), 0).obstacles[0]?.kind).toBe('double')
+    expect(step(slot(500, 139), 1 / 60, dice(0.9, 0.3, 0.5), 0).obstacles[0]?.kind).toBe('hotfix')
+  })
+
+  it('can be jumped at that speed, overlapping or back to back, and pays 100 once', () => {
+    for (const overlap of [0, DOUBLE_OVERLAP]) {
+      let cleared = false
+      for (let ahead = 0; ahead < 120 && !cleared; ahead += 0.5) {
+        const pair = { kind: 'double' as const, x: BUG_X + ahead, y: 0, overlap }
+        const g = play(press(running({ speed: 139, pace: 139, obstacles: [pair] }), 0), 1)
+        cleared = g.phase === 'running' && g.bonus === 100
+      }
+      expect(cleared).toBe(true)
+    }
+  })
+
+  it('starts the road behind it at its end', () => {
+    // overlapping by half the most: 18 long, 8 more than a hotfix
+    const spawned = step(slot(500, 139), 1 / 60, dice(0.9, 0.1, 0.5, 0), 0)
+    expect(spawned.obstacles[0]).toMatchObject({ kind: 'double', overlap: DOUBLE_OVERLAP / 2 })
+    expect(spawned.gap).toBeCloseTo(nextGap(spawned.speed, () => 0) + 8, 6)
+  })
+})
+
+describe('a rubber ducky', () => {
+  it('joins at 1500 points, taken from the hotfixes', () => {
+    // at 1500: 11.25% roaming, 28.4% monitors, then 15% duckies
+    const kindAt = (score: number) =>
+      step(slot(score), 1 / 60, dice(0.5, 0.9), 0).obstacles[0]?.kind
+    expect(kindAt(1499)).toBe('hotfix')
+    expect(kindAt(1500)).toBe('duck')
+  })
+
+  it('runs at the bug faster than the world, and pays 50 when jumped', () => {
+    const duck = { kind: 'duck' as const, x: 200, y: 0 }
+    const g = play(running({ gap: 1e9, obstacles: [duck] }), 0.5)
+    const run = 200 - (g.obstacles[0]?.x ?? 0)
+    expect(run / (g.distance - 0)).toBeCloseTo(1 + DUCK_RUSH, 1)
+    const near = { kind: 'duck' as const, x: BUG_X + 30, y: 0 }
+    expect(play(press(running({ obstacles: [near] }), 0), 0.6).bonus).toBe(50)
+  })
+
+  it('comes once early, at a score each run draws between 300 and 800', () => {
+    const drawn = (roll: number) =>
+      step(running({ duckAt: null }), 1 / 60, dice(roll, roll, 0.9), 0).duckAt
+    expect(drawn(0)).toBe(300)
+    expect(drawn(0.999)).toBe(799)
+  })
+
+  it('waits for room when it comes early, rather than give way to a hotfix', () => {
+    const ahead = { kind: 'hotfix' as const, x: 200, y: 0 }
+    let g = slot(500, 100, { width: 250, duckAt: 400, obstacles: [ahead] })
+    g = step(g, 1 / 60, never, 0)
+    // no room yet: nothing comes in, and the ducky is still to come
+    expect(g.obstacles).toHaveLength(1)
+    expect(g.duckAt).toBe(400)
+    while (g.obstacles.length === 1) g = step(g, 1 / 60, never, 0)
+    expect(g.obstacles[1]?.kind).toBe('duck')
+    expect(g.duckAt).toBe(Number.POSITIVE_INFINITY)
+  })
+
+  it('is a hotfix instead where it would catch up with the obstacle ahead', () => {
+    // a hotfix just let in ahead: the ducky would run into its back
+    const ahead = { kind: 'hotfix' as const, x: 200, y: 0 }
+    const crowded = slot(1500, 100, { width: 250, obstacles: [ahead] })
+    expect(step(crowded, 1 / 60, dice(0.5, 0.9), 0).obstacles[1]?.kind).toBe('hotfix')
+    // the same, with the road ahead clear
+    expect(
+      step(slot(1500, 100, { width: 250 }), 1 / 60, dice(0.5, 0.9), 0).obstacles[0]?.kind,
+    ).toBe('duck')
+  })
+})
+
 // THE CEILING THE HOST CHECKS A SCORE AGAINST. It is only worth anything if no
 // real run ever goes over it, so real runs are played here: the game's own
-// randomness from a fixed seed, a jumper that clears hotfixes, the loop's frame
-// length — and every frame of every run is held against the ceiling for the
-// time it has run.
+// randomness from a fixed seed, a jumper that clears all there is to jump, the
+// loop's frame length — and every frame of every run is held against the
+// ceiling for the time it has run.
 describe('maxScoreWithin', () => {
   const seeded = (seed: number) => {
     let s = seed
@@ -365,11 +523,21 @@ describe('maxScoreWithin', () => {
       return s / 4294967296
     }
   }
-  // jumps when a hotfix comes within an eighth of a second of the bug's front
+  // what stands on the road to be jumped: a hotfix, a pair, a rubber ducky, and
+  // a roaming monitor on the low lane
+  const grounded = (o: Game['obstacles'][number]) =>
+    o.kind === 'hotfix' ||
+    o.kind === 'double' ||
+    o.kind === 'duck' ||
+    (o.kind === 'roaming' && o.lane === 'low')
+  // jumps when one comes within an eighth of a second of the bug's front, at
+  // the speed it comes at — a pair, earlier by half of what it has over a hotfix
   const jumpsHotfixes = (g: Game) =>
     g.obstacles.some((o) => {
+      const closing = g.speed * rushOf(o)
       const ahead = o.x - (BUG_X + BUG.w)
-      return o.kind === 'hotfix' && ahead >= 0 && ahead < g.speed * 0.12
+      const lead = 0.12 + (widthOf(o) - HOTFIX[0].length) / (2 * closing)
+      return grounded(o) && ahead >= 0 && ahead < closing * lead
     })
   // a run of `seconds`, each frame handed to `check`
   const run = (seed: number, seconds: number, check: (g: Game) => void = () => {}) => {
@@ -394,6 +562,23 @@ describe('maxScoreWithin', () => {
       expect(g.phase).toBe('running')
       expect(g.served).toBeGreaterThanOrEqual(5)
       expect(g.pace).toBe(150)
+    }
+  })
+
+  // the real runs serve one more rule, owner's: every run meets a rubber ducky
+  // between 300 and 1000 points — one, whatever servers and sudo cards it meets
+  it('brings a rubber ducky into every real run, once, between 300 and 1000 points', () => {
+    for (let seed = 1; seed <= 30; seed++) {
+      const early: number[] = []
+      const end = run(seed * 101, 45, (g) => {
+        if (scoreOf(g) < 1500 && g.obstacles.some((o) => o.kind === 'duck' && o.x === g.width)) {
+          early.push(scoreOf(g))
+        }
+      })
+      expect(scoreOf(end)).toBeGreaterThan(1000)
+      expect(early).toHaveLength(1)
+      expect(early[0]).toBeGreaterThanOrEqual(300)
+      expect(early[0]).toBeLessThan(1000)
     }
   })
 

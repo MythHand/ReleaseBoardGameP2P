@@ -34,6 +34,7 @@ import {
   BUG_RUN_A,
   BUG_RUN_B,
   BUG_SIT,
+  DUCK,
   HOTFIX,
   MONITOR,
   SERVER_BITES,
@@ -108,9 +109,8 @@ const PIECES = Array.from({ length: 8 }, (_, i) => {
 // An obstacle the protection broke: its pieces fly out from where its middle
 // was, in its colour, and fade as they go.
 function drawWreck(ctx: CanvasRenderingContext2D, w: Wreck, ground: number, colour: string) {
-  const art = w.kind === 'monitor' ? MONITOR : HOTFIX
-  const cx = w.x + (art[0]?.length ?? 0) / 2
-  const cy = ground - w.y - art.length / 2
+  const cx = w.x + w.w / 2
+  const cy = ground - w.y - w.h / 2
   const out = w.age * WRECK_SPEED
   ctx.globalAlpha = 1 - w.age / WRECK_S
   ctx.fillStyle = colour
@@ -121,9 +121,14 @@ function drawWreck(ctx: CanvasRenderingContext2D, w: Wreck, ground: number, colo
 }
 
 function draw(ctx: CanvasRenderingContext2D, g: Game, p: Palette) {
+  // a rubber ducky is a defence card, as a hotfix is; a roaming monitor is a
+  // monitor all the same
   const colourOf: Record<Kind, string> = {
     hotfix: p.hotfix,
+    double: p.hotfix,
+    duck: p.hotfix,
     monitor: p.monitor,
+    roaming: p.monitor,
     server: p.server,
     sudo: p.sudo,
   }
@@ -141,6 +146,17 @@ function draw(ctx: CanvasRenderingContext2D, g: Game, p: Palette) {
   for (const o of g.obstacles) {
     if (o.kind === 'hotfix') {
       drawSprite(ctx, HOTFIX, o.x, ground - o.y - HOTFIX.length, p.hotfix, p.dark)
+    } else if (o.kind === 'double') {
+      // two hotfixes, the second as far on as the pair's overlap leaves it
+      const second = o.x + HOTFIX[0].length - (o.overlap ?? 0)
+      drawSprite(ctx, HOTFIX, o.x, ground - o.y - HOTFIX.length, p.hotfix, p.dark)
+      drawSprite(ctx, HOTFIX, second, ground - o.y - HOTFIX.length, p.hotfix, p.dark)
+    } else if (o.kind === 'duck') {
+      drawSprite(ctx, DUCK, o.x, ground - o.y - DUCK.length, p.hotfix, p.dark)
+    } else if (o.kind === 'roaming') {
+      // on a whole pixel: its height runs through the ones between the lanes
+      const top = ground - Math.round(o.y) - MONITOR.length - bob
+      drawSprite(ctx, MONITOR, o.x, top, p.monitor, p.dark)
     } else if (o.kind === 'server') {
       const server = SERVER_BITES[o.bites ?? 0] ?? []
       drawSprite(ctx, server, o.x, ground - o.y - server.length, p.server, p.dark)

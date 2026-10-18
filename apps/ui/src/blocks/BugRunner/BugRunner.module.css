@@ -60,21 +60,28 @@
   color: var(--white-25);
 }
 
-/* hidden until a payment's popIn; popOut leaves it hidden again */
+/* hidden until a payment's popIn; popOut leaves it hidden again. A flex box, as
+   the score is: its text then sits on the score's line, not on a line as tall
+   as the button's own font, which dropped it below the score */
 .bonus {
   position: absolute;
   inset-block-start: 0;
   inset-inline-start: calc(100% + 6px);
+  display: flex;
   white-space: nowrap;
   opacity: 0;
 }
 
-/* in the colour of what paid it */
-.hotfix {
+/* in the colour of what paid it — a pair and a rubber ducky are defence cards,
+   as a hotfix is; a roaming monitor is a monitor */
+.hotfix,
+.double,
+.duck {
   color: var(--cat-defense);
 }
 
-.monitor {
+.monitor,
+.roaming {
   color: var(--cat-protection);
 }
 
