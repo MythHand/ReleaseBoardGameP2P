@@ -17,6 +17,9 @@ import type { Seat } from './referee'
 //
 // A bot seat is the second exception, left untouched: it has no absence to
 // restamp and nothing to come back from.
+//
+// Everything else on a seat is carried as it was — `surrendering` included: a
+// surrender the keeper had not reduced yet is still owed after the reload.
 export function restoreSeats(stored: Seat[], hostPeerId: string, now: number): Seat[] {
   return stored.map((seat) => {
     // A bot was never present, so there is no absence to restamp — and

@@ -1647,6 +1647,67 @@ it('a guest tells the host when its intro is done', async () => {
   expect(sentTo(hostId)).toContainEqual({ type: 'INTRO_READY', payload: { gameId: hostId } })
 })
 
+it('leaving a running match as a player sends SURRENDER before closing', async () => {
+  vi.useFakeTimers()
+  try {
+    const { result } = renderHook(() => useLobby())
+    await act(async () => {
+      await result.current.joinRoom('F96-NMT', 'Dimbo')
+    })
+    const hostId = parseRoomCode('F96-NMT')
+    act(() => {
+      transports[0].onMessage?.({
+        type: 'GAME_STARTING',
+        payload: {
+          gameId: hostId,
+          seats: SEATING.map((seat, i) => (i === 1 ? { ...seat, peerId: 'peer0' } : seat)),
+        },
+        from: hostId,
+      } as WireMessage)
+    })
+
+    act(() => {
+      result.current.leaveSession()
+    })
+
+    // Through the game link, to the keeper — the same frame any intent takes.
+    expect(sentTo(hostId)).toContainEqual({
+      type: 'INTENT',
+      payload: { intent: { type: 'SURRENDER' } },
+    })
+    // The frame has to leave before the transport goes, so the close waits.
+    expect(transports[0].close).not.toHaveBeenCalled()
+    act(() => {
+      vi.advanceTimersByTime(1_000)
+    })
+    expect(transports[0].close).toHaveBeenCalled()
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+it('leaving a running match as a spectator surrenders nothing', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => {
+    await result.current.joinRoom('F96-NMT', 'Dimbo')
+  })
+  const hostId = parseRoomCode('F96-NMT')
+  act(() => {
+    transports[0].onMessage?.({
+      type: 'GAME_STARTING',
+      payload: { gameId: hostId, seats: SEATING },
+      from: hostId,
+    } as WireMessage)
+  })
+
+  act(() => {
+    result.current.leaveSession()
+  })
+
+  expect(sentAll().some((m) => m.type === 'INTENT')).toBe(false)
+  expect(transports[0].close).toHaveBeenCalled()
+})
+
 it('reporting ready outside a game is a no-op', async () => {
   // In a lobby, with a live transport and a host to address: only the absence of
   // a game keeps the frame from being sent.
@@ -2761,6 +2822,7 @@ interface MutableRefereeSeat {
   playerId: string
   peerId: string | null
   absentSince: number | null
+  surrendering?: unknown
 }
 
 const invalidKeeperSnapshots: [string, (snapshot: StoredKeeper) => void][] = [
@@ -2784,6 +2846,13 @@ const invalidKeeperSnapshots: [string, (snapshot: StoredKeeper) => void][] = [
     (snapshot) => {
       const seats = snapshot.seats as MutableRefereeSeat[]
       snapshot.seats = [seats[0], { ...seats[1], playerId: seats[0].playerId }]
+    },
+  ],
+  [
+    'a non-boolean surrendering flag',
+    (snapshot) => {
+      const seats = snapshot.seats as MutableRefereeSeat[]
+      snapshot.seats = [seats[0], { ...seats[1], peerId: null, absentSince: 500, surrendering: 1 }]
     },
   ],
   [
@@ -2995,6 +3064,36 @@ it('restores a valid snapshot whose guest seat was already absent', async () => 
   expect(result.current.status).toBe('in-lobby')
   expect(result.current.gameId).toBe('g1')
   expect(transports).toHaveLength(1)
+})
+
+// A surrender the keeper had not reduced yet survives the snapshot round trip:
+// read back by the validator and written out again by the trailing save.
+it('keeps a pending surrender through a keeper snapshot round trip', async () => {
+  vi.useFakeTimers()
+  try {
+    storedHostSession('g1')
+    const snapshot = storedKeeperSnapshot('peer0')
+    const seats = snapshot.seats as MutableRefereeSeat[]
+    snapshot.seats = [seats[0], { ...seats[1], peerId: null, absentSince: 500, surrendering: true }]
+    sessionStorage.setItem(KEEPER_KEY, JSON.stringify(snapshot))
+
+    const restored = renderHook(() => useLobby())
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(restored.result.current.gameId).toBe('g1')
+    act(() => {
+      vi.advanceTimersByTime(KEEPER_SAVE_MS)
+    })
+
+    expect((storedKeeper()?.seats as RefereeSeat[])[1]).toMatchObject({
+      playerId: seats[1].playerId,
+      surrendering: true,
+    })
+    restored.unmount()
+  } finally {
+    vi.useRealTimers()
+  }
 })
 
 it('hands the restored host its own table back without waiting for it to act', async () => {

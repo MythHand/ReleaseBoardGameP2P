@@ -253,13 +253,17 @@ function normalizeRefereeSeats(value: unknown): RefereeSeat[] | null {
   const peerIds = new Set<string>()
   for (const entry of value) {
     if (typeof entry !== 'object' || entry === null) return null
-    const { playerId, peerId, absentSince, bot } = entry as {
+    const { playerId, peerId, absentSince, bot, surrendering } = entry as {
       playerId?: unknown
       peerId?: unknown
       absentSince?: unknown
       bot?: unknown
+      surrendering?: unknown
     }
     if (bot !== undefined && typeof bot !== 'boolean') return null
+    // A surrender the keeper had not reduced yet survives the reload: the
+    // player who left is still leaving.
+    if (surrendering !== undefined && typeof surrendering !== 'boolean') return null
     if (!isNonEmptyString(playerId)) return null
     if (peerId !== null && !isNonEmptyString(peerId)) return null
     if (absentSince !== null && (typeof absentSince !== 'number' || !Number.isFinite(absentSince)))
@@ -270,7 +274,13 @@ function normalizeRefereeSeats(value: unknown): RefereeSeat[] | null {
     if (playerIds.has(playerId) || (typeof peerId === 'string' && peerIds.has(peerId))) return null
     playerIds.add(playerId)
     if (typeof peerId === 'string') peerIds.add(peerId)
-    seats.push({ playerId, peerId, absentSince, ...(bot ? { bot: true } : {}) })
+    seats.push({
+      playerId,
+      peerId,
+      absentSince,
+      ...(bot ? { bot: true } : {}),
+      ...(surrendering ? { surrendering: true } : {}),
+    })
   }
   return seats
 }
@@ -607,7 +617,12 @@ export function useLobby(): UseLobby {
   const [gameId, setGameId] = useState<string | null>(null)
   const [gameLink, setGameLink] = useState<GameLink | null>(null)
   const [gameSync, setGameSync] = useState<SyncSnapshot | null>(null)
+  // Whether the match this peer last heard about has finished, as a ref so the
+  // leave path reads the live answer: a player leaving a finished match has
+  // nothing left to surrender.
+  const matchOverRef = useRef(false)
   const captureGameSync = useCallback((sync: Sync) => {
+    matchOverRef.current = sync.view.over !== null
     setGameSync((previous) => accumulateSync(previous, sync))
   }, [])
   const [seats, setSeats] = useState<Seat[]>([])
@@ -1429,7 +1444,10 @@ export function useLobby(): UseLobby {
           // is never played (the old game-over overlay paints for that commit
           // too). The host has no such window because `startGame` batches its
           // state into one update.
-          if (msg.payload.gameId !== gameIdRef.current) setGameSync(null)
+          if (msg.payload.gameId !== gameIdRef.current) {
+            setGameSync(null)
+            matchOverRef.current = false
+          }
           // The seating is the host's, taken as given: recomputing it locally is
           // the defect this payload exists to close. `?? []` only covers a peer
           // running an older build — the page then falls back to seatsFor.
@@ -2408,9 +2426,27 @@ export function useLobby(): UseLobby {
   // user is bounced back into their old session. `flushMs` defers only the
   // transport close (state resets immediately) so a final broadcast can flush
   // over the DataChannels before peer.destroy() — see disband().
+  //
+  // A seated player leaving a running match surrenders first: the keeper marks
+  // the seat and eliminates it once the table is idle (referee.ts). The intent
+  // goes through the game link like any other, and the transport close waits
+  // the same flush the disband takes, so the frame leaves before the channel
+  // does. The host leaving ends the room as it always has.
   const leaveSession = useCallback(
     (flushMs?: number) => {
-      teardownSession(flushMs)
+      const current = stateRef.current
+      const remote = remoteRef.current
+      const seated =
+        current !== null &&
+        seatsRef.current.some((seat) => seat.peerId === current.selfId && !seat.bot)
+      const surrenders =
+        !isHostRef.current &&
+        remote !== null &&
+        gameIdRef.current !== null &&
+        seated &&
+        !matchOverRef.current
+      if (surrenders) remote.link.submit({ type: 'SURRENDER' })
+      teardownSession(surrenders ? Math.max(flushMs ?? 0, DISBAND_FLUSH_MS) : flushMs)
     },
     [teardownSession],
   )
