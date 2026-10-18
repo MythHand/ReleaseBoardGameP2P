@@ -6,6 +6,7 @@ import {
   type GameModesCopy,
   ModeSelect,
   randomNickname,
+  ScrollArea,
   type Setup,
   sanitizeNickname,
   Typography,
@@ -51,9 +52,11 @@ export default function CreateLobbyForm() {
         }
       }}
       requiredMessage={t('start.required')}
+      className={styles.form}
     >
       <div className={styles.createGrid}>
-        <div className={styles.createMods}>
+        {/* the modes scroll on their own; the column beside them stays */}
+        <ScrollArea className={styles.createMods} contentClassName={styles.createModsFlow}>
           {GAME_MODES.map((m) => {
             const mc = modesCopy[m.key]
             return (
@@ -70,7 +73,7 @@ export default function CreateLobbyForm() {
               />
             )
           })}
-        </div>
+        </ScrollArea>
         <div className={styles.createTech}>
           <Typography variant="panelTitle" as="h4" className={styles.techTitle}>
             {t('start.lobbyParams')}

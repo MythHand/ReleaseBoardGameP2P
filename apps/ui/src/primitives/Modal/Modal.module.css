@@ -30,7 +30,9 @@
   max-block-size: 90vh;
   padding: 0;
   margin: 0;
-  overflow: auto;
+
+  /* the body scrolls, not the dialog: the head stays where it is */
+  overflow: hidden;
   color: var(--fg);
   background: color-mix(in srgb, var(--surface-1) 94%, var(--bg));
   border: 1px solid var(--white-14);
@@ -54,6 +56,7 @@
 
 .head {
   display: flex;
+  flex: none;
   gap: 24px;
   align-items: center;
   justify-content: space-between;
@@ -79,12 +82,16 @@
   color: var(--fg);
 }
 
+/* The body is what scrolls, under the head that stays: it may shrink under its
+   content within the dialog's cap. */
 .body {
   display: flex;
   flex: 1;
   flex-direction: column;
   gap: 20px;
+  min-block-size: 0;
   padding: 26px;
+  overflow: auto;
 }
 
 /* a height cap from the consumer (`maxBlockSize`): the body may shrink under
