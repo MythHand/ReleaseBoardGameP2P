@@ -41,6 +41,7 @@ const COPY: Record<'ru' | 'en', StatsCopy> = {
       monitoring: { title: 'Параноик', unit: 'раз поставил Monitoring' },
       gitBranch: { title: 'Дровосек', unit: 'раз разделил колоду' },
     },
+    bugRunner: { title: 'Bug Runner', unit: 'очков' },
   },
   en: {
     title: 'Match results',
@@ -69,6 +70,7 @@ const COPY: Record<'ru' | 'en', StatsCopy> = {
       monitoring: { title: 'Paranoid', unit: 'times set up Monitoring' },
       gitBranch: { title: 'Woodcutter', unit: 'times split a deck' },
     },
+    bugRunner: { title: 'Bug Runner', unit: 'points' },
   },
 }
 

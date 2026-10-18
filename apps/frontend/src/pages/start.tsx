@@ -1,5 +1,6 @@
 import { useTranslation } from '@release/translation'
-import { Menu, MenuButton, MenuGroup, VideoPlayer } from '@release/ui'
+import { Credits, Menu, MenuButton, MenuGroup, VideoPlayer } from '@release/ui'
+import { APP_VERSION } from '~/shared/config'
 import { useModalRoute } from '~/shared/ui/ModalRouter'
 import ScreenShell from '~/shared/ui/ScreenShell'
 import styles from './start.module.css'
@@ -14,8 +15,20 @@ export default function StartPage() {
     <ScreenShell
       tags={[t('start.tagOpenP2P'), t('start.tagBoardCard')]}
       description={t('start.description')}
+      // the credits sit in the bottom corner: the column tightens to clear them
+      fitHeight
       corners={
         <>
+          {/* who made it — the bottom-left corner, names link to GitHub */}
+          <Credits
+            copy={{
+              authorDesign: t('start.authorDesign'),
+              authorDev: t('start.authorDev'),
+              version: t('start.version'),
+            }}
+            version={APP_VERSION}
+            className={styles.credits}
+          />
           {/* Video player — expands in place to an inline iframe */}
           <VideoPlayer
             src={VIDEO_URL}

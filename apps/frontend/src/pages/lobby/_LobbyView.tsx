@@ -11,6 +11,7 @@ import {
   LobbyCode,
   MAX_SPECTATORS,
   Modal,
+  PLAYER_SETTINGS_MAX_BLOCK_SIZE,
   PlayerSettings,
   PlayerSlot,
   PRESET_AVATARS,
@@ -232,7 +233,12 @@ export default function LobbyView() {
           </Typography>
         </div>
         {/* the room between the two sides of the header is the mini-game's */}
-        <BugRunner label={t('lobbyScreen.bugRunner')} className={styles.runner} />
+        <BugRunner
+          label={t('lobbyScreen.bugRunner')}
+          className={styles.runner}
+          onRunStart={session.startBugRunner}
+          onRunEnd={session.reportBugRunner}
+        />
         <div className={styles.headRight}>
           <LobbyCode
             onCopy={copyText}
@@ -469,6 +475,7 @@ export default function LobbyView() {
         title={t('lobbyScreen.playerSettingsTitle')}
         // a player picks an avatar too; a spectator has only the nickname
         wide={Boolean(me)}
+        maxBlockSize={PLAYER_SETTINGS_MAX_BLOCK_SIZE}
       >
         <PlayerSettings
           avatars={

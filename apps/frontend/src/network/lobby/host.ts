@@ -1,3 +1,4 @@
+import { maxBugRunnerScore } from '@release/ui'
 import type { JoinRole, Message, PeerInfo, Where } from '../types'
 import { type JoinAdmission, type JoinOptions, resolveJoinAdmission } from './admission'
 import { pickAvatar } from './profile'
@@ -64,6 +65,9 @@ export function handleJoinRequest(
 
   const avatar =
     role === 'guest' ? undefined : pickAvatar(state, options.avatar, fromId, options.random)
+  // a member back from a reload keeps the mini-game record the host holds for
+  // them: the old row is usually gone by now, dropped with its channel
+  const bugRunner = state.bugRunner?.best[memberId]
   const peer: PeerInfo = {
     id: fromId,
     memberId,
@@ -78,6 +82,7 @@ export function handleJoinRequest(
         options.returningLobbyPeer.ready,
     where: options.returningSeat ? 'game' : 'lobby',
     ...(avatar ? { avatar } : {}),
+    ...(bugRunner ? { bugRunner } : {}),
   }
   const next = applyPeerJoined(state, peer)
 
@@ -142,6 +147,60 @@ export function handleReady(state: LobbyState, fromId: string): Result {
         },
       },
     ],
+  }
+}
+
+// How late a run's two messages may reach the host relative to each other: the
+// start can travel slower than the end, and the time the host measures is then
+// shorter than the run was. Only the difference of the two delays counts, so a
+// second covers it, and a short run's ceiling stays a short run's.
+const BUG_RUNNER_SLACK_S = 1
+
+const bugRunnerBooks = (state: LobbyState) => state.bugRunner ?? { best: {}, started: {} }
+
+// A member's run in the lobby's mini-game has started: the host notes when, by
+// its own clock, so the score that ends the run can be timed. Nothing is sent.
+export function handleBugRunnerStart(state: LobbyState, fromId: string, now: number): Result {
+  if (!state.peers[fromId]) return { state, outgoing: [] }
+  const books = bugRunnerBooks(state)
+  return {
+    state: { ...state, bugRunner: { ...books, started: { ...books.started, [fromId]: now } } },
+    outgoing: [],
+  }
+}
+
+// A member's run has ended with this score, for the results screen's Bug Runner
+// plate. Shaped like handleReady: the host keeps it on the member's row and
+// re-broadcasts the row. Anyone in the room plays, a spectator too, so no role
+// is turned away. A score with no start the host heard, or above what a run of
+// the time the host measured could reach, is turned away. Only a better run
+// moves the record — the room's best is the one to beat, and a later, lower
+// report must not take it back.
+export function handleBugRunnerScore(
+  state: LobbyState,
+  fromId: string,
+  score: unknown,
+  now: number,
+): Result {
+  const existing = state.peers[fromId]
+  const books = bugRunnerBooks(state)
+  const startedAt = books.started[fromId]
+  if (!existing || startedAt === undefined) return { state, outgoing: [] }
+  // the run is over whatever its score: its start is not left for the next one
+  const { [fromId]: _, ...started } = books.started
+  const closed: LobbyState = { ...state, bugRunner: { ...books, started } }
+  if (!Number.isSafeInteger(score) || (score as number) <= 0) return { state: closed, outgoing: [] }
+  const runFor = (now - startedAt) / 1000 + BUG_RUNNER_SLACK_S
+  if ((score as number) > maxBugRunnerScore(runFor)) return { state: closed, outgoing: [] }
+  if ((score as number) <= (existing.bugRunner ?? 0)) return { state: closed, outgoing: [] }
+  const updated: PeerInfo = { ...existing, bugRunner: score as number }
+  const kept: LobbyState = {
+    ...state,
+    bugRunner: { started, best: { ...books.best, [existing.memberId]: score as number } },
+  }
+  return {
+    state: applyPeerJoined(kept, updated),
+    outgoing: [{ to: 'broadcast', message: { type: 'PEER_JOINED', payload: updated } }],
   }
 }
 

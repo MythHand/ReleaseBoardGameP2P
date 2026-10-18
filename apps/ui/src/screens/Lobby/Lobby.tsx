@@ -4,7 +4,10 @@ import BugRunner from '@/blocks/BugRunner'
 import GameSettings from '@/blocks/GameSettings'
 import LangSwitcher, { type SwitchLang } from '@/blocks/LangSwitcher'
 import LobbyCode, { type LobbyCodeCopy } from '@/blocks/LobbyCode'
-import PlayerSettings, { type PlayerSettingsCopy } from '@/blocks/PlayerSettings'
+import PlayerSettings, {
+  PLAYER_SETTINGS_MAX_BLOCK_SIZE,
+  type PlayerSettingsCopy,
+} from '@/blocks/PlayerSettings'
 import PlayerSlot, { EmptySlot } from '@/blocks/PlayerSlot'
 import Rules, { type RulesCopy } from '@/blocks/Rules'
 import ReleaseLogo from '@/brand/ReleaseLogo'
@@ -559,6 +562,7 @@ export default function Lobby({
         title={copy.playerSettingsTitle}
         // a player picks an avatar too; a spectator has only the nickname
         wide={Boolean(me)}
+        maxBlockSize={PLAYER_SETTINGS_MAX_BLOCK_SIZE}
       >
         <PlayerSettings
           avatars={

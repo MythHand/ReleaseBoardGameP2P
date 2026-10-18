@@ -11,9 +11,20 @@ interface ModalProps {
   title?: ReactNode
   children: ReactNode
   wide?: boolean
+  // A tighter cap on the modal's height than the default (a CSS length). With
+  // it the body is held to the cap too, so content that can scroll on its own
+  // (a ScrollArea in it) does, instead of the whole modal.
+  maxBlockSize?: string
 }
 
-export default function Modal({ open, onClose, title, children, wide = false }: ModalProps) {
+export default function Modal({
+  open,
+  onClose,
+  title,
+  children,
+  wide = false,
+  maxBlockSize,
+}: ModalProps) {
   const [mounted, setMounted] = useState(open)
   const [shown, setShown] = useState(false)
   const dialogRef = useRef<HTMLDialogElement>(null)
@@ -107,7 +118,8 @@ export default function Modal({ open, onClose, title, children, wide = false }: 
     >
       <dialog
         ref={dialogRef}
-        className={`${styles.modal} ${wide ? styles.wide : ''}`}
+        className={`${styles.modal} ${wide ? styles.wide : ''} ${maxBlockSize ? styles.bounded : ''}`}
+        style={maxBlockSize ? { maxBlockSize } : undefined}
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
         aria-labelledby={titleId}

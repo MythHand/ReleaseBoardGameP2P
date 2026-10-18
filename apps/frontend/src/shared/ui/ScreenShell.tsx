@@ -21,6 +21,10 @@ interface ScreenShellProps {
   // start screen). 'compact' is for screens whose body is too tall to sit under
   // a 480px logo — the invite form would otherwise push its CTA below the fold.
   density?: 'hero' | 'compact'
+  // The column's rhythm tightens on a short screen so the menu clears whatever
+  // is pinned to the bottom corner — the start page's credits. A page asks for
+  // it; the hero density alone does not carry it.
+  fitHeight?: boolean
   // language + setter: when both are given, the corner switch is drawn
   lang?: SwitchLang
   onLangChange?: (lang: SwitchLang) => void
@@ -40,6 +44,7 @@ export default function ScreenShell({
   tags,
   description,
   density = 'hero',
+  fitHeight = false,
   lang,
   onLangChange,
   corners,
@@ -49,7 +54,9 @@ export default function ScreenShell({
   const compact = density === 'compact'
   const Content = compact ? ScrollArea : 'div'
   return (
-    <div className={`${styles.root} ${compact ? styles.compact : ''}`}>
+    <div
+      className={`${styles.root} ${compact ? styles.compact : ''} ${fitHeight ? styles.fitHeight : ''}`}
+    >
       <div className={styles.bg} />
       <div className={styles.blur} />
       <div className={styles.scrim} />

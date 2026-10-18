@@ -81,6 +81,8 @@ function base(): UseLobby {
     introReady: vi.fn(),
     transferHost: vi.fn(),
     updateProfile: vi.fn(),
+    startBugRunner: vi.fn(),
+    reportBugRunner: vi.fn(),
     profileRejection: null,
     setSetup: vi.fn(),
     disband: vi.fn(),

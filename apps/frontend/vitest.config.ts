@@ -1,6 +1,8 @@
 import { fileURLToPath, URL } from 'node:url'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vitest/config'
+// the same version the app is built with
+import { appVersionDefine } from '../../app-version'
 
 const uiSrc = fileURLToPath(new URL('../ui/src', import.meta.url))
 const appSrc = fileURLToPath(new URL('./src', import.meta.url))
@@ -12,6 +14,7 @@ const translationSrc = fileURLToPath(
 
 export default defineConfig({
   plugins: [react()],
+  define: appVersionDefine,
   resolve: {
     alias: [
       // Must precede the '@' alias: these imports are matched by their suffix,

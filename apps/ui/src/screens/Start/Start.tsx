@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { play } from '@/animations'
+import Credits from '@/blocks/Credits'
 import GameSettings from '@/blocks/GameSettings'
 import LangSwitcher, { type SwitchLang } from '@/blocks/LangSwitcher'
 import Menu, { MenuButton, MenuGroup } from '@/blocks/Menu'
@@ -19,18 +20,10 @@ import styles from './Start.module.css'
 
 // внешние ссылки (открываются в новой вкладке)
 const GITHUB_URL = 'https://github.com/MythHand'
-const DESIGN_URL = 'https://github.com/dimbo-design'
-const DEV_URL = 'https://github.com/ditayler'
-const CLAUDE_URL = 'https://github.com/anthropics/claude-code'
 // печатная версия — заказ/предзаказ ведём через Instagram команды
 const INSTAGRAM_URL = 'https://www.instagram.com/mythhand.team/'
 // game review — the embed shown in the start-screen video player
 const VIDEO_URL = 'https://www.youtube.com/embed/bxGtRnoYW4g?autoplay=1'
-
-// авторы — собственные имена, одинаковы для всех языков
-const DESIGN_NAME = 'Togulev Dmitry'
-const DEV_NAME = 'Andrey Konnov'
-const CLAUDE_NAME = 'Claude'
 
 export interface StartCopy {
   logoAlt: string
@@ -60,6 +53,8 @@ export interface StartCopy {
   // подписи авторства в левом нижнем углу
   authorDesign: string
   authorDev: string
+  // подпись строки версии под авторством
+  version?: string
   // текст режимов партии (заголовки + описания опций)
   modes: GameModesCopy
 }
@@ -79,10 +74,13 @@ interface StartProps {
   // Каталоги экран не держит (i18n-agnostic) — copy свапает консьюмер.
   lang?: SwitchLang
   onLangChange?: (lang: SwitchLang) => void
+  // версия игры — её знает сборка консьюмера, не кит
+  version?: string
 }
 
 export default function Start({
   copy,
+  version,
   physicalEditionCopy,
   onCreate,
   onJoin,
@@ -178,50 +176,15 @@ export default function Start({
       </div>
 
       {/* авторство — левый нижний угол экрана; имена ведут на профили GitHub */}
-      <div className={styles.credits}>
-        <span className={styles.credit}>
-          <span className={styles.creditLabel}>{copy.authorDesign}</span>
-          <a
-            className={styles.creditLink}
-            href={DESIGN_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {DESIGN_NAME}
-          </a>
-        </span>
-        <span className={styles.credit}>
-          <span className={styles.creditLabel}>{copy.authorDev}</span>
-          <span>
-            <a
-              className={styles.creditLink}
-              href={CLAUDE_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {CLAUDE_NAME}
-            </a>
-            {', '}
-            <a
-              className={styles.creditLink}
-              href={DEV_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {DEV_NAME}
-            </a>
-            {', '}
-            <a
-              className={styles.creditLink}
-              href={DESIGN_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {DESIGN_NAME}
-            </a>
-          </span>
-        </span>
-      </div>
+      <Credits
+        copy={{
+          authorDesign: copy.authorDesign,
+          authorDev: copy.authorDev,
+          version: copy.version,
+        }}
+        version={version}
+        className={styles.credits}
+      />
 
       {/* печатная версия — готовый блок @release/ui со своим копирайтом; правый
           нижний угол, симметрично авторству слева. Язык — по тому же сигналу, что

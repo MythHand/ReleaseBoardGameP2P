@@ -2,6 +2,8 @@ import { fileURLToPath, URL } from 'node:url'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import svgr from 'vite-plugin-svgr'
+// the game's version — the same number the app shows
+import { appVersionDefine } from '../../app-version'
 
 const uiSrc = fileURLToPath(new URL('../ui/src', import.meta.url))
 // central translation catalog consumed as raw data (JSON), so a story can feed a
@@ -16,6 +18,7 @@ export default defineConfig({
   // svgr: `*.svg?react` imports resolve to React components (plain `*.svg`
   // imports stay asset URLs). Used for the tintable CardParallax category icons.
   plugins: [react(), svgr()],
+  define: appVersionDefine,
   resolve: {
     alias: [
       { find: '@release/ui/animations', replacement: `${uiSrc}/animations/index.ts` },

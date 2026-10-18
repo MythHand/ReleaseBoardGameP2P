@@ -1,4 +1,5 @@
 import { type ReactNode, useLayoutEffect, useRef, useState } from 'react'
+import bugRunnerArt from '@/assets/bug-runner/achievement.svg'
 import PresetAvatar from '@/avatars/PresetAvatar'
 import LangSwitcher, { type SwitchLang } from '@/blocks/LangSwitcher'
 import { cardById } from '@/cards'
@@ -52,6 +53,19 @@ export interface StatPlayer {
   gitBranch: number
 }
 
+// One member's best in the lobby's mini-game. Anyone in the room can hold it,
+// a spectator too — so it is not a column of the players' table.
+export interface BugRunnerScore {
+  id: string
+  name: string
+  score: number
+}
+
+export interface AchievementCopy {
+  title: string
+  unit: string
+}
+
 // Весь текст экрана — пропсом (i18n-agnostic). Ачивки/локации — по ключам.
 export interface StatsCopy {
   title: string
@@ -68,7 +82,9 @@ export interface StatsCopy {
   colDefense: string
   toLobby: string
   location: Record<Location, string>
-  achievements: Record<MetricKey, { title: string; unit: string }>
+  achievements: Record<MetricKey, AchievementCopy>
+  // the mini-game's plate — needed only with `bugRunner`, so optional
+  bugRunner?: AchievementCopy
   // the voice chat's title in the dock — needed only with the `voice` slot, so
   // optional, like `selfTag`
   voiceChat?: string
@@ -80,6 +96,8 @@ interface StatsProps {
   selfId?: string
   copy: StatsCopy
   players?: StatPlayer[]
+  // the room's best runs in the lobby's mini-game, one per member present
+  bugRunner?: BugRunnerScore[]
   // язык + смена: когда оба переданы — в правом верхнем углу рисуется свитчер.
   // Каталоги экран не держит (i18n-agnostic) — copy свапает консьюмер.
   lang?: SwitchLang
@@ -100,7 +118,7 @@ interface StatsProps {
 
 // Accent of a plate — the whole HUD scheme of the achievement hangs on it:
 // border, bloom, rail, glow of the name, the counter chip.
-type AchTone = 'attack' | 'ai' | 'danger' | 'operation' | 'defense' | 'protection'
+type AchTone = 'attack' | 'ai' | 'danger' | 'operation' | 'defense' | 'protection' | 'release'
 
 interface Achievement {
   key: MetricKey
@@ -228,6 +246,19 @@ const TONE_CLASS: Record<AchTone, string> = {
   operation: styles.toneOperation,
   defense: styles.toneDefense,
   protection: styles.toneProtection,
+  release: styles.toneRelease,
+}
+
+// Достаётся ли ачивка кому-то вообще. Двух причин, по которым нет, две:
+// показателя не случилось ни у кого (максимум — ноль), и показатель разделён
+// поровну. Ничья не разрешается ни в чью пользу: плашка называет ОДНОГО, и
+// назвать первого попавшегося из равных — значит соврать. Поэтому на экран
+// доходят не все ачивки, и раскладка обязана переживать неполный ряд.
+function soleTop<T>(items: T[], score: (item: T) => number): T | undefined {
+  if (items.length === 0) return undefined
+  const best = items.reduce((top, p) => (score(p) > score(top) ? p : top))
+  if (score(best) === 0) return undefined
+  return items.filter((p) => score(p) === score(best)).length === 1 ? best : undefined
 }
 
 export default function Stats({
@@ -235,6 +266,7 @@ export default function Stats({
   selfId,
   copy,
   players = [],
+  bugRunner = [],
   lang,
   onLangChange,
   bgTone = 'neutral',
@@ -251,17 +283,49 @@ export default function Stats({
         {copy.selfTag}
       </Badge>
     ) : null
-  // Достаётся ли ачивка кому-то вообще. Двух причин, по которым нет, две:
-  // показателя не случилось ни у кого (максимум — ноль), и показатель разделён
-  // поровну. Ничья не разрешается ни в чью пользу: плашка называет ОДНОГО, и
-  // назвать первого попавшегося из равных — значит соврать. Поэтому на экран
-  // доходят не все ачивки, и раскладка обязана переживать неполный ряд.
-  const leader = (key: MetricKey): StatPlayer | undefined => {
-    if (players.length === 0) return undefined
-    const best = players.reduce((top, p) => (p[key] > top[key] ? p : top))
-    if (best[key] === 0) return undefined
-    return players.filter((p) => p[key] === best[key]).length === 1 ? best : undefined
-  }
+  const leader = (key: MetricKey) => soleTop(players, (p) => p[key])
+  // the mini-game's plate: the same rule, over everyone in the room who played
+  const runner = soleTop(bugRunner, (s) => s.score)
+
+  // One plate: the art on the left, who holds it and by how much on the right.
+  const plate = (p: {
+    key: string
+    tone: AchTone
+    wide?: boolean
+    art: ReactNode
+    holder: { id: string; name: string }
+    value: number
+    copy: AchievementCopy
+  }) => (
+    <HudSurface
+      key={p.key}
+      // the plate's accent is a class-set var, so no colour literal travels through TSX
+      accent="var(--ach)"
+      className={`${styles.ach} ${TONE_CLASS[p.tone]} ${p.wide ? styles.achWide : ''}`}
+    >
+      <div className={styles.achInner}>
+        {p.art}
+        <div className={styles.achBody}>
+          <div className={styles.achName}>
+            {/* key — сброс подобранного шага: другое имя меряется заново */}
+            <HolderName key={p.holder.name} name={p.holder.name} />
+            {selfMark(p.holder.id)}
+          </div>
+          <Typography base="heading-7" tk="tk-04" className={styles.achTitle}>
+            {p.copy.title}
+          </Typography>
+          <div className={styles.achStat}>
+            <Typography base="value" tk="tk-02" className={styles.achValue}>
+              {p.value}
+            </Typography>
+            <Typography base="label-sm" tk="tk-12" className={styles.achUnit}>
+              {p.copy.unit}
+            </Typography>
+          </div>
+        </div>
+      </div>
+    </HudSurface>
+  )
 
   const body = (
     <>
@@ -330,50 +394,45 @@ export default function Stats({
         {ACHIEVEMENTS.map((a) => {
           const top = leader(a.key)
           if (!top) return null
-          const ach = copy.achievements[a.key]
-          return (
-            <HudSurface
-              key={a.key}
-              // the plate's accent is a class-set var, so no colour literal travels through TSX
-              accent="var(--ach)"
-              className={`${styles.ach} ${TONE_CLASS[a.tone]} ${a.wide ? styles.achWide : ''}`}
-            >
-              <div className={styles.achInner}>
-                <div className={`${styles.achArt} ${a.wide ? styles.achFan : ''}`}>
-                  {a.cards.map((id) => {
-                    const card = cardById(id)
-                    return card ? (
-                      <Card
-                        key={id}
-                        card={card}
-                        width={a.wide ? '72px' : '84px'}
-                        interactive={false}
-                      />
-                    ) : null
-                  })}
-                </div>
-                <div className={styles.achBody}>
-                  <div className={styles.achName}>
-                    {/* key — сброс подобранного шага: другое имя меряется заново */}
-                    <HolderName key={top.name} name={top.name} />
-                    {selfMark(top.id)}
-                  </div>
-                  <Typography base="heading-7" tk="tk-04" className={styles.achTitle}>
-                    {ach.title}
-                  </Typography>
-                  <div className={styles.achStat}>
-                    <Typography base="value" tk="tk-02" className={styles.achValue}>
-                      {top[a.key]}
-                    </Typography>
-                    <Typography base="label-sm" tk="tk-12" className={styles.achUnit}>
-                      {ach.unit}
-                    </Typography>
-                  </div>
-                </div>
+          return plate({
+            key: a.key,
+            tone: a.tone,
+            wide: a.wide,
+            art: (
+              <div className={`${styles.achArt} ${a.wide ? styles.achFan : ''}`}>
+                {a.cards.map((id) => {
+                  const card = cardById(id)
+                  return card ? (
+                    <Card
+                      key={id}
+                      card={card}
+                      width={a.wide ? '72px' : '84px'}
+                      interactive={false}
+                    />
+                  ) : null
+                })}
               </div>
-            </HudSurface>
-          )
+            ),
+            holder: top,
+            value: top[a.key],
+            copy: copy.achievements[a.key],
+          })
         })}
+        {/* last in the row: the lobby's mini-game, not the match */}
+        {runner &&
+          copy.bugRunner &&
+          plate({
+            key: 'bugRunner',
+            tone: 'release',
+            art: (
+              <div className={`${styles.achArt} ${styles.achPixel}`}>
+                <img src={bugRunnerArt} alt="" />
+              </div>
+            ),
+            holder: runner,
+            value: runner.score,
+            copy: copy.bugRunner,
+          })}
       </div>
     </>
   )

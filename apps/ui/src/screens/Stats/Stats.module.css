@@ -248,6 +248,11 @@
   --ach: var(--cat-protection);
 }
 
+/* the lobby's mini-game — green, the server's colour in its art */
+.toneRelease {
+  --ach: var(--cat-release);
+}
+
 /* плашка: прямые углы — как таблица и блок победителя выше; скругление
    HudSurface здесь снимаем, иначе итоги разъезжаются на два разных языка */
 .ach {
@@ -319,6 +324,13 @@
 /* одиночная карта стоит с наклоном — трофей, а не иллюстрация в строке */
 .achArt > :only-child {
   transform: rotate(-6deg);
+}
+
+/* the Bug Runner's pixel art: five screen pixels to one of its own, and
+   upright — turned, its pixels would blur */
+.achPixel > :only-child {
+  inline-size: 115px;
+  transform: none;
 }
 
 /* «веер» из 6 карт у Забагованного — внахлёст и по дуге. Сам веер остаётся как

@@ -123,6 +123,28 @@
   opacity: 0.85;
 }
 
+/* ===== fitHeight — the start page's own modifier =====
+   On a short screen the rhythm tightens, so the menu never runs into the
+   credits pinned to the bottom corner — a start-page corner, which is why the
+   start page asks for this and the hero density alone does not carry it. At
+   956px of height and up it is the full design; below, the top padding, the
+   tags' gap and the description's gap give up the missing height between them
+   — together exactly one pixel per pixel, in the shares 56 : 22 : 72 of what
+   each can spare — until each reaches its floor (16 / 16 / 24) at about 806px.
+   The logo and the text keep size. */
+
+.fitHeight .content {
+  padding-block-start: clamp(16px, calc(72px - (956px - 100dvh) * 0.3733), 72px);
+}
+
+.fitHeight .tags {
+  margin-block-end: clamp(16px, calc(38px - (956px - 100dvh) * 0.1467), 38px);
+}
+
+.fitHeight .desc {
+  margin-block-end: clamp(24px, calc(96px - (956px - 100dvh) * 0.48), 96px);
+}
+
 /* ===== compact density =====
    The invite form is a fixed 513px tall, which at hero scale pushes its connect
    button ~114px below a 900px fold. This rhythm is the largest that clears it:
