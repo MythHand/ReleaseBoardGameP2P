@@ -372,7 +372,9 @@ interface ZoomCard {
 
 // Hover-zoom overlay — an enlarged, parallax card portaled to <body> and fixed at
 // the reference slot, so no ancestor's overflow (the Rules modal scrolls) can clip
-// it. Grows ×2 from the slot centre on mount, shrinks back before unmounting.
+// it. Grows ×2 from the slot centre on mount, shrinks back before unmounting. It
+// starts as the slot's LOD card and rebuilds into the full one as it grows — and
+// back as it shrinks — so the hover lifts the same card, never swaps it.
 function CardZoomOverlay({ card, onClose }: { card: ZoomCard; onClose: () => void }) {
   const [grown, setGrown] = useState(false)
   const closing = useRef(false)
@@ -397,10 +399,20 @@ function CardZoomOverlay({ card, onClose }: { card: ZoomCard; onClose: () => voi
         setGrown(false)
       }}
       onTransitionEnd={(e) => {
-        if (closing.current && e.propertyName === 'transform') onClose()
+        // its own shrink only: the card's layers ease their transforms too
+        // (the tilt, the LOD rebuild), and theirs bubble up here
+        if (closing.current && e.target === e.currentTarget && e.propertyName === 'transform') {
+          onClose()
+        }
       }}
     >
-      <CardParallax config={card.config} content={card.content} width={rect.width} interactive />
+      <CardParallax
+        config={card.config}
+        content={card.content}
+        width={rect.width}
+        interactive
+        lod={!grown}
+      />
     </div>,
     document.body,
   )
@@ -557,6 +569,7 @@ export default function Rules({ copy, lang = 'ru' }: RulesProps) {
                       content={content}
                       width={REF_CARD_W}
                       interactive={false}
+                      lod
                     />
                   </div>
                 )
