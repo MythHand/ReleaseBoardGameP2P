@@ -475,11 +475,11 @@ export function useHandLimit({
   // of the move, not the type of the card.
   const stateAt = useCallback(
     (index: number): HandCardState => {
-      if (carryActive.current || !enabled || !pending || dispatched) return 'disabled'
-      if (picked.length >= pending.excess) return 'disabled'
+      if (carryActive.current || !enabled || !pending || dispatched) return 'idle'
+      if (picked.length >= pending.excess) return 'idle'
       const item = handItems[index]
       if (!item) return 'idle'
-      return pending.options.includes(item.uid) ? 'playable' : 'disabled'
+      return pending.options.includes(item.uid) ? 'playable' : 'idle'
     },
     [enabled, pending, dispatched, picked.length, handItems],
   )

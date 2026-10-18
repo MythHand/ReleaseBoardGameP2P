@@ -306,12 +306,12 @@ export function useDefenseStaging({
       // nothing here is pickable, so nothing here may look pickable. Reachable
       // on a rejoin that replays the opening into a pending already owed to
       // us (fix round 1, L2).
-      if (!enabled || declined) return 'disabled'
+      if (!enabled || declined) return 'idle'
       if (accentAt(index)) return 'selected'
-      if (!pending || staged) return 'disabled'
+      if (!pending || staged) return 'idle'
       if (defenceOptions.includes(item.uid)) return 'playable'
       const partners = state.comboOptions?.[item.uid] ?? []
-      return item.card.id === 'support-sudo' && partners.length > 0 ? 'playable' : 'disabled'
+      return item.card.id === 'support-sudo' && partners.length > 0 ? 'playable' : 'idle'
     },
     [enabled, declined, handItems, accentAt, pending, staged, defenceOptions, state.comboOptions],
   )

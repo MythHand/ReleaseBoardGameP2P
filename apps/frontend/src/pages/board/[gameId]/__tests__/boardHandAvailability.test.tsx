@@ -89,7 +89,7 @@ it.each([
   const onAttack = vi.fn()
   const { rerender } = render(<Board {...props} actions={{ onPlay, onAttack }} />)
   expect(slotState(uid)).toBe('disabled')
-  expect(slotState('protection-debugger#0')).toBe('disabled')
+  expect(slotState('protection-debugger#0')).toBe('idle')
   const slot = document.querySelector<HTMLElement>(`[data-hand-slot="${uid}"]`)
   if (!slot) throw new Error('Missing returned attack')
   fireEvent.mouseDown(slot, { button: 0, clientX: 200, clientY: 600 })
@@ -123,7 +123,7 @@ it('does not lock an attack kept by sudo Rollback', () => {
   expect(slotState('attack-bug#0')).toBe('idle')
 })
 
-it('updates unavailable cards on turn and window changes, preserving combo starters', () => {
+it('keeps ordinary cards idle across turn and window changes', () => {
   const base = makeBoardProps()
   const state = {
     ...base.state,
@@ -137,10 +137,10 @@ it('updates unavailable cards on turn and window changes, preserving combo start
   const { rerender } = render(<Board {...base} state={state} />)
   expect(slotState('attack-bug#0')).toBe('idle')
   expect(slotState('support-sudo#0')).toBe('idle')
-  expect(slotState('protection-debugger#0')).toBe('disabled')
+  expect(slotState('protection-debugger#0')).toBe('idle')
   rerender(<Board {...base} state={{ ...state, turn: 'p2', playable: [], comboOptions: {} }} />)
-  expect(slotState('attack-bug#0')).toBe('disabled')
-  expect(slotState('support-sudo#0')).toBe('disabled')
+  expect(slotState('attack-bug#0')).toBe('idle')
+  expect(slotState('support-sudo#0')).toBe('idle')
   // An opponent's release opens a reaction even though normal playable is empty.
   rerender(
     <Board
@@ -169,11 +169,11 @@ it('updates unavailable cards on turn and window changes, preserving combo start
       state={{ ...state, turn: 'p2', playable: [], comboOptions: {}, window: null }}
     />,
   )
-  expect(slotState('attack-bug#0')).toBe('disabled')
-  expect(slotState('support-sudo#0')).toBe('disabled')
+  expect(slotState('attack-bug#0')).toBe('idle')
+  expect(slotState('support-sudo#0')).toBe('idle')
 })
 
-it('dims ineligible payment cards while a frozen card offered as payment stays available', () => {
+it('keeps ordinary payment alternatives idle while a frozen card can pay', () => {
   const base = makeBoardProps()
   render(
     <Board
@@ -195,7 +195,7 @@ it('dims ineligible payment cards while a frozen card offered as payment stays a
     />,
   )
   expect(slotState('attack-bug#0')).toBe('playable')
-  expect(slotState('protection-debugger#0')).toBe('disabled')
+  expect(slotState('protection-debugger#0')).toBe('idle')
 })
 
 it('only offers eligible cards while discarding down to the hand limit', () => {
@@ -216,5 +216,5 @@ it('only offers eligible cards while discarding down to the hand limit', () => {
     />,
   )
   expect(slotState('attack-bug#0')).toBe('playable')
-  expect(slotState('protection-debugger#0')).toBe('disabled')
+  expect(slotState('protection-debugger#0')).toBe('idle')
 })

@@ -116,7 +116,7 @@ export function useUpgradeStaging(args: {
   }
   const handItems = (state.you?.hand ?? EMPTY_HAND).filter((c) => c.uid !== given)
   const stateAt = (index: number): HandCardState =>
-    enabled && asked && !given && !confirmed && handItems[index] ? 'playable' : 'disabled'
+    enabled && asked && !given && !confirmed && handItems[index] ? 'playable' : 'idle'
   const interaction = {
     asked: Boolean(enabled && asked),
     onHandPlay,
