@@ -2492,7 +2492,10 @@ export function useLobby(): UseLobby {
   // the seat and eliminates it once the table is idle (referee.ts). The intent
   // goes through the game link like any other, and the transport close waits
   // the same flush the disband takes, so the frame leaves before the channel
-  // does. The host leaving ends the room as it always has.
+  // does. The host leaving ends the room as it always has. The intent is sent
+  // only while the channel to the host is actually open: with the link down (a
+  // network drop, a host that is away) there is nobody to receive it and no
+  // frame to wait for, so the guest leaves silently.
   const leaveSession = useCallback(
     (flushMs?: number) => {
       const current = stateRef.current
@@ -2500,9 +2503,12 @@ export function useLobby(): UseLobby {
       const seated =
         current !== null &&
         seatsRef.current.some((seat) => seat.peerId === current.selfId && !seat.bot)
+      const linkOpen =
+        current !== null && !!transportRef.current?.connectedIds().includes(current.hostId)
       const surrenders =
         !isHostRef.current &&
         remote !== null &&
+        linkOpen &&
         gameIdRef.current !== null &&
         seated &&
         !matchOverRef.current

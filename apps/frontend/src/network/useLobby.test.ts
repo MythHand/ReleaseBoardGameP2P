@@ -1670,6 +1670,8 @@ it('leaving a running match as a player sends SURRENDER before closing', async (
       } as WireMessage)
     })
 
+    // The channel to the host is open — the only time a frame can be delivered.
+    transports[0].connectedIds = () => [hostId]
     act(() => {
       result.current.leaveSession()
     })
@@ -1684,6 +1686,38 @@ it('leaving a running match as a player sends SURRENDER before closing', async (
     act(() => {
       vi.advanceTimersByTime(1_000)
     })
+    expect(transports[0].close).toHaveBeenCalled()
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+it('leaving a running match with the host link down sends nothing and closes at once', async () => {
+  vi.useFakeTimers()
+  try {
+    const { result } = renderHook(() => useLobby())
+    await act(async () => {
+      await result.current.joinRoom('F96-NMT', 'Dimbo')
+    })
+    const hostId = parseRoomCode('F96-NMT')
+    act(() => {
+      transports[0].onMessage?.({
+        type: 'GAME_STARTING',
+        payload: {
+          gameId: hostId,
+          seats: SEATING.map((seat, i) => (i === 1 ? { ...seat, peerId: 'peer0' } : seat)),
+        },
+        from: hostId,
+      } as WireMessage)
+    })
+
+    // The default fake reports no open channel: the link is down.
+    act(() => {
+      result.current.leaveSession()
+    })
+
+    expect(sentAll().some((m) => m.type === 'INTENT')).toBe(false)
+    // Nothing to flush, so the transport does not wait.
     expect(transports[0].close).toHaveBeenCalled()
   } finally {
     vi.useRealTimers()
