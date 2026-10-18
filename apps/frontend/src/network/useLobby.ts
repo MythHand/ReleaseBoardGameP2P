@@ -1184,11 +1184,10 @@ export function useLobby(): UseLobby {
             )
           }
           const seat = privateSeat?.seat
-          const joiningGame = Boolean(
-            liveGameId &&
-              (seat ||
-                !(payload.resume?.where === 'lobby' && payload.resume.lastGameId === liveGameId)),
-          )
+          const joiningGame =
+            !!liveGameId &&
+            (!!seat ||
+              !(payload.resume?.where === 'lobby' && payload.resume.lastGameId === liveGameId))
           commit(r.state)
           dispatch([
             ...(replacedLobbyPeer
@@ -1274,11 +1273,7 @@ export function useLobby(): UseLobby {
             // peer builds the remote link the projection needs to arrive on.
             keeperRef.current?.peerReturned(seat.playerId, msg.from)
           }
-          if (
-            !seat &&
-            liveGameId &&
-            !(payload.resume?.where === 'lobby' && payload.resume.lastGameId === liveGameId)
-          ) {
+          if (!seat && joiningGame) {
             dispatch([
               {
                 to: msg.from,
