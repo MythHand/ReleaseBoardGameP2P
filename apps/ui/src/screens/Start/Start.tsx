@@ -281,7 +281,7 @@ export default function Start({
         </div>
       </Modal>
 
-      <Modal open={modal === 'rules'} onClose={close} title={copy.rulesTitle} wide>
+      <Modal open={modal === 'rules'} onClose={close} title={copy.rulesTitle} wide holdHeight>
         <Rules copy={rulesCopy} />
       </Modal>
     </div>

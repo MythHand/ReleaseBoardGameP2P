@@ -257,18 +257,20 @@ export default function LobbyView() {
       <div className={`${styles.grid} ${styles.gridChat}`}>
         {/* Left — match modes */}
         <section className={styles.modes}>
-          <Typography variant="sectionTitle" className={styles.h}>
-            {t('lobbyScreen.modes')}
+          <div className={styles.modesHead}>
+            <Typography variant="sectionTitle" className={styles.h}>
+              {t('lobbyScreen.modes')}
+            </Typography>
             {!isHost && (
-              // a grey tag in a frame, as the player rows' role tags are
-              <Badge tone="muted" size="sm" outlined className={styles.lockTag}>
+              // the host tag of a player row, in grey — beside the heading, not in it
+              <Badge tone="muted" size="sm" outlined>
                 {t('lobbyScreen.modesLockedHint')}
               </Badge>
             )}
             <Button variant="tech" className={styles.rulesBtn} value="rules" onClick={openModal}>
               {t('lobbyScreen.rules')}
             </Button>
-          </Typography>
+          </div>
           <div className={styles.modeList}>
             <GameSettings
               setup={state.setup}

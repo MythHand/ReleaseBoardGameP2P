@@ -44,15 +44,14 @@ interface Layer {
 const sizeOf = (width: number | string | undefined): CSSProperties | undefined =>
   width == null ? undefined : { inlineSize: typeof width === 'number' ? `${width}px` : width }
 
-// A layer's width: the panel's, less the 1px border on its rail side
-// (Drawer.module.css `.right` / `.left`). The layer stands inside that border,
-// and at the panel's full width its first pixel went under it and was cut off
-// — unseen behind the layer's padding, until content ran to its edge (the
-// rules' search field).
+// A layer's width is handed to its CSS, which leaves the panel's border out of
+// it (Drawer.module.css `.layer`).
 const layerSizeOf = (width: number | string | undefined): CSSProperties | undefined =>
   width == null
     ? undefined
-    : { inlineSize: `calc(${typeof width === 'number' ? `${width}px` : width} - 1px)` }
+    : ({
+        '--layer-width': typeof width === 'number' ? `${width}px` : width,
+      } as CSSProperties)
 
 // Тупая controlled-поверхность: знает только сторону, ширину и открыт/закрыт.
 // Оркестрацию (что показывать, когда открывать) держит консьюмер.

@@ -170,13 +170,13 @@
 }
 
 /* the modes column — a scrolling area: only its place here. It reaches over
-   the modal body's padding (26px, Modal .body) to the head's line and the
-   modal's foot, so the modes scroll right under the head, as the whole body
-   did before; the padding goes inside, to the modes */
+   the window's padding (`--window-gutter`, said by the Modal) to the head's
+   line and the window's foot, so the modes scroll right under the head, as
+   the whole body did before; the padding goes inside, to the modes */
 .createMods {
   min-block-size: 0;
   padding-inline-end: 36px;
-  margin-block: -26px;
+  margin-block: calc(-1 * var(--window-gutter, 0px));
 }
 
 /* the modes inside the area */
@@ -184,7 +184,7 @@
   display: flex;
   flex-direction: column;
   gap: 26px;
-  padding-block: 26px;
+  padding-block: var(--window-gutter, 0);
 }
 
 /* stays where it is while the modes scroll; scrolls on its own only on a

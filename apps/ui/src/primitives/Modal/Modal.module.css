@@ -19,6 +19,13 @@
 }
 
 .modal {
+  /* The window's own measures, said once and read by what stands in it: its
+     padding and its fill. Content that has to reach the window's edge (a
+     scrolling column under the head, the rules' search) takes them from here
+     rather than keeping copies — the table's drawer says the same two. */
+  --window-gutter: 26px;
+  --window-fill: color-mix(in srgb, var(--surface-1) 94%, var(--bg));
+
   /* сброс UA-дефолтов нативного <dialog open>, которые ломают вёрстку:
      position:absolute + margin:auto (центрирование), padding:1em, color:CanvasText (чёрный) */
   position: relative;
@@ -34,7 +41,7 @@
   /* the body scrolls, not the dialog: the head stays where it is */
   overflow: hidden;
   color: var(--fg);
-  background: color-mix(in srgb, var(--surface-1) 94%, var(--bg));
+  background: var(--window-fill);
   border: 1px solid var(--white-14);
   border-radius: 0; /* острые углы — терминальная эстетика */
   box-shadow: 0 30px 80px var(--black-60);
@@ -60,7 +67,7 @@
   gap: 24px;
   align-items: center;
   justify-content: space-between;
-  padding: 22px 26px 18px;
+  padding: 22px var(--window-gutter) 18px;
   border-block-end: 1px solid var(--white-08);
 }
 
@@ -83,19 +90,14 @@
 }
 
 /* The body is what scrolls, under the head that stays: it may shrink under its
-   content within the dialog's cap. */
+   content within the dialog's cap — or a tighter one from the consumer
+   (`maxBlockSize`), where a scrolling area inside it takes the overflow. */
 .body {
   display: flex;
   flex: 1;
   flex-direction: column;
   gap: 20px;
   min-block-size: 0;
-  padding: 26px;
+  padding: var(--window-gutter);
   overflow: auto;
-}
-
-/* a height cap from the consumer (`maxBlockSize`): the body may shrink under
-   its content, so a scrolling area inside it takes the overflow */
-.bounded .body {
-  min-block-size: 0;
 }

@@ -533,7 +533,13 @@ export default function Lobby({
         )}
       </div>
 
-      <Modal open={rulesOpen} onClose={() => setRulesOpen(false)} title={copy.rulesTitle} wide>
+      <Modal
+        open={rulesOpen}
+        onClose={() => setRulesOpen(false)}
+        title={copy.rulesTitle}
+        wide
+        holdHeight
+      >
         <Rules copy={rulesCopy} />
       </Modal>
 

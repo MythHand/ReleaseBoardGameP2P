@@ -10,22 +10,23 @@
 }
 
 /* the avatar column: as tall as its avatars, at most the row the modal leaves.
-   It reaches over the modal body's padding (26px, Modal .body) to the head's
-   line and the modal's foot, so the avatars scroll right under the head, as
-   in the create-game modal; the padding goes inside, to the avatars */
+   It reaches over the window's padding (`--window-gutter`, said by the Modal;
+   none outside a window) to the head's line and the window's foot, so the
+   avatars scroll right under the head, as in the create-game modal; the
+   padding goes inside, to the avatars */
 .avatarsScroll {
-  max-block-size: calc(100% + 52px);
-  margin-block: -26px;
+  max-block-size: calc(100% + 2 * var(--window-gutter, 0px));
+  margin-block: calc(-1 * var(--window-gutter, 0px));
 }
 
 /* a <fieldset>: its default border and margin are cleared; its padding is the
-   body's, carried inside the scrolling area */
+   window's, carried inside the scrolling area */
 .avatars {
   display: grid;
   grid-template-columns: repeat(5, max-content);
   gap: 8px;
   min-inline-size: 0;
-  padding: 26px 0;
+  padding: var(--window-gutter, 0) 0;
   padding-inline-end: 36px;
   margin: 0;
   border: 0;
