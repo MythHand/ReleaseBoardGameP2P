@@ -125,10 +125,18 @@ export function createTransport(args: {
     const tryReconnect = () => {
       timer = undefined
       if (closed || peer.destroyed) return
+      // A signaling error can arrive while the broker socket is still up;
+      // PeerJS then refuses to reconnect and no 'open' will follow.
+      if (lost && !peer.disconnected && peer.open) {
+        restore()
+        return
+      }
       try {
         peer.reconnect()
       } catch {
-        // PeerJS refuses while a connection attempt is already in flight.
+        // PeerJS refuses while a connection attempt is already in flight; try
+        // again later.
+        scheduleReconnect()
       }
     }
     const scheduleReconnect = () => {
@@ -156,6 +164,15 @@ export function createTransport(args: {
       const connection = peer.connect(peerId, { reliable: true })
       dataDials.set(peerId, connection)
       wire(connection, true)
+    }
+    const restore = () => {
+      if (!lost) return
+      lost = false
+      attempt = 0
+      stopReconnecting()
+      args.onSignaling?.('restored')
+      for (const peerId of pendingDials) dial(peerId)
+      pendingDials.clear()
     }
     const onOnline = () => {
       if (!lost || closed) return
@@ -268,13 +285,7 @@ export function createTransport(args: {
       if (closed) return
       if (opened) {
         // Re-registered with the same id; the transport is already resolved.
-        if (!lost) return
-        lost = false
-        attempt = 0
-        stopReconnecting()
-        args.onSignaling?.('restored')
-        for (const peerId of pendingDials) dial(peerId)
-        pendingDials.clear()
+        restore()
         return
       }
       opened = true

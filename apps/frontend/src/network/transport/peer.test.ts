@@ -54,6 +54,11 @@ class FakePeer {
     if (event === 'open' && openImmediately) cb(this.id)
   }
   emit(event: string, arg?: unknown) {
+    if (event === 'disconnected') this.disconnected = true
+    if (event === 'open') {
+      this.disconnected = false
+      this.open = true
+    }
     for (const cb of this.handlers[event] ?? []) cb(arg)
   }
   connect(peerId: string, options?: unknown) {
@@ -74,7 +79,12 @@ class FakePeer {
     this.handlers[event] = (this.handlers[event] ?? []).filter((handler) => handler !== cb)
   }
   destroyed = false
-  reconnect = vi.fn()
+  disconnected = false
+  open = true
+  // Like PeerJS: reconnecting a peer that is still connected throws.
+  reconnect = vi.fn(() => {
+    if (!this.disconnected && this.open) throw new Error('cannot reconnect: not disconnected')
+  })
   destroy() {
     this.destroyed = true
   }
@@ -587,6 +597,21 @@ describe('signaling re-registration', () => {
     lastPeer?.emit('open', 'host-1')
     expect(connect).toHaveBeenCalledTimes(1)
     expect(connect).toHaveBeenCalledWith('host', { reliable: true })
+  })
+
+  it('recovers when a signaling error does not disconnect the peer', async () => {
+    const onSignaling = vi.fn()
+    const onError = vi.fn()
+    const t = await createTransport({ peerId: 'host-1', onMessage: () => {}, onSignaling, onError })
+    const connect = vi.spyOn(lastPeer as FakePeer, 'connect')
+    lastPeer?.emit('error', { type: 'server-error', message: 'hiccup' })
+    t.connectTo('host')
+    expect(connect).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(backoffMs(1))
+    expect(onSignaling.mock.calls).toEqual([['lost'], ['restored']])
+    expect(onError).not.toHaveBeenCalled()
+    expect(connect).toHaveBeenCalledTimes(1)
+    expect(lastPeer?.reconnect).not.toHaveBeenCalled()
   })
 
   it('close() stops reconnecting', async () => {
