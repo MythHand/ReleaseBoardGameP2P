@@ -33,6 +33,7 @@ function base(): UseLobby {
     state: null,
     status: 'idle',
     restoring: false,
+    hostOffline: false,
     bootstrapping: false,
     reconnect: {
       attempt: 0,
@@ -298,7 +299,9 @@ it('switches to spectator when only spectator admission is available', () => {
     joinRoom: vi.fn().mockResolvedValue('F96-NMT'),
   }
   renderAtLobby('F96-NMT', 'Ann')
-  expect(screen.getByText('invite.rolePlayer').closest('button')?.disabled).toBe(true)
+  // No player choice is offered at all — not even a disabled one.
+  expect(screen.queryByText('invite.rolePlayer')).toBeNull()
+  expect(screen.getByText('invite.roleSpectator').closest('button')?.ariaPressed).toBe('true')
   expect(screen.getByText('invite.spectatorOnlyNote')).toBeTruthy()
   fireEvent.click(screen.getByText('invite.joinCta'))
   expect(sessionValue.joinRoom).toHaveBeenCalledWith('F96-NMT', 'Ann', 'spectator')

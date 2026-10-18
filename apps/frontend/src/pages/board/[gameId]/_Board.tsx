@@ -74,6 +74,7 @@ import {
   ALARM_POSE,
   ATTACK_POSE,
   COVER_POSE,
+  GUEST_RECONNECT_ATTEMPTS,
   glowsFor,
   SUDO_POSE,
   shownLayout,
@@ -2482,10 +2483,10 @@ function BoardView({
           copy={copy.reconnect}
           host={room.code ?? ''}
           attempt={room.reconnect?.attempt ?? 1}
-          maxAttempts={room.reconnect?.maxAttempts ?? 5}
+          maxAttempts={room.reconnect?.maxAttempts ?? GUEST_RECONNECT_ATTEMPTS}
           status={room.reconnect?.status ?? 'trying'}
           reason={room.reconnect?.reason}
-          onRetry={room.onReconnectRetry ?? (() => {})}
+          onRetry={room.onReconnectRetry}
           onLeave={room.onReconnectLeave ?? (() => {})}
         />
       )}

@@ -86,3 +86,44 @@ it('skips previously eliminated seats when passing the fatal draw’s turn', () 
   expect(result.state.over).toBeNull()
   expect(result.state.turn.player).toBe('p3')
 })
+
+it('surrender eliminates at an idle table', () => {
+  const result = engine.reduce(game(), { type: 'SURRENDER', player: 'p1', at: 1000 })
+  expect(result.state.eliminated).toEqual(['p1'])
+  expect(result.state.over).toBeNull()
+  expect(result.state.players.p1.hand).toEqual([])
+  expect(result.events.some((e) => e.type === 'eliminated' && e.player === 'p1')).toBe(true)
+})
+
+it('surrender ends the surrendering player’s turn', () => {
+  const before = game()
+  expect(before.turn.player).toBe('p1')
+  const result = engine.reduce(before, { type: 'SURRENDER', player: 'p1', at: 1000 })
+  expect(result.state.turn).toMatchObject({ player: 'p2', index: before.turn.index + 1 })
+  expect(result.events.slice(-2)).toMatchObject([
+    { type: 'turnEnded', player: 'p1' },
+    { type: 'turnStarted', player: 'p2' },
+  ])
+})
+
+it('surrender of the second-last player ends the game with lastStanding', () => {
+  const state = { ...game(), eliminated: ['p2'] }
+  const result = engine.reduce(state, { type: 'SURRENDER', player: 'p1', at: 1000 })
+  expect(result.state.over).toEqual({ winner: 'p3', condition: 'lastStanding' })
+  expect(result.events.some((e) => e.type === 'turnStarted')).toBe(false)
+})
+
+it('surrender is rejected while a pending is open', () => {
+  const drawn = engine.reduce(game(false, true), { type: 'DRAW', player: 'p1', at: 1000 })
+  expect(drawn.state.pending?.kind).toBe('neutralize503')
+  const result = engine.reduce(drawn.state, { type: 'SURRENDER', player: 'p1', at: 2000 })
+  expect(result.state).toBe(drawn.state)
+  expect(result.events.some((e) => e.type === 'rejected')).toBe(true)
+})
+
+it('surrender is rejected from a seat already eliminated', () => {
+  const state = { ...game(), eliminated: ['p1'] }
+  const result = engine.reduce(state, { type: 'SURRENDER', player: 'p1', at: 1000 })
+  expect(result.state).toBe(state)
+  expect(result.events.some((e) => e.type === 'rejected')).toBe(true)
+})

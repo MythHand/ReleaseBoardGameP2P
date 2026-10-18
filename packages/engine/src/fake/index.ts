@@ -8,6 +8,7 @@ export { botAction, runUntilIdle } from './bots'
 // itself about whether a turn still owes a draw — one predicate, so the
 // keeper and the reducer cannot disagree about when a turn may end.
 export { DEFEND_MS, drawObligationMet, HAND_CHOICE_MS, TURN_ACTION_MS } from './core'
+export { passiveAction } from './passive'
 // Published for the same reason: a contest window closes on elapsed time, so
 // anything driving the keeper's clock has to know how long a turn can wait on
 // one rather than guess at a number of ticks.

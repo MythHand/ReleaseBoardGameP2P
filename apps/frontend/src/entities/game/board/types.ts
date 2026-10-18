@@ -181,14 +181,16 @@ export interface BoardRoom {
   // local peer; `disconnected` names peers seen as gone.
   connection?: 'online' | 'reconnecting'
   // Present only while `connection` is 'reconnecting'. Absent, the overlay
-  // still renders, on attempt 1 of 5 — a caller that knows it is dialing but
-  // not how far along should not be forced to invent numbers.
+  // still renders, on attempt 1 of the guest's attempt budget
+  // (GUEST_RECONNECT_ATTEMPTS) — a caller that knows it is dialing but not how
+  // far along should not be forced to invent numbers.
   reconnect?: {
     attempt: number
     maxAttempts: number
     status: 'trying' | 'failed'
     reason?: 'room-full'
   }
+  // Absent, the overlay offers no Retry (see Reconnect's `onRetry`).
   onReconnectRetry?: () => void
   onReconnectLeave?: () => void
   disconnected?: string[]

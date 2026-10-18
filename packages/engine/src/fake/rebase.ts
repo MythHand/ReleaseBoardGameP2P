@@ -33,7 +33,14 @@ export function openReorderTop(
   if (piles.length === 0) return { ...spentState, eventSeq: log.seq }
   return {
     ...spentState,
-    pending: { kind: 'reorderTop', player, piles, source: card.id, raisedAt: log.seq },
+    pending: {
+      kind: 'reorderTop',
+      player,
+      piles,
+      source: card.id,
+      spent: spent.map((c) => c.uid),
+      raisedAt: log.seq,
+    },
     eventSeq: log.seq,
   }
 }

@@ -227,6 +227,12 @@ export type Pending =
       player: PlayerId
       options: CardInstance[]
       picks: 1 | 2
+      /**
+       * The uids this play banked in the discard (the card, and its Sudo) —
+       * what ABANDON pulls back. Optional only so a save from before it existed
+       * still typechecks; every open sets it.
+       */
+      spent?: CardUid[]
       source: CardId
       /**
        * WHICH OCCASION THIS IS — the event sequence the decision was raised at.
@@ -253,6 +259,12 @@ export type Pending =
       kind: 'reorderTop'
       player: PlayerId
       piles: { pile: number; cards: CardInstance[] }[]
+      /**
+       * The uids this play banked in the discard (the card, and its Sudo) —
+       * what ABANDON pulls back. Optional only so a save from before it existed
+       * still typechecks; every open sets it.
+       */
+      spent?: CardUid[]
       source: CardId
       /** which occasion this is — see `pickFromDiscard.raisedAt` */
       raisedAt: number

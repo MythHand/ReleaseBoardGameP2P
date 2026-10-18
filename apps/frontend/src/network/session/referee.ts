@@ -5,6 +5,7 @@ import {
   deferNewClocks,
   drawObligationMet,
   HAND_CHOICE_MS,
+  passiveAction,
 } from '@release/engine/fake'
 import { IS_DEV } from '~/shared/config'
 import type { Intent, Message } from '../types'
@@ -30,6 +31,11 @@ export interface Seat {
   // humans who might return; a bot never was one, so it is played from the
   // first tick instead of after 30 seconds of waiting for nobody.
   bot?: boolean
+  // The player behind this seat has left the match on purpose and asked to
+  // surrender. The engine only accepts SURRENDER at an idle table, so the flag
+  // is held here until it can be reduced: `driveUnattended` plays the seat
+  // passively meanwhile and reduces the surrender the first tick it is legal.
+  surrendering?: true
 }
 
 export interface Session {
@@ -303,8 +309,11 @@ export const STALL_WARNING_TICKS = 8
 const stallStreaks = new WeakMap<Session, number>()
 
 // The engine has no concept of a player who left, so a pending owed by one
-// would stall the game permanently. Past the grace period the keeper plays that
-// seat with the engine's own opponent policy.
+// would stall the game permanently. The keeper plays such a seat itself: a
+// lobby bot with the engine's opponent policy (`botAction`), and a human who
+// is away — past the grace period, or gone for good after a surrender — with
+// the passive policy (`passiveAction`), which keeps the table moving without
+// ever playing a card from that player's hand.
 //
 // This is deliberately not `runUntilIdle`: that helper auto-resolves pendings
 // owed by the *human* and must never front a live UI, because it would silently
@@ -318,12 +327,27 @@ export function driveUnattended(session: Session, now: number): SessionResult {
   // keeper itself is the peer whose seat dropped.
   if (!session.seats.some((s) => s.peerId !== null)) return { session, outgoing: [] }
 
+  // A surrender goes first, before any other seat acts, and without waiting
+  // for the grace: the player said they are not coming back. The engine takes
+  // it only at an idle table, so while something is still open the seat is
+  // played passively — it may be the one the open exchange is waiting on — and
+  // the surrender is tried again on the next tick.
+  const { eliminated } = session.state
+  for (const seat of session.seats) {
+    if (!seat.surrendering || eliminated.includes(seat.playerId)) continue
+    const surrendered = accepted(session, { type: 'SURRENDER', player: seat.playerId, at: now })
+    if (surrendered) return surrendered
+    const owed = passiveAction(session.engine, session.state, seat.playerId, now)
+    const answered = owed && accepted(session, owed)
+    if (answered) return answered
+  }
+
   // A seat with nobody behind it: a bot, which never had anybody, or a human
-  // past the grace. Everything below this line treats the two identically —
-  // the difference is only in how long the table waits before giving up on
-  // somebody arriving.
+  // past the grace. The difference between the two is how long the table
+  // waits before giving up on somebody arriving, and which policy plays them.
   const unattended = session.seats.filter(
     (s) =>
+      !s.surrendering &&
       s.peerId === null &&
       (s.bot || (s.absentSince !== null && now - s.absentSince >= ABSENT_GRACE_MS)),
   )
@@ -333,68 +357,20 @@ export function driveUnattended(session: Session, now: number): SessionResult {
   // must not shadow a later seat that does — with two or more seats gone,
   // the one the game is actually waiting on need not be seated first.
   for (const seat of unattended) {
-    const action = botAction(session.engine, session.state, seat.playerId, now)
-
-    // `tick` owns the window deadline, and it is the only thing that owns it.
-    // When an unattended seat holds the open window, botAction answers with
-    // WINDOW_EXPIRED stamped at `Math.max(at, deadline)` (bots.ts) — a forged
-    // future time that would close the window for everyone still sitting
-    // there, whether that seat is a bot that was never going to answer or a
-    // human whose grace period just ran out. The keeper's clock is the only
-    // clock (spec decision 6), so the suggestion is dropped and the window
-    // expires on its own deadline, through `tick`, or not at all.
-    if (action?.type === 'WINDOW_EXPIRED') continue
-
-    if (action) {
-      const { state, events } = session.engine.reduce(session.state, action)
-      if (state !== session.state) {
-        const next: Session = { ...session, state, log: [...session.log, ...events] }
-        return { session: next, outgoing: syncAll(next, events) }
-      }
-
-      // botAction's suggestion was rejected outright. An absent seat still owes
-      // the table forward progress, so on its own uninterrupted turn fall back
-      // to the same escape hatch a human out of moves would take: draw if it
-      // hasn't, or end the turn if it has. Anything still rejected means there
-      // is truly nothing to do, and the next expired seat gets a turn instead.
-      //
-      // This covers a proactive turn only, and deliberately so: it is a net for
-      // a `playable` list that offers more than `onPlay` accepts, and `playable`
-      // is only consulted on a seat's own turn. A pending is answered from the
-      // option list the engine itself publishes on the pending view, so its
-      // answer is legal by construction and there is nothing to fall back to —
-      // which is why an option list the engine cannot answer has to be fixed in
-      // the engine rather than papered over here. `playableFor`
-      // (packages/engine/src/fake/project.ts) checking the release cost is that
-      // fix for the case this net was written against.
-      const { turn, pending, window, over } = session.state
-      if (turn.player === seat.playerId && !pending && !window && !over) {
-        const fallback: Action = drawObligationMet(session.state)
-          ? { type: 'PUSH', player: seat.playerId, at: now }
-          : { type: 'DRAW', player: seat.playerId, at: now }
-        const retried = session.engine.reduce(session.state, fallback)
-        if (retried.state !== session.state) {
-          const next: Session = {
-            ...session,
-            state: retried.state,
-            log: [...session.log, ...retried.events],
-          }
-          return { session: next, outgoing: syncAll(next, retried.events) }
-        }
-      }
-    }
+    const moved = seat.bot ? driveBot(session, seat, now) : drivePassive(session, seat, now)
+    if (moved) return moved
 
     // Getting here means nothing above moved the table forward for this seat:
-    // botAction had no answer at all (the exhaustive switch's `default` in
-    // bots.ts, kept for a Pending kind not yet wired into it), or the answer it
-    // gave was rejected outright — including, on a proactive turn, the
-    // draw/push net just above that exists for exactly this. A seat that owes
-    // the table an answer and has none is a stall: nothing else can move until
-    // it resolves, and with no human in that seat nobody will resolve it by
-    // hand. A pending is answered from the option list the engine itself
-    // publishes on the pending view, so its answer is legal by construction —
-    // an option list the engine still refuses is an engine bug to fix rather
-    // than something to paper over here.
+    // the policy had no answer at all (the exhaustive switch's `default` in
+    // bots.ts / passive.ts, kept for a Pending kind not yet wired into it), or
+    // the answer it gave was rejected outright — including, on a bot's
+    // proactive turn, the draw/push net that exists for exactly this. A seat
+    // that owes the table an answer and has none is a stall: nothing else can
+    // move until it resolves, and with no human in that seat nobody will
+    // resolve it by hand. A pending is answered from the option list the
+    // engine itself publishes on the pending view, so its answer is legal by
+    // construction — an option list the engine still refuses is an engine bug
+    // to fix rather than something to paper over here.
     if (IS_DEV && seatOwes(session.state, seat.playerId)) {
       const streak = (stallStreaks.get(session) ?? 0) + 1
       stallStreaks.set(session, streak)
@@ -409,6 +385,65 @@ export function driveUnattended(session: Session, now: number): SessionResult {
   }
 
   return { session, outgoing: [] }
+}
+
+// One keeper-side action, committed only if the engine takes it. `reduce`
+// hands back the identical state when it refuses, which is what null means.
+function accepted(session: Session, action: Action): SessionResult | null {
+  const { state, events } = session.engine.reduce(session.state, action)
+  if (state === session.state) return null
+  const next: Session = { ...session, state, log: [...session.log, ...events] }
+  return { session: next, outgoing: syncAll(next, events) }
+}
+
+// A human who is away. The passive policy never plays from hand, so it has
+// none of the bot's reasons for an illegal suggestion — except one: in a
+// window where an attack is out, the projection does not say the window is
+// frozen behind the defence, and the PASS it offers is refused. That is not a
+// stall, only a turn to wait, so a refused answer is simply skipped for this
+// tick. There is no draw/push net here: the passive policy already answers a
+// proactive turn with exactly that.
+function drivePassive(session: Session, seat: Seat, now: number): SessionResult | null {
+  const action = passiveAction(session.engine, session.state, seat.playerId, now)
+  return action && accepted(session, action)
+}
+
+// A lobby bot, played with the engine's opponent policy.
+function driveBot(session: Session, seat: Seat, now: number): SessionResult | null {
+  const action = botAction(session.engine, session.state, seat.playerId, now)
+
+  // `tick` owns the window deadline, and it is the only thing that owns it.
+  // When a bot holds the open window, botAction answers with WINDOW_EXPIRED
+  // stamped at `Math.max(at, deadline)` (bots.ts) — a forged future time that
+  // would close the window for everyone still sitting there. The keeper's
+  // clock is the only clock (spec decision 6), so the suggestion is dropped
+  // and the window expires on its own deadline, through `tick`, or not at all.
+  if (!action || action.type === 'WINDOW_EXPIRED') return null
+
+  const played = accepted(session, action)
+  if (played) return played
+
+  // botAction's suggestion was rejected outright. The seat still owes the
+  // table forward progress, so on its own uninterrupted turn fall back to the
+  // same escape hatch a human out of moves would take: draw if it hasn't, or
+  // end the turn if it has. Anything still rejected means there is truly
+  // nothing to do, and the next unattended seat gets a turn instead.
+  //
+  // This covers a proactive turn only, and deliberately so: it is a net for a
+  // `playable` list that offers more than `onPlay` accepts, and `playable` is
+  // only consulted on a seat's own turn. A pending is answered from the option
+  // list the engine itself publishes on the pending view, so its answer is
+  // legal by construction and there is nothing to fall back to — which is why
+  // an option list the engine cannot answer has to be fixed in the engine
+  // rather than papered over here. `playableFor`
+  // (packages/engine/src/fake/project.ts) checking the release cost is that
+  // fix for the case this net was written against.
+  const { turn, pending, window, over } = session.state
+  if (turn.player !== seat.playerId || pending || window || over) return null
+  const fallback: Action = drawObligationMet(session.state)
+    ? { type: 'PUSH', player: seat.playerId, at: now }
+    : { type: 'DRAW', player: seat.playerId, at: now }
+  return accepted(session, fallback)
 }
 
 // A timer callback may expire a window/turn and immediately let a bot act.
@@ -543,6 +578,8 @@ const PEER_INTENT_TYPES: ReadonlySet<string> = new Set<Action['type']>([
   'RESOLVE',
   'SHOW',
   'TAKE_BACK',
+  // Accepted from a peer, but never reduced as it arrives: see applyIntent.
+  'SURRENDER',
 ])
 
 // Parsed JSON, not an `Intent`: the type annotation on the wire is a claim the
@@ -579,25 +616,73 @@ export function applyIntent(
   // peer cannot produce this, so there is no UI to inform.
   if (!isPeerIntent(intent)) return { session, outgoing: [] }
 
+  // A player leaving the match. The engine takes SURRENDER only at an idle
+  // table, and the one leaving may be what the table is waiting on — so the
+  // seat is only marked here, and `driveUnattended` plays it passively until
+  // the surrender can be reduced. A finished match, an eliminated seat or a
+  // repeated frame has nothing left to surrender.
+  if (intent.type === 'SURRENDER') {
+    if (seat.surrendering || session.state.over) return { session, outgoing: [] }
+    if (session.state.eliminated.includes(seat.playerId)) return { session, outgoing: [] }
+    const seats = session.seats.map((s) =>
+      s.playerId === seat.playerId ? { ...s, surrendering: true as const } : s,
+    )
+    return { session: { ...session, seats }, outgoing: [] }
+  }
+
   const action = { ...intent, player: seat.playerId, at: now } as Action
   const { state, events } = session.engine.reduce(session.state, action)
 
   // Referential, not structural: `reduce` hands back the identical object when
   // it refuses an action, which is exactly what "nothing happened" means here.
   // The event ids of consecutive rejections repeat, so they cannot be compared.
-  if (state === session.state) {
-    const message: Message = {
-      type: 'SYNC',
-      payload: {
-        view: session.engine.project(session.state, seat.playerId),
-        events: rejectionsIn(events),
-      },
-    }
-    return { session, outgoing: [{ to: fromPeerId, message }] }
-  }
+  if (state === session.state) return rejection(session, seat.playerId, fromPeerId, events)
 
   const next: Session = { ...session, state, log: [...session.log, ...events] }
   return presentResult(session, { session: next, outgoing: syncAll(next, events) }, now)
+}
+
+// The answer to a refused action: the sender's own unchanged projection plus
+// the rejection, to the sender alone. The board leaves its staged move on the
+// `rejected` event, so a refusal that sent nothing would leave the card hanging
+// at the centre.
+function rejection(
+  session: Session,
+  playerId: PlayerId,
+  fromPeerId: string,
+  events: Event[],
+): SessionResult {
+  const message: Message = {
+    type: 'SYNC',
+    payload: {
+      view: session.engine.project(session.state, playerId),
+      events: rejectionsIn(events),
+    },
+  }
+  return { session, outgoing: [{ to: fromPeerId, message }] }
+}
+
+// An intent the keeper will not reduce right now, answered exactly as an
+// illegal one is: through `rejection`, with the session untouched. The same
+// trust boundary as `applyIntent` comes first — no seat, or not a peer intent,
+// is dropped in silence. SURRENDER goes through `applyIntent` unchanged: it
+// reduces nothing, only marks the seat, and a player leaving the match must
+// not have that mark lost.
+export function refuseIntent(
+  session: Session,
+  fromPeerId: string,
+  intent: unknown,
+  now: number,
+  reason: string,
+): SessionResult {
+  const seat = seatOfPeer(session, fromPeerId)
+  if (!seat || !isPeerIntent(intent)) return { session, outgoing: [] }
+  if (intent.type === 'SURRENDER') return applyIntent(session, fromPeerId, intent, now)
+  const action = { ...intent, player: seat.playerId, at: now } as Action
+  // Numbered the way the engine numbers its own rejections: the next event id,
+  // which a rejection never consumes.
+  const event = { type: 'rejected', action, reason, id: session.state.eventSeq + 1 } as Event
+  return rejection(session, seat.playerId, fromPeerId, [event])
 }
 
 // Voluntary only. A keeper that crashes takes GameState and the seed with it,

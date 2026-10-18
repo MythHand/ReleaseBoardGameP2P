@@ -48,6 +48,7 @@ function base(): UseLobby {
     state: null,
     status: 'idle',
     restoring: false,
+    hostOffline: false,
     bootstrapping: false,
     reconnect: {
       attempt: 0,

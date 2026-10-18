@@ -39,3 +39,18 @@ it('leaves a bot seat exactly as it was', () => {
     { playerId: 'p2', peerId: null, absentSince: null, bot: true },
   ])
 })
+
+// A surrender the keeper had not reduced yet is still owed after a reload: the
+// player who left is still leaving, so the flag travels with the seat.
+it('keeps a pending surrender through a restore', () => {
+  const seats: Seat[] = [
+    { playerId: 'p1', peerId: 'host-peer', absentSince: null },
+    { playerId: 'p2', peerId: null, absentSince: 500, surrendering: true },
+  ]
+  expect(restoreSeats(seats, 'host-peer', 5_000)[1]).toEqual({
+    playerId: 'p2',
+    peerId: null,
+    absentSince: 5_000,
+    surrendering: true,
+  })
+})

@@ -10,6 +10,7 @@ import {
   TURN_USERNAME,
 } from '~/shared/config'
 import { createEnvelope, nextSeq, parseEnvelope } from '../envelope'
+import { backoffMs } from '../session/reconnect'
 import type { Message, WireMessage } from '../types'
 import { createMediaPort } from './media'
 import type { VoiceMediaPort } from './mediaTypes'
@@ -78,6 +79,11 @@ export function createTransport(args: {
   // errors (peer-unavailable, network, disconnected, browser-incompatible, ICE
   // failures) at any time; without this they would be silently dropped.
   onError?: (err: { type?: string; message: string }) => void
+  // The broker connection dropped ('lost') or came back ('restored'). The
+  // host's peer id is the room code, so while it is lost guests cannot find the
+  // room. The transport re-registers on its own; this only reports it. Reported
+  // once per drop, not once per failed attempt. DataChannels are left alone.
+  onSignaling?: (state: 'lost' | 'restored') => void
 }): Promise<Transport> {
   return new Promise((resolve, reject) => {
     if (args.signal?.aborted) {
@@ -104,9 +110,86 @@ export function createTransport(args: {
     }
     const media = createMediaPort(peer, dataDialPeers)
 
+    // Signaling re-registration. `lost` is true from the first 'disconnected'
+    // until the peer reopens; `timer` is the pending backoff attempt.
+    let lost = false
+    let attempt = 0
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const SignalingErrors = new Set([
+      'network',
+      'disconnected',
+      'server-error',
+      'socket-error',
+      'socket-closed',
+    ])
+    const tryReconnect = () => {
+      timer = undefined
+      if (closed || peer.destroyed) return
+      // A signaling error can arrive while the broker socket is still up;
+      // PeerJS then refuses to reconnect and no 'open' will follow.
+      if (lost && !peer.disconnected && peer.open) {
+        restore()
+        return
+      }
+      try {
+        peer.reconnect()
+      } catch {
+        // PeerJS refuses while a connection attempt is already in flight; try
+        // again later.
+        scheduleReconnect()
+      }
+    }
+    const scheduleReconnect = () => {
+      // `attempt` grows only when a timer is actually armed, and the armed timer
+      // blocks duplicates, so a burst of error + 'disconnected' counts once.
+      if (closed || timer !== undefined) return
+      attempt += 1
+      timer = setTimeout(tryReconnect, backoffMs(attempt))
+    }
+    // PeerJS emits the signaling error BEFORE 'disconnected', so either one
+    // starts a drop. Reported once per drop.
+    const enterLost = () => {
+      if (!lost) {
+        lost = true
+        attempt = 0
+        if (typeof window !== 'undefined') window.addEventListener('online', onOnline)
+        args.onSignaling?.('lost')
+      }
+      scheduleReconnect()
+    }
+    // Dials requested while signaling is lost; PeerJS refuses to connect then.
+    const pendingDials = new Set<string>()
+    const dial = (peerId: string) => {
+      dataDialPeers.add(peerId)
+      const connection = peer.connect(peerId, { reliable: true })
+      dataDials.set(peerId, connection)
+      wire(connection, true)
+    }
+    const restore = () => {
+      if (!lost) return
+      lost = false
+      attempt = 0
+      stopReconnecting()
+      args.onSignaling?.('restored')
+      for (const peerId of pendingDials) dial(peerId)
+      pendingDials.clear()
+    }
+    const onOnline = () => {
+      if (!lost || closed) return
+      if (timer !== undefined) clearTimeout(timer)
+      tryReconnect()
+    }
+    const stopReconnecting = () => {
+      if (timer !== undefined) clearTimeout(timer)
+      timer = undefined
+      if (typeof window !== 'undefined') window.removeEventListener('online', onOnline)
+    }
+
     const close = () => {
       if (closed) return
       closed = true
+      stopReconnecting()
+      pendingDials.clear()
       args.signal?.removeEventListener('abort', abort)
       media.close()
       peer.destroy()
@@ -178,6 +261,13 @@ export function createTransport(args: {
       if (closed) return
       const e = err as { type?: string; message: string }
       if (media.handlePeerError(e)) return
+      // A signaling error after open starts (or continues) a drop; failed
+      // reconnect attempts surface the same way. They feed the backoff, not
+      // onError.
+      if (opened && e.type && SignalingErrors.has(e.type)) {
+        enterLost()
+        return
+      }
       // Before the peer opens, an error means setup failed — reject the promise.
       // After it opens, surface the error instead of discarding it silently.
       if (opened)
@@ -187,8 +277,17 @@ export function createTransport(args: {
         reject(err)
       }
     })
+    peer.on('disconnected', () => {
+      if (closed || !opened) return
+      enterLost()
+    })
     peer.on('open', (id) => {
       if (closed) return
+      if (opened) {
+        // Re-registered with the same id; the transport is already resolved.
+        restore()
+        return
+      }
       opened = true
       args.onPeerOpen?.(id as string)
       resolve({
@@ -202,10 +301,8 @@ export function createTransport(args: {
           // table the player had taken it off. The keeper runs a player's
           // intents one by one; this makes them arrive in the order made — and
           // the keeper's own syncs back in the order sent.
-          dataDialPeers.add(peerId)
-          const connection = peer.connect(peerId, { reliable: true })
-          dataDials.set(peerId, connection)
-          wire(connection, true)
+          if (lost) pendingDials.add(peerId)
+          else dial(peerId)
         },
         authenticate(peerId) {
           const generation = connections.get(peerId)

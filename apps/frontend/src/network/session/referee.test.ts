@@ -917,13 +917,13 @@ it('still drives an absent seat while another seat is connected', () => {
   expect(result.session).not.toBe(oneGone)
 })
 
-// driveUnattended's OTHER commit (referee.ts, ~232-238): botAction's own
-// suggestion is accepted on the first try, rather than falling through to the
-// DRAW/PUSH net below it. Staged with a pending `discardForRelease` decision
-// owed by the absent seat itself, so botAction answers it with a RESOLVE that
-// pays the cost — a commit with real events (paying a release discards a card
-// and places it), unlike the bare turn-clock stamps elsewhere in this file.
-it('logs what an absent seat`s own accepted bot suggestion commits', () => {
+// driveUnattended's commit for an absent human: the passive policy's own
+// answer is accepted on the first try. Staged with a pending
+// `discardForRelease` decision owed by the absent seat itself, which the
+// passive policy abandons rather than paying — the release goes back to the
+// hand it never left, and the table sees it taken back. A commit with a real
+// event, unlike the bare turn-clock stamps elsewhere in this file.
+it('logs what an absent seat`s own accepted passive answer commits', () => {
   const { session } = twoPlayerSession()
   const staged = costPendingFixture(tick(session, 1_000).session)
   const pending = staged.state.pending
@@ -934,14 +934,14 @@ it('logs what an absent seat`s own accepted bot suggestion commits', () => {
 
   const result = driveUnattended(dropped, 2_000 + ABSENT_GRACE_MS + 1)
 
-  // Paying the release's cost discards a card and places the release — losing
-  // either this whole append (referee.ts's `log: [...session.log, ...events]`
-  // at line 236) or overwriting it would either leave the log flat or miss
-  // these specific event types while the state itself still visibly moved.
+  // Losing the log append (`accepted`'s `log: [...session.log, ...events]`) or
+  // overwriting it would leave the log flat while the state still moved.
   const grown = result.session.log.slice(before).map((e) => e.type)
   expect(result.session.state.pending).toBeNull()
-  expect(grown).toContain('discarded')
-  expect(grown).toContain('released')
+  expect(grown).toEqual(['takenBack'])
+  expect(result.session.state.players[pending.player].hand.map((c) => c.uid)).toContain(
+    pending.release,
+  )
 })
 
 // A System Upgrade is the only pending owed to several seats at once, so it is
@@ -1192,7 +1192,7 @@ it('starts a 25-second deadline for a legacy request without re-banking its spen
 it.each([
   'attack-bug',
   'attack-security-bug',
-])('lets the absence driver resolve a disconnected %s chooser after grace', (attack) => {
+])('lets the absence driver abandon a disconnected %s chooser after grace', (attack) => {
   const { session: base } = twoPlayerSession()
   const state: GameState = {
     ...base.state,
@@ -1219,7 +1219,10 @@ it.each([
   expect(driveUnattended(absent, 1002 + ABSENT_GRACE_MS - 1).session).toBe(absent)
   const done = driveUnattended(absent, 1002 + ABSENT_GRACE_MS)
   expect(done.session.state.pending).toBeNull()
-  expect(done.session.state.decks.discard).toEqual([{ uid: 'attack#absent', id: attack }])
+  // The passive policy does not choose for the absent attacker: it abandons
+  // the decision, and the attack card goes back to its owner's hand.
+  expect(done.session.state.decks.discard).toEqual([])
+  expect(done.session.state.players.a.hand).toEqual([{ uid: 'attack#absent', id: attack }])
 })
 
 it('automatically completes a legacy handover even while the donor is disconnected', () => {

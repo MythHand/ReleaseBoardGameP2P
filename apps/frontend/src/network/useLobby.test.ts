@@ -24,8 +24,9 @@ import {
   writeSession,
 } from '~/shared/lib/persistence'
 import { AVATAR_IDS } from './lobby/profile'
-import { backoffMs, MAX_RECONNECT_ATTEMPTS } from './session/reconnect'
+import { backoffMs, GUEST_RECONNECT_ATTEMPTS, MAX_RECONNECT_ATTEMPTS } from './session/reconnect'
 import { createSession, type Seat as RefereeSeat } from './session/referee'
+import { SUSPENDED_REASON } from './session/remoteLink'
 import { INTRO_CAP_MS } from './session/startGate'
 import { createTransport } from './transport/peer'
 import type { Message, Setup, WireMessage } from './types'
@@ -55,6 +56,7 @@ interface FakeTransport {
   onConnection?: (peerId: string) => void
   onDisconnect?: (peerId: string) => void
   onMessage?: (msg: WireMessage) => void
+  onSignaling?: (state: 'lost' | 'restored') => void
 }
 
 // vi.mock is hoisted above the imports, so the array it closes over has to be
@@ -79,6 +81,7 @@ vi.mock('./transport/peer', () => ({
       onConnection?: (peerId: string) => void
       onDisconnect?: (peerId: string) => void
       onMessage?: (msg: WireMessage) => void
+      onSignaling?: (state: 'lost' | 'restored') => void
     }) => {
       const authenticated = new Set<string>()
       const fake = {
@@ -110,6 +113,7 @@ vi.mock('./transport/peer', () => ({
         onConnection: args.onConnection,
         onDisconnect: args.onDisconnect,
         onMessage: args.onMessage,
+        onSignaling: args.onSignaling,
       }
       transports.push(fake)
       return fake
@@ -1648,6 +1652,101 @@ it('a guest tells the host when its intro is done', async () => {
   expect(sentTo(hostId)).toContainEqual({ type: 'INTRO_READY', payload: { gameId: hostId } })
 })
 
+it('leaving a running match as a player sends SURRENDER before closing', async () => {
+  vi.useFakeTimers()
+  try {
+    const { result } = renderHook(() => useLobby())
+    await act(async () => {
+      await result.current.joinRoom('F96-NMT', 'Dimbo')
+    })
+    const hostId = parseRoomCode('F96-NMT')
+    act(() => {
+      transports[0].onMessage?.({
+        type: 'GAME_STARTING',
+        payload: {
+          gameId: hostId,
+          seats: SEATING.map((seat, i) => (i === 1 ? { ...seat, peerId: 'peer0' } : seat)),
+        },
+        from: hostId,
+      } as WireMessage)
+    })
+
+    // The channel to the host is open — the only time a frame can be delivered.
+    transports[0].connectedIds = () => [hostId]
+    act(() => {
+      result.current.leaveSession()
+    })
+
+    // Through the game link, to the keeper — the same frame any intent takes.
+    expect(sentTo(hostId)).toContainEqual({
+      type: 'INTENT',
+      payload: { intent: { type: 'SURRENDER' } },
+    })
+    // The frame has to leave before the transport goes, so the close waits.
+    expect(transports[0].close).not.toHaveBeenCalled()
+    act(() => {
+      vi.advanceTimersByTime(1_000)
+    })
+    expect(transports[0].close).toHaveBeenCalled()
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+it('leaving a running match with the host link down sends nothing and closes at once', async () => {
+  vi.useFakeTimers()
+  try {
+    const { result } = renderHook(() => useLobby())
+    await act(async () => {
+      await result.current.joinRoom('F96-NMT', 'Dimbo')
+    })
+    const hostId = parseRoomCode('F96-NMT')
+    act(() => {
+      transports[0].onMessage?.({
+        type: 'GAME_STARTING',
+        payload: {
+          gameId: hostId,
+          seats: SEATING.map((seat, i) => (i === 1 ? { ...seat, peerId: 'peer0' } : seat)),
+        },
+        from: hostId,
+      } as WireMessage)
+    })
+
+    // The default fake reports no open channel: the link is down.
+    act(() => {
+      result.current.leaveSession()
+    })
+
+    expect(sentAll().some((m) => m.type === 'INTENT')).toBe(false)
+    // Nothing to flush, so the transport does not wait.
+    expect(transports[0].close).toHaveBeenCalled()
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+it('leaving a running match as a spectator surrenders nothing', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => {
+    await result.current.joinRoom('F96-NMT', 'Dimbo')
+  })
+  const hostId = parseRoomCode('F96-NMT')
+  act(() => {
+    transports[0].onMessage?.({
+      type: 'GAME_STARTING',
+      payload: { gameId: hostId, seats: SEATING },
+      from: hostId,
+    } as WireMessage)
+  })
+
+  act(() => {
+    result.current.leaveSession()
+  })
+
+  expect(sentAll().some((m) => m.type === 'INTENT')).toBe(false)
+  expect(transports[0].close).toHaveBeenCalled()
+})
+
 it('reporting ready outside a game is a no-op', async () => {
   // In a lobby, with a live transport and a host to address: only the absence of
   // a game keeps the frame from being sent.
@@ -2261,6 +2360,87 @@ async function hostWithOpenGame(): Promise<ReturnType<typeof renderHook>> {
   return rendered
 }
 
+it('a host off the broker keeps its match: status, game id and no error status', async () => {
+  vi.useFakeTimers()
+  try {
+    const hosted = await hostWithOpenGame()
+    const gameId = hosted.result.current.gameId
+    expect(gameId).not.toBeNull()
+    expect(transports[0].onSignaling).toBeDefined()
+    act(() => {
+      transports[0].onSignaling?.('lost')
+    })
+    expect(hosted.result.current.hostOffline).toBe(true)
+    act(() => {
+      // A signaling-type error that still slips through while the host is off
+      // the broker must not end the match the host is keeping.
+      transports[0].onError?.({ type: 'network', message: 'Lost connection to server.' })
+      vi.advanceTimersByTime(60_000)
+    })
+    expect(hosted.result.current.status).toBe('in-lobby')
+    expect(hosted.result.current.gameId).toBe(gameId)
+    act(() => {
+      transports[0].onSignaling?.('restored')
+    })
+    expect(hosted.result.current.hostOffline).toBe(false)
+    expect(hosted.result.current.status).toBe('in-lobby')
+    expect(hosted.result.current.gameId).toBe(gameId)
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+// The order the restore and a match start can race in: the broker drops
+// before a keeper exists. The keeper attached afterwards must not run.
+it('a keeper attached while the host is off the broker starts suspended', async () => {
+  vi.useFakeTimers()
+  try {
+    const rendered = await hostWithGuest()
+    act(() => {
+      transports[0].onSignaling?.('lost')
+    })
+    const random = vi.spyOn(crypto, 'getRandomValues').mockImplementation((values) => {
+      if (values instanceof Uint32Array) values[0] = 1
+      return values
+    })
+    act(() => {
+      rendered.result.current.startGame([])
+    })
+    random.mockRestore()
+    act(() => {
+      rendered.result.current.introReady()
+      transports[0].onMessage?.({
+        type: 'INTRO_READY',
+        payload: { gameId: rendered.result.current.gameId },
+        from: GUEST,
+      } as WireMessage)
+    })
+    const suspended = () =>
+      (rendered.result.current.gameSync?.rejections ?? []).filter(
+        (e) => e.type === 'rejected' && e.reason === SUSPENDED_REASON,
+      ).length
+    act(() => {
+      rendered.result.current.gameLink?.submit({ type: 'DRAW' })
+    })
+    expect(suspended()).toBe(1)
+    act(() => {
+      transports[0].onSignaling?.('restored')
+    })
+    act(() => {
+      rendered.result.current.gameLink?.submit({ type: 'DRAW' })
+    })
+    expect(suspended()).toBe(1)
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+it('a guest transport is not given a signaling handler', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => result.current.joinRoom('F96-NMT', 'Bo'))
+  expect(transports[0]?.onSignaling).toBeUndefined()
+})
+
 function forgeFromStalePeerId(): void {
   act(() => {
     transports[0].onMessage?.({
@@ -2768,6 +2948,7 @@ interface MutableRefereeSeat {
   playerId: string
   peerId: string | null
   absentSince: number | null
+  surrendering?: unknown
 }
 
 const invalidKeeperSnapshots: [string, (snapshot: StoredKeeper) => void][] = [
@@ -2791,6 +2972,13 @@ const invalidKeeperSnapshots: [string, (snapshot: StoredKeeper) => void][] = [
     (snapshot) => {
       const seats = snapshot.seats as MutableRefereeSeat[]
       snapshot.seats = [seats[0], { ...seats[1], playerId: seats[0].playerId }]
+    },
+  ],
+  [
+    'a non-boolean surrendering flag',
+    (snapshot) => {
+      const seats = snapshot.seats as MutableRefereeSeat[]
+      snapshot.seats = [seats[0], { ...seats[1], peerId: null, absentSince: 500, surrendering: 1 }]
     },
   ],
   [
@@ -3002,6 +3190,36 @@ it('restores a valid snapshot whose guest seat was already absent', async () => 
   expect(result.current.status).toBe('in-lobby')
   expect(result.current.gameId).toBe('g1')
   expect(transports).toHaveLength(1)
+})
+
+// A surrender the keeper had not reduced yet survives the snapshot round trip:
+// read back by the validator and written out again by the trailing save.
+it('keeps a pending surrender through a keeper snapshot round trip', async () => {
+  vi.useFakeTimers()
+  try {
+    storedHostSession('g1')
+    const snapshot = storedKeeperSnapshot('peer0')
+    const seats = snapshot.seats as MutableRefereeSeat[]
+    snapshot.seats = [seats[0], { ...seats[1], peerId: null, absentSince: 500, surrendering: true }]
+    sessionStorage.setItem(KEEPER_KEY, JSON.stringify(snapshot))
+
+    const restored = renderHook(() => useLobby())
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(restored.result.current.gameId).toBe('g1')
+    act(() => {
+      vi.advanceTimersByTime(KEEPER_SAVE_MS)
+    })
+
+    expect((storedKeeper()?.seats as RefereeSeat[])[1]).toMatchObject({
+      playerId: seats[1].playerId,
+      surrendering: true,
+    })
+    restored.unmount()
+  } finally {
+    vi.useRealTimers()
+  }
 })
 
 it('hands the restored host its own table back without waiting for it to act', async () => {
@@ -3906,15 +4124,15 @@ it('retries the guest dial with backoff, and gives up once every attempt is spen
     })
     expect(result.current.reconnect.status).toBe('trying')
     expect(result.current.reconnect.attempt).toBe(1)
-    expect(result.current.reconnect.maxAttempts).toBe(MAX_RECONNECT_ATTEMPTS)
+    expect(result.current.reconnect.maxAttempts).toBe(GUEST_RECONNECT_ATTEMPTS)
 
-    for (let attempt = 1; attempt <= MAX_RECONNECT_ATTEMPTS; attempt++) {
+    for (let attempt = 1; attempt <= GUEST_RECONNECT_ATTEMPTS; attempt++) {
       // The host never answers — PeerJS reports it unreachable.
       await act(async () => {
         transports[attempt - 1].onError?.({ type: 'peer-unavailable', message: 'nope' })
         await Promise.resolve()
       })
-      if (attempt < MAX_RECONNECT_ATTEMPTS) {
+      if (attempt < GUEST_RECONNECT_ATTEMPTS) {
         expect(result.current.reconnect.status).toBe('trying')
         await act(async () => {
           await vi.advanceTimersByTimeAsync(backoffMs(attempt))
@@ -3923,12 +4141,12 @@ it('retries the guest dial with backoff, and gives up once every attempt is spen
     }
 
     expect(result.current.reconnect.status).toBe('failed')
-    expect(result.current.reconnect.attempt).toBe(MAX_RECONNECT_ATTEMPTS)
+    expect(result.current.reconnect.attempt).toBe(GUEST_RECONNECT_ATTEMPTS)
     // One dial per attempt, no more.
-    expect(transports).toHaveLength(MAX_RECONNECT_ATTEMPTS)
+    expect(transports).toHaveLength(GUEST_RECONNECT_ATTEMPTS)
     expect(result.current.reconnect.events.at(-1)).toMatchObject({
       kind: 'failed',
-      attempt: MAX_RECONNECT_ATTEMPTS,
+      attempt: GUEST_RECONNECT_ATTEMPTS,
     })
   } finally {
     vi.useRealTimers()
@@ -3981,12 +4199,12 @@ it('retry starts a fresh run from attempt 1', async () => {
     await act(async () => {
       await Promise.resolve()
     })
-    for (let attempt = 1; attempt <= MAX_RECONNECT_ATTEMPTS; attempt++) {
+    for (let attempt = 1; attempt <= GUEST_RECONNECT_ATTEMPTS; attempt++) {
       await act(async () => {
         transports[attempt - 1].onError?.({ type: 'peer-unavailable', message: 'nope' })
         await Promise.resolve()
       })
-      if (attempt < MAX_RECONNECT_ATTEMPTS) {
+      if (attempt < GUEST_RECONNECT_ATTEMPTS) {
         await act(async () => {
           await vi.advanceTimersByTimeAsync(backoffMs(attempt))
         })
@@ -5233,6 +5451,73 @@ it('treats name-taken as terminal', async () => {
   expect(result.current.status).toBe('error')
   expect(result.current.errorKind).toBe('name-taken')
   expect(transports).toHaveLength(1)
+})
+
+// A peer with no seat opening a room whose match is already running. It is
+// admitted as a spectator whatever it asked for, routed to the board, and then
+// its own screens announce themselves the way they do in the app: the lobby
+// mounts first (the roster lands before GAME_STARTING moves it on), then the
+// board. It must still be watching the match once it is on the board.
+const NEWCOMER = 'newcomer'
+function newcomerOpensRunningRoom(requestedRole: 'player' | 'spectator') {
+  act(() => {
+    transports[0].onMessage?.({
+      type: 'JOIN_REQUEST',
+      payload: { name: 'Newcomer', resumeToken: 'newcomer-token', requestedRole },
+      from: NEWCOMER,
+      seq: 200,
+    } as WireMessage)
+  })
+}
+function newcomerWalksLobbyThenBoard() {
+  act(() => {
+    transports[0].receive({
+      type: 'WHEREABOUTS',
+      payload: { where: 'lobby' },
+      from: NEWCOMER,
+      seq: 201,
+    })
+  })
+  act(() => {
+    transports[0].receive({
+      type: 'WHEREABOUTS',
+      payload: { where: 'game' },
+      from: NEWCOMER,
+      seq: 202,
+    })
+  })
+}
+const syncsTo = (peerId: string) => sentTo(peerId).filter((message) => message.type === 'SYNC')
+
+async function restoredHostWithMatch(): Promise<ReturnType<typeof renderHook>> {
+  storedHostSession('g1')
+  storedKeeperSnapshot('peer0')
+  const rendered = renderHook(() => useLobby())
+  await act(async () => {
+    await Promise.resolve()
+  })
+  return rendered
+}
+
+it.each([
+  ['asking for player', 'player', hostWithOpenGame],
+  ['asking for spectator', 'spectator', hostWithOpenGame],
+  ['asking for player, after restoreHost', 'player', restoredHostWithMatch],
+] as const)('a peer with no seat opening a running room (%s) is admitted as spectator and receives a spectator sync', async (_label, requestedRole, host) => {
+  const { result } = await host()
+  expect(result.current.gameId).not.toBeNull()
+  newcomerOpensRunningRoom(requestedRole)
+  expect(result.current.state?.peers[NEWCOMER].role).toBe('guest')
+  expect(typesSentTo(NEWCOMER)).toContain('GAME_STARTING')
+  expect(publicSyncTo(NEWCOMER).view.self).toBeNull()
+  newcomerWalksLobbyThenBoard()
+  expect(result.current.state?.peers[NEWCOMER].where).toBe('game')
+  // Still watching: the next thing that happens at the table reaches it.
+  const before = syncsTo(NEWCOMER).length
+  const hostView = result.current.gameSync
+  act(() => result.current.gameLink?.submit({ type: 'DRAW' }))
+  expect(result.current.gameSync).not.toBe(hostView)
+  expect(syncsTo(NEWCOMER).length).toBeGreaterThan(before)
 })
 
 it('keeps bootstrap pending from the first render until the host restore settles (#245)', async () => {

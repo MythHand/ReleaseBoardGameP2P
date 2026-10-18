@@ -10,8 +10,10 @@ type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K>
 
 // WINDOW_EXPIRED and CLOCK_STARTED are excluded, not stripped: they carry no
 // player identity and are fired by the keeper's own clock, never by a peer.
+// ABANDON is excluded as well: it is the keeper's own answer for an absent
+// seat and is not in the peer allowlist (referee.ts PEER_INTENT_TYPES).
 export type Intent = DistributiveOmit<
-  Exclude<Action, { type: 'WINDOW_EXPIRED' } | { type: 'CLOCK_STARTED' }>,
+  Exclude<Action, { type: 'WINDOW_EXPIRED' } | { type: 'CLOCK_STARTED' } | { type: 'ABANDON' }>,
   'player' | 'at'
 >
 

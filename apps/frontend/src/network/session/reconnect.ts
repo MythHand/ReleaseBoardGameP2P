@@ -12,6 +12,12 @@ export interface ReconnectEvent {
 // is about to come back.
 export const MAX_RECONNECT_ATTEMPTS = 5
 
+// A guest is the one who has to wait out a host's wifi, so it keeps dialing
+// for about two minutes: 18 attempts, 17 backoff gaps summing to ~111.5 s
+// (see backoffMs), plus dial time. Only the guest loop uses this; the host's
+// restore retry stays on MAX_RECONNECT_ATTEMPTS.
+export const GUEST_RECONNECT_ATTEMPTS = 18
+
 // Exponential with a ceiling. The cap matters more than the curve: a fifth
 // attempt eight seconds out still feels like the app is trying, where
 // thirty-two would read as hung.

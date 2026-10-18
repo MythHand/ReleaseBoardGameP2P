@@ -90,7 +90,11 @@ export function openHandChoice(
   }
 }
 
-function finishHandAttack(state: GameState, log: Log, context?: HandAttackContext): GameState {
+export function finishHandAttack(
+  state: GameState,
+  log: Log,
+  context?: HandAttackContext,
+): GameState {
   if (!context) return { ...state, pending: null, eventSeq: log.seq }
   const cards = [context.attack, ...(context.combo ? [context.combo] : [])]
   for (const card of cards)

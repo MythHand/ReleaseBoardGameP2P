@@ -25,7 +25,10 @@ interface ReconnectProps {
   maxAttempts: number
   status: 'trying' | 'failed'
   reason?: 'room-full'
-  onRetry(): void
+  // Absent when there is nothing this peer can retry: a host off the
+  // signaling broker re-registers on its own, so a Retry button would do
+  // nothing. The overlay then offers Leave alone.
+  onRetry?: () => void
   onLeave(): void
 }
 
@@ -117,9 +120,11 @@ export default function Reconnect({
         ) : (
           <div className={styles.foot}>
             <div className={styles.actions}>
-              <Button variant="primary" onClick={onRetry}>
-                {copy.retry}
-              </Button>
+              {onRetry && (
+                <Button variant="primary" onClick={onRetry}>
+                  {copy.retry}
+                </Button>
+              )}
               <Button variant="primary" onClick={() => setConfirmLeave(true)}>
                 {copy.leave}
               </Button>

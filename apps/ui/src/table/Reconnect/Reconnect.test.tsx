@@ -62,6 +62,21 @@ it('confirming the abort actually leaves', () => {
   expect(onLeave).toHaveBeenCalledTimes(1)
 })
 
+it('offers no retry when the caller has nothing to retry', () => {
+  render(
+    <Reconnect
+      copy={copy}
+      host="4F2A-9K"
+      attempt={1}
+      maxAttempts={5}
+      status="trying"
+      onLeave={() => {}}
+    />,
+  )
+  expect(screen.queryByText('reconnect')).toBeNull()
+  expect(screen.getByText('leave')).toBeTruthy()
+})
+
 it('retrying asks the session for another run', () => {
   const onRetry = vi.fn()
   render(
