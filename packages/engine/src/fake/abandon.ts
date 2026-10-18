@@ -69,6 +69,8 @@ export function onAbandon(state: GameState, action: Action & { type: 'ABANDON' }
     case 'stealCard':
       return abandonHandAttack(state, action.player, pending.context)
     case 'requestCard':
+      // A legacy save whose requestCard has no `context` cannot be abandoned:
+      // its absent chooser is waited for instead (ruling R5).
       if (!pending.context) return reject(state, action, 'nothing to abandon')
       return abandonHandAttack(state, action.player, pending.context)
     case 'reorderTop':

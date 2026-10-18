@@ -33,6 +33,7 @@ const BUG: CardInstance = { uid: 'attack-bug#0', id: 'attack-bug' }
 const SPARE: CardInstance = { uid: 'protection-debugger#0', id: 'protection-debugger' }
 const REBASE: CardInstance = { uid: 'operation-git-rebase#0', id: 'operation-git-rebase' }
 const CHERRY: CardInstance = { uid: 'operation-git-cherry-pick#0', id: 'operation-git-cherry-pick' }
+const SEC: CardInstance = { uid: 'attack-security-bug#0', id: 'attack-security-bug' }
 const SUDO: CardInstance = { uid: 'support-sudo#0', id: 'support-sudo' }
 const WORKS: CardInstance = {
   uid: 'defense-works-on-my-machine#0',
@@ -168,6 +169,30 @@ describe('ABANDON', () => {
     expect(uids(r.state.decks.discard)).toContain(BUG.uid)
     expect(uids(r.state.players.p1.hand)).not.toContain(BUG.uid)
     expect(cardsPresent(r.state).sort()).toEqual(cardsPresent(reflected.state).sort())
+  })
+
+  it('abandon of a Security Bug request returns the attack and its Sudo to the attacker', () => {
+    const attacked = reduce(table([SEC, SUDO, SPARE], [FILLER]), {
+      type: 'PLAY',
+      player: 'p1',
+      card: SEC.uid,
+      combo: SUDO.uid,
+      target: { kind: 'player', player: 'p2' },
+      at: 1000,
+    })
+    const requested = reduce(attacked.state, {
+      type: 'RESOLVE',
+      player: 'p2',
+      choice: { kind: 'defend', card: null },
+      at: 1001,
+    })
+    expect(requested.state.pending).toMatchObject({ kind: 'requestCard', player: 'p1' })
+    const r = abandon(requested.state)
+    expect(r.state.pending).toBeNull()
+    expect(uids(r.state.players.p1.hand).sort()).toEqual([SEC.uid, SUDO.uid, SPARE.uid].sort())
+    expect(r.state.players.p2.hand).toEqual(requested.state.players.p2.hand)
+    expect(r.events).toMatchObject([{ type: 'takenBack', player: 'p1', cards: [SEC.id, SUDO.id] }])
+    expect(cardsPresent(r.state).sort()).toEqual(cardsPresent(requested.state).sort())
   })
 
   it('abandon is rejected for a pending owed by someone else', () => {

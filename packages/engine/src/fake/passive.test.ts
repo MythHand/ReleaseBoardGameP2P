@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { Action } from '../actions'
 import { rulesFor } from '../cards'
 import type { GameConfig } from '../engine'
-import { type CardInstance, type GameState, seatOwing } from '../state'
+import { type CardInstance, cardsPresent, type GameState, seatOwing } from '../state'
 import { createFakeEngine, FAKE_DECK, FAKE_EVENTS, passiveAction } from './index'
 import { reduce } from './reduce'
 
@@ -205,5 +205,81 @@ describe('passiveAction', () => {
     expect(after.drawing).toBeFalsy()
     expect(after.turn.player).not.toBe('p1')
     expect(after.eliminated).not.toContain(after.turn.player)
+  })
+
+  describe('system upgrade', () => {
+    const bug = (n: string): CardInstance => card('attack-bug', n)
+    const discarding = (): GameState => {
+      const base = engine.createGame(config())
+      return {
+        ...base,
+        players: {
+          ...base.players,
+          p2: { ...base.players.p2, hand: [bug('h0'), card('support-sudo', 'h1'), bug('h2')] },
+        },
+        pending: {
+          kind: 'systemUpgrade',
+          actor: 'p1',
+          owed: ['p2'],
+          thrown: [],
+          sudo: true,
+          phase: 'discarding',
+        } as never,
+      }
+    }
+    const picking = (): GameState => {
+      const base = engine.createGame(config())
+      const thrown = [
+        { player: 'p2', card: bug('t0') },
+        { player: 'p3', card: bug('t1') },
+      ]
+      return {
+        ...base,
+        // The thrown cards lie at the centre, held on the pending.
+        pending: {
+          kind: 'systemUpgrade',
+          actor: 'p1',
+          owed: [],
+          thrown,
+          sudo: true,
+          phase: 'picking',
+        } as never,
+      }
+    }
+
+    it('discarding: the owed seat throws a card from its hand, deterministically', () => {
+      const state = discarding()
+      const first = passiveAction(engine, state, 'p2', 2000)
+      expect(first).toEqual(passiveAction(engine, state, 'p2', 2000))
+      if (first?.type !== 'RESOLVE' || first.choice.kind !== 'upgradeDiscard') {
+        expect.fail('wrong answer')
+      }
+      const thrown = first.choice.card
+      expect(state.players.p2.hand.map((c) => c.uid)).toContain(thrown)
+      const r = engine.reduce(state, first)
+      expect(r.events.filter((e) => e.type === 'rejected')).toEqual([])
+      expect(r.state.players.p2.hand.map((c) => c.uid)).not.toContain(thrown)
+    })
+
+    it('picking: the actor takes one of the thrown cards, deterministically', () => {
+      const state = picking()
+      const first = passiveAction(engine, state, 'p1', 2000)
+      expect(first).toEqual(passiveAction(engine, state, 'p1', 2000))
+      if (first?.type !== 'RESOLVE' || first.choice.kind !== 'upgradeTake') {
+        expect.fail('wrong answer')
+      }
+      const taken = first.choice.card
+      expect(['attack-bug#t0', 'attack-bug#t1']).toContain(taken)
+
+      const before = cardsPresent(state)
+      const r = engine.reduce(state, first)
+      expect(r.events.filter((e) => e.type === 'rejected')).toEqual([])
+      expect(r.state.pending).toBeNull()
+      expect(r.state.players.p1.hand.map((c) => c.uid)).toContain(taken)
+      const rest = ['attack-bug#t0', 'attack-bug#t1'].filter((uid) => uid !== taken)
+      expect(r.state.decks.discard.map((c) => c.uid)).toEqual(expect.arrayContaining(rest))
+      expect(r.state.decks.discard.map((c) => c.uid)).not.toContain(taken)
+      expect(cardsPresent(r.state).sort()).toEqual(before.sort())
+    })
   })
 })
