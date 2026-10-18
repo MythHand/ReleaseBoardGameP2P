@@ -362,6 +362,7 @@ describe('aiBeat', () => {
         setup: {},
         playable: [],
         frozen: [],
+        replayLocked: [],
       } as unknown as BoardState
       await runBeat(
         result.current.run,
@@ -392,6 +393,7 @@ describe('aiBeat', () => {
       setup: {},
       playable: [],
       frozen: [],
+      replayLocked: [],
     } as unknown as BoardState
     // every publish, numbered in the same trace the drops and flights are in
     const recording = () => {
@@ -660,6 +662,7 @@ describe('runTaken — a Release comes back out of the discard (#106, Task 11)',
       setup: {},
       playable: [],
       frozen: [],
+      replayLocked: [],
     } as unknown as BoardState
     const { result } = renderBeat(() => useAiBeat(anchors))
     const { published } = await runBeat(
@@ -781,6 +784,7 @@ describe('runTaken — a Release comes back out of the discard (#106, Task 11)',
       setup: {},
       playable: [],
       frozen: [],
+      replayLocked: [],
     } as unknown as BoardState
     // each publish stamped with the flights already played when it happened —
     // presence alone would survive a publish made AFTER the flight
@@ -858,6 +862,7 @@ describe('the events deck and the heap, one place at a time', () => {
       setup: {},
       playable: [],
       frozen: [],
+      replayLocked: [],
     } as unknown as BoardState
     await runBeat(
       result.current.runTaken,

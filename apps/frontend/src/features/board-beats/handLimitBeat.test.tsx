@@ -118,6 +118,7 @@ const base = {
   setup: {},
   playable: [],
   frozen: [],
+  replayLocked: [],
 } as unknown as BoardState
 
 const plan = (player = 'p1'): Extract<BeatPlan, { kind: 'handLimit' }> => ({

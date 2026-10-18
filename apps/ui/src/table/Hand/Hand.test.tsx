@@ -1,4 +1,4 @@
-import { fireEvent, render } from '@testing-library/react'
+import { fireEvent, render, waitFor } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
 import { cardById } from '@/cards'
 import Hand from './Hand'
@@ -38,4 +38,31 @@ it('still starts and completes a fan drag while another interaction reports carr
   fireEvent.mouseUp(window, { clientX: 0, clientY: -200 }) // released well above the hand → play
 
   expect(onPlay).toHaveBeenCalledWith('protection-debugger#0', expect.anything())
+})
+
+it('keeps a disabled card readable but refuses its click and drag', async () => {
+  const onPlay = vi.fn(() => true)
+  const onCardClick = vi.fn()
+  const { container } = render(
+    <Hand
+      items={[{ uid: 'attack-bug#0', card: knownCard('attack-bug') }]}
+      stateAt={() => 'disabled'}
+      onPlay={onPlay}
+      onCardClick={onCardClick}
+    />,
+  )
+  const slot = container.querySelector<HTMLElement>('[data-hand-slot]')
+  if (!slot) throw new Error('Missing hand slot')
+  expect(container.querySelector('[data-shown]')).toBeNull()
+  fireEvent.mouseEnter(slot)
+  await waitFor(() =>
+    expect(container.querySelector('[data-shown="true"] [data-card="attack-bug"]')).toBeTruthy(),
+  )
+  fireEvent.mouseDown(slot, { clientX: 0, clientY: 0 })
+  fireEvent.mouseUp(window, { clientX: 0, clientY: 0 })
+  fireEvent.mouseDown(slot, { clientX: 0, clientY: 0 })
+  fireEvent.mouseMove(window, { clientX: 0, clientY: -20 })
+  fireEvent.mouseUp(window, { clientX: 0, clientY: -200 })
+  expect(onCardClick).not.toHaveBeenCalled()
+  expect(onPlay).not.toHaveBeenCalled()
 })

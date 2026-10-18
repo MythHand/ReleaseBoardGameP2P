@@ -13,6 +13,7 @@ const base: Omit<PlayerTableState, 'turn' | 'hasDrawn'> = {
   selfId: 'you',
   playable: [],
   frozen: [],
+  replayLocked: [],
 }
 
 const defendPending: TablePending = {

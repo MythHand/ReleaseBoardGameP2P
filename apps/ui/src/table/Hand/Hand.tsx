@@ -275,7 +275,7 @@ export default function Hand({
   // drag-mode → arm; move past the threshold turns it into a drag, a release
   // before that is a click. So click-to-play and drag-to-reorder coexist.
   function onSlotDown(i: number, el: HTMLElement, e: React.MouseEvent) {
-    if (drag) return
+    if (drag || stateAt?.(i) === 'disabled') return
     if (!dragEnabled) {
       onCardClick?.(i, el, e)
       return

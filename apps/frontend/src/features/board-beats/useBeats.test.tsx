@@ -87,6 +87,7 @@ const preDiscard = {
   setup: {},
   playable: [],
   frozen: [],
+  replayLocked: [],
 } as unknown as PlayerBoardState
 
 // …and after: the card is gone from the hand and counted in the discard. The

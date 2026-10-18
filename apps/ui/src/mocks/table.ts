@@ -306,5 +306,6 @@ export function makeSpectatorTable(playerCount: 2 | 3 | 4 | 5 | 6): SpectatorTab
     setup: base.setup,
     playable: [],
     frozen: [],
+    replayLocked: [],
   }
 }

@@ -202,6 +202,7 @@ export function project(state: GameState, viewerId: PlayerId): PlayerView {
       targets: targetsFor(state, viewerId),
       combos: combosFor(state, viewerId),
       frozen: [...me.frozen],
+      replayLocked: [...me.replayLocked],
     },
   }
 }

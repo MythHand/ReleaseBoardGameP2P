@@ -35,6 +35,7 @@ export function makeBoardProps(over: Partial<BoardProps> = {}): BoardProps {
       setup: mock.setup,
       playable: [],
       frozen: [],
+      replayLocked: [],
     },
     room: {
       role: 'host',
@@ -92,6 +93,7 @@ export function introFixture(): { gameId: string; view: PlayerView; events: Even
         targets: {},
         combos: {},
         frozen: [],
+        replayLocked: [],
       },
       opponents: [{ id: 'p2', name: 'Two', handCount: 2, release: {}, eliminated: false }],
       shown: [],

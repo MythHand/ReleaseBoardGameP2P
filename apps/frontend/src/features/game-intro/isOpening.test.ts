@@ -15,6 +15,7 @@ const opening = (): PlayerView => ({
     targets: {},
     combos: {},
     frozen: [],
+    replayLocked: [],
   },
   opponents: [{ id: 'p2', name: 'Two', handCount: 5, release: {}, eliminated: false }],
   shown: [],

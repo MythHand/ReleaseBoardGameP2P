@@ -28,6 +28,7 @@ const board = (): PlayerBoardState =>
     setup: {},
     playable: [],
     frozen: [],
+    replayLocked: [],
   }) as unknown as PlayerBoardState
 
 describe('withoutFlown', () => {

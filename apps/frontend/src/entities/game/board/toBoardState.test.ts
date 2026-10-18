@@ -32,6 +32,7 @@ const view: PlayerView = {
     targets: {},
     combos: {},
     frozen: [],
+    replayLocked: [],
   },
   opponents: [{ id: 'p2', name: 'bot', handCount: 3, release: {}, eliminated: false }],
   shown: [],

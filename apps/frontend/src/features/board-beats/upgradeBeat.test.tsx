@@ -72,6 +72,7 @@ const base = {
   setup: {},
   playable: [],
   frozen: [],
+  replayLocked: [],
 } as unknown as BoardState
 
 function harness(
