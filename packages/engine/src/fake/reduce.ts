@@ -26,7 +26,7 @@ import { playableFor } from './project'
 import { onReorderTop } from './rebase'
 import { onCancelRelease, onDiscardForRelease, onPlay } from './release'
 import { onShow, onTakeBack } from './shown'
-import { fireTrigger, onDecline503, onDeclineCrush, onNeutralize } from './triggers'
+import { eliminate, fireTrigger, onDecline503, onDeclineCrush, onNeutralize } from './triggers'
 import { onUpgradeDiscard, onUpgradeTake } from './upgrade'
 import { onPass, onUnpass, onWindowExpired } from './window'
 
@@ -339,6 +339,19 @@ function onResolve(state: GameState, action: Action & { type: 'RESOLVE' }): Redu
   }
 }
 
+// A seat that leaves the match is eliminated like a fatal draw, but only at an
+// idle table: nothing open, nothing drawing, no finished game. Anything else
+// would drop a decision someone is owed or a draw already in progress.
+function onSurrender(state: GameState, action: Action & { type: 'SURRENDER' }): Reduction {
+  const living = state.seating.includes(action.player) && !state.eliminated.includes(action.player)
+  if (!living) return reject(state, action, 'not a living player')
+  if (state.pending || state.window || state.drawing || state.over) {
+    return reject(state, action, 'table is busy')
+  }
+  const log = createLog(state.eventSeq)
+  return { state: eliminate(state, log, action.player), events: log.events }
+}
+
 export function reduce(state: GameState, action: Action): Reduction {
   // A malformed action (any shape survives JSON deserialization) is rejected
   // before any handler destructures it, so no handler needs its own guard.
@@ -411,6 +424,8 @@ function dispatch(state: GameState, action: Action): Reduction {
       return onTakeBack(state, action)
     case 'ABANDON':
       return onAbandon(state, action)
+    case 'SURRENDER':
+      return onSurrender(state, action)
     default:
       return reject(
         state,

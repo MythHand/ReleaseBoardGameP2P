@@ -71,5 +71,8 @@ export type Action =
   // Keeper-only, never a peer intent: the seat owing a decision raised by a
   // card it played has dropped, and the card goes back to its hand.
   | { type: 'ABANDON'; player: PlayerId; at: number }
+  // A player leaves the match: they are eliminated at an idle table. The keeper
+  // sends it once no decision, window, draw or finished game is open.
+  | { type: 'SURRENDER'; player: PlayerId; at: number }
 
 export type ActionType = Action['type']
