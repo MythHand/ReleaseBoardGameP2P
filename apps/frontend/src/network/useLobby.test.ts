@@ -24,7 +24,7 @@ import {
   writeSession,
 } from '~/shared/lib/persistence'
 import { AVATAR_IDS } from './lobby/profile'
-import { backoffMs, MAX_RECONNECT_ATTEMPTS } from './session/reconnect'
+import { backoffMs, GUEST_RECONNECT_ATTEMPTS, MAX_RECONNECT_ATTEMPTS } from './session/reconnect'
 import { createSession, type Seat as RefereeSeat } from './session/referee'
 import { SUSPENDED_REASON } from './session/remoteLink'
 import { INTRO_CAP_MS } from './session/startGate'
@@ -4083,15 +4083,15 @@ it('retries the guest dial with backoff, and gives up once every attempt is spen
     })
     expect(result.current.reconnect.status).toBe('trying')
     expect(result.current.reconnect.attempt).toBe(1)
-    expect(result.current.reconnect.maxAttempts).toBe(MAX_RECONNECT_ATTEMPTS)
+    expect(result.current.reconnect.maxAttempts).toBe(GUEST_RECONNECT_ATTEMPTS)
 
-    for (let attempt = 1; attempt <= MAX_RECONNECT_ATTEMPTS; attempt++) {
+    for (let attempt = 1; attempt <= GUEST_RECONNECT_ATTEMPTS; attempt++) {
       // The host never answers — PeerJS reports it unreachable.
       await act(async () => {
         transports[attempt - 1].onError?.({ type: 'peer-unavailable', message: 'nope' })
         await Promise.resolve()
       })
-      if (attempt < MAX_RECONNECT_ATTEMPTS) {
+      if (attempt < GUEST_RECONNECT_ATTEMPTS) {
         expect(result.current.reconnect.status).toBe('trying')
         await act(async () => {
           await vi.advanceTimersByTimeAsync(backoffMs(attempt))
@@ -4100,12 +4100,12 @@ it('retries the guest dial with backoff, and gives up once every attempt is spen
     }
 
     expect(result.current.reconnect.status).toBe('failed')
-    expect(result.current.reconnect.attempt).toBe(MAX_RECONNECT_ATTEMPTS)
+    expect(result.current.reconnect.attempt).toBe(GUEST_RECONNECT_ATTEMPTS)
     // One dial per attempt, no more.
-    expect(transports).toHaveLength(MAX_RECONNECT_ATTEMPTS)
+    expect(transports).toHaveLength(GUEST_RECONNECT_ATTEMPTS)
     expect(result.current.reconnect.events.at(-1)).toMatchObject({
       kind: 'failed',
-      attempt: MAX_RECONNECT_ATTEMPTS,
+      attempt: GUEST_RECONNECT_ATTEMPTS,
     })
   } finally {
     vi.useRealTimers()
@@ -4158,12 +4158,12 @@ it('retry starts a fresh run from attempt 1', async () => {
     await act(async () => {
       await Promise.resolve()
     })
-    for (let attempt = 1; attempt <= MAX_RECONNECT_ATTEMPTS; attempt++) {
+    for (let attempt = 1; attempt <= GUEST_RECONNECT_ATTEMPTS; attempt++) {
       await act(async () => {
         transports[attempt - 1].onError?.({ type: 'peer-unavailable', message: 'nope' })
         await Promise.resolve()
       })
-      if (attempt < MAX_RECONNECT_ATTEMPTS) {
+      if (attempt < GUEST_RECONNECT_ATTEMPTS) {
         await act(async () => {
           await vi.advanceTimersByTimeAsync(backoffMs(attempt))
         })

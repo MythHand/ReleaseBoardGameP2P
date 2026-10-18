@@ -75,7 +75,12 @@ import {
 } from './lobby/state'
 import type { GameLink, Sync } from './session/link'
 import { restorePresentationRuntime } from './session/presentationGate'
-import { backoffMs, MAX_RECONNECT_ATTEMPTS, type ReconnectEvent } from './session/reconnect'
+import {
+  backoffMs,
+  GUEST_RECONNECT_ATTEMPTS,
+  MAX_RECONNECT_ATTEMPTS,
+  type ReconnectEvent,
+} from './session/reconnect'
 import {
   adoptSession,
   createSession,
@@ -2102,7 +2107,7 @@ export function useLobby(): UseLobby {
     setReconnectAttempt(0)
     setReconnectEvents([])
 
-    for (let attempt = 1; attempt <= MAX_RECONNECT_ATTEMPTS; attempt++) {
+    for (let attempt = 1; attempt <= GUEST_RECONNECT_ATTEMPTS; attempt++) {
       if (reconnectEpochRef.current !== runEpoch || sessionEpochRef.current !== sessionEpoch) return
       setReconnectAttempt(attempt)
       pushReconnectEvent('dialing', attempt)
@@ -2202,7 +2207,7 @@ export function useLobby(): UseLobby {
         return
       }
 
-      if (terminal || attempt === MAX_RECONNECT_ATTEMPTS) {
+      if (terminal || attempt === GUEST_RECONNECT_ATTEMPTS) {
         pushReconnectEvent('failed', attempt)
         setReconnectStatus('failed')
         return
@@ -2816,7 +2821,7 @@ export function useLobby(): UseLobby {
       hostOffline,
       reconnect: {
         attempt: reconnectAttempt,
-        maxAttempts: MAX_RECONNECT_ATTEMPTS,
+        maxAttempts: GUEST_RECONNECT_ATTEMPTS,
         status: reconnectStatus,
         events: reconnectEvents,
         retry: retryReconnect,
