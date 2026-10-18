@@ -455,9 +455,9 @@ export function resolveAiEvent(
         ...state,
         drawing: {
           player,
-          // Bonus cards resolve first, including their own triggers. Then
-          // the interrupted ordinary draw resumes its remaining piles.
-          piles: [0, 0, ...(state.drawing?.piles ?? [])],
+          // Preserve both the interrupted ordinary draw and any outer bonus.
+          piles: state.drawing?.piles ?? [],
+          bonus: 2 + (state.drawing?.bonus ?? 0),
         },
         eventSeq: log.seq,
       }

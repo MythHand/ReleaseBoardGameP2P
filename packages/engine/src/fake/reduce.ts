@@ -79,15 +79,20 @@ function refillFromDiscard(state: GameState, log: Log): GameState {
 // card for a player whose turn Hallucination had already ended.
 export function runDrawSequence(state: GameState, log: Log, at: number): GameState {
   let next = state
-  while (next.drawing && next.drawing.piles.length > 0) {
+  while (next.drawing && ((next.drawing.bonus ?? 0) > 0 || next.drawing.piles.length > 0)) {
     const owed = next.drawing
     if (next.over || next.eliminated.includes(owed.player) || next.turn.player !== owed.player) {
       return { ...next, drawing: null, eventSeq: log.seq }
     }
 
-    const [pileIndex, ...rest] = owed.piles
-    const remaining = rest.length > 0 ? { ...owed, piles: rest } : null
     const filled = refillFromDiscard(next, log)
+    const bonus = owed.bonus ?? 0
+    const pileIndex =
+      bonus > 0 ? filled.decks.main.findIndex((candidate) => candidate.length > 0) : owed.piles[0]
+    const rest = bonus > 0 ? owed.piles : owed.piles.slice(1)
+    const remainingBonus = Math.max(0, bonus - 1)
+    const remaining =
+      rest.length > 0 || remainingBonus > 0 ? { ...owed, piles: rest, bonus: remainingBonus } : null
     const pile = filled.decks.main[pileIndex]
     // A pile with nothing in it and nothing to recycle yields no card; the step
     // is spent either way rather than retried forever.
@@ -103,7 +108,7 @@ export function runDrawSequence(state: GameState, log: Log, at: number): GameSta
       decks: { ...filled.decks, main },
       drawing: remaining,
       // Record the source, not a live obligation against the current piles:
-      // `drawing` owns the remaining steps. Good Vibe-Coding may repeat pile 0.
+      // `drawing` owns the remaining ordinary steps and bonus cards.
       turn:
         owed.player === filled.turn.player
           ? { ...filled.turn, drawnFrom: [...filled.turn.drawnFrom, pileIndex] }
