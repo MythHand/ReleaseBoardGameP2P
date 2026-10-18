@@ -125,7 +125,7 @@ describe('Good Vibe-Coding draws two, one at a time (#72)', () => {
     // does sit between actions, so it is exactly where a player could otherwise
     // spend the interruption on a play.
     // One bonus card and the ordinary draw's second pile are still owed.
-    expect(r.state.drawing).toMatchObject({ player: 'p1', piles: [0, 1] })
+    expect(r.state.drawing).toMatchObject({ player: 'p1', piles: [1], bonus: 1 })
     expect(engine.project(r.state, 'p1').self.playable).toEqual([])
 
     const answered = reduce(r.state, {
@@ -138,5 +138,104 @@ describe('Good Vibe-Coding draws two, one at a time (#72)', () => {
     // Sequence spent, so the hand is live again.
     expect(answered.state.drawing).toBeNull()
     expect(engine.project(answered.state, 'p1').self.playable).toContain(bug.uid)
+  })
+})
+
+describe('Good Vibe-Coding continues across exhausted piles (#246)', () => {
+  function staged(piles: CardInstance[][], mode: Setup['gitBranch'] = 'strategic'): GameState {
+    const base = engine.createGame({ ...config, setup: { ...BASE, gitBranch: mode } })
+    return {
+      ...base,
+      turn: { ...base.turn, player: 'p1', drawnFrom: [] },
+      players: { ...base.players, p1: { ...base.players.p1, hand: [] } },
+      decks: {
+        ...base.decks,
+        main: piles,
+        discard: [],
+        events: [c('ai-good-vibe-coding', 'e0')],
+      },
+    }
+  }
+
+  it.each([
+    ['strategic', 0],
+    ['strategic', 1],
+    ['strategic', 2],
+    ['base', 0],
+    ['base', 1],
+    ['base', 2],
+  ] as const)('keeps both bonus cards in %s with %i cards after the trigger', (mode, left) => {
+    const first = Array.from({ length: left }, (_, i) => c('release-backend', `first${i}`))
+    const second = Array.from({ length: 4 }, (_, i) => c('attack-bug', `second${i}`))
+    const state = staged([[AI, ...first], [], second], mode)
+    const r = reduce(state, { type: 'DRAW', player: 'p1', at: 1000 })
+    const ordinary = mode === 'base' ? 1 : 0
+
+    expect(r.state.players.p1.hand).toEqual([...first, ...second.slice(0, 2 - left + ordinary)])
+    expect(r.state.decks.main).toEqual([second.slice(2 - left + ordinary)])
+    expect(r.state.drawing).toBeNull()
+    expect(r.events.filter((e) => e.type === 'drawn').map((e) => e.pile)).toEqual([
+      0,
+      ...first.map(() => 0),
+      ...Array.from({ length: 2 - left + ordinary }, () => 2),
+    ])
+    expect(reduce(r.state, { type: 'PUSH', player: 'p1', at: 1100 }).state.turn.player).toBe('p2')
+  })
+
+  it('continues when the next pile also runs out', () => {
+    const bug = c('attack-bug', 'b1')
+    const hotfix = c('defense-hotfix', 'h1')
+    const ddos = c('attack-ddos', 'd1')
+    const state = staged([[AI], [bug], [], [hotfix, ddos]])
+    const r = reduce(state, { type: 'DRAW', player: 'p1', at: 1000 })
+
+    expect(r.state.players.p1.hand).toEqual([bug, hotfix])
+    expect(r.state.decks.main).toEqual([[ddos]])
+    expect(r.events.filter((e) => e.type === 'drawn').map((e) => e.pile)).toEqual([0, 1, 3])
+  })
+
+  it('resumes bonus and ordinary draws after a trigger in the next pile', () => {
+    const bug = c('attack-bug', 'b1')
+    const ddos = c('attack-ddos', 'd1')
+    const base = staged([[AI], [c('trigger-error-503', 't1'), bug, ddos]], 'base')
+    const state = {
+      ...base,
+      players: {
+        ...base.players,
+        p1: { ...base.players.p1, hand: [c('protection-debugger', 'd1')] },
+      },
+    }
+    const r = reduce(state, { type: 'DRAW', player: 'p1', at: 1000 })
+    expect(r.state.pending).toMatchObject({ kind: 'neutralize503', player: 'p1' })
+
+    // A saved/reloaded pending must retain both kinds of draw obligation.
+    const answered = reduce(JSON.parse(JSON.stringify(r.state)), {
+      type: 'RESOLVE',
+      player: 'p1',
+      choice: { kind: 'neutralize503', method: 'debugger' },
+      at: 1100,
+    })
+    expect(answered.state.players.p1.hand).toEqual([bug, ddos])
+    expect(answered.state.drawing).toBeNull()
+    expect(answered.events.filter((e) => e.type === 'drawn').map((e) => e.pile)).toEqual([1, 1])
+  })
+
+  it('keeps the outer bonus when a bonus card triggers another Good Vibe-Coding', () => {
+    const cards = ['attack-bug', 'attack-ddos', 'defense-hotfix', 'release-backend'].map((id, i) =>
+      c(id, `nested${i}`),
+    )
+    const base = staged([[AI], [c('trigger-ai', 'nested'), ...cards]])
+    const state = {
+      ...base,
+      decks: {
+        ...base.decks,
+        events: [c('ai-good-vibe-coding', 'e0'), c('ai-good-vibe-coding', 'e1')],
+      },
+    }
+    const r = reduce(state, { type: 'DRAW', player: 'p1', at: 1000 })
+
+    expect(r.state.players.p1.hand).toEqual(cards.slice(0, 3))
+    expect(r.state.decks.main).toEqual([cards.slice(3)])
+    expect(r.state.drawing).toBeNull()
   })
 })
