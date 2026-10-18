@@ -85,6 +85,49 @@ describe('passiveAction', () => {
     expect(passiveAction(engine, after.state, 'p1', 1100)).toMatchObject({ type: 'PUSH' })
   })
 
+  describe('strategic git branch', () => {
+    // Three piles out of the dealt deck, the shape Git Branch leaves behind.
+    const strategic = (eventSeq: number, emptyPile?: number): GameState => {
+      const base = engine.createGame({
+        ...config(),
+        setup: { ...config().setup, gitBranch: 'strategic' },
+      })
+      const deck = base.decks.main.flat()
+      const third = Math.floor(deck.length / 3)
+      const main = [deck.slice(0, third), deck.slice(third, 2 * third), deck.slice(2 * third)]
+      if (emptyPile !== undefined) main[emptyPile] = []
+      return { ...base, eventSeq, decks: { ...base.decks, main } }
+    }
+    const pileOf = (state: GameState) => {
+      const draw = must(passiveAction(engine, state, 'p1', 1000))
+      if (draw.type !== 'DRAW') throw new Error(`expected DRAW, got ${draw.type}`)
+      return draw.pile
+    }
+
+    it('names a random stocked pile, deterministically', () => {
+      const picks = new Set<number | undefined>()
+      for (let seq = 0; seq < 40; seq += 1) {
+        const state = strategic(seq)
+        const pile = pileOf(state)
+        expect(pileOf(state)).toBe(pile)
+        expect([0, 1, 2]).toContain(pile)
+        expect(
+          engine.reduce(state, must(passiveAction(engine, state, 'p1', 1000))).events,
+        ).not.toContainEqual(expect.objectContaining({ type: 'rejected' }))
+        picks.add(pile)
+      }
+      expect(picks.size).toBeGreaterThan(1)
+    })
+
+    it('never names an empty pile', () => {
+      for (let seq = 0; seq < 40; seq += 1) expect(pileOf(strategic(seq, 1))).not.toBe(1)
+    })
+
+    it('names no pile outside Strategic', () => {
+      expect(pileOf(engine.createGame(config()))).toBeUndefined()
+    })
+  })
+
   it('offers nothing to a seat that owes nothing', () => {
     expect(passiveAction(engine, engine.createGame(config()), 'p2', 1000)).toBeNull()
   })

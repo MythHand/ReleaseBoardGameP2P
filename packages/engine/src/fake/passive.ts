@@ -103,9 +103,16 @@ export function passiveAction(
   }
 
   if (!pending && view.turn.player === me) {
-    // No `pile`: under Strategic Git Branch the engine takes pile 0. Which pile
-    // a passive seat should pick is an open rules question (docs/rules/backlog.md).
-    return view.turn.hasDrawn ? { type: 'PUSH', player: me, at } : { type: 'DRAW', player: me, at }
+    if (view.turn.hasDrawn) return { type: 'PUSH', player: me, at }
+    // Strategic Git Branch draws from one pile the player names; the passive
+    // seat names a random stocked one (owner, 19.10.2026). With nothing stocked
+    // the engine's default reaches the refill, so no pile is named.
+    if (state.setup.gitBranch === 'strategic') {
+      const stocked = state.decks.main.flatMap((cards, i) => (cards.length > 0 ? [i] : []))
+      const pile = pick(stocked)
+      if (pile !== undefined) return { type: 'DRAW', player: me, pile, at }
+    }
+    return { type: 'DRAW', player: me, at }
   }
 
   return null
