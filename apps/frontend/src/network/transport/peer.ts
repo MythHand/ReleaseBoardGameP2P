@@ -10,6 +10,7 @@ import {
   TURN_USERNAME,
 } from '~/shared/config'
 import { createEnvelope, nextSeq, parseEnvelope } from '../envelope'
+import { backoffMs } from '../session/reconnect'
 import type { Message, WireMessage } from '../types'
 import { createMediaPort } from './media'
 import type { VoiceMediaPort } from './mediaTypes'
@@ -78,6 +79,11 @@ export function createTransport(args: {
   // errors (peer-unavailable, network, disconnected, browser-incompatible, ICE
   // failures) at any time; without this they would be silently dropped.
   onError?: (err: { type?: string; message: string }) => void
+  // The broker connection dropped ('lost') or came back ('restored'). The
+  // host's peer id is the room code, so while it is lost guests cannot find the
+  // room. The transport re-registers on its own; this only reports it. Reported
+  // once per drop, not once per failed attempt. DataChannels are left alone.
+  onSignaling?: (state: 'lost' | 'restored') => void
 }): Promise<Transport> {
   return new Promise((resolve, reject) => {
     if (args.signal?.aborted) {
@@ -104,9 +110,47 @@ export function createTransport(args: {
     }
     const media = createMediaPort(peer, dataDialPeers)
 
+    // Signaling re-registration. `lost` is true from the first 'disconnected'
+    // until the peer reopens; `timer` is the pending backoff attempt.
+    let lost = false
+    let attempt = 0
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const SignalingErrors = new Set([
+      'network',
+      'disconnected',
+      'server-error',
+      'socket-error',
+      'socket-closed',
+    ])
+    const tryReconnect = () => {
+      timer = undefined
+      if (closed || peer.destroyed) return
+      try {
+        peer.reconnect()
+      } catch {
+        // PeerJS refuses while a connection attempt is already in flight.
+      }
+    }
+    const scheduleReconnect = () => {
+      if (closed || timer !== undefined) return
+      attempt += 1
+      timer = setTimeout(tryReconnect, backoffMs(attempt))
+    }
+    const onOnline = () => {
+      if (!lost || closed) return
+      if (timer !== undefined) clearTimeout(timer)
+      tryReconnect()
+    }
+    const stopReconnecting = () => {
+      if (timer !== undefined) clearTimeout(timer)
+      timer = undefined
+      if (typeof window !== 'undefined') window.removeEventListener('online', onOnline)
+    }
+
     const close = () => {
       if (closed) return
       closed = true
+      stopReconnecting()
       args.signal?.removeEventListener('abort', abort)
       media.close()
       peer.destroy()
@@ -178,6 +222,12 @@ export function createTransport(args: {
       if (closed) return
       const e = err as { type?: string; message: string }
       if (media.handlePeerError(e)) return
+      // While signaling is lost, failed reconnect attempts surface as errors;
+      // they feed the backoff, not onError.
+      if (lost && e.type && SignalingErrors.has(e.type)) {
+        scheduleReconnect()
+        return
+      }
       // Before the peer opens, an error means setup failed — reject the promise.
       // After it opens, surface the error instead of discarding it silently.
       if (opened)
@@ -187,8 +237,27 @@ export function createTransport(args: {
         reject(err)
       }
     })
+    peer.on('disconnected', () => {
+      if (closed || !opened) return
+      if (!lost) {
+        lost = true
+        attempt = 0
+        if (typeof window !== 'undefined') window.addEventListener('online', onOnline)
+        args.onSignaling?.('lost')
+      }
+      scheduleReconnect()
+    })
     peer.on('open', (id) => {
       if (closed) return
+      if (opened) {
+        // Re-registered with the same id; the transport is already resolved.
+        if (!lost) return
+        lost = false
+        attempt = 0
+        stopReconnecting()
+        args.onSignaling?.('restored')
+        return
+      }
       opened = true
       args.onPeerOpen?.(id as string)
       resolve({

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, vi } from 'vitest'
+import { backoffMs } from '../session/reconnect'
 import type { Message, WireMessage } from '../types'
 
 // Minimal in-memory fake of the PeerJS API surface we use.
@@ -72,7 +73,11 @@ class FakePeer {
   off(event: string, cb: (arg: unknown) => void) {
     this.handlers[event] = (this.handlers[event] ?? []).filter((handler) => handler !== cb)
   }
-  destroy() {}
+  destroyed = false
+  reconnect = vi.fn()
+  destroy() {
+    this.destroyed = true
+  }
 }
 
 vi.mock('peerjs', () => ({ default: FakePeer, Peer: FakePeer }))
@@ -478,4 +483,94 @@ it('aborts before signaling opens and ignores a late open event', async () => {
   await rejection
   lastPeer?.emit('open', 'visitor')
   expect(onPeerOpen).not.toHaveBeenCalled()
+})
+
+describe('signaling re-registration', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('emits lost on disconnected and calls reconnect', async () => {
+    const onSignaling = vi.fn()
+    await createTransport({ peerId: 'host-1', onMessage: () => {}, onSignaling })
+    lastPeer?.emit('disconnected')
+    lastPeer?.emit('disconnected')
+    expect(onSignaling).toHaveBeenCalledTimes(1)
+    expect(onSignaling).toHaveBeenCalledWith('lost')
+    await vi.advanceTimersByTimeAsync(backoffMs(1))
+    expect(lastPeer?.reconnect).toHaveBeenCalledTimes(1)
+  })
+
+  it('backs off between failed attempts without re-reporting lost', async () => {
+    const onSignaling = vi.fn()
+    await createTransport({ peerId: 'host-1', onMessage: () => {}, onSignaling })
+    lastPeer?.emit('disconnected')
+    await vi.advanceTimersByTimeAsync(backoffMs(1))
+    lastPeer?.emit('disconnected')
+    await vi.advanceTimersByTimeAsync(backoffMs(2) - 1)
+    expect(lastPeer?.reconnect).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(lastPeer?.reconnect).toHaveBeenCalledTimes(2)
+    expect(onSignaling).toHaveBeenCalledTimes(1)
+  })
+
+  it('emits restored when the peer reopens, without resolving or announcing twice', async () => {
+    const onSignaling = vi.fn()
+    const onPeerOpen = vi.fn()
+    await createTransport({ peerId: 'host-1', onMessage: () => {}, onSignaling, onPeerOpen })
+    lastPeer?.emit('disconnected')
+    lastPeer?.emit('open', 'host-1')
+    expect(onSignaling.mock.calls).toEqual([['lost'], ['restored']])
+    expect(onPeerOpen).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(lastPeer?.reconnect).not.toHaveBeenCalled()
+    lastPeer?.emit('disconnected')
+    expect(onSignaling.mock.calls).toEqual([['lost'], ['restored'], ['lost']])
+  })
+
+  it('retries reconnect on the online event', async () => {
+    await createTransport({ peerId: 'host-1', onMessage: () => {}, onSignaling: vi.fn() })
+    lastPeer?.emit('disconnected')
+    window.dispatchEvent(new Event('online'))
+    expect(lastPeer?.reconnect).toHaveBeenCalledTimes(1)
+  })
+
+  it('reconnects even without an onSignaling callback', async () => {
+    await createTransport({ peerId: 'host-1', onMessage: () => {} })
+    lastPeer?.emit('disconnected')
+    await vi.advanceTimersByTimeAsync(backoffMs(1))
+    expect(lastPeer?.reconnect).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not report network errors through onError while lost', async () => {
+    const onError = vi.fn()
+    await createTransport({
+      peerId: 'host-1',
+      onMessage: () => {},
+      onSignaling: vi.fn(),
+      onError,
+    })
+    lastPeer?.emit('disconnected')
+    for (const type of ['network', 'disconnected', 'server-error', 'socket-error', 'socket-closed'])
+      lastPeer?.emit('error', { type, message: type })
+    expect(onError).not.toHaveBeenCalled()
+    lastPeer?.emit('error', { type: 'peer-unavailable', message: 'gone' })
+    expect(onError).toHaveBeenCalledTimes(1)
+  })
+
+  it('close() stops reconnecting', async () => {
+    const t = await createTransport({
+      peerId: 'host-1',
+      onMessage: () => {},
+      onSignaling: vi.fn(),
+    })
+    lastPeer?.emit('disconnected')
+    t.close()
+    await vi.advanceTimersByTimeAsync(60_000)
+    window.dispatchEvent(new Event('online'))
+    expect(lastPeer?.reconnect).not.toHaveBeenCalled()
+  })
 })
