@@ -3,16 +3,19 @@ import {
   BONUS,
   BUG,
   BUG_X,
+  FLASH_S,
   type Game,
   MONITOR_Y,
   maxScoreWithin,
   newGame,
   press,
   STARTER_BONUS,
+  SUDO_Y,
   scoreOf,
   serverAt,
   serverBonus,
   step,
+  WRECK_S,
 } from './game'
 import {
   BUG_RUN_A,
@@ -22,16 +25,18 @@ import {
   MONITOR,
   SERVER_BITES,
   type Sprite,
+  SUDO,
 } from './sprites'
 
 // no obstacle of its own unless a test places one
 const never = () => 0.99
-// the opening server is left out unless a test asks for it
+// the opening server and the sudo cards are left out unless a test asks for them
 const running = (over: Partial<Game> = {}): Game => ({
   ...newGame(200),
   phase: 'running',
   gap: 1e9,
   starter: false,
+  sudoAt: Number.POSITIVE_INFINITY,
   ...over,
 })
 // run `seconds` of play in frames, the way the loop does
@@ -48,6 +53,7 @@ describe('the sprites', () => {
     ['bug sit', BUG_SIT],
     ['hotfix', HOTFIX],
     ['monitor', MONITOR],
+    ['sudo', SUDO],
     ...SERVER_BITES.map((s, i): [string, Sprite] => [`server after ${i} bites`, s]),
   ] as [string, Sprite][])('%s is a rectangle', (_, sprite) => {
     expect(new Set(sprite.map((row) => row.length)).size).toBe(1)
@@ -189,6 +195,74 @@ describe('the servers', () => {
     const met = play(press(running({ served: 1, obstacles: [server] }), 0), 0.3)
     expect(met.phase).toBe('running')
     expect(met.meal).not.toBeNull()
+  })
+})
+
+describe('the sudo card', () => {
+  const ahead = { kind: 'hotfix' as const, x: BUG_X + 23, y: 0 }
+  const card = { kind: 'sudo' as const, x: BUG_X + 10, y: SUDO_Y }
+  // past the first server mark, so the slot is the card's to take
+  const due = (over: Partial<Game>) => running({ gap: 0, served: 1, ...over })
+
+  it('comes first at a score each run draws between 600 and 700', () => {
+    const low = () => 0
+    expect(step(due({ sudoAt: null, distance: 5990 }), 1 / 60, low, 0).obstacles[0]?.kind).toBe(
+      'hotfix',
+    )
+    expect(step(due({ sudoAt: null, distance: 6000 }), 1 / 60, low, 0).obstacles[0]?.kind).toBe(
+      'sudo',
+    )
+    expect(step(due({ sudoAt: null, distance: 6980 }), 1 / 60, never, 0).obstacles[0]?.kind).toBe(
+      'hotfix',
+    )
+    expect(step(due({ sudoAt: null, distance: 6990 }), 1 / 60, never, 0).obstacles[0]?.kind).toBe(
+      'sudo',
+    )
+  })
+
+  it('comes one at a time: the next slot after it is an obstacle again', () => {
+    const spawned = step(due({ sudoAt: 600, distance: 7000 }), 1 / 60, never, 0)
+    // between the lanes: above a hotfix, below a monitor
+    expect(spawned.obstacles[0]).toMatchObject({ kind: 'sudo', y: SUDO_Y })
+    expect(spawned.sudoAt).toBe(Number.POSITIVE_INFINITY)
+    expect(step({ ...spawned, gap: 0 }, 1 / 60, never, 0).obstacles[1]?.kind).toBe('hotfix')
+  })
+
+  it('is taken on the run, in the air too, and the bug blinks into its protection', () => {
+    const before = running({ obstacles: [card] })
+    const taken = play(before, 0.2)
+    expect(taken.shielded).toBe(true)
+    expect(taken.obstacles).toHaveLength(0)
+    // no meal: the world never stood still for it
+    expect(taken.meal).toBeNull()
+    expect(taken.distance).toBeGreaterThan(before.distance + 64 * 0.15)
+    expect(taken.flash).not.toBeNull()
+    expect(play(taken, FLASH_S).flash).toBeNull()
+    expect(play(press(running({ obstacles: [card] }), 0), 0.2).shielded).toBe(true)
+  })
+
+  it('takes a hit for the bug: the obstacle breaks for nothing, the next card 1200 points on', () => {
+    let g = running({ shielded: true, obstacles: [ahead] })
+    while (g.shielded) g = step(g, 1 / 60, never, 0)
+    expect(g.phase).toBe('running')
+    expect(g.obstacles).toHaveLength(0)
+    expect(g.bonus).toBe(0)
+    expect(g.wreck).toMatchObject({ kind: 'hotfix', age: 0 })
+    expect(g.flash).toBe(0)
+    expect(g.sudoAt).toBe(scoreOf(g) + 1200)
+    // the pieces fly, then are gone
+    expect(play(g, WRECK_S).wreck).toBeNull()
+    // a monitor jumped into is taken the same way
+    const above = { kind: 'monitor' as const, x: BUG_X + 23, y: MONITOR_Y }
+    const jumped = play(press(running({ shielded: true, obstacles: [above] }), 0), 0.6)
+    expect(jumped.phase).toBe('running')
+    expect(jumped.shielded).toBe(false)
+  })
+
+  it('takes one hit only: the next one ends the run', () => {
+    const spent = play(running({ shielded: true, obstacles: [ahead] }), 0.6)
+    expect(spent.shielded).toBe(false)
+    expect(play({ ...spent, obstacles: [ahead] }, 0.6).phase).toBe('over')
   })
 })
 

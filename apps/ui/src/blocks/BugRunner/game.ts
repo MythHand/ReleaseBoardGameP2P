@@ -1,12 +1,13 @@
-import { BUG_RUN_A, HOTFIX, MONITOR, SERVER, SERVER_BITES, sizeOf } from './sprites'
+import { BUG_RUN_A, HOTFIX, MONITOR, SERVER, SERVER_BITES, SUDO, sizeOf } from './sprites'
 
 // The runner's rules, apart from any drawing: the browser's dinosaur game with
 // the Bug as its hero. Everything is measured in world units — one pixel of the
 // pixel art — and seconds; heights are above the ground, x from the left edge.
 
 export type Phase = 'idle' | 'running' | 'over'
-// a server is not an obstacle to beat but food: the bug runs into it and eats it
-export type Kind = 'hotfix' | 'monitor' | 'server'
+// a server is not an obstacle to beat but food: the bug runs into it and eats it;
+// a sudo card is taken on the run, for one hit the bug lives through
+export type Kind = 'hotfix' | 'monitor' | 'server' | 'sudo'
 
 export interface Obstacle {
   kind: Kind
@@ -22,6 +23,16 @@ export interface Obstacle {
 export interface Paid {
   kind: Kind
   points: number
+}
+
+// an obstacle the protection broke: its pieces fly apart where it stood, and go
+// with the world as it runs
+export interface Wreck {
+  kind: Kind
+  x: number
+  y: number
+  // seconds since it broke
+  age: number
 }
 
 export interface Game {
@@ -52,6 +63,14 @@ export interface Game {
   starter: boolean
   served: number
   meal: number | null
+  // the score the next sudo card comes at — drawn on the run's first frame,
+  // and none while a card is on the road or its protection is held; whether
+  // the bug holds one; how many seconds into the blink of taking or spending
+  // it; and the obstacle it last broke, while its pieces fly
+  sudoAt: number | null
+  shielded: boolean
+  flash: number | null
+  wreck: Wreck | null
   best: number
   // when the last run ended (ms, the caller's clock) — a click right on the
   // crash must not start the next run by accident
@@ -73,6 +92,7 @@ const SIZE: Record<Kind, { w: number; h: number }> = {
   hotfix: sizeOf(HOTFIX),
   monitor: sizeOf(MONITOR),
   server: sizeOf(SERVER),
+  sudo: sizeOf(SUDO),
 }
 
 // A jump peaks at about 15 units, over a hotfix with room to spare, and lasts
@@ -84,6 +104,9 @@ const JUMP = 96
 // the monitors fly in a lane a standing bug passes under and a jumping one
 // runs into — the dinosaur's high bird: the answer to it is not to jump
 export const MONITOR_Y = 12
+// a sudo card flies between the two lanes, its middle where the hotfix's top
+// and the monitor's bottom meet — taken at any height all the same
+export const SUDO_Y = 7
 const SPEED_START = 64
 const SPEED_MAX = 150
 const SPEED_GAIN = 2.5
@@ -117,6 +140,17 @@ export const STARTER_BONUS = 10
 const BITE = 0.23
 const BITES = SERVER_BITES.length
 const SPEED_LOSS = 0.3
+// The first sudo card comes at a score each run draws between 600 and 700; the
+// next, 1200 points after its protection is spent. One at a time: none comes
+// while a card is on the road or the bug holds one.
+const SUDO_FIRST = 600
+const SUDO_SPREAD = 100
+const SUDO_AGAIN = 1200
+// taking or spending the protection blinks the bug between its two colours for
+// this long, a colour per BLINK; a broken obstacle's pieces fly for WRECK_S
+export const FLASH_S = 0.6
+export const BLINK = 0.1
+export const WRECK_S = 0.4
 
 export const scoreOf = (g: Game) => Math.floor(g.distance / 10) + g.bonus
 
@@ -137,6 +171,10 @@ export function newGame(width: number, best = 0): Game {
     starter: true,
     served: 0,
     meal: null,
+    sudoAt: null,
+    shielded: false,
+    flash: null,
+    wreck: null,
     best,
     overAt: 0,
   }
@@ -188,12 +226,15 @@ export function maxScoreWithin(seconds: number): number {
   }
 }
 
-// A server is met, not dodged: the bug's front reaching it is enough, at any
-// height — a bug in the air eats it too, and lands while it does.
-const reaches = (o: Obstacle) => o.kind === 'server' && o.x + 1 < BUG_X + BUG.w - 1
+// A server and a sudo card are met, not dodged: the bug's front reaching one is
+// enough, at any height — a bug in the air eats a server too, and lands while
+// it does, and takes a card it runs over.
+const meets = (o: Obstacle) => o.x + 1 < BUG_X + BUG.w - 1
+const reaches = (o: Obstacle) => o.kind === 'server' && meets(o)
+const takes = (o: Obstacle) => o.kind === 'sudo' && meets(o)
 
 function hits(y: number, o: Obstacle): boolean {
-  if (o.kind === 'server') return false
+  if (o.kind === 'server' || o.kind === 'sudo') return false
   const s = SIZE[o.kind]
   // a pixel of slack on every side: the art's edges are glow, not body
   return (
@@ -254,21 +295,30 @@ export function step(g: Game, dt: number, rng: () => number, now: number): Game 
     vy = 0
   }
 
-  if (g.meal !== null) return eat({ ...g, t, y, vy }, g.meal + d, rng)
+  // the blink and a wreck's pieces keep their own time, through a meal too
+  const aged = g.flash === null ? null : g.flash + d
+  let flash = aged !== null && aged < FLASH_S ? aged : null
+  const wreckAge = (shift: number): Wreck | null =>
+    g.wreck && g.wreck.age + d < WRECK_S
+      ? { ...g.wreck, x: g.wreck.x - shift, age: g.wreck.age + d }
+      : null
+  if (g.meal !== null) return eat({ ...g, t, y, vy, flash, wreck: wreckAge(0) }, g.meal + d, rng)
   const pace = Math.min(SPEED_MAX, g.pace + SPEED_GAIN * d)
   // off a meal the bug is below the pace, and catches up with it; otherwise the
   // two are one
   const speed = Math.min(pace, g.speed + CATCH_UP * d)
+  const wreck = wreckAge(speed * d)
+  let sudoAt = g.sudoAt ?? SUDO_FIRST + Math.floor(rng() * SUDO_SPREAD)
 
   // what has run out past the left edge is gone — it left through the fade
-  const obstacles = g.obstacles
+  let obstacles = g.obstacles
     .map((o) => ({ ...o, x: o.x - speed * d }))
     .filter((o) => o.x + SIZE[o.kind].w > 0)
   // paid once, on the frame its back edge runs past the bug's
   let bonus = g.bonus
   let paid = g.paid
   for (const o of g.obstacles) {
-    if (o.kind === 'server') continue
+    if (o.kind === 'server' || o.kind === 'sudo') continue
     const back = o.x + SIZE[o.kind].w
     if (back > BUG_X && back - speed * d <= BUG_X) {
       bonus += BONUS[o.kind]
@@ -289,11 +339,26 @@ export function step(g: Game, dt: number, rng: () => number, now: number): Game 
     obstacles.push({ kind: 'server', x: g.width, y: 0, bites: 0 })
     served += 1
     gap = Number.POSITIVE_INFINITY
+  } else if (gap <= 0 && scoreOf(g) >= sudoAt) {
+    // a sudo card takes the next obstacle's place; the road behind it fills as
+    // usual, and no other card comes until this one's protection is spent
+    obstacles.push({ kind: 'sudo', x: g.width, y: SUDO_Y })
+    sudoAt = Number.POSITIVE_INFINITY
+    gap = nextGap(speed, rng)
   } else if (gap <= 0) {
     const kind: Kind = t >= MONITOR_FROM && rng() < MONITOR_SHARE ? 'monitor' : 'hotfix'
     // in at the right edge, out of the fade
     obstacles.push({ kind, x: g.width, y: kind === 'monitor' ? MONITOR_Y : 0 })
     gap = nextGap(speed, rng)
+  }
+
+  // a card run over is taken on the run: the bug blinks into its protection
+  let shielded = g.shielded
+  const card = obstacles.find(takes)
+  if (card) {
+    obstacles = obstacles.filter((o) => o !== card)
+    shielded = true
+    flash = 0
   }
 
   const next: Game = {
@@ -310,9 +375,26 @@ export function step(g: Game, dt: number, rng: () => number, now: number): Game 
     paid,
     starter,
     served,
+    sudoAt,
+    shielded,
+    flash,
+    wreck,
   }
-  if (obstacles.some((o) => hits(y, o))) {
+  const hit = obstacles.find((o) => hits(y, o))
+  if (hit && !shielded) {
     return { ...next, phase: 'over', best: Math.max(g.best, scoreOf(next)), overAt: now }
+  }
+  if (hit) {
+    // the protection takes the hit: the obstacle breaks and pays nothing, the
+    // bug blinks back to itself, and the next card is set 1200 points on
+    return {
+      ...next,
+      obstacles: obstacles.filter((o) => o !== hit),
+      shielded: false,
+      flash: 0,
+      wreck: { kind: hit.kind, x: hit.x, y: hit.y, age: 0 },
+      sudoAt: scoreOf(next) + SUDO_AGAIN,
+    }
   }
   return obstacles.some(reaches) ? { ...next, meal: 0 } : next
 }

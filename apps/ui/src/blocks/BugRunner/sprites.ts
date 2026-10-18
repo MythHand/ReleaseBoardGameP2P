@@ -51,6 +51,18 @@ export const MONITOR: Sprite = [
   '...aaaaaa...',
 ]
 
+// Sudo — the card's access card: the chip at its corner, the stripe across it.
+export const SUDO: Sprite = [
+  'aaaaaaaaaaaa',
+  'adddddddddda',
+  'adaaddddddda',
+  'adaaddddddda',
+  'adddddddddda',
+  'aaaaaaaaaaaa',
+  'adddddddddda',
+  'aaaaaaaaaaaa',
+]
+
 // Server — a system unit on its feet: two drive bays, a light, a vent. The bug
 // eats it from the left, the side it runs in from; every bite keeps a neon edge.
 export const SERVER: Sprite = [
