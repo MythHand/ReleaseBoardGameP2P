@@ -488,6 +488,13 @@ export interface UseLobby {
   // for that a restoring host sits in front of a blank table with nothing on
   // screen explaining why. The guest's half is `reconnect` (a later task).
   restoring: boolean
+  // True while this browser is the host and its peer is off the signaling
+  // broker (transport `onSignaling`). The room code is the host's peer id, so
+  // for that span nobody can find the room — and the guests' channels usually
+  // drop with the host's network. The keeper is suspended meanwhile, so no
+  // clock runs and no absent seat is played over an outage that is the host's;
+  // the board shows the reconnect overlay. False for a guest, always.
+  hostOffline: boolean
   // The guest's half of the reconnect overlay — see ReconnectState. Idle
   // whenever there is nothing to reconnect: no stored guest session, a host
   // restore that already succeeded, or a run that finished either way.
@@ -587,6 +594,9 @@ export function useLobby(): UseLobby {
   // bails out (no stored session, spent retries) would leave the board
   // believing a reconnect is still in flight forever.
   const [restoring, setRestoring] = useState(false)
+  const [hostOffline, setHostOffline] = useState(false)
+  // Read by the keeper attach sites and by onError, which are closures.
+  const hostOfflineRef = useRef(false)
   const [isHost, setIsHost] = useState(false)
   const [roomCode, setRoomCode] = useState<string | null>(null)
   // The pick somebody's surface is currently offering to confirm — see
@@ -736,7 +746,24 @@ export function useLobby(): UseLobby {
     // with no error shown and no recovery.
     setError(err.type ? `${err.type}: ${err.message}` : err.message)
     setErrorKind(classify(err.type))
-    setStatus((s) => (err.type !== 'connection' || s === 'connecting' ? 'error' : s))
+    // A host off the broker is still keeping its match: the transport
+    // re-registers on its own, and an error from that span ending the session
+    // would end the game for the whole table over a network blink.
+    setStatus((s) =>
+      hostOfflineRef.current ? s : err.type !== 'connection' || s === 'connecting' ? 'error' : s,
+    )
+  }, [])
+
+  // The host's transports only (fresh room and restore). A keeper attached
+  // later — a restore adopting its snapshot, a match started meanwhile — reads
+  // `hostOfflineRef` and starts suspended, so the order does not matter.
+  const onSignaling = useCallback((signaling: 'lost' | 'restored') => {
+    const offline = signaling === 'lost'
+    if (hostOfflineRef.current === offline) return
+    hostOfflineRef.current = offline
+    setHostOffline(offline)
+    if (offline) keeperRef.current?.suspend()
+    else keeperRef.current?.resume()
   }, [])
 
   // A rejected createTransport (setup failed before the peer opened) bypasses
@@ -904,6 +931,8 @@ export function useLobby(): UseLobby {
       setState(null)
       setStatus('idle')
       setRestoring(false)
+      hostOfflineRef.current = false
+      setHostOffline(false)
       setRoomCode(null)
       setError(null)
       setErrorKind(null)
@@ -1532,6 +1561,9 @@ export function useLobby(): UseLobby {
           onDisconnect: (peerId) => {
             if (ownsTransport()) onDisconnect(peerId)
           },
+          onSignaling: (signaling) => {
+            if (ownsTransport()) onSignaling(signaling)
+          },
         })
         owner = t
         if (cancelled()) {
@@ -1599,7 +1631,16 @@ export function useLobby(): UseLobby {
         throw err
       }
     },
-    [chatSession, onMessage, onError, onDisconnect, commit, surfaceSetupError, teardownSession],
+    [
+      chatSession,
+      onMessage,
+      onError,
+      onDisconnect,
+      onSignaling,
+      commit,
+      surfaceSetupError,
+      teardownSession,
+    ],
   )
 
   const dialRoom = useCallback(
@@ -1851,6 +1892,9 @@ export function useLobby(): UseLobby {
             onDisconnect: (peerId) => {
               if (ownsTransport()) onDisconnect(peerId)
             },
+            onSignaling: (signaling) => {
+              if (ownsTransport()) onSignaling(signaling)
+            },
           })
           owner = t
           break
@@ -1966,6 +2010,7 @@ export function useLobby(): UseLobby {
         now: () => Date.now(),
         onCommit: persistKeeper,
       })
+      if (hostOfflineRef.current) keeper.suspend()
       keeperRef.current = keeper
       setGameSync(null)
       keeper.link.subscribe(captureGameSync)
@@ -2022,6 +2067,7 @@ export function useLobby(): UseLobby {
     onMessage,
     onError,
     onDisconnect,
+    onSignaling,
     commit,
     applySeats,
     persistKeeper,
@@ -2582,6 +2628,7 @@ export function useLobby(): UseLobby {
         gate,
         onCommit: persistKeeper,
       })
+      if (hostOfflineRef.current) keeper.suspend()
       keeperRef.current = keeper
       setGameSync(null)
       keeper.link.subscribe(captureGameSync)
@@ -2766,6 +2813,7 @@ export function useLobby(): UseLobby {
       state,
       status,
       restoring,
+      hostOffline,
       reconnect: {
         attempt: reconnectAttempt,
         maxAttempts: MAX_RECONNECT_ATTEMPTS,
@@ -2819,6 +2867,7 @@ export function useLobby(): UseLobby {
       state,
       status,
       restoring,
+      hostOffline,
       reconnectAttempt,
       reconnectStatus,
       reconnectEvents,

@@ -34,6 +34,7 @@ function session(overrides: Partial<UseLobby> = {}): UseLobby {
       send: vi.fn(() => true),
     },
     restoring: false,
+    hostOffline: false,
     reconnect: {
       attempt: 0,
       maxAttempts: MAX_RECONNECT_ATTEMPTS,
@@ -156,6 +157,22 @@ it('shows the reconnect overlay while the host is restoring the match', async ()
   sessionValue = session({ restoring: true })
   renderBoardWith()
   expect(await screen.findByTestId('board-page')).toBeTruthy()
+  expect(await screen.findByText(/^(reconnecting…|переподключение…)$/i)).toBeTruthy()
+})
+
+it('shows the reconnect overlay while the host is off the signaling broker', async () => {
+  // Mid-match, with a live table: the keeper is frozen until the broker is
+  // back, so the board must say so rather than show a table that is not running.
+  sessionValue = session({
+    hostOffline: true,
+    seats: [
+      { playerId: 'p1', peerId: 'me', name: 'Ann' },
+      { playerId: 'p2', peerId: 'bo', name: 'Bo' },
+    ],
+    gameSync: { view: realView('p1'), events: [] },
+  } as Partial<UseLobby>)
+  renderBoardWith()
+  expect(await screen.findByText('Bo')).toBeTruthy()
   expect(await screen.findByText(/^(reconnecting…|переподключение…)$/i)).toBeTruthy()
 })
 

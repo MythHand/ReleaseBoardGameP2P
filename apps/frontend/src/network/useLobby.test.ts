@@ -55,6 +55,7 @@ interface FakeTransport {
   onConnection?: (peerId: string) => void
   onDisconnect?: (peerId: string) => void
   onMessage?: (msg: WireMessage) => void
+  onSignaling?: (state: 'lost' | 'restored') => void
 }
 
 // vi.mock is hoisted above the imports, so the array it closes over has to be
@@ -79,6 +80,7 @@ vi.mock('./transport/peer', () => ({
       onConnection?: (peerId: string) => void
       onDisconnect?: (peerId: string) => void
       onMessage?: (msg: WireMessage) => void
+      onSignaling?: (state: 'lost' | 'restored') => void
     }) => {
       const authenticated = new Set<string>()
       const fake = {
@@ -110,6 +112,7 @@ vi.mock('./transport/peer', () => ({
         onConnection: args.onConnection,
         onDisconnect: args.onDisconnect,
         onMessage: args.onMessage,
+        onSignaling: args.onSignaling,
       }
       transports.push(fake)
       return fake
@@ -2320,6 +2323,42 @@ async function hostWithOpenGame(): Promise<ReturnType<typeof renderHook>> {
   })
   return rendered
 }
+
+it('host status stays in-game across a signaling drop', async () => {
+  vi.useFakeTimers()
+  try {
+    const hosted = await hostWithOpenGame()
+    const gameId = hosted.result.current.gameId
+    expect(gameId).not.toBeNull()
+    expect(transports[0].onSignaling).toBeDefined()
+    act(() => {
+      transports[0].onSignaling?.('lost')
+    })
+    expect(hosted.result.current.hostOffline).toBe(true)
+    act(() => {
+      // A signaling-type error that still slips through while the host is off
+      // the broker must not end the match the host is keeping.
+      transports[0].onError?.({ type: 'network', message: 'Lost connection to server.' })
+      vi.advanceTimersByTime(60_000)
+    })
+    expect(hosted.result.current.status).toBe('in-lobby')
+    expect(hosted.result.current.gameId).toBe(gameId)
+    act(() => {
+      transports[0].onSignaling?.('restored')
+    })
+    expect(hosted.result.current.hostOffline).toBe(false)
+    expect(hosted.result.current.status).toBe('in-lobby')
+    expect(hosted.result.current.gameId).toBe(gameId)
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+it('a guest transport is not given a signaling handler', async () => {
+  const { result } = renderHook(() => useLobby())
+  await act(async () => result.current.joinRoom('F96-NMT', 'Bo'))
+  expect(transports[0]?.onSignaling).toBeUndefined()
+})
 
 function forgeFromStalePeerId(): void {
   act(() => {

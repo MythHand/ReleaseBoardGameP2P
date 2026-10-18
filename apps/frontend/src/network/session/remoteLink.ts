@@ -23,6 +23,7 @@ import {
   watch,
 } from './referee'
 import type { StartGate } from './startGate'
+import { resumeSession } from './suspend'
 
 // The peer side of the link, plus the two seams a lobby-level caller drives:
 // frames arriving off the transport, and the keeper this link talks to.
@@ -197,6 +198,13 @@ export interface KeeperHandle {
   // PlayerId, so the keeper's own seat reports through exactly the rule a
   // remote seat's INTRO_READY takes: the seat is resolved from the connection.
   introReady(peerId: string): void
+  // The host is off the signaling broker. Until `resume` the ticker does not
+  // advance the session and intents from every link — the keeper's own seat
+  // included — are dropped, so nobody is played or timed out over an outage
+  // that is the host's. `resume` shifts every live deadline by the pause
+  // (`resumeSession`) and resyncs the table. Both are idempotent.
+  suspend(): void
+  resume(): void
   close(): void
 }
 
@@ -232,6 +240,12 @@ export function attachKeeper(args: {
   // re-pointed yet would have their intents applied to a state the successor
   // never sees, and the two SYNC streams would contradict each other.
   let keeping = true
+  // Keeper time at the moment the keeper froze; null while it is running.
+  let pausedAt: number | null = null
+  // The keeper's game time: held at the pause while suspended, so anything
+  // stamped then (an absence, a presented clock) lands where the pause began
+  // and `resumeSession` moves it with every other clock.
+  const stamp = () => pausedAt ?? clock.now()
 
   const deliver = (untimed: Outgoing) => {
     const outgoing: Outgoing =
@@ -278,6 +292,9 @@ export function attachKeeper(args: {
   const early: { peerId: string; intent: unknown }[] = []
 
   const applyNow = (peerId: string, intent: unknown) => {
+    // Dropped, not buffered: a peer whose intent is lost here sees no answer
+    // and acts again on the projection the resume resyncs.
+    if (pausedAt !== null) return
     save(applyIntent(args.ref.current, peerId, intent, clock.now()))
   }
 
@@ -285,7 +302,7 @@ export function attachKeeper(args: {
   // an action cannot carry a timestamp from before the table was live.
   const flush = () => {
     if (!args.ref.current.presentation) {
-      args.ref.current = enablePresentation(args.ref.current, clock.now())
+      args.ref.current = enablePresentation(args.ref.current, stamp())
       save({ session: args.ref.current, outgoing: syncAll(args.ref.current, []) })
     }
     const queued = early.splice(0, early.length)
@@ -309,7 +326,7 @@ export function attachKeeper(args: {
   ticker.start(() => {
     // The whole reason the gate exists: `driveUnattended` playing an absent seat
     // mid-animation is the move nobody at the table could see coming.
-    if (gated()) return
+    if (gated() || pausedAt !== null) return
     const now = clock.now()
     save(advanceSession(args.ref.current, now))
   })
@@ -326,8 +343,7 @@ export function attachKeeper(args: {
     link: {
       clock,
       presentationReady(id) {
-        if (keeping)
-          save(acknowledgePresentation(args.ref.current, args.transport.id, id, clock.now()))
+        if (keeping) save(acknowledgePresentation(args.ref.current, args.transport.id, id, stamp()))
       },
       submit(intent) {
         if (!keeping) return
@@ -360,7 +376,7 @@ export function attachKeeper(args: {
               args.ref.current,
               frame.from,
               frame.payload.presentation,
-              clock.now(),
+              stamp(),
             ),
           )
         return
@@ -411,11 +427,11 @@ export function attachKeeper(args: {
     },
     peerLeft(peerId) {
       if (!keeping) return
-      save(disconnect(args.ref.current, peerId, clock.now()))
+      save(disconnect(args.ref.current, peerId, stamp()))
     },
     peerReturned(playerId, peerId) {
       if (!keeping) return
-      save(rebind(args.ref.current, playerId, peerId, clock.now()))
+      save(rebind(args.ref.current, playerId, peerId, stamp()))
     },
     handover(toPlayerId) {
       if (!keeping) return
@@ -435,6 +451,20 @@ export function attachKeeper(args: {
     introReady(peerId) {
       if (!keeping) return
       reportReady(peerId)
+    },
+    suspend() {
+      if (!keeping || pausedAt !== null) return
+      pausedAt = clock.now()
+    },
+    resume() {
+      if (pausedAt === null) return
+      const from = pausedAt
+      pausedAt = null
+      if (!keeping) return
+      args.ref.current = resumeSession(args.ref.current, from, clock.now())
+      // Every seat's countdown is absolute keeper time, so the shifted
+      // deadlines have to reach the boards, not just the referee.
+      save({ session: args.ref.current, outgoing: syncAll(args.ref.current, []) })
     },
     close() {
       keeping = false
