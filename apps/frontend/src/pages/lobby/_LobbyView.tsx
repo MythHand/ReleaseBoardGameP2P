@@ -260,9 +260,10 @@ export default function LobbyView() {
           <Typography variant="sectionTitle" className={styles.h}>
             {t('lobbyScreen.modes')}
             {!isHost && (
-              <Typography base="mono-xs" tk="tk-10" as="span" className={styles.lockTag}>
+              // a grey tag in a frame, as the player rows' role tags are
+              <Badge tone="muted" size="sm" outlined className={styles.lockTag}>
                 {t('lobbyScreen.modesLockedHint')}
-              </Typography>
+              </Badge>
             )}
             <Button variant="tech" className={styles.rulesBtn} value="rules" onClick={openModal}>
               {t('lobbyScreen.rules')}

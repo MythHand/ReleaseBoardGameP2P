@@ -122,9 +122,10 @@
   color: var(--white-45);
 }
 
+/* the "set by host" tag — a Badge, framed: on the heading's middle, as the
+   rules button beside it is, not on its baseline */
 .lockTag {
-  color: var(--white-40);
-  text-transform: none; /* reset the uppercase heading it sits inside */
+  align-self: center;
 }
 
 /* rules — a secondary action in the heading row, pushed to the right edge */
