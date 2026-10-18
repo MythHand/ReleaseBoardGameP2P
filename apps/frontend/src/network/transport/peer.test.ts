@@ -366,8 +366,8 @@ it('uses its single Peer for media and scopes media-only errors away from the ga
   expect(FakePeer.created - before).toBe(1)
   lastPeer?.emit('error', { type: 'webrtc', message: 'negotiation failed' })
   expect(errors).toHaveBeenCalledWith({ type: 'connection', message: 'negotiation failed' })
-  lastPeer?.emit('error', { type: 'network', message: 'socket lost' })
-  expect(errors).toHaveBeenCalledWith({ type: 'network', message: 'socket lost' })
+  lastPeer?.emit('error', { type: 'browser-incompatible', message: 'no webrtc' })
+  expect(errors).toHaveBeenCalledWith({ type: 'browser-incompatible', message: 'no webrtc' })
 })
 it('preserves peer-unavailable for a pending game data dial', async () => {
   const errors = vi.fn()
@@ -559,6 +559,34 @@ describe('signaling re-registration', () => {
     expect(onError).not.toHaveBeenCalled()
     lastPeer?.emit('error', { type: 'peer-unavailable', message: 'gone' })
     expect(onError).toHaveBeenCalledTimes(1)
+  })
+
+  it('treats an error before disconnected (real PeerJS order) as one drop', async () => {
+    const onError = vi.fn()
+    const onSignaling = vi.fn()
+    await createTransport({ peerId: 'host-1', onMessage: () => {}, onSignaling, onError })
+    lastPeer?.emit('error', { type: 'network', message: 'lost' })
+    lastPeer?.emit('disconnected')
+    expect(onError).not.toHaveBeenCalled()
+    expect(onSignaling.mock.calls).toEqual([['lost']])
+    await vi.advanceTimersByTimeAsync(backoffMs(1))
+    expect(lastPeer?.reconnect).toHaveBeenCalledTimes(1)
+  })
+
+  it('holds a dial made during a drop until signaling is restored', async () => {
+    const t = await createTransport({
+      peerId: 'host-1',
+      onMessage: () => {},
+      onSignaling: vi.fn(),
+    })
+    const connect = vi.spyOn(lastPeer as FakePeer, 'connect')
+    lastPeer?.emit('disconnected')
+    t.connectTo('host')
+    t.connectTo('host')
+    expect(connect).not.toHaveBeenCalled()
+    lastPeer?.emit('open', 'host-1')
+    expect(connect).toHaveBeenCalledTimes(1)
+    expect(connect).toHaveBeenCalledWith('host', { reliable: true })
   })
 
   it('close() stops reconnecting', async () => {
