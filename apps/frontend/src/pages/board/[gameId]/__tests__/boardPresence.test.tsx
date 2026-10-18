@@ -34,6 +34,7 @@ function session(overrides: Partial<UseLobby> = {}): UseLobby {
       send: vi.fn(() => true),
     },
     restoring: false,
+    bootstrapping: false,
     reconnect: {
       attempt: 0,
       maxAttempts: MAX_RECONNECT_ATTEMPTS,
