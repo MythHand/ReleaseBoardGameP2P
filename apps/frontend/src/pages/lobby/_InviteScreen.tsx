@@ -164,17 +164,22 @@ export default function InviteScreen() {
               {t('invite.roleTitle')}
             </Typography>
             <div className={styles.roleOptions}>
-              <button
-                type="button"
-                disabled={busy || availability?.player === false}
-                aria-pressed={effectiveRole === 'player'}
-                onClick={() => setRole('player')}
-                className={`${styles.roleOpt} ${!noSlots && effectiveRole === 'player' ? styles.roleOptOn : ''}`}
-              >
-                <Typography base="label-md" tk="tk-12">
-                  {t('invite.rolePlayer')}
-                </Typography>
-              </button>
+              {/* With no player place to take (a running match, or a full
+                  table) there is no choice to make: the join is a spectator's,
+                  and the note below says why. */}
+              {!spectatorOnly && (
+                <button
+                  type="button"
+                  disabled={busy || availability?.player === false}
+                  aria-pressed={effectiveRole === 'player'}
+                  onClick={() => setRole('player')}
+                  className={`${styles.roleOpt} ${!noSlots && effectiveRole === 'player' ? styles.roleOptOn : ''}`}
+                >
+                  <Typography base="label-md" tk="tk-12">
+                    {t('invite.rolePlayer')}
+                  </Typography>
+                </button>
+              )}
               <button
                 type="button"
                 disabled={busy || availability?.spectator === false}
