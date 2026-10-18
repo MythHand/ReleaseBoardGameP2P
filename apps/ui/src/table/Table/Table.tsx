@@ -320,7 +320,7 @@ function TableView({
   // table render. One element per copy — as the board keeps it.
   const rulesPanel = useMemo(
     () => (
-      <ScrollArea className={styles.scrollPanel}>
+      <ScrollArea className={styles.scrollPanel} contentClassName={styles.scrollPanelFlow}>
         <Rules copy={copy.rules} />
       </ScrollArea>
     ),

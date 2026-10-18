@@ -14,19 +14,28 @@
 
 /* ── поиск ─────────────────────────────────────────── */
 
-/* поиск — sticky-строка, не скроллится с правилами */
+/* The search field sits at the top edge of whatever window the rules are open
+   in, across its whole width, and stays there while the rules scroll under it
+   — a line under the window's head. It reaches over the window's padding
+   (`--rules-gutter`, the modal body's 26px unless the window sets its own),
+   and that gutter is its inner padding: what is written in it, and the tools
+   at its end, stand on the window text's own lines. It sticks to the window's very edge: a modal
+   body pads the scrolling box itself, which a sticky top counts from, so the
+   top is pulled back over it (`--rules-stick`, the gutter unless the window,
+   padding inside its scrolling content, sets 0). Behind the field's own
+   see-through fill, the window's (`--rules-fill`). */
 .searchBar {
   position: sticky;
-  inset-block-start: 0;
+  inset-block-start: calc(-1 * var(--rules-stick, var(--rules-gutter, 26px)));
   z-index: 2;
-  margin-block-end: 18px;
-  background: color-mix(in srgb, var(--surface-1) 94%, var(--bg));
+  margin: calc(-1 * var(--rules-gutter, 26px)) calc(-1 * var(--rules-gutter, 26px)) 18px;
+  background: var(--rules-fill, color-mix(in srgb, var(--surface-1) 94%, var(--bg)));
 }
 
 .search {
   composes: mono-md tk-04 from '../../design/typography.module.css';
   inline-size: 100%;
-  padding: 10px 104px 10px 14px;
+  padding: 10px calc(104px + var(--rules-gutter, 26px)) 10px var(--rules-gutter, 26px);
   color: var(--fg);
   outline: none;
   background: var(--white-05);
@@ -37,6 +46,11 @@
   border-color: var(--brand-green);
 }
 
+/* the project's focus outline, at half its width (owner) */
+.search:focus-visible {
+  outline-width: 1px;
+}
+
 .search::placeholder {
   color: var(--white-35);
 }
@@ -45,7 +59,7 @@
 .searchTools {
   position: absolute;
   inset-block-start: 50%;
-  inset-inline-end: 8px;
+  inset-inline-end: var(--rules-gutter, 26px);
   display: flex;
   gap: 4px;
   align-items: center;
