@@ -273,6 +273,7 @@ const DEFAULT_BASE: BoardState = {
   setup: {},
   playable: [],
   frozen: [],
+  replayLocked: [],
 } as unknown as BoardState
 
 /**

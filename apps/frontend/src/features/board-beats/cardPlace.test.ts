@@ -34,6 +34,7 @@ const board = (over: Partial<BoardState> = {}): BoardState =>
     setup: {},
     playable: [],
     frozen: [],
+    replayLocked: [],
     ...over,
   }) as unknown as BoardState
 

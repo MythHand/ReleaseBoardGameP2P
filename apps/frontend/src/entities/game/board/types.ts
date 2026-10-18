@@ -109,6 +109,7 @@ interface BoardPayload {
   setup: Setup
   playable: string[]
   frozen: string[]
+  replayLocked: string[]
   // Legal targets per playable card — the projection's answer (PlayerView.self.targets),
   // engine Target and TableTarget being one structural shape. An entry only for a
   // card that needs a target.

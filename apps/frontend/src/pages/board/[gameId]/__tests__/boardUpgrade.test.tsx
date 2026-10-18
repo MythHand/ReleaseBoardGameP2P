@@ -332,7 +332,7 @@ it.each([false, true])('lights only an unanswered Upgrade contribution (sudo=%s)
   const props = { ...base, state, actions: { onResolve } }
   const board = render(<Board {...props} />)
   const states = () =>
-    Array.from(board.container.querySelectorAll('[data-hand-slot] [data-card]'), (el) =>
+    Array.from(board.container.querySelectorAll('[data-hand-slot] > [data-state]'), (el) =>
       el.getAttribute('data-state'),
     )
   const pull = () => {
@@ -351,7 +351,7 @@ it.each([false, true])('lights only an unanswered Upgrade contribution (sudo=%s)
     expect(onResolve).not.toHaveBeenCalled()
     pull()
     expect(onResolve).toHaveBeenCalledExactlyOnceWith({ kind: 'upgradeDiscard', card: 'h1' })
-    expect(states()).toEqual(['idle'])
+    expect(states()).toEqual(['disabled'])
     pull()
     expect(onResolve).toHaveBeenCalledTimes(1)
     const rejected = {
@@ -379,9 +379,9 @@ it.each([false, true])('lights only an unanswered Upgrade contribution (sudo=%s)
         }}
       />,
     )
-    expect(states()).toEqual(['idle'])
+    expect(states()).toEqual(['disabled'])
     board.rerender(<Board {...props} state={{ ...state, pending: null }} />)
-    expect(states()).toEqual(['idle', 'idle'])
+    expect(states()).toEqual(['disabled', 'disabled'])
   } finally {
     board.unmount()
     motion.mockRestore()

@@ -751,7 +751,7 @@ it('hands the staging gesture the match it belongs to', () => {
 
 it('lights no payer the opening would refuse', () => {
   expect(costStateAt(true)(0)).toBe('playable')
-  expect(costStateAt(false)(0)).toBe('idle')
+  expect(costStateAt(false)(0)).toBe('disabled')
 })
 
 // A guard, not evidence: this passed before the fix too (nothing lit at all).

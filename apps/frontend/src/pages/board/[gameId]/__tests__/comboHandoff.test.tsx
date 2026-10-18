@@ -86,6 +86,7 @@ const before: BoardState = {
   setup: {},
   playable: ['u-atk'],
   frozen: [],
+  replayLocked: [],
   targets: { 'u-atk': [{ kind: 'player', player: 'p2' }] },
 } as unknown as BoardState
 
@@ -381,6 +382,7 @@ const opponentSudoBefore: BoardState = {
   setup: {},
   playable: [],
   frozen: [],
+  replayLocked: [],
 } as unknown as BoardState
 
 const opponentSudoAttacked: Event = {
@@ -446,6 +448,7 @@ const resolutionBefore: BoardState = {
   setup: {},
   playable: [],
   frozen: [],
+  replayLocked: [],
   pending: {
     kind: 'defend',
     player: 'p1',
@@ -522,6 +525,7 @@ const releaseBefore: BoardState = {
   setup: {},
   playable: ['support-code-review#0', 'release-frontend#0'],
   frozen: [],
+  replayLocked: [],
   targets: {},
   comboOptions: { 'support-code-review#0': ['release-frontend#0'] },
 } as unknown as BoardState
@@ -636,6 +640,7 @@ const soloReleaseBefore: BoardState = {
   setup: {},
   playable: ['release-frontend#0'],
   frozen: [],
+  replayLocked: [],
   targets: {},
   comboOptions: {},
 } as unknown as BoardState
@@ -894,6 +899,7 @@ const watchingBefore: BoardState = {
   setup: {},
   playable: [],
   frozen: [],
+  replayLocked: [],
 } as unknown as BoardState
 
 const oneFlush: Event[] = [
@@ -1093,6 +1099,7 @@ const defBefore: BoardState = {
   setup: {},
   playable: [],
   frozen: [],
+  replayLocked: [],
   pending: {
     kind: 'defend',
     player: 'p1',

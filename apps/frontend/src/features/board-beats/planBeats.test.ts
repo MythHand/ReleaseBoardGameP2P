@@ -27,6 +27,7 @@ const boardBefore = (over: Partial<PlayerBoardState> = {}): PlayerBoardState =>
     setup: {},
     playable: [],
     frozen: [],
+    replayLocked: [],
     ...over,
   }) as PlayerBoardState
 

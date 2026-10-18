@@ -223,6 +223,7 @@ export interface PlayerView {
     // window pairs Sudo with canAttackWith. Absent key: no pair possible.
     combos: Record<CardUid, CardUid[]>
     frozen: CardUid[]
+    replayLocked: CardUid[]
   }
   opponents: OpponentView[]
   // Every card put out at the centre and still waiting on its play — seat by

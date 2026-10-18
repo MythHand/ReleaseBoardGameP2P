@@ -67,6 +67,7 @@ const view = (): PlayerView => ({
     targets: {},
     combos: {},
     frozen: [],
+    replayLocked: [],
   },
   opponents: [{ id: 'p2', name: 'Two', handCount: 2, release: {}, eliminated: false }],
   shown: [],
@@ -96,6 +97,7 @@ const live = (): BoardState => ({
   setup: {},
   playable: [],
   frozen: [],
+  replayLocked: [],
 })
 
 // The queue now hands every beat's `run` a `BeatRun` (#97 generalizes the

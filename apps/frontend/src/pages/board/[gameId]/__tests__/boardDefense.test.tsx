@@ -415,6 +415,16 @@ it('leaves the Sudo dark when the projection offers it nothing to enhance', () =
   expect(litState('support-sudo#0')).toBe('idle')
 })
 
+it('dims cards that cannot answer a defence while keeping legal reactions available', () => {
+  render(defenceBoard({ options: ['defense-hotfix#0'] }))
+  expect(
+    document
+      .querySelector('[data-hand-slot="support-sudo#0"] > [data-state]')
+      ?.getAttribute('data-state'),
+  ).toBe('disabled')
+  expect(litState('defense-hotfix#0')).toBe('playable')
+})
+
 // Fix B, fix round 1 (L2): `stateAt` decided what to light from the pending
 // alone, while every path that ACCEPTS an answer (`resolveLegal`,
 // `resolveSudo`) additionally requires `enabled` — false while the opening
@@ -460,7 +470,7 @@ it('lights nothing the opening would refuse', () => {
   // the same hand, the same pending — only the gate differs, so a green here
   // cannot come from the fixture being unlit in the first place
   expect(defenceStateAt(true)(0)).toBe('playable')
-  expect(defenceStateAt(false)(0)).toBe('idle')
+  expect(defenceStateAt(false)(0)).toBe('disabled')
 })
 
 // Fix B (#101), Defect 5 — the hue says what kind of card is aiming. The

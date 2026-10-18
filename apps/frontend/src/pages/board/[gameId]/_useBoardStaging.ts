@@ -125,7 +125,7 @@ export interface BoardStaging {
   accentAt: (index: number) => string | undefined // partner lighting while a support awaits one
   /** what a fan slot reads as — 'playable' for the cards that answer the step
    * the turn side is actually waiting on (today: a standing release's cost),
-   * 'selected' for a waiting support's own partners, 'idle' at rest */
+   * 'selected' for a waiting support's partners, 'disabled' when unavailable */
   stateAt: (index: number) => HandCardState
   /** the pair the fold step is carrying, while it carries one (`usePairFold`) */
   pairNode: () => HTMLDivElement | null
@@ -905,37 +905,42 @@ export function useBoardStaging({
     [staged, handItems, costOptions, state.comboOptions],
   )
 
-  // What each fan slot READS as — the half `accentAt` alone cannot say, since
-  // `Hand`'s own fallback turns any accent into 'selected' and nothing else
-  // into 'idle' (Hand.tsx: `stateAt?.(i) ?? (accentAt?.(i) ? 'selected' : 'idle')`).
-  // The rule, from the approved scene: the fan lights only while a step is
-  // actually waiting on a choice FROM it, and only on the cards that answer
-  // that step — a glow with nothing asked reads as "already selected", not as
-  // "available". Nothing is lit at rest, and the fallback for a waiting
-  // support is reproduced verbatim so #100's own combo reading is untouched.
+  // Availability follows the action currently asking for a hand card. Costs
+  // and combo partners take precedence over ordinary play and replay locks.
   const stateAt = useCallback(
     (index: number): HandCardState => {
       const item = handItems[index]
       if (!item) return 'idle'
-      // The same gate `onCostPick` opens with: while the opening owns the
-      // table the click is refused, so the card must not look clickable.
-      // Reachable on a rejoin that replays the opening into a pending already
-      // owed to us (fix round 1, L2).
-      if (!enabled) return 'idle'
-      // …and the moment a card has been GIVEN, nothing in the fan is payable any
-      // more. The pending is what lights them up and it lives until the engine
-      // resolves — which is long after the player has chosen: the card is in the
-      // air, then lying open at the centre, then on its way to the discard, and
-      // the whole fan stayed lit through all of it (owner, 22.09).
-      if (costOptions.length > 0 && !costGone)
-        return costOptions.includes(item.uid) ? 'playable' : 'idle'
-      if (costOptions.length > 0) return 'idle'
-      // DDoS blocks replaying this release, but it may still pay a cost
-      // when the engine offers it above.
-      if (state.frozen.includes(item.uid)) return 'disabled'
-      return accentAt(index) ? 'selected' : 'idle'
+      if (!enabled) return 'disabled'
+      if (cost) return !costGone && costOptions.includes(item.uid) ? 'playable' : 'disabled'
+      if (staged) {
+        if (staged.phase === 'partner' && staged.support && !staged.main)
+          return (state.comboOptions?.[staged.support.uid] ?? []).includes(item.uid)
+            ? 'selected'
+            : 'disabled'
+        return 'disabled'
+      }
+      if (state.frozen.includes(item.uid) || state.replayLocked.includes(item.uid))
+        return 'disabled'
+      const available =
+        state.playable.includes(item.uid) ||
+        Boolean(state.window?.canAttackWith?.includes(item.uid)) ||
+        (state.comboOptions?.[item.uid]?.length ?? 0) > 0
+      return available ? 'idle' : 'disabled'
     },
-    [enabled, handItems, costOptions, costGone, accentAt, state.frozen],
+    [
+      enabled,
+      handItems,
+      cost,
+      costOptions,
+      costGone,
+      staged,
+      state.frozen,
+      state.replayLocked,
+      state.playable,
+      state.window,
+      state.comboOptions,
+    ],
   )
 
   // STAGING A RELEASE — the one play that stands at the STAGE slot rather than

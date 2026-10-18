@@ -126,6 +126,7 @@ export default function TableStory() {
     setup: base.setup,
     playable: [],
     frozen: [],
+    replayLocked: [],
   }
 
   // the four-option selector still drives one demo state at a time, now mapped

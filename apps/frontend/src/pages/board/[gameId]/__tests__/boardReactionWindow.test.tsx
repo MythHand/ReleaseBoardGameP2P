@@ -54,15 +54,18 @@ function grabBug(container: HTMLElement) {
   fireEvent.mouseMove(window, { clientX: 0, clientY: -20 })
 }
 
-it('attacks a fresh release when its window opens while Bug is being dragged', async () => {
+it('refuses a disabled Bug until a fresh release opens its reaction window', async () => {
   mockReducedMotion(true)
   const base = props()
   const { container, rerender } = render(<Board {...base} />)
   grabBug(container)
+  fireEvent.mouseUp(window, { clientX: 0, clientY: -200 })
+  expect(base.actions?.onAttack).not.toHaveBeenCalled()
 
   await act(() => {
     rerender(<Board {...openWindow(base)} />)
   })
+  grabBug(container)
   await act(() => {
     fireEvent.mouseUp(window, { clientX: 0, clientY: -200 })
   })
