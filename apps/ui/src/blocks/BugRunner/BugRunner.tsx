@@ -120,18 +120,26 @@ function drawWreck(ctx: CanvasRenderingContext2D, w: Wreck, ground: number, colo
   ctx.globalAlpha = 1
 }
 
-function draw(ctx: CanvasRenderingContext2D, g: Game, p: Palette) {
-  // a rubber ducky is a defence card, as a hotfix is; a roaming monitor is a
-  // monitor all the same
-  const colourOf: Record<Kind, string> = {
-    hotfix: p.hotfix,
-    double: p.hotfix,
-    duck: p.hotfix,
-    monitor: p.monitor,
-    roaming: p.monitor,
-    server: p.server,
-    sudo: p.sudo,
+// The colour an obstacle is drawn in — asked only for a broken one's pieces.
+// A rubber ducky is a defence card, as a hotfix is; a roaming monitor is a
+// monitor all the same.
+function colourOf(kind: Kind, p: Palette): string {
+  switch (kind) {
+    case 'hotfix':
+    case 'double':
+    case 'duck':
+      return p.hotfix
+    case 'monitor':
+    case 'roaming':
+      return p.monitor
+    case 'server':
+      return p.server
+    case 'sudo':
+      return p.sudo
   }
+}
+
+function draw(ctx: CanvasRenderingContext2D, g: Game, p: Palette) {
   const ground = WORLD_H - GROUND
   ctx.clearRect(0, 0, g.width, WORLD_H)
 
@@ -183,7 +191,7 @@ function draw(ctx: CanvasRenderingContext2D, g: Game, p: Palette) {
   const accent = g.flash !== null && Math.floor(g.flash / BLINK) % 2 === 0 ? other : own
   drawSprite(ctx, bug, BUG_X, ground - Math.round(g.y) - BUG.h, accent, p.dark)
 
-  if (g.wreck) drawWreck(ctx, g.wreck, ground, colourOf[g.wreck.kind])
+  if (g.wreck) drawWreck(ctx, g.wreck, ground, colourOf(g.wreck.kind, p))
 }
 
 const pad = (n: number) => String(n).padStart(5, '0')
