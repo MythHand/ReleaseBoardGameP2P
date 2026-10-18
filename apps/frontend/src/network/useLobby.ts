@@ -1337,8 +1337,18 @@ export function useLobby(): UseLobby {
           commit(handleBugRunnerStart(current, msg.from, Date.now()).state)
         } else if (msg.type === 'WHEREABOUTS') {
           if (!['lobby', 'game', 'stats'].includes(msg.payload?.where)) return
-          if (msg.payload.where === 'lobby' && current.peers[msg.from]?.role === 'guest')
-            keeperRef.current?.unwatch(msg.from)
+          // A spectator in the lobby stops receiving the match; back on the
+          // board it watches again. The second half is what keeps a newcomer
+          // to a running match watching: its lobby screen mounts (and
+          // announces itself) between the admission that subscribed it and the
+          // GAME_STARTING that moves it on to the board. `watch` is a no-op for
+          // a peer already watching and sends a resync to one that was not, so
+          // whatever it missed in between is caught up.
+          if (current.peers[msg.from]?.role === 'guest') {
+            if (msg.payload.where === 'lobby') keeperRef.current?.unwatch(msg.from)
+            else if (msg.payload.where === 'game' && gameIdRef.current)
+              keeperRef.current?.watch(msg.from)
+          }
           const r = handleWhereabouts(current, msg.from, msg.payload.where)
           commit(r.state)
           dispatch(r.outgoing)

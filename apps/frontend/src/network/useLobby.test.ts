@@ -5405,3 +5405,70 @@ it('treats name-taken as terminal', async () => {
   expect(result.current.errorKind).toBe('name-taken')
   expect(transports).toHaveLength(1)
 })
+
+// A peer with no seat opening a room whose match is already running. It is
+// admitted as a spectator whatever it asked for, routed to the board, and then
+// its own screens announce themselves the way they do in the app: the lobby
+// mounts first (the roster lands before GAME_STARTING moves it on), then the
+// board. It must still be watching the match once it is on the board.
+const NEWCOMER = 'newcomer'
+function newcomerOpensRunningRoom(requestedRole: 'player' | 'spectator') {
+  act(() => {
+    transports[0].onMessage?.({
+      type: 'JOIN_REQUEST',
+      payload: { name: 'Newcomer', resumeToken: 'newcomer-token', requestedRole },
+      from: NEWCOMER,
+      seq: 200,
+    } as WireMessage)
+  })
+}
+function newcomerWalksLobbyThenBoard() {
+  act(() => {
+    transports[0].receive({
+      type: 'WHEREABOUTS',
+      payload: { where: 'lobby' },
+      from: NEWCOMER,
+      seq: 201,
+    })
+  })
+  act(() => {
+    transports[0].receive({
+      type: 'WHEREABOUTS',
+      payload: { where: 'game' },
+      from: NEWCOMER,
+      seq: 202,
+    })
+  })
+}
+const syncsTo = (peerId: string) => sentTo(peerId).filter((message) => message.type === 'SYNC')
+
+async function restoredHostWithMatch(): Promise<ReturnType<typeof renderHook>> {
+  storedHostSession('g1')
+  storedKeeperSnapshot('peer0')
+  const rendered = renderHook(() => useLobby())
+  await act(async () => {
+    await Promise.resolve()
+  })
+  return rendered
+}
+
+it.each([
+  ['asking for player', 'player', hostWithOpenGame],
+  ['asking for spectator', 'spectator', hostWithOpenGame],
+  ['asking for player, after restoreHost', 'player', restoredHostWithMatch],
+] as const)('a peer with no seat opening a running room (%s) is admitted as spectator and receives a spectator sync', async (_label, requestedRole, host) => {
+  const { result } = await host()
+  expect(result.current.gameId).not.toBeNull()
+  newcomerOpensRunningRoom(requestedRole)
+  expect(result.current.state?.peers[NEWCOMER].role).toBe('guest')
+  expect(typesSentTo(NEWCOMER)).toContain('GAME_STARTING')
+  expect(publicSyncTo(NEWCOMER).view.self).toBeNull()
+  newcomerWalksLobbyThenBoard()
+  expect(result.current.state?.peers[NEWCOMER].where).toBe('game')
+  // Still watching: the next thing that happens at the table reaches it.
+  const before = syncsTo(NEWCOMER).length
+  const hostView = result.current.gameSync
+  act(() => result.current.gameLink?.submit({ type: 'DRAW' }))
+  expect(result.current.gameSync).not.toBe(hostView)
+  expect(syncsTo(NEWCOMER).length).toBeGreaterThan(before)
+})
