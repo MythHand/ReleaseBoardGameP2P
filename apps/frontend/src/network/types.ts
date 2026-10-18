@@ -99,7 +99,11 @@ export type Message =
       type: 'JOIN_REJECTED'
       payload: { reason: JoinRejectReason; availability: JoinAvailability }
     }
-  | { type: 'PEER_LIST'; payload: { peers: PeerInfo[]; yourRole: Role } }
+  | {
+      type: 'PEER_LIST'
+      // When true, admission includes a following GAME_STARTING frame.
+      payload: { peers: PeerInfo[]; yourRole: Role; joiningGame?: boolean }
+    }
   // The whole row, as the host now holds it: the same shape as PeerInfo, so a
   // new field (the avatar) cannot be dropped by a sender that lists fields.
   | { type: 'PEER_JOINED'; payload: PeerInfo }

@@ -34,6 +34,7 @@ function base(): UseLobby {
     status: 'idle',
     restoring: false,
     hostOffline: false,
+    bootstrapping: false,
     reconnect: {
       attempt: 0,
       maxAttempts: MAX_RECONNECT_ATTEMPTS,

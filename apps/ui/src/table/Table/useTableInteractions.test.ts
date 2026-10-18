@@ -32,6 +32,7 @@ const setup = (over: Record<string, unknown> = {}) => ({
     you: { name: 'You', hand, release: {} },
     playable: ['c1'],
     frozen: [] as string[],
+    replayLocked: [] as string[],
     ...over,
   },
   actions: {

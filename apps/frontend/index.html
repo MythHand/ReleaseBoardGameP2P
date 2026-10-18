@@ -3,6 +3,16 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <!-- Match the app background before its JavaScript and styles load. -->
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #000;
+        color-scheme: dark;
+      }
+    </style>
     <title>Release любой ценой</title>
     <!-- Tab icon is set at runtime (random rotation) by app/favicon.ts; these
          cover install / home-screen surfaces that don't run our JS. -->

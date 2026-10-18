@@ -35,6 +35,7 @@ function session(overrides: Partial<UseLobby> = {}): UseLobby {
     },
     restoring: false,
     hostOffline: false,
+    bootstrapping: false,
     reconnect: {
       attempt: 0,
       maxAttempts: MAX_RECONNECT_ATTEMPTS,

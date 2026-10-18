@@ -24,6 +24,7 @@ const hand = (...ids: string[]): BoardState =>
     setup: {},
     playable: [],
     frozen: [],
+    replayLocked: [],
   }) as unknown as BoardState
 
 const uids = (s: BoardState) => s.you?.hand.map((c) => c.uid)

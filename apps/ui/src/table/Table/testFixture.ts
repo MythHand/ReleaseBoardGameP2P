@@ -20,6 +20,7 @@ export function makeTableProps(over: Partial<TableProps> = {}): TableProps {
       setup: mock.setup,
       playable: [],
       frozen: [],
+      replayLocked: [],
     },
     room: {
       role: 'host',

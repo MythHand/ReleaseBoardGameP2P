@@ -86,6 +86,8 @@ describe("Rollback's replay lock (#68)", () => {
   it('bars playing it from hand as well', () => {
     const r = bugRolledBack()
     expect(engine.project(r.state, 'p1').self.playable).not.toContain(BUG.uid)
+    expect(engine.project(r.state, 'p1').self.replayLocked).toEqual([BUG.uid])
+    expect(engine.project(r.state, 'p2').self.replayLocked).toEqual([])
   })
 
   it('frees it again on the attacker’s own next turn, not the one after', () => {
@@ -103,6 +105,7 @@ describe("Rollback's replay lock (#68)", () => {
 
     expect(pushed.state.turn.player).toBe('p1')
     expect(engine.project(pushed.state, 'p1').self.playable).toContain(BUG.uid)
+    expect(engine.project(pushed.state, 'p1').self.replayLocked).toEqual([])
   })
 
   it('leaves a sudo Rollback alone, which keeps the card rather than returning it', () => {

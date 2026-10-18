@@ -767,6 +767,7 @@ export function toBoardState(view: GameView, log: Event[], labels: HistoryLabels
     setup: view.setup,
     playable: view.self?.playable ?? [],
     frozen: view.self?.frozen ?? [],
+    replayLocked: view.self?.replayLocked ?? [],
     // Structural passthrough — Target and TableTarget are one shape; licensed
     // the same way `pending`/`window` are by contract.test-d.ts.
     targets: view.self?.targets ?? {},

@@ -71,6 +71,7 @@ const base = {
   setup: {},
   playable: [],
   frozen: [],
+  replayLocked: [],
 } as unknown as PlayerBoardState
 
 const ctx: BeatRun = { base, publish: () => {} }

@@ -129,6 +129,7 @@ const base = {
   setup: {},
   playable: [],
   frozen: [],
+  replayLocked: [],
 } as unknown as BoardState
 
 const node = () => document.createElement('div')

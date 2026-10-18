@@ -84,6 +84,7 @@ function session(peers: Record<string, unknown> = {}): UseLobby {
     // this fixture is about a session already settled, not one reconnecting.
     restoring: false,
     hostOffline: false,
+    bootstrapping: false,
     reconnect: { attempt: 0, maxAttempts: 5, status: 'idle', events: [], retry: vi.fn() },
     kick: vi.fn(),
     introReady: vi.fn(),

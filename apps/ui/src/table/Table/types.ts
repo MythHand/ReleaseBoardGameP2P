@@ -59,6 +59,7 @@ interface TablePayload {
   setup: Setup
   playable: string[]
   frozen: string[]
+  replayLocked: string[]
   pending?: TablePending | null
   window?: TableWindow | null
   // Every card put out at the centre while its play is being made, whoever put

@@ -500,6 +500,8 @@ export interface UseLobby {
   // clock runs and no absent seat is played over an outage that is the host's;
   // the board shows the reconnect overlay. False for a guest, always.
   hostOffline: boolean
+  // True from the first render until the mount-time host/guest check settles.
+  bootstrapping: boolean
   // The guest's half of the reconnect overlay — see ReconnectState. Idle
   // whenever there is nothing to reconnect: no stored guest session, a host
   // restore that already succeeded, or a run that finished either way.
@@ -593,6 +595,7 @@ export function useLobby(): UseLobby {
   const clearChatRoom = chatSession.clearRoom
   const [state, setState] = useState<LobbyState | null>(null)
   const [status, setStatus] = useState<LobbyStatus>('idle')
+  const [bootstrapping, setBootstrapping] = useState(true)
   // The host's half of the reconnect overlay (see the interface doc). Set for
   // the whole span of restoreHost, success or failure alike, in a finally —
   // every early return inside it must still clear this, or a restore that
@@ -1229,6 +1232,11 @@ export function useLobby(): UseLobby {
               }),
             )
           }
+          const seat = privateSeat?.seat
+          const joiningGame =
+            !!liveGameId &&
+            (!!seat ||
+              !(payload.resume?.where === 'lobby' && payload.resume.lastGameId === liveGameId))
           commit(r.state)
           dispatch([
             ...(replacedLobbyPeer
@@ -1242,7 +1250,17 @@ export function useLobby(): UseLobby {
                   },
                 ]
               : []),
-            ...r.outgoing,
+            ...r.outgoing.map((outgoing) =>
+              joiningGame && outgoing.message.type === 'PEER_LIST'
+                ? {
+                    ...outgoing,
+                    message: {
+                      ...outgoing.message,
+                      payload: { ...outgoing.message.payload, joiningGame: true },
+                    },
+                  }
+                : outgoing,
+            ),
             {
               to: msg.from,
               message: {
@@ -1259,7 +1277,6 @@ export function useLobby(): UseLobby {
             })),
           ])
 
-          const seat = privateSeat?.seat
           if (seat && liveGameId) {
             // Captured before the seating is patched: this is the dead peer
             // id the returner is replacing.
@@ -1305,11 +1322,7 @@ export function useLobby(): UseLobby {
             // peer builds the remote link the projection needs to arrive on.
             keeperRef.current?.peerReturned(seat.playerId, msg.from)
           }
-          if (
-            !seat &&
-            liveGameId &&
-            !(payload.resume?.where === 'lobby' && payload.resume.lastGameId === liveGameId)
-          ) {
+          if (!seat && joiningGame) {
             dispatch([
               {
                 to: msg.from,
@@ -1685,6 +1698,7 @@ export function useLobby(): UseLobby {
       const epoch = sessionEpochRef.current
       try {
         let owner: Transport | null = null
+        let awaitingGame = false
         const ownsTransport = () =>
           transportGenerationRef.current === generation && transportRef.current === owner
         const t = await createTransport({
@@ -1724,10 +1738,17 @@ export function useLobby(): UseLobby {
               hostConnectedRef.current = true
               refreshVoice()
               setStatus('in-lobby')
-              onDialOutcome?.({ ok: true })
+              // Admission can precede GAME_STARTING by a DataChannel event.
+              // Do not release a restoring guest onto an intermediate lobby.
+              awaitingGame = msg.payload.joiningGame === true
+              if (!awaitingGame) onDialOutcome?.({ ok: true })
               return
             }
             onMessage(msg)
+            if (awaitingGame && msg.from === hostId && msg.type === 'GAME_STARTING') {
+              awaitingGame = false
+              onDialOutcome?.({ ok: true })
+            }
           },
           onError: (err) => {
             if (!ownsTransport()) return
@@ -2252,12 +2273,16 @@ export function useLobby(): UseLobby {
     if (restored.current) return
     restored.current = true
     void (async () => {
-      const hostRestored = await restoreHost()
-      if (hostRestored) return
-      const stored = readSession()
-      if (stored?.role !== 'guest') return
-      reconnectSessionRef.current = stored
-      await runGuestReconnect()
+      try {
+        const hostRestored = await restoreHost()
+        if (hostRestored) return
+        const stored = readSession()
+        if (stored?.role !== 'guest') return
+        reconnectSessionRef.current = stored
+        await runGuestReconnect()
+      } finally {
+        setBootstrapping(false)
+      }
     })()
   }, [restoreHost, runGuestReconnect])
 
@@ -2835,6 +2860,7 @@ export function useLobby(): UseLobby {
       status,
       restoring,
       hostOffline,
+      bootstrapping,
       reconnect: {
         attempt: reconnectAttempt,
         maxAttempts: GUEST_RECONNECT_ATTEMPTS,
@@ -2889,6 +2915,7 @@ export function useLobby(): UseLobby {
       status,
       restoring,
       hostOffline,
+      bootstrapping,
       reconnectAttempt,
       reconnectStatus,
       reconnectEvents,

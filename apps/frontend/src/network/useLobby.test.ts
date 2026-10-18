@@ -164,7 +164,7 @@ afterEach(() => {
   renderedLobbies.length = 0
 })
 
-function acceptGuest(transport: FakeTransport, hostId: string) {
+function acceptGuest(transport: FakeTransport, hostId: string, joiningGame = false) {
   transport.onConnection?.(hostId)
   transport.onMessage?.({
     type: 'PEER_LIST',
@@ -172,6 +172,7 @@ function acceptGuest(transport: FakeTransport, hostId: string) {
     seq: 1,
     payload: {
       yourRole: 'player',
+      ...(joiningGame ? { joiningGame: true } : {}),
       peers: [
         {
           id: transport.id,
@@ -2630,6 +2631,12 @@ it('tells the keeper about a dropped peer, not just the roster', async () => {
   // returning player would find their own seat occupied and never receive a
   // projection.
   expect(sentTo(RETURNED).some((m) => m.type === 'SYNC')).toBe(true)
+  expect(sentTo(RETURNED)).toContainEqual(
+    expect.objectContaining({
+      type: 'PEER_LIST',
+      payload: expect.objectContaining({ joiningGame: true }),
+    }),
+  )
 })
 
 it('recovers a returning seat even when its JOIN_REQUEST beats onDisconnect there', async () => {
@@ -4855,6 +4862,12 @@ it('sends GAME_STARTING before public catch-up on a late join', async () => {
     expect.arrayContaining(['PEER_LIST', 'CHAT_HISTORY', 'GAME_STARTING', 'SYNC']),
   )
   expect(types.indexOf('GAME_STARTING')).toBeLessThan(types.indexOf('SYNC'))
+  expect(sentTo('watcher')).toContainEqual(
+    expect.objectContaining({
+      type: 'PEER_LIST',
+      payload: expect.objectContaining({ joiningGame: true }),
+    }),
+  )
   expect(publicSyncTo('watcher').resync).toBe(true)
   expect(publicSyncTo('watcher').view.self).toBeNull()
 })
@@ -5505,4 +5518,83 @@ it.each([
   act(() => result.current.gameLink?.submit({ type: 'DRAW' }))
   expect(result.current.gameSync).not.toBe(hostView)
   expect(syncsTo(NEWCOMER).length).toBeGreaterThan(before)
+})
+
+it('keeps bootstrap pending from the first render until the host restore settles (#245)', async () => {
+  storedHostSession('g1')
+  storedKeeperSnapshot('peer0')
+  const frames: boolean[] = []
+  const { result } = renderHook(() => {
+    const lobby = useLobby()
+    frames.push(lobby.bootstrapping)
+    return lobby
+  })
+  expect(frames[0]).toBe(true)
+  await act(async () => {
+    await Promise.resolve()
+  })
+  expect(result.current.bootstrapping).toBe(false)
+  expect(result.current.gameId).toBe('g1')
+})
+
+it.each([
+  'missing',
+  'malformed',
+  'expired',
+])('releases bootstrap for a %s saved session (#245)', async (record) => {
+  if (record === 'malformed') sessionStorage.setItem(SESSION_KEY, '{broken')
+  if (record === 'expired') {
+    storedHostSession('g1')
+    const stored = JSON.parse(sessionStorage.getItem(SESSION_KEY) ?? '{}')
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ ...stored, joinedAt: 0 }))
+  }
+  const { result } = renderHook(() => useLobby())
+  await act(async () => {
+    await Promise.resolve()
+  })
+  expect(result.current.bootstrapping).toBe(false)
+  expect(result.current.status).toBe('idle')
+  expect(transports).toHaveLength(0)
+})
+
+it('keeps bootstrap pending until the stored guest handshake completes (#245)', async () => {
+  storedGuestSession(null)
+  const { result } = renderHook(() => useLobby())
+  await act(async () => {
+    await Promise.resolve()
+  })
+  expect(result.current.bootstrapping).toBe(true)
+  await act(async () => {
+    acceptGuest(transports[0], parseRoomCode('ABC-123'))
+    await Promise.resolve()
+  })
+  expect(result.current.bootstrapping).toBe(false)
+  expect(result.current.status).toBe('in-lobby')
+})
+
+it('holds guest bootstrap between PEER_LIST and its promised GAME_STARTING (#245)', async () => {
+  storedGuestSession('g1')
+  const { result } = renderHook(() => useLobby())
+  await act(async () => {
+    await Promise.resolve()
+  })
+  const hostId = parseRoomCode('ABC-123')
+  await act(async () => {
+    acceptGuest(transports[0], hostId, true)
+    await Promise.resolve()
+  })
+  expect(result.current.status).toBe('in-lobby')
+  expect(result.current.gameId).toBeNull()
+  expect(result.current.bootstrapping).toBe(true)
+  await act(async () => {
+    transports[0].onMessage?.({
+      type: 'GAME_STARTING',
+      from: hostId,
+      seq: 2,
+      payload: { gameId: 'g1', seats: [] },
+    })
+    await Promise.resolve()
+  })
+  expect(result.current.bootstrapping).toBe(false)
+  expect(result.current.gameId).toBe('g1')
 })

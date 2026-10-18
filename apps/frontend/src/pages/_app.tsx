@@ -3,6 +3,7 @@ import AppModals from '~/app/AppModals'
 import styles from '~/app/app.module.css'
 import FollowGameStart from '~/app/FollowGameStart'
 import { SessionProvider } from '~/app/providers/SessionProvider'
+import SessionBootstrap from '~/app/SessionBootstrap'
 import ErrorScreen from '~/shared/ui/ErrorScreen'
 import LanguageSwitch from '~/shared/ui/LanguageSwitch'
 
@@ -14,9 +15,11 @@ export default function App() {
       <div className={styles.root}>
         {/* Only on the start screen — elsewhere (e.g. the lobby) it would
             overlay the page header. */}
-        {pathname === '/start' && <LanguageSwitch />}
-        <Outlet />
-        <AppModals />
+        <SessionBootstrap>
+          {pathname === '/start' && <LanguageSwitch />}
+          <Outlet />
+          <AppModals />
+        </SessionBootstrap>
       </div>
     </SessionProvider>
   )

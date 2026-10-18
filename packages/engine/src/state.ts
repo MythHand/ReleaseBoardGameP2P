@@ -465,10 +465,11 @@ export interface GameState {
   // sequence (rules decisions answer 2): a trigger drawn partway through pauses
   // it, and resolving that trigger resumes it where it stopped.
   //
-  // Indices rather than a count because the same sequence serves both shapes:
-  // Good Vibe-Coding is two cards off pile 0 (`[0, 0]`), and the multi-pile
-  // draw #61 slice A introduces is one card off each existing pile (`[0, 1, …]`).
-  drawing: { player: PlayerId; piles: number[] } | null
+  // `piles` preserves the ordinary draw's source indices until it finishes.
+  // Good Vibe-Coding's `bonus` cards resolve first, each from the first stocked
+  // pile, so exhausting a pile cannot spend a bonus without drawing a card.
+  // Optional for saved states made before bonus draws were tracked separately.
+  drawing: { player: PlayerId; piles: number[]; bonus?: number } | null
 
   pending: Pending | null
   window: ReactionWindow | null
