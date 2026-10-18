@@ -93,6 +93,7 @@ export function isWellFormedAction(action: unknown): action is Action {
   if (typeof action !== 'object' || action === null) return false
   const a = action as { type?: unknown; choice?: unknown }
   if (typeof a.type !== 'string') return false
+  if (a.type === 'ABANDON') return typeof (action as { player?: unknown }).player === 'string'
   if (a.type !== 'RESOLVE') return true
   return (
     typeof a.choice === 'object' &&

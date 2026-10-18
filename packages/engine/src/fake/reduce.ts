@@ -4,6 +4,7 @@ import type { Reduction } from '../engine'
 import { shuffle } from '../rng'
 import type { CardUid, GameState, PlayerId } from '../state'
 import { foldTally } from '../tally'
+import { onAbandon } from './abandon'
 import { onAttack, onDefend } from './attacks'
 import {
   attackTargets,
@@ -408,6 +409,8 @@ function dispatch(state: GameState, action: Action): Reduction {
       return onShow(state, action)
     case 'TAKE_BACK':
       return onTakeBack(state, action)
+    case 'ABANDON':
+      return onAbandon(state, action)
     default:
       return reject(
         state,

@@ -68,5 +68,8 @@ export type Action =
   // PLAY/ATTACK/RESOLVE that completes it.
   | { type: 'SHOW'; player: PlayerId; card: CardUid; at: number }
   | { type: 'TAKE_BACK'; player: PlayerId; at: number }
+  // Keeper-only, never a peer intent: the seat owing a decision raised by a
+  // card it played has dropped, and the card goes back to its hand.
+  | { type: 'ABANDON'; player: PlayerId; at: number }
 
 export type ActionType = Action['type']

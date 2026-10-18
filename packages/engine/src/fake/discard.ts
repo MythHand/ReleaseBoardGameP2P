@@ -60,6 +60,7 @@ export function openPickFromDiscard(
       options,
       picks,
       source: card.id,
+      spent: spent.map((c) => c.uid),
       raisedAt: log.seq,
     },
     eventSeq: log.seq,
