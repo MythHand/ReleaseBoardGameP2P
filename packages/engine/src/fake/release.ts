@@ -71,7 +71,6 @@ export function placeRelease(
         },
       },
     },
-    turn: { ...state.turn, releasesPlayed: state.turn.releasesPlayed + 1 },
     pending: null,
   }
   // The win is deliberately not decided here. Three releases win only after the
@@ -82,10 +81,14 @@ export function placeRelease(
   //
   // A Code Review-protected release cannot be attacked at all, so no window
   // opens (understanding.md §8) and there is nothing to wait for.
-  if (cr) return checkWin(placed, log)
+  const completed: GameState = {
+    ...placed,
+    turn: { ...placed.turn, releasesPlayed: placed.turn.releasesPlayed + 1 },
+  }
+  if (cr) return checkWin(completed, log)
 
-  const opened = openWindow(placed, log, { player, slot, card: card.uid }, 1, at)
-  if (!opened.window) return checkWin(opened, log)
+  const opened = openWindow(placed, log, { player, slot, card: card.uid, fromHand: true }, 1, at)
+  if (!opened.window) return checkWin({ ...opened, turn: completed.turn }, log)
   // `openWindow` declines when nobody is left alive to respond. Nothing will
   // ever close a window that never opened, so the win is settled now rather
   // than leaving the game hanging one release short of its end.

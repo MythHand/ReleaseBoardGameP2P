@@ -2378,10 +2378,22 @@ keeper отдаёт публичный snapshot и события. Ранее о
 **Статус.** `открыто`.
 
 
-### Spectator layout - owner clarification 2026-10-05
+### Spectator layout - owner clarifications 2026-10-05, 2026-10-17
 
 [PR #214 comment](https://github.com/MythHand/ReleaseBoardGameP2P/pull/214#issuecomment-5998127154)
 supersedes the earlier rows of three: 2-5 seats share the upper row; six seats split three
 above and three in the vacant hand area. Four/five seats adapt their real card dimensions
 to the available row width. Flight anchors measure those dimensions without CSS scaling.
 With six seats, the piles occupy the gap between rows.
+
+**Owner clarification 2026-10-17 (supersedes the above).** A spectator sees the table the
+way a player does: the piles, the events deck, the discard and the turn dock keep the
+player's sizes and places — no 80px piles in one row, no squeezed pile column, no compact
+dock with a "spectator" badge. What a spectator lacks is their own fan and the "you are out"
+state. The seats are the one layout of their own: the larger half in the upper row, as a
+player's opponents stand, the rest where a player's fan stands, centred on the turn dock's
+height — 2 → 1 + 1, 3 → 2 + 1, 4 → 2 + 2, 5 → 3 + 2, 6 → 3 + 3. Both rows stay one seats
+container, so the deal still drops the seats in one after another; with at most three seats
+above, the 4/5 shrinking is gone. The centre stands halfway down the screen. The dock is
+the player's "whose turn" state at full size, titled "player turn" (`turnDock.playerTurn`)
+instead of "opponent turn".

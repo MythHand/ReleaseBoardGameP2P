@@ -182,6 +182,7 @@
   "turnDock": {
     "yourTurn": "your turn",
     "turnOf": "opponent turn",
+    "playerTurn": "player turn",
     "reaction": "reaction",
     "reactionDanger": "error 503",
     "attack": "attack",

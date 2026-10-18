@@ -199,7 +199,9 @@ export interface TableCopyBundle {
   reconnect: ReconnectCopy
   gameOver: GameOverCopy
   lobbyCode: LobbyCodeCopy
-  turnDock: TurnDockCopy
+  // `playerTurn` stands in for `turnOf` at a spectator's table: nobody there
+  // is their opponent. The dock itself never knows which word it was given.
+  turnDock: TurnDockCopy & { playerTurn: string }
   pause?: PauseGameCopy
   pending: PendingPromptCopy
 }

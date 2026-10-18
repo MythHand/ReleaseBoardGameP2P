@@ -102,10 +102,8 @@ export function runDrawSequence(state: GameState, log: Log, at: number): GameSta
       ...filled,
       decks: { ...filled.decks, main },
       drawing: remaining,
-      // A turn's obligation is discharged pile by pile, so each card taken
-      // records its source. Good Vibe-Coding draws twice off pile 0 and the
-      // duplicate is harmless — the obligation asks whether a pile has been
-      // drawn from, not how often.
+      // Record the source, not a live obligation against the current piles:
+      // `drawing` owns the remaining steps. Good Vibe-Coding may repeat pile 0.
       turn:
         owed.player === filled.turn.player
           ? { ...filled.turn, drawnFrom: [...filled.turn.drawnFrom, pileIndex] }

@@ -188,16 +188,12 @@ export const bankToDiscard = (state: GameState, cards: CardInstance[]): GameStat
   }
 }
 
-// Whether the turn's draw obligation is discharged. Base owes every pile that
-// has cards in it; Strategic owes one card from a pile of the player's choosing
-// (rules decisions answer 1). `PUSH` legality, `onDraw`'s "already drew this
-// turn" rejection and the dock's draw-or-push state all derive from this, so
-// the three cannot disagree about what a completed draw is.
+// One ordinary draw per turn. Its sequence fixes the owed piles when DRAW
+// starts, so later changes to the table cannot create another obligation.
+// `PUSH`, DRAW validation and the dock share this answer. A paused sequence
+// still owes its remaining steps, even though some cards were already drawn.
 export function drawObligationMet(state: GameState): boolean {
-  const drawn = state.turn.drawnFrom
-  if (drawn.length === 0) return false
-  if (state.setup.gitBranch === 'strategic') return true
-  return state.decks.main.every((pile, i) => pile.length === 0 || drawn.includes(i))
+  return state.turn.drawnFrom.length > 0 && state.drawing === null
 }
 
 // Ends the turn, or holds it open when the hand is over the mode's limit.

@@ -68,7 +68,7 @@ it('places the release once the cost is paid', () => {
   expect(r.state.players.p1.release.frontend?.card).toEqual(FE)
   expect(r.state.players.p1.hand).toEqual([])
   expect(r.state.decks.discard.at(-1)).toEqual(BUG)
-  expect(r.state.turn.releasesPlayed).toBe(1)
+  expect(r.state.turn.releasesPlayed).toBe(0)
   expect(r.events.map((e) => e.type)).toEqual(['discarded', 'released', 'windowOpened'])
 })
 
@@ -115,7 +115,9 @@ it('rejects a second release in a turn under Base, allows it under Fast Release'
   const closed = reduce(fastFirst.state, { type: 'PASS', player: 'p2', at: 1001 })
   const fast = reduce(closed.state, { type: 'PLAY', player: 'p1', card: BE.uid, at: 1002 })
   expect(fast.state.players.p1.release.backend?.card).toEqual(BE)
-  expect(fast.state.turn.releasesPlayed).toBe(2)
+  expect(fast.state.turn.releasesPlayed).toBe(1)
+  const completed = reduce(fast.state, { type: 'PASS', player: 'p2', at: 1003 })
+  expect(completed.state.turn.releasesPlayed).toBe(2)
 })
 
 it('rejects a duplicate release type in the zone', () => {

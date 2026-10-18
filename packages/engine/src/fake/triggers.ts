@@ -451,7 +451,16 @@ export function resolveAiEvent(
       // single pending slot and erasing the first threat.
       //
       // The reducer runs and resumes the sequence; this only declares it.
-      return { ...state, drawing: { player, piles: [0, 0] }, eventSeq: log.seq }
+      return {
+        ...state,
+        drawing: {
+          player,
+          // Bonus cards resolve first, including their own triggers. Then
+          // the interrupted ordinary draw resumes its remaining piles.
+          piles: [0, 0, ...(state.drawing?.piles ?? [])],
+        },
+        eventSeq: log.seq,
+      }
 
     case 'ai-bad-vibe-coding':
       // "сбросьте одну карту из руки" — nothing about the turn. An empty hand

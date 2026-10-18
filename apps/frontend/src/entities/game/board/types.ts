@@ -273,10 +273,11 @@ export interface BoardCopyBundle {
   reconnect: ReconnectCopy
   gameOver: GameOverCopy
   lobbyCode: LobbyCodeCopy
-  // The dock's copy plus one line the kit has no notion of: while the deal
-  // intro runs nobody is on turn, so the dock names the moment where it would
-  // name a player.
-  turnDock: TurnDockCopy & { gameStart: string }
+  // The dock's copy plus two lines the dock itself has no notion of: while the
+  // deal intro runs nobody is on turn, so the dock names the moment where it
+  // would name a player; and at a spectator's table nobody is their opponent,
+  // so the turn is a player's.
+  turnDock: TurnDockCopy & { gameStart: string; playerTurn: string }
   pause?: PauseGameCopy
   pending: PendingPromptCopy
 }

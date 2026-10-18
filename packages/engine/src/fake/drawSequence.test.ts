@@ -124,7 +124,8 @@ describe('Good Vibe-Coding draws two, one at a time (#72)', () => {
     // Paused: the 503 is owed and the second card is still to come. This state
     // does sit between actions, so it is exactly where a player could otherwise
     // spend the interruption on a play.
-    expect(r.state.drawing).toMatchObject({ player: 'p1', piles: [0] })
+    // One bonus card and the ordinary draw's second pile are still owed.
+    expect(r.state.drawing).toMatchObject({ player: 'p1', piles: [0, 1] })
     expect(engine.project(r.state, 'p1').self.playable).toEqual([])
 
     const answered = reduce(r.state, {
