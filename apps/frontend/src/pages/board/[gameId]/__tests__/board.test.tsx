@@ -83,6 +83,7 @@ function session(peers: Record<string, unknown> = {}): UseLobby {
     // Both halves of the reconnect overlay (#110) — idle/false here, since
     // this fixture is about a session already settled, not one reconnecting.
     restoring: false,
+    bootstrapping: false,
     reconnect: { attempt: 0, maxAttempts: 5, status: 'idle', events: [], retry: vi.fn() },
     kick: vi.fn(),
     introReady: vi.fn(),
