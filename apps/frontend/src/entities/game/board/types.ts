@@ -188,6 +188,7 @@ export interface BoardRoom {
     status: 'trying' | 'failed'
     reason?: 'room-full'
   }
+  // Absent, the overlay offers no Retry (see Reconnect's `onRetry`).
   onReconnectRetry?: () => void
   onReconnectLeave?: () => void
   disconnected?: string[]

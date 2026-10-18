@@ -15,6 +15,7 @@ import {
   handover,
   type Outgoing,
   rebind,
+  refuseIntent,
   type Session,
   type SessionRef,
   seatOfPeer,
@@ -165,6 +166,10 @@ export function createRemoteLink(args: {
   }
 }
 
+// Diagnostic text on the rejection a suspended keeper answers with; never
+// shown to a player (the board reads that a rejection arrived, not why).
+export const SUSPENDED_REASON = 'keeper suspended'
+
 // The result of attaching a keeper to a session: message handling plus the
 // membership hooks a lobby-level caller drives on connect/disconnect.
 export interface KeeperHandle {
@@ -200,7 +205,7 @@ export interface KeeperHandle {
   introReady(peerId: string): void
   // The host is off the signaling broker. Until `resume` the ticker does not
   // advance the session and intents from every link — the keeper's own seat
-  // included — are dropped, so nobody is played or timed out over an outage
+  // included — are answered with a rejection and not reduced, so nobody is played or timed out over an outage
   // that is the host's. `resume` shifts every live deadline by the pause
   // (`resumeSession`) and resyncs the table. Both are idempotent.
   suspend(): void
@@ -292,9 +297,15 @@ export function attachKeeper(args: {
   const early: { peerId: string; intent: unknown }[] = []
 
   const applyNow = (peerId: string, intent: unknown) => {
-    // Dropped, not buffered: a peer whose intent is lost here sees no answer
-    // and acts again on the projection the resume resyncs.
-    if (pausedAt !== null) return
+    // Refused, not dropped and not buffered: the host's broker drop leaves
+    // live DataChannels up, so guests keep acting — and a board whose staged
+    // PLAY gets no answer keeps the card at the centre for good. The rejection
+    // is the answer an illegal action gets, so the board stands it down the
+    // same way. This covers the start gate's early buffer too: it drains here.
+    if (pausedAt !== null) {
+      save(refuseIntent(args.ref.current, peerId, intent, pausedAt, SUSPENDED_REASON))
+      return
+    }
     save(applyIntent(args.ref.current, peerId, intent, clock.now()))
   }
 

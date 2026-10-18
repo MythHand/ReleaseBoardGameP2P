@@ -1,10 +1,11 @@
-import type { PlayerId } from '@release/engine'
+import type { Event, PlayerId } from '@release/engine'
 import { createFakeEngine, FAKE_DECK, FAKE_EVENTS } from '@release/engine/fake'
 import type { Intent, Message, WireMessage } from '../types'
 import type { Ticker } from './link'
 import { createMemoryNetwork } from './memoryNetwork'
 import { ABSENT_GRACE_MS, createSession, type Session, type SessionRef } from './referee'
-import { attachKeeper } from './remoteLink'
+import { attachKeeper, SUSPENDED_REASON } from './remoteLink'
+import { createStartGate, type StartGate } from './startGate'
 import { resumeSession } from './suspend'
 
 const TICK_MS = 250
@@ -129,7 +130,7 @@ it('resumeSession restamps absent humans and leaves bots', () => {
 
 // The table passivePlay.test.ts builds, trimmed to the keeper and one remote
 // human: the seed that hands the turn cleanly to p2.
-function table() {
+function table(options: { gate?: StartGate } = {}) {
   const clock = { at: 1_000_000 }
   const players = [
     { playerId: 'p1', peerId: peerOf('p1'), name: 'Ann' },
@@ -147,6 +148,9 @@ function table() {
   })
   const ref: SessionRef = { current: session }
   const network = createMemoryNetwork(players.map((p) => p.peerId))
+  // Every frame the guest's board receives, so a test can read its answers.
+  const inbox: WireMessage[] = []
+  network.onDeliver(peerOf('p2'), (received) => inbox.push(received))
   const ticker = manualTicker(clock)
   const keeper = attachKeeper({
     ref,
@@ -154,6 +158,7 @@ function table() {
     now: () => clock.at,
     monotonicNow: () => clock.at,
     ticker,
+    gate: options.gate,
   })
   let seq = 0
   const frame = (from: string, message: Message) =>
@@ -180,14 +185,22 @@ function table() {
     ticker.fire()
     present()
   }
+  if (options.gate) return { ref, clock, keeper, send, tick, inbox, present }
   present()
   tick()
   send('p1', { type: 'DRAW' })
   send('p1', { type: 'PUSH' })
   tick()
   if (ref.current.state.turn.player !== 'p2') throw new Error('the turn never reached p2')
-  return { ref, clock, keeper, send, tick }
+  return { ref, clock, keeper, send, tick, inbox, present }
 }
+
+// The rejections in every SYNC the guest received since `since`.
+const rejectionsAt = (inbox: WireMessage[], since: number) =>
+  inbox
+    .slice(since)
+    .flatMap((frame) => (frame.type === 'SYNC' ? (frame.payload.events ?? []) : []))
+    .filter((event) => event.type === 'rejected')
 
 // Review Focus 5: an outage that is the host's must not be spent as the
 // guests' time. The guest's channel closes with the host's network, so the
@@ -223,20 +236,80 @@ it('a seat that dropped during the suspension gets its full grace after resume',
   expect(t.ref.current.log.slice(since)).toEqual([])
 })
 
-it('a suspended keeper drops intents, its own included', () => {
+// Losing the broker does not close live DataChannels, so a guest keeps
+// acting. An unanswered PLAY would leave its board's staged card at the centre
+// for good; the refusal is the answer an illegal action gets.
+it('a suspended keeper rejects a guest PLAY and accepts it after resume', () => {
   const t = table()
-  const before = t.ref.current
-  t.keeper.suspend()
   t.send('p2', { type: 'DRAW' })
+  const view = t.ref.current.engine.project(t.ref.current.state, 'p2')
+  const card = view.self?.playable[0]
+  if (!card) throw new Error('p2 holds nothing playable at this seed')
+
+  t.keeper.suspend()
+  const before = t.ref.current.state
+  const since = t.inbox.length
+  t.send('p2', { type: 'PLAY', card })
+  expect(t.ref.current.state).toBe(before)
+  expect(rejectionsAt(t.inbox, since)).toEqual([
+    expect.objectContaining({
+      type: 'rejected',
+      reason: SUSPENDED_REASON,
+      action: expect.objectContaining({ type: 'PLAY', card, player: 'p2' }),
+    }),
+  ])
+
+  t.keeper.resume()
+  const after = t.inbox.length
+  t.send('p2', { type: 'PLAY', card })
+  expect(t.ref.current.state).not.toBe(before)
+  expect(rejectionsAt(t.inbox, after)).toEqual([])
+})
+
+it("a suspended keeper rejects its own seat's intent through its local link", () => {
+  const t = table()
+  const local: Event[] = []
+  t.keeper.link.subscribe((sync) => local.push(...sync.events))
+  t.keeper.suspend()
+  const before = t.ref.current.state
   t.keeper.link.submit({ type: 'DRAW' })
-  expect(t.ref.current.state).toBe(before.state)
-  // Idempotent both ways: a second resume does not shift the clocks again.
+  expect(t.ref.current.state).toBe(before)
+  expect(local).toEqual([expect.objectContaining({ type: 'rejected', reason: SUSPENDED_REASON })])
+})
+
+it('suspend and resume are idempotent', () => {
+  const t = table()
   t.keeper.suspend()
   t.clock.at += 5_000
+  t.keeper.suspend()
+  t.clock.at += 5_000
+  const deadline = t.ref.current.state.turn.deadline as number
   t.keeper.resume()
-  const deadline = t.ref.current.state.turn.deadline
+  expect(t.ref.current.state.turn.deadline).toBe(deadline + 10_000)
   t.keeper.resume()
-  expect(t.ref.current.state.turn.deadline).toBe(deadline)
-  t.send('p2', { type: 'DRAW' })
-  expect(t.ref.current.state).not.toBe(before.state)
+  expect(t.ref.current.state.turn.deadline).toBe(deadline + 10_000)
+})
+
+// The start gate's early buffer drains through the same path, so an intent
+// sent during the intro and released by the gate mid-suspension is refused as
+// well — not reduced, and not lost without an answer. The keeper's own seat
+// is on turn, so its DRAW would be legal: only the suspension refuses it.
+it('early intents the start gate releases during a suspension are rejected', () => {
+  const gate = createStartGate({ expect: ['p1', 'p2'], capMs: 60_000 })
+  const t = table({ gate })
+  const local: Event[] = []
+  t.keeper.link.subscribe((sync) => local.push(...sync.events))
+  t.keeper.link.submit({ type: 'DRAW' })
+  expect(local).toEqual([])
+  t.keeper.suspend()
+  const logged = t.ref.current.log.length
+  t.keeper.introReady(peerOf('p1'))
+  t.keeper.introReady(peerOf('p2'))
+  expect(gate.open).toBe(true)
+  expect(t.ref.current.log.slice(logged).filter((e) => e.type === 'drawn')).toEqual([])
+  expect(t.ref.current.state.turn.drawnFrom).toEqual([])
+  expect(local.filter((e) => e.type === 'rejected')).toEqual([
+    expect.objectContaining({ type: 'rejected', reason: SUSPENDED_REASON }),
+  ])
+  gate.cancel()
 })

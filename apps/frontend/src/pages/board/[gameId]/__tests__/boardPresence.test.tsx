@@ -174,6 +174,9 @@ it('shows the reconnect overlay while the host is off the signaling broker', asy
   renderBoardWith()
   expect(await screen.findByText('Bo')).toBeTruthy()
   expect(await screen.findByText(/^(reconnecting…|переподключение…)$/i)).toBeTruthy()
+  // The transport re-registers on its own; a Retry here would do nothing.
+  expect(screen.queryByText(/^(reconnect|переподключиться)$/i)).toBeNull()
+  expect(screen.getByText(/^(leave|выйти)$/i)).toBeTruthy()
 })
 
 it('shows the reconnect overlay while a guest is dialing its way back', async () => {

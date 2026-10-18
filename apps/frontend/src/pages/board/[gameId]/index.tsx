@@ -202,14 +202,14 @@ export default function BoardPage() {
           spectatorLimit: session.state?.maxSpectators,
           onSpectatorLimitChange: session.isHost ? session.setMaxSpectators : undefined,
           disconnected,
-          // The overlay covers both ways a peer can be off the table: a guest
-          // dialing its way back, and a host rebuilding the match it was
-          // keeping. `restoring` is the host's half — without it the host
-          // stares at an empty board for the length of the restore with
-          // nothing saying why. `hostOffline` is the host off the signaling
-          // broker mid-match: its keeper is frozen until the broker is back,
-          // so the table it shows is not running. `reconnect.status` stays 'failed' (not
-          // 'idle') once every attempt is spent, so the overlay must keep
+          // The overlay covers every way a peer can be off the table: a guest
+          // dialing its way back, a host rebuilding the match it was keeping,
+          // and a host off the signaling broker mid-match. `restoring` is the
+          // second — without it the host stares at an empty board for the
+          // length of the restore with nothing saying why. `hostOffline` is
+          // the third: the keeper is frozen until the broker is back, so the
+          // table on screen is not running. `reconnect.status` stays 'failed'
+          // (not 'idle') once every attempt is spent, so the overlay must keep
           // showing then too — 'trying' alone would drop it the moment the
           // dial gives up, right when the player needs the retry/leave choice.
           connection:
@@ -222,7 +222,9 @@ export default function BoardPage() {
             status: session.reconnect.status === 'failed' ? 'failed' : 'trying',
             reason: session.errorKind === 'room-full' ? 'room-full' : undefined,
           },
-          onReconnectRetry: session.reconnect.retry,
+          // A host off the broker has nothing to retry: the transport
+          // re-registers on its own, so the overlay offers Leave alone.
+          onReconnectRetry: session.hostOffline ? undefined : session.reconnect.retry,
           onReconnectLeave: () => {
             session.leaveSession()
             void navigate('/start')

@@ -26,6 +26,7 @@ import {
 import { AVATAR_IDS } from './lobby/profile'
 import { backoffMs, MAX_RECONNECT_ATTEMPTS } from './session/reconnect'
 import { createSession, type Seat as RefereeSeat } from './session/referee'
+import { SUSPENDED_REASON } from './session/remoteLink'
 import { INTRO_CAP_MS } from './session/startGate'
 import { createTransport } from './transport/peer'
 import type { Message, Setup, WireMessage } from './types'
@@ -2324,7 +2325,7 @@ async function hostWithOpenGame(): Promise<ReturnType<typeof renderHook>> {
   return rendered
 }
 
-it('host status stays in-game across a signaling drop', async () => {
+it('a host off the broker keeps its match: status, game id and no error status', async () => {
   vi.useFakeTimers()
   try {
     const hosted = await hostWithOpenGame()
@@ -2349,6 +2350,51 @@ it('host status stays in-game across a signaling drop', async () => {
     expect(hosted.result.current.hostOffline).toBe(false)
     expect(hosted.result.current.status).toBe('in-lobby')
     expect(hosted.result.current.gameId).toBe(gameId)
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+// The order the restore and a match start can race in: the broker drops
+// before a keeper exists. The keeper attached afterwards must not run.
+it('a keeper attached while the host is off the broker starts suspended', async () => {
+  vi.useFakeTimers()
+  try {
+    const rendered = await hostWithGuest()
+    act(() => {
+      transports[0].onSignaling?.('lost')
+    })
+    const random = vi.spyOn(crypto, 'getRandomValues').mockImplementation((values) => {
+      if (values instanceof Uint32Array) values[0] = 1
+      return values
+    })
+    act(() => {
+      rendered.result.current.startGame([])
+    })
+    random.mockRestore()
+    act(() => {
+      rendered.result.current.introReady()
+      transports[0].onMessage?.({
+        type: 'INTRO_READY',
+        payload: { gameId: rendered.result.current.gameId },
+        from: GUEST,
+      } as WireMessage)
+    })
+    const suspended = () =>
+      (rendered.result.current.gameSync?.rejections ?? []).filter(
+        (e) => e.type === 'rejected' && e.reason === SUSPENDED_REASON,
+      ).length
+    act(() => {
+      rendered.result.current.gameLink?.submit({ type: 'DRAW' })
+    })
+    expect(suspended()).toBe(1)
+    act(() => {
+      transports[0].onSignaling?.('restored')
+    })
+    act(() => {
+      rendered.result.current.gameLink?.submit({ type: 'DRAW' })
+    })
+    expect(suspended()).toBe(1)
   } finally {
     vi.useRealTimers()
   }

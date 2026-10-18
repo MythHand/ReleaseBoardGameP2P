@@ -2485,7 +2485,7 @@ function BoardView({
           maxAttempts={room.reconnect?.maxAttempts ?? 5}
           status={room.reconnect?.status ?? 'trying'}
           reason={room.reconnect?.reason}
-          onRetry={room.onReconnectRetry ?? (() => {})}
+          onRetry={room.onReconnectRetry}
           onLeave={room.onReconnectLeave ?? (() => {})}
         />
       )}

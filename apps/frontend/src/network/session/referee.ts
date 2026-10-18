@@ -636,19 +636,53 @@ export function applyIntent(
   // Referential, not structural: `reduce` hands back the identical object when
   // it refuses an action, which is exactly what "nothing happened" means here.
   // The event ids of consecutive rejections repeat, so they cannot be compared.
-  if (state === session.state) {
-    const message: Message = {
-      type: 'SYNC',
-      payload: {
-        view: session.engine.project(session.state, seat.playerId),
-        events: rejectionsIn(events),
-      },
-    }
-    return { session, outgoing: [{ to: fromPeerId, message }] }
-  }
+  if (state === session.state) return rejection(session, seat.playerId, fromPeerId, events)
 
   const next: Session = { ...session, state, log: [...session.log, ...events] }
   return presentResult(session, { session: next, outgoing: syncAll(next, events) }, now)
+}
+
+// The answer to a refused action: the sender's own unchanged projection plus
+// the rejection, to the sender alone. The board leaves its staged move on the
+// `rejected` event, so a refusal that sent nothing would leave the card hanging
+// at the centre.
+function rejection(
+  session: Session,
+  playerId: PlayerId,
+  fromPeerId: string,
+  events: Event[],
+): SessionResult {
+  const message: Message = {
+    type: 'SYNC',
+    payload: {
+      view: session.engine.project(session.state, playerId),
+      events: rejectionsIn(events),
+    },
+  }
+  return { session, outgoing: [{ to: fromPeerId, message }] }
+}
+
+// An intent the keeper will not reduce right now, answered exactly as an
+// illegal one is: through `rejection`, with the session untouched. The same
+// trust boundary as `applyIntent` comes first — no seat, or not a peer intent,
+// is dropped in silence. SURRENDER goes through `applyIntent` unchanged: it
+// reduces nothing, only marks the seat, and a player leaving the match must
+// not have that mark lost.
+export function refuseIntent(
+  session: Session,
+  fromPeerId: string,
+  intent: unknown,
+  now: number,
+  reason: string,
+): SessionResult {
+  const seat = seatOfPeer(session, fromPeerId)
+  if (!seat || !isPeerIntent(intent)) return { session, outgoing: [] }
+  if (intent.type === 'SURRENDER') return applyIntent(session, fromPeerId, intent, now)
+  const action = { ...intent, player: seat.playerId, at: now } as Action
+  // Numbered the way the engine numbers its own rejections: the next event id,
+  // which a rejection never consumes.
+  const event = { type: 'rejected', action, reason, id: session.state.eventSeq + 1 } as Event
+  return rejection(session, seat.playerId, fromPeerId, [event])
 }
 
 // Voluntary only. A keeper that crashes takes GameState and the seed with it,
