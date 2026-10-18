@@ -216,9 +216,12 @@ export default function BoardPage() {
             session.restoring || session.hostOffline || session.reconnect.status !== 'idle'
               ? 'reconnecting'
               : 'online',
+          // The attempt counter is the guest's dial. A host in the overlay is
+          // restoring or waiting for the broker, not dialing anyone: 0 of 0
+          // keeps the overlay from printing an "attempt n/m" line for it.
           reconnect: {
-            attempt: session.reconnect.attempt,
-            maxAttempts: session.reconnect.maxAttempts,
+            attempt: session.isHost ? 0 : session.reconnect.attempt,
+            maxAttempts: session.isHost ? 0 : session.reconnect.maxAttempts,
             status: session.reconnect.status === 'failed' ? 'failed' : 'trying',
             reason: session.errorKind === 'room-full' ? 'room-full' : undefined,
           },

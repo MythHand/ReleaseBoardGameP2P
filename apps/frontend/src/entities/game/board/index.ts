@@ -1,3 +1,4 @@
+export { GUEST_RECONNECT_ATTEMPTS } from '~/network/session/reconnect'
 export { glowsFor } from './alarm'
 export { type BoardAnchors, useBoardAnchors } from './anchors'
 export {

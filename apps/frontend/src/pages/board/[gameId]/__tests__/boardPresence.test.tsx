@@ -186,6 +186,37 @@ it('shows the reconnect overlay while a guest is dialing its way back', async ()
   expect(await screen.findByText(/^(reconnecting…|переподключение…)$/i)).toBeTruthy()
 })
 
+it('prints no dial attempts in the overlay a host sees', async () => {
+  // A stale counter from an earlier dial must not surface on the host: it is
+  // restoring or waiting for the broker, not dialing anyone.
+  sessionValue = session({
+    hostOffline: true,
+    reconnect: { ...session().reconnect, attempt: 3, maxAttempts: 18 },
+    seats: [
+      { playerId: 'p1', peerId: 'me', name: 'Ann' },
+      { playerId: 'p2', peerId: 'bo', name: 'Bo' },
+    ],
+    gameSync: { view: realView('p1'), events: [] },
+  } as Partial<UseLobby>)
+  renderBoardWith()
+  expect(await screen.findByText(/^(reconnecting…|переподключение…)$/i)).toBeTruthy()
+  expect(screen.queryByText(/attempt \d+\/\d+/)).toBeNull()
+})
+
+it('prints the dial attempts in the overlay a guest sees', async () => {
+  sessionValue = session({
+    isHost: false,
+    reconnect: { ...session().reconnect, status: 'trying', attempt: 3, maxAttempts: 18 },
+    seats: [
+      { playerId: 'p1', peerId: 'me', name: 'Ann' },
+      { playerId: 'p2', peerId: 'bo', name: 'Bo' },
+    ],
+    gameSync: { view: realView('p1'), events: [] },
+  } as Partial<UseLobby>)
+  renderBoardWith()
+  expect(await screen.findByText(/attempt 3\/18/)).toBeTruthy()
+})
+
 it('stays online once the roster is complete and nothing is reconnecting', () => {
   sessionValue = session({
     state: {

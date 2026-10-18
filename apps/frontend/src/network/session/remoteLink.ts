@@ -204,10 +204,11 @@ export interface KeeperHandle {
   // remote seat's INTRO_READY takes: the seat is resolved from the connection.
   introReady(peerId: string): void
   // The host is off the signaling broker. Until `resume` the ticker does not
-  // advance the session and intents from every link — the keeper's own seat
-  // included — are answered with a rejection and not reduced, so nobody is played or timed out over an outage
-  // that is the host's. `resume` shifts every live deadline by the pause
-  // (`resumeSession`) and resyncs the table. Both are idempotent.
+  // advance the session, and intents from every link — the keeper's own seat
+  // included — are answered with a rejection and not reduced, so nobody is
+  // played or timed out over an outage that is the host's. `resume` shifts
+  // every live deadline by the pause (`resumeSession`) and resyncs the table.
+  // Both are idempotent.
   suspend(): void
   resume(): void
   close(): void
