@@ -2,11 +2,12 @@
 import i18n from 'i18next'
 import LanguageDetector from 'i18next-browser-languagedetector'
 import { initReactI18next } from 'react-i18next'
-import { en, ru } from './catalog'
+import { en, ru } from './common'
 
 // Re-export the React binding so the app has a single i18n surface
 // (`@release/translation`) and never imports `react-i18next` directly.
 export { Trans, useTranslation } from 'react-i18next'
+export { loadRules } from './rulesResources'
 
 export const resources = {
   en: { common: en },

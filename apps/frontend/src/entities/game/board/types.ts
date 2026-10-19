@@ -269,7 +269,7 @@ export interface BoardChromeCopy {
 export interface BoardCopyBundle {
   table: BoardChromeCopy
   modes: GameModesCopy
-  rules: RulesCopy
+  rules?: RulesCopy
   seat: SeatCopy
   participants: ParticipantsCopy
   history: MoveHistoryCopy
@@ -387,6 +387,7 @@ export interface IntroBeat {
 }
 
 export interface BoardSlots {
+  rules?: ReactNode
   // App-only chrome the playground has no equivalent of: navigation out of the
   // match, and the consumer's non-fatal error notice.
   corner?: ReactNode
