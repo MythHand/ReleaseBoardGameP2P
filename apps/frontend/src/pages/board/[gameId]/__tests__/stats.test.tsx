@@ -49,6 +49,7 @@ const zero = {
   attackedInto: 0,
   monitoring: 0,
   gitBranch: 0,
+  codeReview: 0,
 }
 
 beforeEach(() => {

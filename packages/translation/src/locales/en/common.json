@@ -110,6 +110,10 @@
         "title": "Woodcutter",
         "unit": "times split a deck"
       },
+      "codeReview": {
+        "title": "Nitpicker",
+        "unit": "releases under Code Review"
+      },
       "bugRunner": {
         "title": "Bug Runner",
         "unit": "points"

@@ -111,6 +111,10 @@ export default function StatsPage() {
         title: t('stats.achievements.gitBranch.title'),
         unit: t('stats.achievements.gitBranch.unit'),
       },
+      codeReview: {
+        title: t('stats.achievements.codeReview.title'),
+        unit: t('stats.achievements.codeReview.unit'),
+      },
     },
     bugRunner: {
       title: t('stats.achievements.bugRunner.title'),

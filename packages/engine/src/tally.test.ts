@@ -117,6 +117,20 @@ it('counts Git Branch plays and no other operation', () => {
   expect(out.p2.gitBranch).toBe(1)
 })
 
+it('counts a release played with Code Review, and not one played without', () => {
+  const out = foldTally(base(), [
+    ev({
+      type: 'released',
+      player: 'p1',
+      slot: 'frontend',
+      card: 'release-frontend',
+      codeReview: 'support-code-review',
+    }),
+    ev({ type: 'released', player: 'p1', slot: 'backend', card: 'release-backend' }),
+  ])
+  expect(out.p1.codeReview).toBe(1)
+})
+
 it('counts an attack against the seat it was aimed at, landed or not', () => {
   // A Bug thrown at me is one attack against me whether I defended it or not —
   // whether it got through is what the defence column already says (design

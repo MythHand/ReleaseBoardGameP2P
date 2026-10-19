@@ -31,6 +31,7 @@ type MetricKey =
   | 'defense'
   | 'monitoring'
   | 'gitBranch'
+  | 'codeReview'
 
 export interface StatPlayer {
   id: string
@@ -51,6 +52,8 @@ export interface StatPlayer {
   monitoring: number
   // Git Branch played
   gitBranch: number
+  // releases played together with Code Review
+  codeReview: number
 }
 
 // One member's best in the lobby's mini-game. Anyone in the room can hold it,
@@ -118,7 +121,15 @@ interface StatsProps {
 
 // Accent of a plate — the whole HUD scheme of the achievement hangs on it:
 // border, bloom, rail, glow of the name, the counter chip.
-type AchTone = 'attack' | 'ai' | 'danger' | 'operation' | 'defense' | 'protection' | 'release'
+type AchTone =
+  | 'attack'
+  | 'ai'
+  | 'danger'
+  | 'operation'
+  | 'defense'
+  | 'protection'
+  | 'support'
+  | 'release'
 
 interface Achievement {
   key: MetricKey
@@ -139,6 +150,12 @@ interface Achievement {
 // operation / ai). Оба триггера цвета категории не имеют (`--cat-trigger`
 // технически белый), поэтому Error 503 берёт `--danger-accent` — токен, который
 // именно за 503 и закреплён.
+//
+// The ordinary plates are ordered by colour, not by meaning: no two of one colour
+// follow each other, so they do not touch in either grid — three columns or the
+// chat's two. A plate nobody won pulls the ones after it a cell back; with the
+// colours alternating along the whole order, same colours mostly stay apart then
+// too.
 const ACHIEVEMENTS: Achievement[] = [
   {
     key: 'attackedInto',
@@ -168,13 +185,14 @@ const ACHIEVEMENTS: Achievement[] = [
       'defense-hotfix',
     ],
   },
-  { key: 'ai', tone: 'ai', cards: ['trigger-ai'] },
-  { key: 'cherryPick', tone: 'operation', cards: ['operation-git-cherry-pick'] },
-  { key: 'err503', tone: 'danger', cards: ['trigger-error-503'] },
-  { key: 'ddos', tone: 'attack', cards: ['attack-ddos'] },
   // AI Monitoring counts too; the preview shows the Monitoring it plays as
   { key: 'monitoring', tone: 'protection', cards: ['protection-monitoring'] },
+  { key: 'cherryPick', tone: 'operation', cards: ['operation-git-cherry-pick'] },
+  { key: 'ddos', tone: 'attack', cards: ['attack-ddos'] },
+  { key: 'ai', tone: 'ai', cards: ['trigger-ai'] },
+  { key: 'codeReview', tone: 'support', cards: ['support-code-review'] },
   { key: 'gitBranch', tone: 'operation', cards: ['operation-git-branch'] },
+  { key: 'err503', tone: 'danger', cards: ['trigger-error-503'] },
 ]
 
 // Шаги кегля имени, от героя вниз. Что за строка придёт — экран не знает:
@@ -246,6 +264,7 @@ const TONE_CLASS: Record<AchTone, string> = {
   operation: styles.toneOperation,
   defense: styles.toneDefense,
   protection: styles.toneProtection,
+  support: styles.toneSupport,
   release: styles.toneRelease,
 }
 
