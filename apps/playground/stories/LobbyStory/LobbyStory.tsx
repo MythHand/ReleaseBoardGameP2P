@@ -61,6 +61,7 @@ export default function LobbyStory() {
           lobbyScreenCopy={{ ru: ruCommon.lobbyScreen, en: enCommon.lobbyScreen }}
           playerSettingsCopy={{ ru: ruCommon.playerSettings, en: enCommon.playerSettings }}
           meSpectator={me === 'spectator'}
+          version={import.meta.env.VITE_APP_VERSION}
         />
       </div>
     </div>

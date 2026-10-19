@@ -79,7 +79,10 @@ const sections: { title: string; items: Entry[] }[] = [
       },
       {
         role: { ru: 'Тег (Start)', en: 'Tag (Start)' },
-        sample: { ru: 'Открытый P2P-проект', en: 'Open P2P project' },
+        sample: {
+          ru: 'Beta · Открытый код · без игрового сервера',
+          en: 'Beta · Open source · no game server',
+        },
         style: {
           ...mono,
           fontSize: 12,

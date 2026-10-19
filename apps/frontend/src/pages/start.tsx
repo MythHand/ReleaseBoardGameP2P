@@ -13,7 +13,7 @@ export default function StartPage() {
   const handleMenuClick = useModalRoute()
   return (
     <ScreenShell
-      tags={[t('start.tagOpenP2P'), t('start.tagBoardCard')]}
+      tags={[t('start.tagProject'), t('start.tagBoardCard')]}
       description={t('start.description')}
       // the credits sit in the bottom corner: the column tightens to clear them
       fitHeight

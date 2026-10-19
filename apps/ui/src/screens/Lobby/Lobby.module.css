@@ -56,12 +56,32 @@
   margin: 0;
 }
 
+/* under the title row, one grey line: the beta mark and the version under the
+   logo, the subtitle under the word */
+.subRow {
+  display: flex;
+  align-items: baseline;
+  margin-block-start: 6px;
+  color: var(--white-45);
+}
+
+/* at least as wide as the logo and the divider beside it — лого 96 + gap 18 +
+   линия 1 + gap 18 — so the subtitle starts under «Лобби»; a longer version
+   pushes it on rather than running into it. The gap is a space of this face:
+   a 0.6em glyph and its 0.14em tracking. */
+.release {
+  box-sizing: border-box;
+  display: flex;
+  flex: none;
+  gap: 0.74em;
+  min-inline-size: 133px;
+  padding-inline-end: 12px;
+  margin: 0;
+}
+
 .sub {
   composes: label tk-14 from '../../design/typography.module.css';
-
-  /* выровнено под слово «Лобби»: лого 96 + gap 18 + линия 1 + gap 18 */
-  margin: 6px 0 0 133px;
-  color: var(--white-45);
+  margin: 0;
 }
 
 /* the mini-game takes whatever room the two sides of the header leave, and

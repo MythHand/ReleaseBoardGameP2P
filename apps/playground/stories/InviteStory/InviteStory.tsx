@@ -12,7 +12,7 @@ const COPY: Record<'ru' | 'en', InviteCopy> = {
   ru: {
     logoAlt: 'Release любой ценой',
     logoVariant: 'ru',
-    tags: ['Открытый P2P-проект', 'По настольной карточной игре'],
+    tags: ['Beta · Открытый код · без игрового сервера', 'По настольной карточной игре'],
     description:
       'Стратегическая карточная игра про реальные будни разработки. Баги, неожиданные события, атаки соперников — преодолевай всё это и зарелизь первым.',
     formTitle: 'Приглашение в игру',
@@ -43,7 +43,7 @@ const COPY: Record<'ru' | 'en', InviteCopy> = {
   en: {
     logoAlt: 'Release at any cost',
     logoVariant: 'en',
-    tags: ['Open P2P project', 'Based on the tabletop card game'],
+    tags: ['Beta · Open source · no game server', 'Based on the tabletop card game'],
     description:
       'A strategy card game about the real grind of software development. Bugs, sudden events, rival attacks — power through it all and ship your release first.',
     formTitle: 'Game invite',
