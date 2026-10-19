@@ -1,0 +1,5084 @@
+{
+  "source": {
+    "baseline": "5879517d9241f00964e310acfa1d50e78d640f75",
+    "after": "eb12eddf",
+    "node": "24.13.0",
+    "pnpm": "9.15.0",
+    "vite": "6.4.3"
+  },
+  "protocol": {
+    "viewport": [1440, 900],
+    "language": "en",
+    "cpuSlowdown": 4,
+    "latencyMs": 150,
+    "downloadBytesPerSecond": 200000,
+    "uploadBytesPerSecond": 93750,
+    "visitsPerUrl": 5,
+    "cacheAndStorage": "fresh context; CDP cache disabled",
+    "observation": "10 seconds after load",
+    "delivery": "same local gzip HTTP server; final timing run after test suite"
+  },
+  "baseline": [
+    {
+      "fcp": 2904,
+      "lcp": {
+        "time": 4000,
+        "element": "IMG",
+        "id": "_image_1xixq_54"
+      },
+      "requests": [
+        {
+          "url": "/ReleaseBoardGameP2P/assets/index-CvPwj5_g.js",
+          "bytes": 372682,
+          "encoded": 372382
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/index-CKuN60SI.css",
+          "bytes": 24509,
+          "encoded": 24209
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/JetBrainsMono-VariableFont_wght-ByLpDV2T.woff2",
+          "bytes": 73065,
+          "encoded": 72765
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/photo-CnpmufjY.jpg",
+          "bytes": 96267,
+          "encoded": 95967
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/FiraMono-Regular-DZfKlnWR.woff2",
+          "bytes": 62882,
+          "encoded": 62582
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/rubber-ducky-CPgscgOX.png",
+          "bytes": 44840,
+          "encoded": 44540
+        }
+      ],
+      "text": "RU\nEN\nOPEN P2P PROJECT\nBOARD CARD GAME\n\nA strategic card game about the real grind of software development. Bugs, surprise events, rivals' attacks — beat it all",
+      "route": "",
+      "version": "148.0.7778.96",
+      "failures": [],
+      "metrics": [
+        {
+          "name": "Timestamp",
+          "value": 738364.946178
+        },
+        {
+          "name": "AudioHandlers",
+          "value": 0
+        },
+        {
+          "name": "AudioWorkletProcessors",
+          "value": 0
+        },
+        {
+          "name": "Documents",
+          "value": 3
+        },
+        {
+          "name": "Frames",
+          "value": 1
+        },
+        {
+          "name": "JSEventListeners",
+          "value": 157
+        },
+        {
+          "name": "LayoutObjects",
+          "value": 176
+        },
+        {
+          "name": "MediaKeySessions",
+          "value": 0
+        },
+        {
+          "name": "MediaKeys",
+          "value": 0
+        },
+        {
+          "name": "Nodes",
+          "value": 231
+        },
+        {
+          "name": "Resources",
+          "value": 9
+        },
+        {
+          "name": "ContextLifecycleStateObservers",
+          "value": 4
+        },
+        {
+          "name": "V8PerContextDatas",
+          "value": 4
+        },
+        {
+          "name": "WorkerGlobalScopes",
+          "value": 0
+        },
+        {
+          "name": "UACSSResources",
+          "value": 0
+        },
+        {
+          "name": "RTCPeerConnections",
+          "value": 1
+        },
+        {
+          "name": "ResourceFetchers",
+          "value": 3
+        },
+        {
+          "name": "AdSubframes",
+          "value": 0
+        },
+        {
+          "name": "DetachedScriptStates",
+          "value": 2
+        },
+        {
+          "name": "ArrayBufferContents",
+          "value": 0
+        },
+        {
+          "name": "LayoutCount",
+          "value": 7
+        },
+        {
+          "name": "RecalcStyleCount",
+          "value": 63
+        },
+        {
+          "name": "LayoutDuration",
+          "value": 0.185272
+        },
+        {
+          "name": "RecalcStyleDuration",
+          "value": 0.029834
+        },
+        {
+          "name": "DevToolsCommandDuration",
+          "value": 0.007367
+        },
+        {
+          "name": "ScriptDuration",
+          "value": 0.298914
+        },
+        {
+          "name": "V8CompileDuration",
+          "value": 0
+        },
+        {
+          "name": "TaskDuration",
+          "value": 0.6677
+        },
+        {
+          "name": "TaskOtherDuration",
+          "value": 0.146313
+        },
+        {
+          "name": "ThreadTime",
+          "value": 9.730515
+        },
+        {
+          "name": "ProcessTime",
+          "value": 10.533233
+        },
+        {
+          "name": "JSHeapUsedSize",
+          "value": 3966864
+        },
+        {
+          "name": "JSHeapTotalSize",
+          "value": 6291456
+        },
+        {
+          "name": "FirstMeaningfulPaint",
+          "value": 738355.294618
+        },
+        {
+          "name": "DomContentLoaded",
+          "value": 738354.931952
+        },
+        {
+          "name": "NavigationStart",
+          "value": 738352.391018
+        }
+      ]
+    },
+    {
+      "fcp": 2704,
+      "lcp": {
+        "time": 3740,
+        "element": "IMG",
+        "id": "_image_1xixq_54"
+      },
+      "requests": [
+        {
+          "url": "/ReleaseBoardGameP2P/assets/index-CvPwj5_g.js",
+          "bytes": 372682,
+          "encoded": 372382
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/index-CKuN60SI.css",
+          "bytes": 24509,
+          "encoded": 24209
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/JetBrainsMono-VariableFont_wght-ByLpDV2T.woff2",
+          "bytes": 73065,
+          "encoded": 72765
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/photo-CnpmufjY.jpg",
+          "bytes": 96267,
+          "encoded": 95967
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/FiraMono-Regular-DZfKlnWR.woff2",
+          "bytes": 62882,
+          "encoded": 62582
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/rubber-ducky-CPgscgOX.png",
+          "bytes": 44840,
+          "encoded": 44540
+        }
+      ],
+      "text": "RU\nEN\nOPEN P2P PROJECT\nBOARD CARD GAME\n\nA strategic card game about the real grind of software development. Bugs, surprise events, rivals' attacks — beat it all",
+      "route": "",
+      "version": "148.0.7778.96",
+      "failures": [],
+      "metrics": [
+        {
+          "name": "Timestamp",
+          "value": 738377.773715
+        },
+        {
+          "name": "AudioHandlers",
+          "value": 0
+        },
+        {
+          "name": "AudioWorkletProcessors",
+          "value": 0
+        },
+        {
+          "name": "Documents",
+          "value": 3
+        },
+        {
+          "name": "Frames",
+          "value": 1
+        },
+        {
+          "name": "JSEventListeners",
+          "value": 157
+        },
+        {
+          "name": "LayoutObjects",
+          "value": 176
+        },
+        {
+          "name": "MediaKeySessions",
+          "value": 0
+        },
+        {
+          "name": "MediaKeys",
+          "value": 0
+        },
+        {
+          "name": "Nodes",
+          "value": 231
+        },
+        {
+          "name": "Resources",
+          "value": 9
+        },
+        {
+          "name": "ContextLifecycleStateObservers",
+          "value": 4
+        },
+        {
+          "name": "V8PerContextDatas",
+          "value": 4
+        },
+        {
+          "name": "WorkerGlobalScopes",
+          "value": 0
+        },
+        {
+          "name": "UACSSResources",
+          "value": 0
+        },
+        {
+          "name": "RTCPeerConnections",
+          "value": 1
+        },
+        {
+          "name": "ResourceFetchers",
+          "value": 3
+        },
+        {
+          "name": "AdSubframes",
+          "value": 0
+        },
+        {
+          "name": "DetachedScriptStates",
+          "value": 2
+        },
+        {
+          "name": "ArrayBufferContents",
+          "value": 0
+        },
+        {
+          "name": "LayoutCount",
+          "value": 7
+        },
+        {
+          "name": "RecalcStyleCount",
+          "value": 63
+        },
+        {
+          "name": "LayoutDuration",
+          "value": 0.076094
+        },
+        {
+          "name": "RecalcStyleDuration",
+          "value": 0.024135
+        },
+        {
+          "name": "DevToolsCommandDuration",
+          "value": 0.00893
+        },
+        {
+          "name": "ScriptDuration",
+          "value": 0.238531
+        },
+        {
+          "name": "V8CompileDuration",
+          "value": 0
+        },
+        {
+          "name": "TaskDuration",
+          "value": 0.445267
+        },
+        {
+          "name": "TaskOtherDuration",
+          "value": 0.097577
+        },
+        {
+          "name": "ThreadTime",
+          "value": 9.665602
+        },
+        {
+          "name": "ProcessTime",
+          "value": 10.417617
+        },
+        {
+          "name": "JSHeapUsedSize",
+          "value": 3981408
+        },
+        {
+          "name": "JSHeapTotalSize",
+          "value": 6291456
+        },
+        {
+          "name": "FirstMeaningfulPaint",
+          "value": 738367.967537
+        },
+        {
+          "name": "DomContentLoaded",
+          "value": 738367.753526
+        },
+        {
+          "name": "NavigationStart",
+          "value": 738365.265322
+        }
+      ]
+    },
+    {
+      "fcp": 2720,
+      "lcp": {
+        "time": 3756,
+        "element": "IMG",
+        "id": "_image_1xixq_54"
+      },
+      "requests": [
+        {
+          "url": "/ReleaseBoardGameP2P/assets/index-CvPwj5_g.js",
+          "bytes": 372682,
+          "encoded": 372382
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/index-CKuN60SI.css",
+          "bytes": 24509,
+          "encoded": 24209
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/JetBrainsMono-VariableFont_wght-ByLpDV2T.woff2",
+          "bytes": 73065,
+          "encoded": 72765
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/photo-CnpmufjY.jpg",
+          "bytes": 96267,
+          "encoded": 95967
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/FiraMono-Regular-DZfKlnWR.woff2",
+          "bytes": 62882,
+          "encoded": 62582
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/rubber-ducky-CPgscgOX.png",
+          "bytes": 44840,
+          "encoded": 44540
+        }
+      ],
+      "text": "RU\nEN\nOPEN P2P PROJECT\nBOARD CARD GAME\n\nA strategic card game about the real grind of software development. Bugs, surprise events, rivals' attacks — beat it all",
+      "route": "",
+      "version": "148.0.7778.96",
+      "failures": [],
+      "metrics": [
+        {
+          "name": "Timestamp",
+          "value": 738390.617182
+        },
+        {
+          "name": "AudioHandlers",
+          "value": 0
+        },
+        {
+          "name": "AudioWorkletProcessors",
+          "value": 0
+        },
+        {
+          "name": "Documents",
+          "value": 3
+        },
+        {
+          "name": "Frames",
+          "value": 1
+        },
+        {
+          "name": "JSEventListeners",
+          "value": 157
+        },
+        {
+          "name": "LayoutObjects",
+          "value": 176
+        },
+        {
+          "name": "MediaKeySessions",
+          "value": 0
+        },
+        {
+          "name": "MediaKeys",
+          "value": 0
+        },
+        {
+          "name": "Nodes",
+          "value": 231
+        },
+        {
+          "name": "Resources",
+          "value": 9
+        },
+        {
+          "name": "ContextLifecycleStateObservers",
+          "value": 4
+        },
+        {
+          "name": "V8PerContextDatas",
+          "value": 4
+        },
+        {
+          "name": "WorkerGlobalScopes",
+          "value": 0
+        },
+        {
+          "name": "UACSSResources",
+          "value": 0
+        },
+        {
+          "name": "RTCPeerConnections",
+          "value": 1
+        },
+        {
+          "name": "ResourceFetchers",
+          "value": 3
+        },
+        {
+          "name": "AdSubframes",
+          "value": 0
+        },
+        {
+          "name": "DetachedScriptStates",
+          "value": 2
+        },
+        {
+          "name": "ArrayBufferContents",
+          "value": 0
+        },
+        {
+          "name": "LayoutCount",
+          "value": 7
+        },
+        {
+          "name": "RecalcStyleCount",
+          "value": 64
+        },
+        {
+          "name": "LayoutDuration",
+          "value": 0.077254
+        },
+        {
+          "name": "RecalcStyleDuration",
+          "value": 0.022641
+        },
+        {
+          "name": "DevToolsCommandDuration",
+          "value": 0.005398
+        },
+        {
+          "name": "ScriptDuration",
+          "value": 0.245568
+        },
+        {
+          "name": "V8CompileDuration",
+          "value": 0
+        },
+        {
+          "name": "TaskDuration",
+          "value": 0.450164
+        },
+        {
+          "name": "TaskOtherDuration",
+          "value": 0.099303
+        },
+        {
+          "name": "ThreadTime",
+          "value": 9.652819
+        },
+        {
+          "name": "ProcessTime",
+          "value": 10.424322
+        },
+        {
+          "name": "JSHeapUsedSize",
+          "value": 3982036
+        },
+        {
+          "name": "JSHeapTotalSize",
+          "value": 6291456
+        },
+        {
+          "name": "FirstMeaningfulPaint",
+          "value": 738380.836776
+        },
+        {
+          "name": "DomContentLoaded",
+          "value": 738380.606799
+        },
+        {
+          "name": "NavigationStart",
+          "value": 738378.120404
+        }
+      ]
+    },
+    {
+      "fcp": 2780,
+      "lcp": {
+        "time": 3816,
+        "element": "IMG",
+        "id": "_image_1xixq_54"
+      },
+      "requests": [
+        {
+          "url": "/ReleaseBoardGameP2P/assets/index-CvPwj5_g.js",
+          "bytes": 372682,
+          "encoded": 372382
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/index-CKuN60SI.css",
+          "bytes": 24509,
+          "encoded": 24209
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/JetBrainsMono-VariableFont_wght-ByLpDV2T.woff2",
+          "bytes": 73065,
+          "encoded": 72765
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/photo-CnpmufjY.jpg",
+          "bytes": 96267,
+          "encoded": 95967
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/FiraMono-Regular-DZfKlnWR.woff2",
+          "bytes": 62882,
+          "encoded": 62582
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/rubber-ducky-CPgscgOX.png",
+          "bytes": 44840,
+          "encoded": 44540
+        }
+      ],
+      "text": "RU\nEN\nOPEN P2P PROJECT\nBOARD CARD GAME\n\nA strategic card game about the real grind of software development. Bugs, surprise events, rivals' attacks — beat it all",
+      "route": "",
+      "version": "148.0.7778.96",
+      "failures": [],
+      "metrics": [
+        {
+          "name": "Timestamp",
+          "value": 738403.450423
+        },
+        {
+          "name": "AudioHandlers",
+          "value": 0
+        },
+        {
+          "name": "AudioWorkletProcessors",
+          "value": 0
+        },
+        {
+          "name": "Documents",
+          "value": 3
+        },
+        {
+          "name": "Frames",
+          "value": 1
+        },
+        {
+          "name": "JSEventListeners",
+          "value": 157
+        },
+        {
+          "name": "LayoutObjects",
+          "value": 176
+        },
+        {
+          "name": "MediaKeySessions",
+          "value": 0
+        },
+        {
+          "name": "MediaKeys",
+          "value": 0
+        },
+        {
+          "name": "Nodes",
+          "value": 231
+        },
+        {
+          "name": "Resources",
+          "value": 9
+        },
+        {
+          "name": "ContextLifecycleStateObservers",
+          "value": 4
+        },
+        {
+          "name": "V8PerContextDatas",
+          "value": 4
+        },
+        {
+          "name": "WorkerGlobalScopes",
+          "value": 0
+        },
+        {
+          "name": "UACSSResources",
+          "value": 0
+        },
+        {
+          "name": "RTCPeerConnections",
+          "value": 1
+        },
+        {
+          "name": "ResourceFetchers",
+          "value": 3
+        },
+        {
+          "name": "AdSubframes",
+          "value": 0
+        },
+        {
+          "name": "DetachedScriptStates",
+          "value": 2
+        },
+        {
+          "name": "ArrayBufferContents",
+          "value": 0
+        },
+        {
+          "name": "LayoutCount",
+          "value": 7
+        },
+        {
+          "name": "RecalcStyleCount",
+          "value": 62
+        },
+        {
+          "name": "LayoutDuration",
+          "value": 0.082588
+        },
+        {
+          "name": "RecalcStyleDuration",
+          "value": 0.022705
+        },
+        {
+          "name": "DevToolsCommandDuration",
+          "value": 0.006307
+        },
+        {
+          "name": "ScriptDuration",
+          "value": 0.295939
+        },
+        {
+          "name": "V8CompileDuration",
+          "value": 0
+        },
+        {
+          "name": "TaskDuration",
+          "value": 0.506598
+        },
+        {
+          "name": "TaskOtherDuration",
+          "value": 0.099059
+        },
+        {
+          "name": "ThreadTime",
+          "value": 9.690493
+        },
+        {
+          "name": "ProcessTime",
+          "value": 10.425082
+        },
+        {
+          "name": "JSHeapUsedSize",
+          "value": 3953572
+        },
+        {
+          "name": "JSHeapTotalSize",
+          "value": 6291456
+        },
+        {
+          "name": "FirstMeaningfulPaint",
+          "value": 738393.675381
+        },
+        {
+          "name": "DomContentLoaded",
+          "value": 738393.440599
+        },
+        {
+          "name": "NavigationStart",
+          "value": 738390.898932
+        }
+      ]
+    },
+    {
+      "fcp": 2724,
+      "lcp": {
+        "time": 3760,
+        "element": "IMG",
+        "id": "_image_1xixq_54"
+      },
+      "requests": [
+        {
+          "url": "/ReleaseBoardGameP2P/assets/index-CvPwj5_g.js",
+          "bytes": 372682,
+          "encoded": 372382
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/index-CKuN60SI.css",
+          "bytes": 24509,
+          "encoded": 24209
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/JetBrainsMono-VariableFont_wght-ByLpDV2T.woff2",
+          "bytes": 73065,
+          "encoded": 72765
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/photo-CnpmufjY.jpg",
+          "bytes": 96267,
+          "encoded": 95967
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/FiraMono-Regular-DZfKlnWR.woff2",
+          "bytes": 62882,
+          "encoded": 62582
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/rubber-ducky-CPgscgOX.png",
+          "bytes": 44840,
+          "encoded": 44540
+        }
+      ],
+      "text": "RU\nEN\nOPEN P2P PROJECT\nBOARD CARD GAME\n\nA strategic card game about the real grind of software development. Bugs, surprise events, rivals' attacks — beat it all",
+      "route": "",
+      "version": "148.0.7778.96",
+      "failures": [],
+      "metrics": [
+        {
+          "name": "Timestamp",
+          "value": 738416.293132
+        },
+        {
+          "name": "AudioHandlers",
+          "value": 0
+        },
+        {
+          "name": "AudioWorkletProcessors",
+          "value": 0
+        },
+        {
+          "name": "Documents",
+          "value": 3
+        },
+        {
+          "name": "Frames",
+          "value": 1
+        },
+        {
+          "name": "JSEventListeners",
+          "value": 157
+        },
+        {
+          "name": "LayoutObjects",
+          "value": 176
+        },
+        {
+          "name": "MediaKeySessions",
+          "value": 0
+        },
+        {
+          "name": "MediaKeys",
+          "value": 0
+        },
+        {
+          "name": "Nodes",
+          "value": 231
+        },
+        {
+          "name": "Resources",
+          "value": 9
+        },
+        {
+          "name": "ContextLifecycleStateObservers",
+          "value": 4
+        },
+        {
+          "name": "V8PerContextDatas",
+          "value": 4
+        },
+        {
+          "name": "WorkerGlobalScopes",
+          "value": 0
+        },
+        {
+          "name": "UACSSResources",
+          "value": 0
+        },
+        {
+          "name": "RTCPeerConnections",
+          "value": 1
+        },
+        {
+          "name": "ResourceFetchers",
+          "value": 3
+        },
+        {
+          "name": "AdSubframes",
+          "value": 0
+        },
+        {
+          "name": "DetachedScriptStates",
+          "value": 2
+        },
+        {
+          "name": "ArrayBufferContents",
+          "value": 0
+        },
+        {
+          "name": "LayoutCount",
+          "value": 7
+        },
+        {
+          "name": "RecalcStyleCount",
+          "value": 60
+        },
+        {
+          "name": "LayoutDuration",
+          "value": 0.077797
+        },
+        {
+          "name": "RecalcStyleDuration",
+          "value": 0.021083
+        },
+        {
+          "name": "DevToolsCommandDuration",
+          "value": 0.007324
+        },
+        {
+          "name": "ScriptDuration",
+          "value": 0.259162
+        },
+        {
+          "name": "V8CompileDuration",
+          "value": 0
+        },
+        {
+          "name": "TaskDuration",
+          "value": 0.477994
+        },
+        {
+          "name": "TaskOtherDuration",
+          "value": 0.112628
+        },
+        {
+          "name": "ThreadTime",
+          "value": 9.686723
+        },
+        {
+          "name": "ProcessTime",
+          "value": 10.519772
+        },
+        {
+          "name": "JSHeapUsedSize",
+          "value": 3777896
+        },
+        {
+          "name": "JSHeapTotalSize",
+          "value": 6815744
+        },
+        {
+          "name": "FirstMeaningfulPaint",
+          "value": 738406.500823
+        },
+        {
+          "name": "DomContentLoaded",
+          "value": 738406.27672
+        },
+        {
+          "name": "NavigationStart",
+          "value": 738403.777022
+        }
+      ]
+    },
+    {
+      "fcp": 2736,
+      "lcp": {
+        "time": 3768,
+        "element": "IMG",
+        "id": "_image_1xixq_54"
+      },
+      "requests": [
+        {
+          "url": "/ReleaseBoardGameP2P/assets/index-CvPwj5_g.js",
+          "bytes": 372682,
+          "encoded": 372382
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/index-CKuN60SI.css",
+          "bytes": 24509,
+          "encoded": 24209
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/JetBrainsMono-VariableFont_wght-ByLpDV2T.woff2",
+          "bytes": 73065,
+          "encoded": 72765
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/photo-CnpmufjY.jpg",
+          "bytes": 96267,
+          "encoded": 95967
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/FiraMono-Regular-DZfKlnWR.woff2",
+          "bytes": 62882,
+          "encoded": 62582
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/rubber-ducky-CPgscgOX.png",
+          "bytes": 44840,
+          "encoded": 44540
+        }
+      ],
+      "text": "RU\nEN\nOPEN P2P PROJECT\nBOARD CARD GAME\n\nA strategic card game about the real grind of software development. Bugs, surprise events, rivals' attacks — beat it all",
+      "route": "start",
+      "version": "148.0.7778.96",
+      "failures": [],
+      "metrics": [
+        {
+          "name": "Timestamp",
+          "value": 738429.187235
+        },
+        {
+          "name": "AudioHandlers",
+          "value": 0
+        },
+        {
+          "name": "AudioWorkletProcessors",
+          "value": 0
+        },
+        {
+          "name": "Documents",
+          "value": 3
+        },
+        {
+          "name": "Frames",
+          "value": 1
+        },
+        {
+          "name": "JSEventListeners",
+          "value": 157
+        },
+        {
+          "name": "LayoutObjects",
+          "value": 176
+        },
+        {
+          "name": "MediaKeySessions",
+          "value": 0
+        },
+        {
+          "name": "MediaKeys",
+          "value": 0
+        },
+        {
+          "name": "Nodes",
+          "value": 231
+        },
+        {
+          "name": "Resources",
+          "value": 9
+        },
+        {
+          "name": "ContextLifecycleStateObservers",
+          "value": 4
+        },
+        {
+          "name": "V8PerContextDatas",
+          "value": 4
+        },
+        {
+          "name": "WorkerGlobalScopes",
+          "value": 0
+        },
+        {
+          "name": "UACSSResources",
+          "value": 0
+        },
+        {
+          "name": "RTCPeerConnections",
+          "value": 1
+        },
+        {
+          "name": "ResourceFetchers",
+          "value": 3
+        },
+        {
+          "name": "AdSubframes",
+          "value": 0
+        },
+        {
+          "name": "DetachedScriptStates",
+          "value": 2
+        },
+        {
+          "name": "ArrayBufferContents",
+          "value": 0
+        },
+        {
+          "name": "LayoutCount",
+          "value": 5
+        },
+        {
+          "name": "RecalcStyleCount",
+          "value": 64
+        },
+        {
+          "name": "LayoutDuration",
+          "value": 0.08705
+        },
+        {
+          "name": "RecalcStyleDuration",
+          "value": 0.025276
+        },
+        {
+          "name": "DevToolsCommandDuration",
+          "value": 0.005216
+        },
+        {
+          "name": "ScriptDuration",
+          "value": 0.253724
+        },
+        {
+          "name": "V8CompileDuration",
+          "value": 0
+        },
+        {
+          "name": "TaskDuration",
+          "value": 0.488079
+        },
+        {
+          "name": "TaskOtherDuration",
+          "value": 0.116813
+        },
+        {
+          "name": "ThreadTime",
+          "value": 9.680705
+        },
+        {
+          "name": "ProcessTime",
+          "value": 10.390003
+        },
+        {
+          "name": "JSHeapUsedSize",
+          "value": 3782744
+        },
+        {
+          "name": "JSHeapTotalSize",
+          "value": 6029312
+        },
+        {
+          "name": "FirstMeaningfulPaint",
+          "value": 738419.400998
+        },
+        {
+          "name": "DomContentLoaded",
+          "value": 738419.175721
+        },
+        {
+          "name": "NavigationStart",
+          "value": 738416.666102
+        }
+      ]
+    },
+    {
+      "fcp": 2688,
+      "lcp": {
+        "time": 3736,
+        "element": "IMG",
+        "id": "_image_1xixq_54"
+      },
+      "requests": [
+        {
+          "url": "/ReleaseBoardGameP2P/assets/index-CvPwj5_g.js",
+          "bytes": 372682,
+          "encoded": 372382
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/index-CKuN60SI.css",
+          "bytes": 24509,
+          "encoded": 24209
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/JetBrainsMono-VariableFont_wght-ByLpDV2T.woff2",
+          "bytes": 73065,
+          "encoded": 72765
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/photo-CnpmufjY.jpg",
+          "bytes": 96267,
+          "encoded": 95967
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/FiraMono-Regular-DZfKlnWR.woff2",
+          "bytes": 62882,
+          "encoded": 62582
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/rubber-ducky-CPgscgOX.png",
+          "bytes": 44840,
+          "encoded": 44540
+        }
+      ],
+      "text": "RU\nEN\nOPEN P2P PROJECT\nBOARD CARD GAME\n\nA strategic card game about the real grind of software development. Bugs, surprise events, rivals' attacks — beat it all",
+      "route": "start",
+      "version": "148.0.7778.96",
+      "failures": [],
+      "metrics": [
+        {
+          "name": "Timestamp",
+          "value": 738441.997044
+        },
+        {
+          "name": "AudioHandlers",
+          "value": 0
+        },
+        {
+          "name": "AudioWorkletProcessors",
+          "value": 0
+        },
+        {
+          "name": "Documents",
+          "value": 3
+        },
+        {
+          "name": "Frames",
+          "value": 1
+        },
+        {
+          "name": "JSEventListeners",
+          "value": 157
+        },
+        {
+          "name": "LayoutObjects",
+          "value": 176
+        },
+        {
+          "name": "MediaKeySessions",
+          "value": 0
+        },
+        {
+          "name": "MediaKeys",
+          "value": 0
+        },
+        {
+          "name": "Nodes",
+          "value": 231
+        },
+        {
+          "name": "Resources",
+          "value": 9
+        },
+        {
+          "name": "ContextLifecycleStateObservers",
+          "value": 4
+        },
+        {
+          "name": "V8PerContextDatas",
+          "value": 4
+        },
+        {
+          "name": "WorkerGlobalScopes",
+          "value": 0
+        },
+        {
+          "name": "UACSSResources",
+          "value": 0
+        },
+        {
+          "name": "RTCPeerConnections",
+          "value": 1
+        },
+        {
+          "name": "ResourceFetchers",
+          "value": 3
+        },
+        {
+          "name": "AdSubframes",
+          "value": 0
+        },
+        {
+          "name": "DetachedScriptStates",
+          "value": 2
+        },
+        {
+          "name": "ArrayBufferContents",
+          "value": 0
+        },
+        {
+          "name": "LayoutCount",
+          "value": 6
+        },
+        {
+          "name": "RecalcStyleCount",
+          "value": 63
+        },
+        {
+          "name": "LayoutDuration",
+          "value": 0.075966
+        },
+        {
+          "name": "RecalcStyleDuration",
+          "value": 0.020407
+        },
+        {
+          "name": "DevToolsCommandDuration",
+          "value": 0.007265
+        },
+        {
+          "name": "ScriptDuration",
+          "value": 0.230093
+        },
+        {
+          "name": "V8CompileDuration",
+          "value": 0
+        },
+        {
+          "name": "TaskDuration",
+          "value": 0.437486
+        },
+        {
+          "name": "TaskOtherDuration",
+          "value": 0.103755
+        },
+        {
+          "name": "ThreadTime",
+          "value": 9.663052
+        },
+        {
+          "name": "ProcessTime",
+          "value": 10.452814
+        },
+        {
+          "name": "JSHeapUsedSize",
+          "value": 3778156
+        },
+        {
+          "name": "JSHeapTotalSize",
+          "value": 6029312
+        },
+        {
+          "name": "FirstMeaningfulPaint",
+          "value": 738432.188456
+        },
+        {
+          "name": "DomContentLoaded",
+          "value": 738431.98473
+        },
+        {
+          "name": "NavigationStart",
+          "value": 738429.500475
+        }
+      ]
+    },
+    {
+      "fcp": 2716,
+      "lcp": {
+        "time": 3756,
+        "element": "IMG",
+        "id": "_image_1xixq_54"
+      },
+      "requests": [
+        {
+          "url": "/ReleaseBoardGameP2P/assets/index-CvPwj5_g.js",
+          "bytes": 372682,
+          "encoded": 372382
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/index-CKuN60SI.css",
+          "bytes": 24509,
+          "encoded": 24209
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/JetBrainsMono-VariableFont_wght-ByLpDV2T.woff2",
+          "bytes": 73065,
+          "encoded": 72765
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/photo-CnpmufjY.jpg",
+          "bytes": 96267,
+          "encoded": 95967
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/FiraMono-Regular-DZfKlnWR.woff2",
+          "bytes": 62882,
+          "encoded": 62582
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/rubber-ducky-CPgscgOX.png",
+          "bytes": 44840,
+          "encoded": 44540
+        }
+      ],
+      "text": "RU\nEN\nOPEN P2P PROJECT\nBOARD CARD GAME\n\nA strategic card game about the real grind of software development. Bugs, surprise events, rivals' attacks — beat it all",
+      "route": "start",
+      "version": "148.0.7778.96",
+      "failures": [],
+      "metrics": [
+        {
+          "name": "Timestamp",
+          "value": 738454.848256
+        },
+        {
+          "name": "AudioHandlers",
+          "value": 0
+        },
+        {
+          "name": "AudioWorkletProcessors",
+          "value": 0
+        },
+        {
+          "name": "Documents",
+          "value": 3
+        },
+        {
+          "name": "Frames",
+          "value": 1
+        },
+        {
+          "name": "JSEventListeners",
+          "value": 157
+        },
+        {
+          "name": "LayoutObjects",
+          "value": 176
+        },
+        {
+          "name": "MediaKeySessions",
+          "value": 0
+        },
+        {
+          "name": "MediaKeys",
+          "value": 0
+        },
+        {
+          "name": "Nodes",
+          "value": 231
+        },
+        {
+          "name": "Resources",
+          "value": 9
+        },
+        {
+          "name": "ContextLifecycleStateObservers",
+          "value": 4
+        },
+        {
+          "name": "V8PerContextDatas",
+          "value": 4
+        },
+        {
+          "name": "WorkerGlobalScopes",
+          "value": 0
+        },
+        {
+          "name": "UACSSResources",
+          "value": 0
+        },
+        {
+          "name": "RTCPeerConnections",
+          "value": 1
+        },
+        {
+          "name": "ResourceFetchers",
+          "value": 3
+        },
+        {
+          "name": "AdSubframes",
+          "value": 0
+        },
+        {
+          "name": "DetachedScriptStates",
+          "value": 2
+        },
+        {
+          "name": "ArrayBufferContents",
+          "value": 0
+        },
+        {
+          "name": "LayoutCount",
+          "value": 5
+        },
+        {
+          "name": "RecalcStyleCount",
+          "value": 63
+        },
+        {
+          "name": "LayoutDuration",
+          "value": 0.07566
+        },
+        {
+          "name": "RecalcStyleDuration",
+          "value": 0.021444
+        },
+        {
+          "name": "DevToolsCommandDuration",
+          "value": 0.006078
+        },
+        {
+          "name": "ScriptDuration",
+          "value": 0.244516
+        },
+        {
+          "name": "V8CompileDuration",
+          "value": 0
+        },
+        {
+          "name": "TaskDuration",
+          "value": 0.445116
+        },
+        {
+          "name": "TaskOtherDuration",
+          "value": 0.097418
+        },
+        {
+          "name": "ThreadTime",
+          "value": 9.665385
+        },
+        {
+          "name": "ProcessTime",
+          "value": 10.357709
+        },
+        {
+          "name": "JSHeapUsedSize",
+          "value": 3794932
+        },
+        {
+          "name": "JSHeapTotalSize",
+          "value": 6029312
+        },
+        {
+          "name": "FirstMeaningfulPaint",
+          "value": 738445.048976
+        },
+        {
+          "name": "DomContentLoaded",
+          "value": 738444.83743
+        },
+        {
+          "name": "NavigationStart",
+          "value": 738442.335362
+        }
+      ]
+    },
+    {
+      "fcp": 2764,
+      "lcp": {
+        "time": 3792,
+        "element": "IMG",
+        "id": "_image_1xixq_54"
+      },
+      "requests": [
+        {
+          "url": "/ReleaseBoardGameP2P/assets/index-CvPwj5_g.js",
+          "bytes": 372682,
+          "encoded": 372382
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/index-CKuN60SI.css",
+          "bytes": 24509,
+          "encoded": 24209
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/JetBrainsMono-VariableFont_wght-ByLpDV2T.woff2",
+          "bytes": 73065,
+          "encoded": 72765
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/photo-CnpmufjY.jpg",
+          "bytes": 96267,
+          "encoded": 95967
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/FiraMono-Regular-DZfKlnWR.woff2",
+          "bytes": 62882,
+          "encoded": 62582
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/rubber-ducky-CPgscgOX.png",
+          "bytes": 44840,
+          "encoded": 44540
+        }
+      ],
+      "text": "RU\nEN\nOPEN P2P PROJECT\nBOARD CARD GAME\n\nA strategic card game about the real grind of software development. Bugs, surprise events, rivals' attacks — beat it all",
+      "route": "start",
+      "version": "148.0.7778.96",
+      "failures": [],
+      "metrics": [
+        {
+          "name": "Timestamp",
+          "value": 738467.6973
+        },
+        {
+          "name": "AudioHandlers",
+          "value": 0
+        },
+        {
+          "name": "AudioWorkletProcessors",
+          "value": 0
+        },
+        {
+          "name": "Documents",
+          "value": 3
+        },
+        {
+          "name": "Frames",
+          "value": 1
+        },
+        {
+          "name": "JSEventListeners",
+          "value": 157
+        },
+        {
+          "name": "LayoutObjects",
+          "value": 176
+        },
+        {
+          "name": "MediaKeySessions",
+          "value": 0
+        },
+        {
+          "name": "MediaKeys",
+          "value": 0
+        },
+        {
+          "name": "Nodes",
+          "value": 231
+        },
+        {
+          "name": "Resources",
+          "value": 9
+        },
+        {
+          "name": "ContextLifecycleStateObservers",
+          "value": 4
+        },
+        {
+          "name": "V8PerContextDatas",
+          "value": 4
+        },
+        {
+          "name": "WorkerGlobalScopes",
+          "value": 0
+        },
+        {
+          "name": "UACSSResources",
+          "value": 0
+        },
+        {
+          "name": "RTCPeerConnections",
+          "value": 1
+        },
+        {
+          "name": "ResourceFetchers",
+          "value": 3
+        },
+        {
+          "name": "AdSubframes",
+          "value": 0
+        },
+        {
+          "name": "DetachedScriptStates",
+          "value": 2
+        },
+        {
+          "name": "ArrayBufferContents",
+          "value": 0
+        },
+        {
+          "name": "LayoutCount",
+          "value": 6
+        },
+        {
+          "name": "RecalcStyleCount",
+          "value": 69
+        },
+        {
+          "name": "LayoutDuration",
+          "value": 0.115227
+        },
+        {
+          "name": "RecalcStyleDuration",
+          "value": 0.022244
+        },
+        {
+          "name": "DevToolsCommandDuration",
+          "value": 0.006701
+        },
+        {
+          "name": "ScriptDuration",
+          "value": 0.259316
+        },
+        {
+          "name": "V8CompileDuration",
+          "value": 0
+        },
+        {
+          "name": "TaskDuration",
+          "value": 0.527668
+        },
+        {
+          "name": "TaskOtherDuration",
+          "value": 0.12418
+        },
+        {
+          "name": "ThreadTime",
+          "value": 9.69213
+        },
+        {
+          "name": "ProcessTime",
+          "value": 10.513218
+        },
+        {
+          "name": "JSHeapUsedSize",
+          "value": 3783548
+        },
+        {
+          "name": "JSHeapTotalSize",
+          "value": 6029312
+        },
+        {
+          "name": "FirstMeaningfulPaint",
+          "value": 738457.941984
+        },
+        {
+          "name": "DomContentLoaded",
+          "value": 738457.684667
+        },
+        {
+          "name": "NavigationStart",
+          "value": 738455.179189
+        }
+      ]
+    },
+    {
+      "fcp": 2704,
+      "lcp": {
+        "time": 3736,
+        "element": "IMG",
+        "id": "_image_1xixq_54"
+      },
+      "requests": [
+        {
+          "url": "/ReleaseBoardGameP2P/assets/index-CvPwj5_g.js",
+          "bytes": 372682,
+          "encoded": 372382
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/index-CKuN60SI.css",
+          "bytes": 24509,
+          "encoded": 24209
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/JetBrainsMono-VariableFont_wght-ByLpDV2T.woff2",
+          "bytes": 73065,
+          "encoded": 72765
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/photo-CnpmufjY.jpg",
+          "bytes": 96267,
+          "encoded": 95967
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/FiraMono-Regular-DZfKlnWR.woff2",
+          "bytes": 62882,
+          "encoded": 62582
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/rubber-ducky-CPgscgOX.png",
+          "bytes": 44840,
+          "encoded": 44540
+        }
+      ],
+      "text": "RU\nEN\nOPEN P2P PROJECT\nBOARD CARD GAME\n\nA strategic card game about the real grind of software development. Bugs, surprise events, rivals' attacks — beat it all",
+      "route": "start",
+      "version": "148.0.7778.96",
+      "failures": [],
+      "metrics": [
+        {
+          "name": "Timestamp",
+          "value": 738480.541004
+        },
+        {
+          "name": "AudioHandlers",
+          "value": 0
+        },
+        {
+          "name": "AudioWorkletProcessors",
+          "value": 0
+        },
+        {
+          "name": "Documents",
+          "value": 3
+        },
+        {
+          "name": "Frames",
+          "value": 1
+        },
+        {
+          "name": "JSEventListeners",
+          "value": 157
+        },
+        {
+          "name": "LayoutObjects",
+          "value": 176
+        },
+        {
+          "name": "MediaKeySessions",
+          "value": 0
+        },
+        {
+          "name": "MediaKeys",
+          "value": 0
+        },
+        {
+          "name": "Nodes",
+          "value": 231
+        },
+        {
+          "name": "Resources",
+          "value": 9
+        },
+        {
+          "name": "ContextLifecycleStateObservers",
+          "value": 4
+        },
+        {
+          "name": "V8PerContextDatas",
+          "value": 4
+        },
+        {
+          "name": "WorkerGlobalScopes",
+          "value": 0
+        },
+        {
+          "name": "UACSSResources",
+          "value": 0
+        },
+        {
+          "name": "RTCPeerConnections",
+          "value": 1
+        },
+        {
+          "name": "ResourceFetchers",
+          "value": 3
+        },
+        {
+          "name": "AdSubframes",
+          "value": 0
+        },
+        {
+          "name": "DetachedScriptStates",
+          "value": 2
+        },
+        {
+          "name": "ArrayBufferContents",
+          "value": 0
+        },
+        {
+          "name": "LayoutCount",
+          "value": 6
+        },
+        {
+          "name": "RecalcStyleCount",
+          "value": 62
+        },
+        {
+          "name": "LayoutDuration",
+          "value": 0.078674
+        },
+        {
+          "name": "RecalcStyleDuration",
+          "value": 0.020384
+        },
+        {
+          "name": "DevToolsCommandDuration",
+          "value": 0.005027
+        },
+        {
+          "name": "ScriptDuration",
+          "value": 0.238592
+        },
+        {
+          "name": "V8CompileDuration",
+          "value": 0
+        },
+        {
+          "name": "TaskDuration",
+          "value": 0.443737
+        },
+        {
+          "name": "TaskOtherDuration",
+          "value": 0.10106
+        },
+        {
+          "name": "ThreadTime",
+          "value": 9.675836
+        },
+        {
+          "name": "ProcessTime",
+          "value": 10.469317
+        },
+        {
+          "name": "JSHeapUsedSize",
+          "value": 3782548
+        },
+        {
+          "name": "JSHeapTotalSize",
+          "value": 6029312
+        },
+        {
+          "name": "FirstMeaningfulPaint",
+          "value": 738470.734527
+        },
+        {
+          "name": "DomContentLoaded",
+          "value": 738470.531805
+        },
+        {
+          "name": "NavigationStart",
+          "value": 738468.032237
+        }
+      ]
+    }
+  ],
+  "after": [
+    {
+      "fcp": 1464,
+      "lcp": {
+        "time": 2500,
+        "element": "IMG",
+        "id": "_image_1xixq_54"
+      },
+      "requests": [
+        {
+          "url": "/ReleaseBoardGameP2P/assets/index-BfkPVdNJ.js",
+          "bytes": 5109,
+          "encoded": 4809
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/vendor-react-9LjzQdLw.js",
+          "bytes": 60834,
+          "encoded": 60534
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/vendor-router-C7MaVHp2.js",
+          "bytes": 31002,
+          "encoded": 30702
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/vendor-i18n-79SrbKY8.js",
+          "bytes": 17765,
+          "encoded": 17465
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/session-context-BSLeE8w1.js",
+          "bytes": 1875,
+          "encoded": 1575
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/start-screen-DBKv6xnj.js",
+          "bytes": 44599,
+          "encoded": 44299
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/start-screen-BwSiytTw.css",
+          "bytes": 6848,
+          "encoded": 6548
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/session-context-CoGuwXgX.css",
+          "bytes": 428,
+          "encoded": 128
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/index-CDY3TLzC.css",
+          "bytes": 2577,
+          "encoded": 2277
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/photo-CnpmufjY.jpg",
+          "bytes": 96267,
+          "encoded": 95967
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/JetBrainsMono-VariableFont_wght-ByLpDV2T.woff2",
+          "bytes": 73065,
+          "encoded": 72765
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/FiraMono-Regular-DZfKlnWR.woff2",
+          "bytes": 62882,
+          "encoded": 62582
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/rubber-ducky-CPgscgOX.png",
+          "bytes": 44840,
+          "encoded": 44540
+        }
+      ],
+      "text": "RU\nEN\nOPEN P2P PROJECT\nBOARD CARD GAME\n\nA strategic card game about the real grind of software development. Bugs, surprise events, rivals' attacks — beat it all",
+      "route": "",
+      "version": "148.0.7778.96",
+      "failures": [],
+      "metrics": [
+        {
+          "name": "Timestamp",
+          "value": 740908.452833
+        },
+        {
+          "name": "AudioHandlers",
+          "value": 0
+        },
+        {
+          "name": "AudioWorkletProcessors",
+          "value": 0
+        },
+        {
+          "name": "Documents",
+          "value": 3
+        },
+        {
+          "name": "Frames",
+          "value": 1
+        },
+        {
+          "name": "JSEventListeners",
+          "value": 155
+        },
+        {
+          "name": "LayoutObjects",
+          "value": 141
+        },
+        {
+          "name": "MediaKeySessions",
+          "value": 0
+        },
+        {
+          "name": "MediaKeys",
+          "value": 0
+        },
+        {
+          "name": "Nodes",
+          "value": 211
+        },
+        {
+          "name": "Resources",
+          "value": 16
+        },
+        {
+          "name": "ContextLifecycleStateObservers",
+          "value": 4
+        },
+        {
+          "name": "V8PerContextDatas",
+          "value": 4
+        },
+        {
+          "name": "WorkerGlobalScopes",
+          "value": 0
+        },
+        {
+          "name": "UACSSResources",
+          "value": 0
+        },
+        {
+          "name": "RTCPeerConnections",
+          "value": 0
+        },
+        {
+          "name": "ResourceFetchers",
+          "value": 3
+        },
+        {
+          "name": "AdSubframes",
+          "value": 0
+        },
+        {
+          "name": "DetachedScriptStates",
+          "value": 2
+        },
+        {
+          "name": "ArrayBufferContents",
+          "value": 0
+        },
+        {
+          "name": "LayoutCount",
+          "value": 6
+        },
+        {
+          "name": "RecalcStyleCount",
+          "value": 66
+        },
+        {
+          "name": "LayoutDuration",
+          "value": 0.077503
+        },
+        {
+          "name": "RecalcStyleDuration",
+          "value": 0.017305
+        },
+        {
+          "name": "DevToolsCommandDuration",
+          "value": 0.007057
+        },
+        {
+          "name": "ScriptDuration",
+          "value": 0.135911
+        },
+        {
+          "name": "V8CompileDuration",
+          "value": 0
+        },
+        {
+          "name": "TaskDuration",
+          "value": 0.33194
+        },
+        {
+          "name": "TaskOtherDuration",
+          "value": 0.094164
+        },
+        {
+          "name": "ThreadTime",
+          "value": 8.691181
+        },
+        {
+          "name": "ProcessTime",
+          "value": 9.29603
+        },
+        {
+          "name": "JSHeapUsedSize",
+          "value": 2973700
+        },
+        {
+          "name": "JSHeapTotalSize",
+          "value": 5242880
+        },
+        {
+          "name": "FirstMeaningfulPaint",
+          "value": 740898.623082
+        },
+        {
+          "name": "DomContentLoaded",
+          "value": 740898.438066
+        },
+        {
+          "name": "NavigationStart",
+          "value": 740897.159906
+        }
+      ]
+    },
+    {
+      "fcp": 1460,
+      "lcp": {
+        "time": 2496,
+        "element": "IMG",
+        "id": "_image_1xixq_54"
+      },
+      "requests": [
+        {
+          "url": "/ReleaseBoardGameP2P/assets/index-BfkPVdNJ.js",
+          "bytes": 5109,
+          "encoded": 4809
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/vendor-router-C7MaVHp2.js",
+          "bytes": 31002,
+          "encoded": 30702
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/vendor-react-9LjzQdLw.js",
+          "bytes": 60834,
+          "encoded": 60534
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/vendor-i18n-79SrbKY8.js",
+          "bytes": 17765,
+          "encoded": 17465
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/start-screen-DBKv6xnj.js",
+          "bytes": 44599,
+          "encoded": 44299
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/start-screen-BwSiytTw.css",
+          "bytes": 6848,
+          "encoded": 6548
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/session-context-BSLeE8w1.js",
+          "bytes": 1875,
+          "encoded": 1575
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/session-context-CoGuwXgX.css",
+          "bytes": 428,
+          "encoded": 128
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/index-CDY3TLzC.css",
+          "bytes": 2577,
+          "encoded": 2277
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/photo-CnpmufjY.jpg",
+          "bytes": 96267,
+          "encoded": 95967
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/JetBrainsMono-VariableFont_wght-ByLpDV2T.woff2",
+          "bytes": 73065,
+          "encoded": 72765
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/FiraMono-Regular-DZfKlnWR.woff2",
+          "bytes": 62882,
+          "encoded": 62582
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/rubber-ducky-CPgscgOX.png",
+          "bytes": 44840,
+          "encoded": 44540
+        }
+      ],
+      "text": "RU\nEN\nOPEN P2P PROJECT\nBOARD CARD GAME\n\nA strategic card game about the real grind of software development. Bugs, surprise events, rivals' attacks — beat it all",
+      "route": "",
+      "version": "148.0.7778.96",
+      "failures": [],
+      "metrics": [
+        {
+          "name": "Timestamp",
+          "value": 740920.05832
+        },
+        {
+          "name": "AudioHandlers",
+          "value": 0
+        },
+        {
+          "name": "AudioWorkletProcessors",
+          "value": 0
+        },
+        {
+          "name": "Documents",
+          "value": 3
+        },
+        {
+          "name": "Frames",
+          "value": 1
+        },
+        {
+          "name": "JSEventListeners",
+          "value": 155
+        },
+        {
+          "name": "LayoutObjects",
+          "value": 141
+        },
+        {
+          "name": "MediaKeySessions",
+          "value": 0
+        },
+        {
+          "name": "MediaKeys",
+          "value": 0
+        },
+        {
+          "name": "Nodes",
+          "value": 211
+        },
+        {
+          "name": "Resources",
+          "value": 16
+        },
+        {
+          "name": "ContextLifecycleStateObservers",
+          "value": 4
+        },
+        {
+          "name": "V8PerContextDatas",
+          "value": 4
+        },
+        {
+          "name": "WorkerGlobalScopes",
+          "value": 0
+        },
+        {
+          "name": "UACSSResources",
+          "value": 0
+        },
+        {
+          "name": "RTCPeerConnections",
+          "value": 0
+        },
+        {
+          "name": "ResourceFetchers",
+          "value": 3
+        },
+        {
+          "name": "AdSubframes",
+          "value": 0
+        },
+        {
+          "name": "DetachedScriptStates",
+          "value": 2
+        },
+        {
+          "name": "ArrayBufferContents",
+          "value": 0
+        },
+        {
+          "name": "LayoutCount",
+          "value": 6
+        },
+        {
+          "name": "RecalcStyleCount",
+          "value": 67
+        },
+        {
+          "name": "LayoutDuration",
+          "value": 0.07418
+        },
+        {
+          "name": "RecalcStyleDuration",
+          "value": 0.017807
+        },
+        {
+          "name": "DevToolsCommandDuration",
+          "value": 0.005543
+        },
+        {
+          "name": "ScriptDuration",
+          "value": 0.127432
+        },
+        {
+          "name": "V8CompileDuration",
+          "value": 0
+        },
+        {
+          "name": "TaskDuration",
+          "value": 0.321175
+        },
+        {
+          "name": "TaskOtherDuration",
+          "value": 0.096213
+        },
+        {
+          "name": "ThreadTime",
+          "value": 8.680495
+        },
+        {
+          "name": "ProcessTime",
+          "value": 9.276048
+        },
+        {
+          "name": "JSHeapUsedSize",
+          "value": 2972612
+        },
+        {
+          "name": "JSHeapTotalSize",
+          "value": 5242880
+        },
+        {
+          "name": "FirstMeaningfulPaint",
+          "value": 740910.2263
+        },
+        {
+          "name": "DomContentLoaded",
+          "value": 740910.047586
+        },
+        {
+          "name": "NavigationStart",
+          "value": 740908.769338
+        }
+      ]
+    },
+    {
+      "fcp": 1464,
+      "lcp": {
+        "time": 2488,
+        "element": "IMG",
+        "id": "_image_1xixq_54"
+      },
+      "requests": [
+        {
+          "url": "/ReleaseBoardGameP2P/assets/index-BfkPVdNJ.js",
+          "bytes": 5109,
+          "encoded": 4809
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/vendor-react-9LjzQdLw.js",
+          "bytes": 60834,
+          "encoded": 60534
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/vendor-router-C7MaVHp2.js",
+          "bytes": 31002,
+          "encoded": 30702
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/vendor-i18n-79SrbKY8.js",
+          "bytes": 17765,
+          "encoded": 17465
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/start-screen-DBKv6xnj.js",
+          "bytes": 44599,
+          "encoded": 44299
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/start-screen-BwSiytTw.css",
+          "bytes": 6848,
+          "encoded": 6548
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/session-context-BSLeE8w1.js",
+          "bytes": 1875,
+          "encoded": 1575
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/session-context-CoGuwXgX.css",
+          "bytes": 428,
+          "encoded": 128
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/index-CDY3TLzC.css",
+          "bytes": 2577,
+          "encoded": 2277
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/photo-CnpmufjY.jpg",
+          "bytes": 96267,
+          "encoded": 95967
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/JetBrainsMono-VariableFont_wght-ByLpDV2T.woff2",
+          "bytes": 73065,
+          "encoded": 72765
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/FiraMono-Regular-DZfKlnWR.woff2",
+          "bytes": 62882,
+          "encoded": 62582
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/rubber-ducky-CPgscgOX.png",
+          "bytes": 44840,
+          "encoded": 44540
+        }
+      ],
+      "text": "RU\nEN\nOPEN P2P PROJECT\nBOARD CARD GAME\n\nA strategic card game about the real grind of software development. Bugs, surprise events, rivals' attacks — beat it all",
+      "route": "",
+      "version": "148.0.7778.96",
+      "failures": [],
+      "metrics": [
+        {
+          "name": "Timestamp",
+          "value": 740931.621521
+        },
+        {
+          "name": "AudioHandlers",
+          "value": 0
+        },
+        {
+          "name": "AudioWorkletProcessors",
+          "value": 0
+        },
+        {
+          "name": "Documents",
+          "value": 3
+        },
+        {
+          "name": "Frames",
+          "value": 1
+        },
+        {
+          "name": "JSEventListeners",
+          "value": 155
+        },
+        {
+          "name": "LayoutObjects",
+          "value": 141
+        },
+        {
+          "name": "MediaKeySessions",
+          "value": 0
+        },
+        {
+          "name": "MediaKeys",
+          "value": 0
+        },
+        {
+          "name": "Nodes",
+          "value": 211
+        },
+        {
+          "name": "Resources",
+          "value": 16
+        },
+        {
+          "name": "ContextLifecycleStateObservers",
+          "value": 4
+        },
+        {
+          "name": "V8PerContextDatas",
+          "value": 4
+        },
+        {
+          "name": "WorkerGlobalScopes",
+          "value": 0
+        },
+        {
+          "name": "UACSSResources",
+          "value": 0
+        },
+        {
+          "name": "RTCPeerConnections",
+          "value": 0
+        },
+        {
+          "name": "ResourceFetchers",
+          "value": 3
+        },
+        {
+          "name": "AdSubframes",
+          "value": 0
+        },
+        {
+          "name": "DetachedScriptStates",
+          "value": 2
+        },
+        {
+          "name": "ArrayBufferContents",
+          "value": 0
+        },
+        {
+          "name": "LayoutCount",
+          "value": 6
+        },
+        {
+          "name": "RecalcStyleCount",
+          "value": 65
+        },
+        {
+          "name": "LayoutDuration",
+          "value": 0.075057
+        },
+        {
+          "name": "RecalcStyleDuration",
+          "value": 0.017607
+        },
+        {
+          "name": "DevToolsCommandDuration",
+          "value": 0.00761
+        },
+        {
+          "name": "ScriptDuration",
+          "value": 0.128674
+        },
+        {
+          "name": "V8CompileDuration",
+          "value": 0
+        },
+        {
+          "name": "TaskDuration",
+          "value": 0.326602
+        },
+        {
+          "name": "TaskOtherDuration",
+          "value": 0.097654
+        },
+        {
+          "name": "ThreadTime",
+          "value": 8.681364
+        },
+        {
+          "name": "ProcessTime",
+          "value": 9.281545
+        },
+        {
+          "name": "JSHeapUsedSize",
+          "value": 2991000
+        },
+        {
+          "name": "JSHeapTotalSize",
+          "value": 5505024
+        },
+        {
+          "name": "FirstMeaningfulPaint",
+          "value": 740921.794972
+        },
+        {
+          "name": "DomContentLoaded",
+          "value": 740921.611137
+        },
+        {
+          "name": "NavigationStart",
+          "value": 740920.334849
+        }
+      ]
+    },
+    {
+      "fcp": 1460,
+      "lcp": {
+        "time": 2488,
+        "element": "IMG",
+        "id": "_image_1xixq_54"
+      },
+      "requests": [
+        {
+          "url": "/ReleaseBoardGameP2P/assets/index-BfkPVdNJ.js",
+          "bytes": 5109,
+          "encoded": 4809
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/vendor-react-9LjzQdLw.js",
+          "bytes": 60834,
+          "encoded": 60534
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/vendor-router-C7MaVHp2.js",
+          "bytes": 31002,
+          "encoded": 30702
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/vendor-i18n-79SrbKY8.js",
+          "bytes": 17765,
+          "encoded": 17465
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/session-context-BSLeE8w1.js",
+          "bytes": 1875,
+          "encoded": 1575
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/start-screen-DBKv6xnj.js",
+          "bytes": 44599,
+          "encoded": 44299
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/start-screen-BwSiytTw.css",
+          "bytes": 6848,
+          "encoded": 6548
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/session-context-CoGuwXgX.css",
+          "bytes": 428,
+          "encoded": 128
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/index-CDY3TLzC.css",
+          "bytes": 2577,
+          "encoded": 2277
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/photo-CnpmufjY.jpg",
+          "bytes": 96267,
+          "encoded": 95967
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/JetBrainsMono-VariableFont_wght-ByLpDV2T.woff2",
+          "bytes": 73065,
+          "encoded": 72765
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/FiraMono-Regular-DZfKlnWR.woff2",
+          "bytes": 62882,
+          "encoded": 62582
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/rubber-ducky-CPgscgOX.png",
+          "bytes": 44840,
+          "encoded": 44540
+        }
+      ],
+      "text": "RU\nEN\nOPEN P2P PROJECT\nBOARD CARD GAME\n\nA strategic card game about the real grind of software development. Bugs, surprise events, rivals' attacks — beat it all",
+      "route": "",
+      "version": "148.0.7778.96",
+      "failures": [],
+      "metrics": [
+        {
+          "name": "Timestamp",
+          "value": 740943.222507
+        },
+        {
+          "name": "AudioHandlers",
+          "value": 0
+        },
+        {
+          "name": "AudioWorkletProcessors",
+          "value": 0
+        },
+        {
+          "name": "Documents",
+          "value": 3
+        },
+        {
+          "name": "Frames",
+          "value": 1
+        },
+        {
+          "name": "JSEventListeners",
+          "value": 155
+        },
+        {
+          "name": "LayoutObjects",
+          "value": 141
+        },
+        {
+          "name": "MediaKeySessions",
+          "value": 0
+        },
+        {
+          "name": "MediaKeys",
+          "value": 0
+        },
+        {
+          "name": "Nodes",
+          "value": 211
+        },
+        {
+          "name": "Resources",
+          "value": 16
+        },
+        {
+          "name": "ContextLifecycleStateObservers",
+          "value": 4
+        },
+        {
+          "name": "V8PerContextDatas",
+          "value": 4
+        },
+        {
+          "name": "WorkerGlobalScopes",
+          "value": 0
+        },
+        {
+          "name": "UACSSResources",
+          "value": 0
+        },
+        {
+          "name": "RTCPeerConnections",
+          "value": 0
+        },
+        {
+          "name": "ResourceFetchers",
+          "value": 3
+        },
+        {
+          "name": "AdSubframes",
+          "value": 0
+        },
+        {
+          "name": "DetachedScriptStates",
+          "value": 2
+        },
+        {
+          "name": "ArrayBufferContents",
+          "value": 0
+        },
+        {
+          "name": "LayoutCount",
+          "value": 6
+        },
+        {
+          "name": "RecalcStyleCount",
+          "value": 63
+        },
+        {
+          "name": "LayoutDuration",
+          "value": 0.074738
+        },
+        {
+          "name": "RecalcStyleDuration",
+          "value": 0.015989
+        },
+        {
+          "name": "DevToolsCommandDuration",
+          "value": 0.006253
+        },
+        {
+          "name": "ScriptDuration",
+          "value": 0.126884
+        },
+        {
+          "name": "V8CompileDuration",
+          "value": 0
+        },
+        {
+          "name": "TaskDuration",
+          "value": 0.316683
+        },
+        {
+          "name": "TaskOtherDuration",
+          "value": 0.092819
+        },
+        {
+          "name": "ThreadTime",
+          "value": 8.680076
+        },
+        {
+          "name": "ProcessTime",
+          "value": 9.273438
+        },
+        {
+          "name": "JSHeapUsedSize",
+          "value": 2977228
+        },
+        {
+          "name": "JSHeapTotalSize",
+          "value": 5505024
+        },
+        {
+          "name": "FirstMeaningfulPaint",
+          "value": 740933.391842
+        },
+        {
+          "name": "DomContentLoaded",
+          "value": 740933.211701
+        },
+        {
+          "name": "NavigationStart",
+          "value": 740931.934787
+        }
+      ]
+    },
+    {
+      "fcp": 1456,
+      "lcp": {
+        "time": 2496,
+        "element": "IMG",
+        "id": "_image_1xixq_54"
+      },
+      "requests": [
+        {
+          "url": "/ReleaseBoardGameP2P/assets/index-BfkPVdNJ.js",
+          "bytes": 5109,
+          "encoded": 4809
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/vendor-react-9LjzQdLw.js",
+          "bytes": 60834,
+          "encoded": 60534
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/vendor-router-C7MaVHp2.js",
+          "bytes": 31002,
+          "encoded": 30702
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/vendor-i18n-79SrbKY8.js",
+          "bytes": 17765,
+          "encoded": 17465
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/session-context-BSLeE8w1.js",
+          "bytes": 1875,
+          "encoded": 1575
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/start-screen-DBKv6xnj.js",
+          "bytes": 44599,
+          "encoded": 44299
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/start-screen-BwSiytTw.css",
+          "bytes": 6848,
+          "encoded": 6548
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/session-context-CoGuwXgX.css",
+          "bytes": 428,
+          "encoded": 128
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/index-CDY3TLzC.css",
+          "bytes": 2577,
+          "encoded": 2277
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/photo-CnpmufjY.jpg",
+          "bytes": 96267,
+          "encoded": 95967
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/JetBrainsMono-VariableFont_wght-ByLpDV2T.woff2",
+          "bytes": 73065,
+          "encoded": 72765
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/FiraMono-Regular-DZfKlnWR.woff2",
+          "bytes": 62882,
+          "encoded": 62582
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/rubber-ducky-CPgscgOX.png",
+          "bytes": 44840,
+          "encoded": 44540
+        }
+      ],
+      "text": "RU\nEN\nOPEN P2P PROJECT\nBOARD CARD GAME\n\nA strategic card game about the real grind of software development. Bugs, surprise events, rivals' attacks — beat it all",
+      "route": "",
+      "version": "148.0.7778.96",
+      "failures": [],
+      "metrics": [
+        {
+          "name": "Timestamp",
+          "value": 740954.780688
+        },
+        {
+          "name": "AudioHandlers",
+          "value": 0
+        },
+        {
+          "name": "AudioWorkletProcessors",
+          "value": 0
+        },
+        {
+          "name": "Documents",
+          "value": 3
+        },
+        {
+          "name": "Frames",
+          "value": 1
+        },
+        {
+          "name": "JSEventListeners",
+          "value": 155
+        },
+        {
+          "name": "LayoutObjects",
+          "value": 141
+        },
+        {
+          "name": "MediaKeySessions",
+          "value": 0
+        },
+        {
+          "name": "MediaKeys",
+          "value": 0
+        },
+        {
+          "name": "Nodes",
+          "value": 211
+        },
+        {
+          "name": "Resources",
+          "value": 16
+        },
+        {
+          "name": "ContextLifecycleStateObservers",
+          "value": 4
+        },
+        {
+          "name": "V8PerContextDatas",
+          "value": 4
+        },
+        {
+          "name": "WorkerGlobalScopes",
+          "value": 0
+        },
+        {
+          "name": "UACSSResources",
+          "value": 0
+        },
+        {
+          "name": "RTCPeerConnections",
+          "value": 0
+        },
+        {
+          "name": "ResourceFetchers",
+          "value": 3
+        },
+        {
+          "name": "AdSubframes",
+          "value": 0
+        },
+        {
+          "name": "DetachedScriptStates",
+          "value": 2
+        },
+        {
+          "name": "ArrayBufferContents",
+          "value": 0
+        },
+        {
+          "name": "LayoutCount",
+          "value": 6
+        },
+        {
+          "name": "RecalcStyleCount",
+          "value": 65
+        },
+        {
+          "name": "LayoutDuration",
+          "value": 0.071583
+        },
+        {
+          "name": "RecalcStyleDuration",
+          "value": 0.019566
+        },
+        {
+          "name": "DevToolsCommandDuration",
+          "value": 0.00673
+        },
+        {
+          "name": "ScriptDuration",
+          "value": 0.136429
+        },
+        {
+          "name": "V8CompileDuration",
+          "value": 0
+        },
+        {
+          "name": "TaskDuration",
+          "value": 0.32624
+        },
+        {
+          "name": "TaskOtherDuration",
+          "value": 0.091932
+        },
+        {
+          "name": "ThreadTime",
+          "value": 8.675054
+        },
+        {
+          "name": "ProcessTime",
+          "value": 9.25406
+        },
+        {
+          "name": "JSHeapUsedSize",
+          "value": 2977528
+        },
+        {
+          "name": "JSHeapTotalSize",
+          "value": 5242880
+        },
+        {
+          "name": "FirstMeaningfulPaint",
+          "value": 740944.948895
+        },
+        {
+          "name": "DomContentLoaded",
+          "value": 740944.76678
+        },
+        {
+          "name": "NavigationStart",
+          "value": 740943.493218
+        }
+      ]
+    },
+    {
+      "fcp": 1440,
+      "lcp": {
+        "time": 2480,
+        "element": "IMG",
+        "id": "_image_1xixq_54"
+      },
+      "requests": [
+        {
+          "url": "/ReleaseBoardGameP2P/assets/index-BfkPVdNJ.js",
+          "bytes": 5109,
+          "encoded": 4809
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/vendor-react-9LjzQdLw.js",
+          "bytes": 60834,
+          "encoded": 60534
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/vendor-router-C7MaVHp2.js",
+          "bytes": 31002,
+          "encoded": 30702
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/vendor-i18n-79SrbKY8.js",
+          "bytes": 17765,
+          "encoded": 17465
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/start-screen-DBKv6xnj.js",
+          "bytes": 44599,
+          "encoded": 44299
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/start-screen-BwSiytTw.css",
+          "bytes": 6848,
+          "encoded": 6548
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/session-context-CoGuwXgX.css",
+          "bytes": 428,
+          "encoded": 128
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/session-context-BSLeE8w1.js",
+          "bytes": 1875,
+          "encoded": 1575
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/index-CDY3TLzC.css",
+          "bytes": 2577,
+          "encoded": 2277
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/photo-CnpmufjY.jpg",
+          "bytes": 96267,
+          "encoded": 95967
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/JetBrainsMono-VariableFont_wght-ByLpDV2T.woff2",
+          "bytes": 73065,
+          "encoded": 72765
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/FiraMono-Regular-DZfKlnWR.woff2",
+          "bytes": 62882,
+          "encoded": 62582
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/rubber-ducky-CPgscgOX.png",
+          "bytes": 44840,
+          "encoded": 44540
+        }
+      ],
+      "text": "RU\nEN\nOPEN P2P PROJECT\nBOARD CARD GAME\n\nA strategic card game about the real grind of software development. Bugs, surprise events, rivals' attacks — beat it all",
+      "route": "start",
+      "version": "148.0.7778.96",
+      "failures": [],
+      "metrics": [
+        {
+          "name": "Timestamp",
+          "value": 740966.377406
+        },
+        {
+          "name": "AudioHandlers",
+          "value": 0
+        },
+        {
+          "name": "AudioWorkletProcessors",
+          "value": 0
+        },
+        {
+          "name": "Documents",
+          "value": 3
+        },
+        {
+          "name": "Frames",
+          "value": 1
+        },
+        {
+          "name": "JSEventListeners",
+          "value": 155
+        },
+        {
+          "name": "LayoutObjects",
+          "value": 141
+        },
+        {
+          "name": "MediaKeySessions",
+          "value": 0
+        },
+        {
+          "name": "MediaKeys",
+          "value": 0
+        },
+        {
+          "name": "Nodes",
+          "value": 211
+        },
+        {
+          "name": "Resources",
+          "value": 16
+        },
+        {
+          "name": "ContextLifecycleStateObservers",
+          "value": 4
+        },
+        {
+          "name": "V8PerContextDatas",
+          "value": 4
+        },
+        {
+          "name": "WorkerGlobalScopes",
+          "value": 0
+        },
+        {
+          "name": "UACSSResources",
+          "value": 0
+        },
+        {
+          "name": "RTCPeerConnections",
+          "value": 0
+        },
+        {
+          "name": "ResourceFetchers",
+          "value": 3
+        },
+        {
+          "name": "AdSubframes",
+          "value": 0
+        },
+        {
+          "name": "DetachedScriptStates",
+          "value": 2
+        },
+        {
+          "name": "ArrayBufferContents",
+          "value": 0
+        },
+        {
+          "name": "LayoutCount",
+          "value": 5
+        },
+        {
+          "name": "RecalcStyleCount",
+          "value": 67
+        },
+        {
+          "name": "LayoutDuration",
+          "value": 0.071805
+        },
+        {
+          "name": "RecalcStyleDuration",
+          "value": 0.013881
+        },
+        {
+          "name": "DevToolsCommandDuration",
+          "value": 0.005993
+        },
+        {
+          "name": "ScriptDuration",
+          "value": 0.113667
+        },
+        {
+          "name": "V8CompileDuration",
+          "value": 0
+        },
+        {
+          "name": "TaskDuration",
+          "value": 0.299452
+        },
+        {
+          "name": "TaskOtherDuration",
+          "value": 0.094106
+        },
+        {
+          "name": "ThreadTime",
+          "value": 8.670854
+        },
+        {
+          "name": "ProcessTime",
+          "value": 9.256858
+        },
+        {
+          "name": "JSHeapUsedSize",
+          "value": 2762676
+        },
+        {
+          "name": "JSHeapTotalSize",
+          "value": 3932160
+        },
+        {
+          "name": "FirstMeaningfulPaint",
+          "value": 740956.530143
+        },
+        {
+          "name": "DomContentLoaded",
+          "value": 740956.36685
+        },
+        {
+          "name": "NavigationStart",
+          "value": 740955.092533
+        }
+      ]
+    },
+    {
+      "fcp": 1432,
+      "lcp": {
+        "time": 2476,
+        "element": "IMG",
+        "id": "_image_1xixq_54"
+      },
+      "requests": [
+        {
+          "url": "/ReleaseBoardGameP2P/assets/index-BfkPVdNJ.js",
+          "bytes": 5109,
+          "encoded": 4809
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/vendor-router-C7MaVHp2.js",
+          "bytes": 31002,
+          "encoded": 30702
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/vendor-react-9LjzQdLw.js",
+          "bytes": 60834,
+          "encoded": 60534
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/vendor-i18n-79SrbKY8.js",
+          "bytes": 17765,
+          "encoded": 17465
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/start-screen-DBKv6xnj.js",
+          "bytes": 44599,
+          "encoded": 44299
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/session-context-BSLeE8w1.js",
+          "bytes": 1875,
+          "encoded": 1575
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/session-context-CoGuwXgX.css",
+          "bytes": 428,
+          "encoded": 128
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/start-screen-BwSiytTw.css",
+          "bytes": 6848,
+          "encoded": 6548
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/index-CDY3TLzC.css",
+          "bytes": 2577,
+          "encoded": 2277
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/photo-CnpmufjY.jpg",
+          "bytes": 96267,
+          "encoded": 95967
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/FiraMono-Regular-DZfKlnWR.woff2",
+          "bytes": 62882,
+          "encoded": 62582
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/JetBrainsMono-VariableFont_wght-ByLpDV2T.woff2",
+          "bytes": 73065,
+          "encoded": 72765
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/rubber-ducky-CPgscgOX.png",
+          "bytes": 44840,
+          "encoded": 44540
+        }
+      ],
+      "text": "RU\nEN\nOPEN P2P PROJECT\nBOARD CARD GAME\n\nA strategic card game about the real grind of software development. Bugs, surprise events, rivals' attacks — beat it all",
+      "route": "start",
+      "version": "148.0.7778.96",
+      "failures": [],
+      "metrics": [
+        {
+          "name": "Timestamp",
+          "value": 740977.969028
+        },
+        {
+          "name": "AudioHandlers",
+          "value": 0
+        },
+        {
+          "name": "AudioWorkletProcessors",
+          "value": 0
+        },
+        {
+          "name": "Documents",
+          "value": 3
+        },
+        {
+          "name": "Frames",
+          "value": 1
+        },
+        {
+          "name": "JSEventListeners",
+          "value": 155
+        },
+        {
+          "name": "LayoutObjects",
+          "value": 141
+        },
+        {
+          "name": "MediaKeySessions",
+          "value": 0
+        },
+        {
+          "name": "MediaKeys",
+          "value": 0
+        },
+        {
+          "name": "Nodes",
+          "value": 211
+        },
+        {
+          "name": "Resources",
+          "value": 16
+        },
+        {
+          "name": "ContextLifecycleStateObservers",
+          "value": 4
+        },
+        {
+          "name": "V8PerContextDatas",
+          "value": 4
+        },
+        {
+          "name": "WorkerGlobalScopes",
+          "value": 0
+        },
+        {
+          "name": "UACSSResources",
+          "value": 0
+        },
+        {
+          "name": "RTCPeerConnections",
+          "value": 0
+        },
+        {
+          "name": "ResourceFetchers",
+          "value": 3
+        },
+        {
+          "name": "AdSubframes",
+          "value": 0
+        },
+        {
+          "name": "DetachedScriptStates",
+          "value": 2
+        },
+        {
+          "name": "ArrayBufferContents",
+          "value": 0
+        },
+        {
+          "name": "LayoutCount",
+          "value": 5
+        },
+        {
+          "name": "RecalcStyleCount",
+          "value": 71
+        },
+        {
+          "name": "LayoutDuration",
+          "value": 0.07385
+        },
+        {
+          "name": "RecalcStyleDuration",
+          "value": 0.018638
+        },
+        {
+          "name": "DevToolsCommandDuration",
+          "value": 0.007451
+        },
+        {
+          "name": "ScriptDuration",
+          "value": 0.11207
+        },
+        {
+          "name": "V8CompileDuration",
+          "value": 0
+        },
+        {
+          "name": "TaskDuration",
+          "value": 0.302802
+        },
+        {
+          "name": "TaskOtherDuration",
+          "value": 0.090793
+        },
+        {
+          "name": "ThreadTime",
+          "value": 8.669581
+        },
+        {
+          "name": "ProcessTime",
+          "value": 9.265457
+        },
+        {
+          "name": "JSHeapUsedSize",
+          "value": 2756632
+        },
+        {
+          "name": "JSHeapTotalSize",
+          "value": 4194304
+        },
+        {
+          "name": "FirstMeaningfulPaint",
+          "value": 740968.12347
+        },
+        {
+          "name": "DomContentLoaded",
+          "value": 740967.956613
+        },
+        {
+          "name": "NavigationStart",
+          "value": 740966.691483
+        }
+      ]
+    },
+    {
+      "fcp": 1448,
+      "lcp": {
+        "time": 2484,
+        "element": "IMG",
+        "id": "_image_1xixq_54"
+      },
+      "requests": [
+        {
+          "url": "/ReleaseBoardGameP2P/assets/index-BfkPVdNJ.js",
+          "bytes": 5109,
+          "encoded": 4809
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/vendor-react-9LjzQdLw.js",
+          "bytes": 60834,
+          "encoded": 60534
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/vendor-router-C7MaVHp2.js",
+          "bytes": 31002,
+          "encoded": 30702
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/vendor-i18n-79SrbKY8.js",
+          "bytes": 17765,
+          "encoded": 17465
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/session-context-BSLeE8w1.js",
+          "bytes": 1875,
+          "encoded": 1575
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/start-screen-DBKv6xnj.js",
+          "bytes": 44599,
+          "encoded": 44299
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/start-screen-BwSiytTw.css",
+          "bytes": 6848,
+          "encoded": 6548
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/session-context-CoGuwXgX.css",
+          "bytes": 428,
+          "encoded": 128
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/index-CDY3TLzC.css",
+          "bytes": 2577,
+          "encoded": 2277
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/photo-CnpmufjY.jpg",
+          "bytes": 96267,
+          "encoded": 95967
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/JetBrainsMono-VariableFont_wght-ByLpDV2T.woff2",
+          "bytes": 73065,
+          "encoded": 72765
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/FiraMono-Regular-DZfKlnWR.woff2",
+          "bytes": 62882,
+          "encoded": 62582
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/rubber-ducky-CPgscgOX.png",
+          "bytes": 44840,
+          "encoded": 44540
+        }
+      ],
+      "text": "RU\nEN\nOPEN P2P PROJECT\nBOARD CARD GAME\n\nA strategic card game about the real grind of software development. Bugs, surprise events, rivals' attacks — beat it all",
+      "route": "start",
+      "version": "148.0.7778.96",
+      "failures": [],
+      "metrics": [
+        {
+          "name": "Timestamp",
+          "value": 740989.533257
+        },
+        {
+          "name": "AudioHandlers",
+          "value": 0
+        },
+        {
+          "name": "AudioWorkletProcessors",
+          "value": 0
+        },
+        {
+          "name": "Documents",
+          "value": 3
+        },
+        {
+          "name": "Frames",
+          "value": 1
+        },
+        {
+          "name": "JSEventListeners",
+          "value": 155
+        },
+        {
+          "name": "LayoutObjects",
+          "value": 141
+        },
+        {
+          "name": "MediaKeySessions",
+          "value": 0
+        },
+        {
+          "name": "MediaKeys",
+          "value": 0
+        },
+        {
+          "name": "Nodes",
+          "value": 211
+        },
+        {
+          "name": "Resources",
+          "value": 16
+        },
+        {
+          "name": "ContextLifecycleStateObservers",
+          "value": 4
+        },
+        {
+          "name": "V8PerContextDatas",
+          "value": 4
+        },
+        {
+          "name": "WorkerGlobalScopes",
+          "value": 0
+        },
+        {
+          "name": "UACSSResources",
+          "value": 0
+        },
+        {
+          "name": "RTCPeerConnections",
+          "value": 0
+        },
+        {
+          "name": "ResourceFetchers",
+          "value": 3
+        },
+        {
+          "name": "AdSubframes",
+          "value": 0
+        },
+        {
+          "name": "DetachedScriptStates",
+          "value": 2
+        },
+        {
+          "name": "ArrayBufferContents",
+          "value": 0
+        },
+        {
+          "name": "LayoutCount",
+          "value": 5
+        },
+        {
+          "name": "RecalcStyleCount",
+          "value": 63
+        },
+        {
+          "name": "LayoutDuration",
+          "value": 0.072769
+        },
+        {
+          "name": "RecalcStyleDuration",
+          "value": 0.017277
+        },
+        {
+          "name": "DevToolsCommandDuration",
+          "value": 0.007641
+        },
+        {
+          "name": "ScriptDuration",
+          "value": 0.119886
+        },
+        {
+          "name": "V8CompileDuration",
+          "value": 0
+        },
+        {
+          "name": "TaskDuration",
+          "value": 0.315105
+        },
+        {
+          "name": "TaskOtherDuration",
+          "value": 0.097532
+        },
+        {
+          "name": "ThreadTime",
+          "value": 8.675226
+        },
+        {
+          "name": "ProcessTime",
+          "value": 9.317585
+        },
+        {
+          "name": "JSHeapUsedSize",
+          "value": 2757136
+        },
+        {
+          "name": "JSHeapTotalSize",
+          "value": 3932160
+        },
+        {
+          "name": "FirstMeaningfulPaint",
+          "value": 740979.686858
+        },
+        {
+          "name": "DomContentLoaded",
+          "value": 740979.521152
+        },
+        {
+          "name": "NavigationStart",
+          "value": 740978.240693
+        }
+      ]
+    },
+    {
+      "fcp": 1452,
+      "lcp": {
+        "time": 2484,
+        "element": "IMG",
+        "id": "_image_1xixq_54"
+      },
+      "requests": [
+        {
+          "url": "/ReleaseBoardGameP2P/assets/index-BfkPVdNJ.js",
+          "bytes": 5109,
+          "encoded": 4809
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/vendor-react-9LjzQdLw.js",
+          "bytes": 60834,
+          "encoded": 60534
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/vendor-router-C7MaVHp2.js",
+          "bytes": 31002,
+          "encoded": 30702
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/vendor-i18n-79SrbKY8.js",
+          "bytes": 17765,
+          "encoded": 17465
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/start-screen-DBKv6xnj.js",
+          "bytes": 44599,
+          "encoded": 44299
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/start-screen-BwSiytTw.css",
+          "bytes": 6848,
+          "encoded": 6548
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/session-context-BSLeE8w1.js",
+          "bytes": 1875,
+          "encoded": 1575
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/session-context-CoGuwXgX.css",
+          "bytes": 428,
+          "encoded": 128
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/index-CDY3TLzC.css",
+          "bytes": 2577,
+          "encoded": 2277
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/photo-CnpmufjY.jpg",
+          "bytes": 96267,
+          "encoded": 95967
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/JetBrainsMono-VariableFont_wght-ByLpDV2T.woff2",
+          "bytes": 73065,
+          "encoded": 72765
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/FiraMono-Regular-DZfKlnWR.woff2",
+          "bytes": 62882,
+          "encoded": 62582
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/rubber-ducky-CPgscgOX.png",
+          "bytes": 44840,
+          "encoded": 44540
+        }
+      ],
+      "text": "RU\nEN\nOPEN P2P PROJECT\nBOARD CARD GAME\n\nA strategic card game about the real grind of software development. Bugs, surprise events, rivals' attacks — beat it all",
+      "route": "start",
+      "version": "148.0.7778.96",
+      "failures": [],
+      "metrics": [
+        {
+          "name": "Timestamp",
+          "value": 741001.1157
+        },
+        {
+          "name": "AudioHandlers",
+          "value": 0
+        },
+        {
+          "name": "AudioWorkletProcessors",
+          "value": 0
+        },
+        {
+          "name": "Documents",
+          "value": 3
+        },
+        {
+          "name": "Frames",
+          "value": 1
+        },
+        {
+          "name": "JSEventListeners",
+          "value": 155
+        },
+        {
+          "name": "LayoutObjects",
+          "value": 141
+        },
+        {
+          "name": "MediaKeySessions",
+          "value": 0
+        },
+        {
+          "name": "MediaKeys",
+          "value": 0
+        },
+        {
+          "name": "Nodes",
+          "value": 211
+        },
+        {
+          "name": "Resources",
+          "value": 16
+        },
+        {
+          "name": "ContextLifecycleStateObservers",
+          "value": 4
+        },
+        {
+          "name": "V8PerContextDatas",
+          "value": 4
+        },
+        {
+          "name": "WorkerGlobalScopes",
+          "value": 0
+        },
+        {
+          "name": "UACSSResources",
+          "value": 0
+        },
+        {
+          "name": "RTCPeerConnections",
+          "value": 0
+        },
+        {
+          "name": "ResourceFetchers",
+          "value": 3
+        },
+        {
+          "name": "AdSubframes",
+          "value": 0
+        },
+        {
+          "name": "DetachedScriptStates",
+          "value": 2
+        },
+        {
+          "name": "ArrayBufferContents",
+          "value": 0
+        },
+        {
+          "name": "LayoutCount",
+          "value": 5
+        },
+        {
+          "name": "RecalcStyleCount",
+          "value": 65
+        },
+        {
+          "name": "LayoutDuration",
+          "value": 0.074341
+        },
+        {
+          "name": "RecalcStyleDuration",
+          "value": 0.017191
+        },
+        {
+          "name": "DevToolsCommandDuration",
+          "value": 0.005551
+        },
+        {
+          "name": "ScriptDuration",
+          "value": 0.122228
+        },
+        {
+          "name": "V8CompileDuration",
+          "value": 0
+        },
+        {
+          "name": "TaskDuration",
+          "value": 0.320459
+        },
+        {
+          "name": "TaskOtherDuration",
+          "value": 0.101148
+        },
+        {
+          "name": "ThreadTime",
+          "value": 8.686263
+        },
+        {
+          "name": "ProcessTime",
+          "value": 9.297771
+        },
+        {
+          "name": "JSHeapUsedSize",
+          "value": 2743892
+        },
+        {
+          "name": "JSHeapTotalSize",
+          "value": 4194304
+        },
+        {
+          "name": "FirstMeaningfulPaint",
+          "value": 740991.272097
+        },
+        {
+          "name": "DomContentLoaded",
+          "value": 740991.105707
+        },
+        {
+          "name": "NavigationStart",
+          "value": 740989.823436
+        }
+      ]
+    },
+    {
+      "fcp": 1456,
+      "lcp": {
+        "time": 2492,
+        "element": "IMG",
+        "id": "_image_1xixq_54"
+      },
+      "requests": [
+        {
+          "url": "/ReleaseBoardGameP2P/assets/index-BfkPVdNJ.js",
+          "bytes": 5109,
+          "encoded": 4809
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/vendor-react-9LjzQdLw.js",
+          "bytes": 60834,
+          "encoded": 60534
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/vendor-router-C7MaVHp2.js",
+          "bytes": 31002,
+          "encoded": 30702
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/vendor-i18n-79SrbKY8.js",
+          "bytes": 17765,
+          "encoded": 17465
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/start-screen-DBKv6xnj.js",
+          "bytes": 44599,
+          "encoded": 44299
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/session-context-BSLeE8w1.js",
+          "bytes": 1875,
+          "encoded": 1575
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/start-screen-BwSiytTw.css",
+          "bytes": 6848,
+          "encoded": 6548
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/session-context-CoGuwXgX.css",
+          "bytes": 428,
+          "encoded": 128
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/index-CDY3TLzC.css",
+          "bytes": 2577,
+          "encoded": 2277
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/photo-CnpmufjY.jpg",
+          "bytes": 96267,
+          "encoded": 95967
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/JetBrainsMono-VariableFont_wght-ByLpDV2T.woff2",
+          "bytes": 73065,
+          "encoded": 72765
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/FiraMono-Regular-DZfKlnWR.woff2",
+          "bytes": 62882,
+          "encoded": 62582
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/rubber-ducky-CPgscgOX.png",
+          "bytes": 44840,
+          "encoded": 44540
+        }
+      ],
+      "text": "RU\nEN\nOPEN P2P PROJECT\nBOARD CARD GAME\n\nA strategic card game about the real grind of software development. Bugs, surprise events, rivals' attacks — beat it all",
+      "route": "start",
+      "version": "148.0.7778.96",
+      "failures": [],
+      "metrics": [
+        {
+          "name": "Timestamp",
+          "value": 741012.740547
+        },
+        {
+          "name": "AudioHandlers",
+          "value": 0
+        },
+        {
+          "name": "AudioWorkletProcessors",
+          "value": 0
+        },
+        {
+          "name": "Documents",
+          "value": 3
+        },
+        {
+          "name": "Frames",
+          "value": 1
+        },
+        {
+          "name": "JSEventListeners",
+          "value": 155
+        },
+        {
+          "name": "LayoutObjects",
+          "value": 141
+        },
+        {
+          "name": "MediaKeySessions",
+          "value": 0
+        },
+        {
+          "name": "MediaKeys",
+          "value": 0
+        },
+        {
+          "name": "Nodes",
+          "value": 211
+        },
+        {
+          "name": "Resources",
+          "value": 16
+        },
+        {
+          "name": "ContextLifecycleStateObservers",
+          "value": 4
+        },
+        {
+          "name": "V8PerContextDatas",
+          "value": 4
+        },
+        {
+          "name": "WorkerGlobalScopes",
+          "value": 0
+        },
+        {
+          "name": "UACSSResources",
+          "value": 0
+        },
+        {
+          "name": "RTCPeerConnections",
+          "value": 0
+        },
+        {
+          "name": "ResourceFetchers",
+          "value": 3
+        },
+        {
+          "name": "AdSubframes",
+          "value": 0
+        },
+        {
+          "name": "DetachedScriptStates",
+          "value": 2
+        },
+        {
+          "name": "ArrayBufferContents",
+          "value": 0
+        },
+        {
+          "name": "LayoutCount",
+          "value": 5
+        },
+        {
+          "name": "RecalcStyleCount",
+          "value": 62
+        },
+        {
+          "name": "LayoutDuration",
+          "value": 0.077232
+        },
+        {
+          "name": "RecalcStyleDuration",
+          "value": 0.018238
+        },
+        {
+          "name": "DevToolsCommandDuration",
+          "value": 0.007001
+        },
+        {
+          "name": "ScriptDuration",
+          "value": 0.122123
+        },
+        {
+          "name": "V8CompileDuration",
+          "value": 0
+        },
+        {
+          "name": "TaskDuration",
+          "value": 0.325177
+        },
+        {
+          "name": "TaskOtherDuration",
+          "value": 0.100583
+        },
+        {
+          "name": "ThreadTime",
+          "value": 8.683715
+        },
+        {
+          "name": "ProcessTime",
+          "value": 9.280908
+        },
+        {
+          "name": "JSHeapUsedSize",
+          "value": 2732656
+        },
+        {
+          "name": "JSHeapTotalSize",
+          "value": 4194304
+        },
+        {
+          "name": "FirstMeaningfulPaint",
+          "value": 741002.901125
+        },
+        {
+          "name": "DomContentLoaded",
+          "value": 741002.729082
+        },
+        {
+          "name": "NavigationStart",
+          "value": 741001.445978
+        }
+      ]
+    }
+  ],
+  "actions": {
+    "create": {
+      "delayMs": 2943,
+      "requests": [
+        {
+          "url": "/ReleaseBoardGameP2P/assets/photo-CnpmufjY.jpg",
+          "encoded": 95967
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/JetBrainsMono-VariableFont_wght-ByLpDV2T.woff2",
+          "encoded": 72765
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/FiraMono-Regular-DZfKlnWR.woff2",
+          "encoded": 62582
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/rubber-ducky-CPgscgOX.png",
+          "encoded": 44540
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/SessionRuntime-4FwBwJoM.js",
+          "encoded": 379
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/useLobby-CNBZdL_i.js",
+          "encoded": 40596
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/cards-XaN06sDx.js",
+          "encoded": 488
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/persistence-BrxJJO1z.js",
+          "encoded": 2334
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/tally-B1xmQLE9.js",
+          "encoded": 450
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/profile-D5zDNknD.js",
+          "encoded": 4196
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/PendingPrompt-DIQaSQL1.js",
+          "encoded": 29232
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/PendingPrompt-Bzu5mBE-.css",
+          "encoded": 4860
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/spectatorLimit-Bak-J4z-.js",
+          "encoded": 114
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/presentationGate-UvezHEs5.js",
+          "encoded": 1764
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/vendor-peer-DxjM1MWA.js",
+          "encoded": 24259
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/Onest-VariableFont_wght-CzhIYVoS.woff2",
+          "encoded": 82194
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/FollowGameStart-CjwMN-r0.js",
+          "encoded": 269
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/useStartGame-DBmYHdQS.js",
+          "encoded": 438
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/CreateLobbyForm-3X0o-I2b.js",
+          "encoded": 1104
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/ModeSelect-37Mnb_Na.css",
+          "encoded": 1160
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/ModeSelect-B_zMOIW6.js",
+          "encoded": 631
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/Form-C6fGIqBf.js",
+          "encoded": 1481
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/Form-Cj9w3TRl.css",
+          "encoded": 936
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/CreateLobbyForm-D4uMbjgS.css",
+          "encoded": 412
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/lobbyNavigation-hcOe1qTX.js",
+          "encoded": 670
+        }
+      ]
+    },
+    "join": {
+      "delayMs": 2934,
+      "requests": [
+        {
+          "url": "/ReleaseBoardGameP2P/assets/photo-CnpmufjY.jpg",
+          "encoded": 95967
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/JetBrainsMono-VariableFont_wght-ByLpDV2T.woff2",
+          "encoded": 72765
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/FiraMono-Regular-DZfKlnWR.woff2",
+          "encoded": 62582
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/rubber-ducky-CPgscgOX.png",
+          "encoded": 44540
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/SessionRuntime-4FwBwJoM.js",
+          "encoded": 379
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/useLobby-CNBZdL_i.js",
+          "encoded": 40596
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/cards-XaN06sDx.js",
+          "encoded": 488
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/persistence-BrxJJO1z.js",
+          "encoded": 2334
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/tally-B1xmQLE9.js",
+          "encoded": 450
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/profile-D5zDNknD.js",
+          "encoded": 4196
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/PendingPrompt-DIQaSQL1.js",
+          "encoded": 29232
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/PendingPrompt-Bzu5mBE-.css",
+          "encoded": 4860
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/spectatorLimit-Bak-J4z-.js",
+          "encoded": 114
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/presentationGate-UvezHEs5.js",
+          "encoded": 1764
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/vendor-peer-DxjM1MWA.js",
+          "encoded": 24259
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/Onest-VariableFont_wght-CzhIYVoS.woff2",
+          "encoded": 82194
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/FollowGameStart-CjwMN-r0.js",
+          "encoded": 269
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/useStartGame-DBmYHdQS.js",
+          "encoded": 438
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/JoinLobbyForm-DYGCZw9q.js",
+          "encoded": 797
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/Form-C6fGIqBf.js",
+          "encoded": 1481
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/Form-Cj9w3TRl.css",
+          "encoded": 936
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/lobbyNavigation-hcOe1qTX.js",
+          "encoded": 670
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/useJoinLobby-C5Fnqs9n.js",
+          "encoded": 138
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/JoinLobbyForm-CVIhrTpZ.css",
+          "encoded": 166
+        }
+      ]
+    },
+    "rules": {
+      "delayMs": 1666,
+      "requests": [
+        {
+          "url": "/ReleaseBoardGameP2P/assets/FiraMono-Regular-DZfKlnWR.woff2",
+          "encoded": 62582
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/rubber-ducky-CPgscgOX.png",
+          "encoded": 44540
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/Rules-D4V-kOKL.js",
+          "encoded": 600
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/PendingPrompt-DIQaSQL1.js",
+          "encoded": 29232
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/PendingPrompt-Bzu5mBE-.css",
+          "encoded": 4860
+        },
+        {
+          "url": "/ReleaseBoardGameP2P/assets/rules-CvRalDUo.json",
+          "encoded": 4205
+        }
+      ]
+    }
+  },
+  "cache": {
+    "edit": "Append .cacheProbe { opacity: 0.99; } to board-only _Board.module.css; restored after build",
+    "identical": [
+      {
+        "file": "assets/session-context-CoGuwXgX.css",
+        "raw": 144,
+        "gzip": 128,
+        "brotli": 100,
+        "sha256": "41091d8b631d69a636a10aa30eddf16592edcead4d62147915cbf48160d5f72f"
+      },
+      {
+        "file": "assets/start-screen-BwSiytTw.css",
+        "raw": 32941,
+        "gzip": 6548,
+        "brotli": 5738,
+        "sha256": "637bd600c128e986f6103bf1738a151045bf63f633102b7e21da468168bc1c60"
+      },
+      {
+        "file": "assets/index-CDY3TLzC.css",
+        "raw": 7150,
+        "gzip": 2277,
+        "brotli": 1902,
+        "sha256": "7ac698a97009bfd68619feb3af303566b0684fadea61824173c3ea43fd998cfc"
+      },
+      {
+        "file": "assets/stats-D1ohIcek.css",
+        "raw": 9742,
+        "gzip": 2347,
+        "brotli": 1940,
+        "sha256": "3e5427ec5859dfe936c135bce3fd2ba096ae0fc43ba786bced48c620432c1106"
+      },
+      {
+        "file": "assets/useGame-UPgd-2ht.css",
+        "raw": 1189,
+        "gzip": 486,
+        "brotli": 390,
+        "sha256": "7a93a64742c72db02a4ac7f56fff17c18f543882ac223c5c4dfa837209febf86"
+      },
+      {
+        "file": "assets/help-DDdKVGDB.css",
+        "raw": 212,
+        "gzip": 174,
+        "brotli": 123,
+        "sha256": "3356c04219d0991de7911d081d7a6e54c1ec40165bf61c6f1ffe41e464b13ddf"
+      },
+      {
+        "file": "assets/_lobbyId_-Ck9amSse.css",
+        "raw": 11851,
+        "gzip": 2908,
+        "brotli": 2454,
+        "sha256": "688e06478a4fc2f8e7e87a44f2edf1b0528bd689ee48f198b2847591b1cd9d0c"
+      },
+      {
+        "file": "assets/copyText-D8131cGu.css",
+        "raw": 5683,
+        "gzip": 1338,
+        "brotli": 1049,
+        "sha256": "2af5bc51c49831a42ce6804f5123611b5026b7ca684af341e5b39def225fee62"
+      },
+      {
+        "file": "assets/RoomVoice-DnGWyeuR.css",
+        "raw": 12080,
+        "gzip": 2987,
+        "brotli": 2505,
+        "sha256": "ba181355fd545b4297c202ac819b446e83999689e9ea19f3c5760e380add2415"
+      },
+      {
+        "file": "assets/CreateLobbyForm-D4uMbjgS.css",
+        "raw": 887,
+        "gzip": 412,
+        "brotli": 336,
+        "sha256": "4d23c157406ca167758eee159d3630aecc4c8d800a46b0386e805ff95d835b80"
+      },
+      {
+        "file": "assets/ModeSelect-37Mnb_Na.css",
+        "raw": 4924,
+        "gzip": 1160,
+        "brotli": 902,
+        "sha256": "ce8236490fb1851cd473d5edc0ace508bbb93cea35dea2631595bec6b687d576"
+      },
+      {
+        "file": "assets/JoinLobbyForm-CVIhrTpZ.css",
+        "raw": 200,
+        "gzip": 166,
+        "brotli": 117,
+        "sha256": "3178c5b65a7ca892dc37258285f7a684fcf3b270051727dc22c02016a63d6e85"
+      },
+      {
+        "file": "assets/Form-Cj9w3TRl.css",
+        "raw": 4290,
+        "gzip": 936,
+        "brotli": 720,
+        "sha256": "f2cc410bc13f3eae1325681e3be1dffcfda23399e536774d1258a785e8f4a047"
+      },
+      {
+        "file": "assets/Reconnect-8QcdeVE1.css",
+        "raw": 1984,
+        "gzip": 822,
+        "brotli": 691,
+        "sha256": "b2341d7737c94a5a7c1dbe0a942fc03dc2e525b9206b450d2496658e548fd7ea"
+      },
+      {
+        "file": "assets/PendingPrompt-Bzu5mBE-.css",
+        "raw": 19857,
+        "gzip": 4860,
+        "brotli": 4178,
+        "sha256": "b7a423d3366a85581142276b641bd4483ff94d40e2aee092ecd484a0b7d678b6"
+      },
+      {
+        "file": "assets/vendor-react-9LjzQdLw.js",
+        "raw": 193810,
+        "gzip": 60534,
+        "brotli": 52075,
+        "sha256": "ca4f0513ef23b8477fdd1dd2757e5f3576e84697bf323e6e110a2496ff03086c"
+      },
+      {
+        "file": "assets/vendor-router-C7MaVHp2.js",
+        "raw": 93968,
+        "gzip": 30702,
+        "brotli": 27089,
+        "sha256": "aaec5ec420d5232efd65f2bc953516d41248f15c07e258e01c6ee748ec1cf362"
+      },
+      {
+        "file": "assets/session-context-BSLeE8w1.js",
+        "raw": 3309,
+        "gzip": 1575,
+        "brotli": 1401,
+        "sha256": "81ef932cb307632a1e1ccb9dca1f498367914797dae4ba8da84819eb5db074d2"
+      },
+      {
+        "file": "assets/vendor-i18n-79SrbKY8.js",
+        "raw": 56453,
+        "gzip": 17465,
+        "brotli": 15725,
+        "sha256": "712ee1b173f0e0c8118b538d4de87a725bddf17a7374048c1ead9ab7a1919435"
+      },
+      {
+        "file": "assets/start-screen-DBKv6xnj.js",
+        "raw": 112269,
+        "gzip": 44299,
+        "brotli": 37096,
+        "sha256": "4f68720df687a6d892f107b2abbe30d35b4ead15354a44bc04ddcd3b82726e60"
+      },
+      {
+        "file": "assets/vendor-peer-DxjM1MWA.js",
+        "raw": 88843,
+        "gzip": 24259,
+        "brotli": 21477,
+        "sha256": "5caa9b97d71e2dfeb2fbd8037350787c35ffcd81713a46a0ce0ba98366ec20af"
+      },
+      {
+        "file": "assets/SessionRuntime-4FwBwJoM.js",
+        "raw": 598,
+        "gzip": 379,
+        "brotli": 319,
+        "sha256": "bd6b63aa676decb8e7c5049c649b6da988b96b12433ea6d90fa30fd5a7d69c95"
+      },
+      {
+        "file": "assets/stats-C33YWf5D.js",
+        "raw": 10798,
+        "gzip": 4004,
+        "brotli": 3641,
+        "sha256": "0d5019cf372c0dbf8c941c0881523b57a10e75314df89ce2321620af235c5156"
+      },
+      {
+        "file": "assets/useGame-2rbEcAvq.js",
+        "raw": 2559,
+        "gzip": 1199,
+        "brotli": 1082,
+        "sha256": "caaed565705d16ab36e054bb141fa09dfd01c07ec0a6272e9f588c4a31657e8e"
+      },
+      {
+        "file": "assets/help-C1CI8N-i.js",
+        "raw": 585,
+        "gzip": 360,
+        "brotli": 305,
+        "sha256": "830ca76602a5f6db115a46a30d05d942edb1ef055a828e2bf5ae3d2474403456"
+      },
+      {
+        "file": "assets/_lobbyId_-BF36hXXJ.js",
+        "raw": 22323,
+        "gzip": 7677,
+        "brotli": 6862,
+        "sha256": "610c950705d44fc84cae598702efef13cbcc628299609201f47b4d349b70ebfc"
+      },
+      {
+        "file": "assets/useLobby-CNBZdL_i.js",
+        "raw": 137981,
+        "gzip": 40596,
+        "brotli": 35892,
+        "sha256": "f6e7743ff11d06cf7168bec508b1ffe2cee441245868a57794fbe6e73df5fe13"
+      },
+      {
+        "file": "assets/copyText-CD1Br25E.js",
+        "raw": 3629,
+        "gzip": 1603,
+        "brotli": 1424,
+        "sha256": "7d5494323997adc3e48caaf63dd6793ce5cbf9fa696e2b682107cc74a9db78d7"
+      },
+      {
+        "file": "assets/presentationGate-UvezHEs5.js",
+        "raw": 4386,
+        "gzip": 1764,
+        "brotli": 1597,
+        "sha256": "aec23976a7ea613ad9c85ba7a6a47394cb76aa197758eec31e4f61604cf1f025"
+      },
+      {
+        "file": "assets/tally-B1xmQLE9.js",
+        "raw": 901,
+        "gzip": 450,
+        "brotli": 402,
+        "sha256": "155e6bdfda19c2a5ea7bdbdf81235dcd46b1909b79eda97b179478c7aa9f6ce9"
+      },
+      {
+        "file": "assets/RoomVoice-CvgVIuNx.js",
+        "raw": 41674,
+        "gzip": 10404,
+        "brotli": 8967,
+        "sha256": "f684f9695fd74a1edf5c09111953cb4d34a8b3941bd9f594fb8710b0ac3044ee"
+      },
+      {
+        "file": "assets/persistence-BrxJJO1z.js",
+        "raw": 6544,
+        "gzip": 2334,
+        "brotli": 2086,
+        "sha256": "0fa43579914b8053b411e13461fb665e0aa16f6e8f7cb2b9d5e010b5950b55df"
+      },
+      {
+        "file": "assets/CreateLobbyForm-3X0o-I2b.js",
+        "raw": 2211,
+        "gzip": 1104,
+        "brotli": 973,
+        "sha256": "02968d4c58092ad55d2f4ebe40375d8744353a51504474a54cda7bd8238fac4e"
+      },
+      {
+        "file": "assets/ModeSelect-B_zMOIW6.js",
+        "raw": 1162,
+        "gzip": 631,
+        "brotli": 543,
+        "sha256": "3ad2f5b9f9e85b3c291d2c97d1919992ed0ca143adb9915c4233ee3ed10fe2da"
+      },
+      {
+        "file": "assets/JoinLobbyForm-DYGCZw9q.js",
+        "raw": 1425,
+        "gzip": 797,
+        "brotli": 695,
+        "sha256": "14f52f491bf067aef12bb9cc0bc2dcb01f94a27491f661bc8d27d953dd8361a1"
+      },
+      {
+        "file": "assets/useJoinLobby-C5Fnqs9n.js",
+        "raw": 133,
+        "gzip": 138,
+        "brotli": 110,
+        "sha256": "925c8281da2d2c3f8045672286751408caad54869ff79b69b5514c19fb3ff68e"
+      },
+      {
+        "file": "assets/Form-C6fGIqBf.js",
+        "raw": 2699,
+        "gzip": 1481,
+        "brotli": 1335,
+        "sha256": "6fc2cbff656967b1caa9eafbb44d7c5adbf2ae95e96d2a1e3a4afc0e56178c5f"
+      },
+      {
+        "file": "assets/lobbyNavigation-hcOe1qTX.js",
+        "raw": 1486,
+        "gzip": 670,
+        "brotli": 617,
+        "sha256": "578af387db44e3768af154134e8fc79a1eb4a2ca186172cbc78d6a85648d9d07"
+      },
+      {
+        "file": "assets/Rules-D4V-kOKL.js",
+        "raw": 1115,
+        "gzip": 600,
+        "brotli": 539,
+        "sha256": "22ed0a06230deca19b0b37c43cb84b4643da83c3b7ea2094e2268a78d8dd5024"
+      },
+      {
+        "file": "assets/FollowGameStart-CjwMN-r0.js",
+        "raw": 407,
+        "gzip": 269,
+        "brotli": 220,
+        "sha256": "0a1722982d55508fc7ee006e9f299b25f5d44082639d5156197e48cf6bce74cd"
+      },
+      {
+        "file": "assets/useStartGame-DBmYHdQS.js",
+        "raw": 708,
+        "gzip": 438,
+        "brotli": 379,
+        "sha256": "c5b3baf5a8f7cecfa40fd593dccf863e53689209aeaefa609dcf842e3d092c52"
+      },
+      {
+        "file": "assets/profile-D5zDNknD.js",
+        "raw": 10646,
+        "gzip": 4196,
+        "brotli": 3697,
+        "sha256": "751b2c8ad984d16bcab2e61ec7f2e8fa52b4d843302d0f5aadf25a6c3ffac7b8"
+      },
+      {
+        "file": "assets/spectatorLimit-Bak-J4z-.js",
+        "raw": 109,
+        "gzip": 114,
+        "brotli": 97,
+        "sha256": "52f7928184c3963ca1b618e470d8ba0c0a2a8f5d6134414a9ee9316e1c993671"
+      },
+      {
+        "file": "assets/cards-XaN06sDx.js",
+        "raw": 1626,
+        "gzip": 488,
+        "brotli": 455,
+        "sha256": "71de511a01062e3f4894c457493a3379f3fda7111bab812b6149723babe222fa"
+      },
+      {
+        "file": "assets/SessionBootstrap-Dad4B5Eh.js",
+        "raw": 1355,
+        "gzip": 743,
+        "brotli": 661,
+        "sha256": "d74f8b207e1e76ea96d72a8eead164ea946eaae162cf7d7b6f28f10714663016"
+      },
+      {
+        "file": "assets/Reconnect-D52SqjQX.js",
+        "raw": 2726,
+        "gzip": 1215,
+        "brotli": 1087,
+        "sha256": "b74f48e2e2a1400e2bdfbf3a1347ba013b441de65bc654dda0795b70c924c9c5"
+      },
+      {
+        "file": "assets/PendingPrompt-DIQaSQL1.js",
+        "raw": 92337,
+        "gzip": 29232,
+        "brotli": 24452,
+        "sha256": "06993810cbcaee3368ed53ddf58a28f81a0341ee40b739f4a4da9c8223ec6b50"
+      }
+    ],
+    "changedBefore": [
+      {
+        "file": "assets/index-C_32VFV-.css",
+        "raw": 35626,
+        "gzip": 7759,
+        "brotli": 6771,
+        "sha256": "7621afe4bf341ec294c88170a204f4d69699b12309c6db431a0568c29ceca5df"
+      },
+      {
+        "file": "assets/index-BfkPVdNJ.js",
+        "raw": 11946,
+        "gzip": 4809,
+        "brotli": 4325,
+        "sha256": "c7082a03d1d5b155a3317e37f88042b3434eac7614fc20165541224e46744d9d"
+      },
+      {
+        "file": "assets/index-B7QwowYn.js",
+        "raw": 251322,
+        "gzip": 81243,
+        "brotli": 70595,
+        "sha256": "6736b3c1c6f9ef6ac446040eca5c2381a8e6256f326ea5679c872bf651366d8e"
+      }
+    ],
+    "changedAfter": [
+      {
+        "file": "assets/index-CpYTjnvq.css",
+        "raw": 35661,
+        "gzip": 7780,
+        "brotli": 6785,
+        "sha256": "ebdd8ec79f8cd35913114d78ade182816d29a0fafe791cba78904698711a991b"
+      },
+      {
+        "file": "assets/index-DCCQeVlX.js",
+        "raw": 11946,
+        "gzip": 4809,
+        "brotli": 4323,
+        "sha256": "e28fe5e2c1ab8eb1e8ea6ea5b97478243c29f9c75bb11c4ac86980335daaa2ad"
+      },
+      {
+        "file": "assets/index-DzI53qBt.js",
+        "raw": 251322,
+        "gzip": 81244,
+        "brotli": 70633,
+        "sha256": "13c2f06cba88099421b4747bbd2c4290800b8eeff9dd8bdffc4f10df9cc1e430"
+      }
+    ],
+    "invalidatedGzip": 93833
+  },
+  "networkChecks": {
+    "coldRulesJsonRequests": 0,
+    "asyncChunksImportingBootstrap": [],
+    "graphAssertion": {
+      "loaded": [
+        "assets/index-BfkPVdNJ.js",
+        "assets/vendor-react-9LjzQdLw.js",
+        "assets/vendor-router-C7MaVHp2.js",
+        "assets/vendor-i18n-79SrbKY8.js",
+        "assets/session-context-BSLeE8w1.js",
+        "assets/start-screen-DBKv6xnj.js",
+        "assets/start-screen-BwSiytTw.css",
+        "assets/session-context-CoGuwXgX.css",
+        "assets/index-CDY3TLzC.css",
+        "assets/photo-CnpmufjY.jpg",
+        "assets/JetBrainsMono-VariableFont_wght-ByLpDV2T.woff2",
+        "assets/FiraMono-Regular-DZfKlnWR.woff2",
+        "assets/rubber-ducky-CPgscgOX.png"
+      ],
+      "findings": []
+    }
+  },
+  "p2p": {
+    "connected": {
+      "host": {
+        "pcs": ["closed", "connected"],
+        "channels": [
+          {
+            "token": 0,
+            "id": null,
+            "state": "closed"
+          },
+          {
+            "token": 1,
+            "id": 1,
+            "state": "open"
+          }
+        ]
+      },
+      "guest": {
+        "pcs": ["closed", "connected"],
+        "channels": [
+          {
+            "token": 0,
+            "id": null,
+            "state": "closed"
+          },
+          {
+            "token": 1,
+            "id": 1,
+            "state": "open"
+          }
+        ]
+      }
+    },
+    "persistent404": {
+      "documents": 0,
+      "host": {
+        "pcs": ["closed", "connected"],
+        "channels": [
+          {
+            "token": 0,
+            "id": null,
+            "state": "closed"
+          },
+          {
+            "token": 1,
+            "id": 1,
+            "state": "open"
+          }
+        ]
+      }
+    },
+    "board": {
+      "host": {
+        "pcs": ["closed", "connected"],
+        "channels": [
+          {
+            "token": 0,
+            "id": null,
+            "state": "closed"
+          },
+          {
+            "token": 1,
+            "id": 1,
+            "state": "open"
+          }
+        ]
+      },
+      "guest": {
+        "pcs": ["closed", "connected"],
+        "channels": [
+          {
+            "token": 0,
+            "id": null,
+            "state": "closed"
+          },
+          {
+            "token": 1,
+            "id": 1,
+            "state": "open"
+          }
+        ]
+      }
+    },
+    "rulesReopen": {
+      "search": "Debugger"
+    },
+    "stats": {
+      "host": {
+        "pcs": ["closed", "connected"],
+        "channels": [
+          {
+            "token": 0,
+            "id": null,
+            "state": "closed"
+          },
+          {
+            "token": 1,
+            "id": 1,
+            "state": "open"
+          }
+        ]
+      },
+      "guest": {
+        "pcs": ["closed", "connected"],
+        "channels": [
+          {
+            "token": 0,
+            "id": null,
+            "state": "closed"
+          },
+          {
+            "token": 1,
+            "id": 1,
+            "state": "open"
+          }
+        ]
+      }
+    },
+    "nextMatch": {
+      "differentGame": true,
+      "host": {
+        "pcs": ["closed", "connected"],
+        "channels": [
+          {
+            "token": 0,
+            "id": null,
+            "state": "closed"
+          },
+          {
+            "token": 1,
+            "id": 1,
+            "state": "open"
+          }
+        ]
+      },
+      "guest": {
+        "pcs": ["closed", "connected"],
+        "channels": [
+          {
+            "token": 0,
+            "id": null,
+            "state": "closed"
+          },
+          {
+            "token": 1,
+            "id": 1,
+            "state": "open"
+          }
+        ]
+      }
+    },
+    "guestRestore": {
+      "host": {
+        "pcs": ["closed", "closed", "connected"],
+        "channels": [
+          {
+            "token": 0,
+            "id": null,
+            "state": "closed"
+          },
+          {
+            "token": 1,
+            "id": 1,
+            "state": "closed"
+          },
+          {
+            "token": 2,
+            "id": 1,
+            "state": "open"
+          }
+        ]
+      },
+      "guest": {
+        "pcs": ["closed", "connected"],
+        "channels": [
+          {
+            "token": 0,
+            "id": null,
+            "state": "closed"
+          },
+          {
+            "token": 1,
+            "id": 1,
+            "state": "open"
+          }
+        ]
+      }
+    },
+    "hostRestore": {
+      "host": {
+        "pcs": ["closed", "connected"],
+        "channels": [
+          {
+            "token": 0,
+            "id": null,
+            "state": "closed"
+          }
+        ]
+      },
+      "guest": {
+        "pcs": ["closed", "closed", "connected"],
+        "channels": [
+          {
+            "token": 0,
+            "id": null,
+            "state": "closed"
+          },
+          {
+            "token": 1,
+            "id": 1,
+            "state": "closed"
+          },
+          {
+            "token": 2,
+            "id": 1,
+            "state": "open"
+          }
+        ]
+      }
+    },
+    "errors": []
+  },
+  "recovery": {
+    "module": {
+      "requests": 2,
+      "navigationsBeforeRefresh": 3,
+      "navigationsAfterRefresh": 4
+    },
+    "json": {
+      "requests": 2
+    },
+    "dependentCss": {
+      "requests": 2,
+      "documents": 2
+    },
+    "sharedChild": {
+      "requests": 2,
+      "documents": 2
+    }
+  },
+  "tests": {
+    "frontend": 1995,
+    "engine": 589,
+    "ui": 312,
+    "peerServer": 6,
+    "playground": 3,
+    "translation": 2
+  },
+  "executionRulings": [
+    "Ruling: Use origin/main 5879517d rather than old design branch — preserves #249 bootstrap and #251 offline handling — baseline changes must be measured on this newer source.",
+    "Ruling: Use manual detached worktree in .worktree because native API cannot select the user's required directory — isolated checkout stays in writable project — cost: not app-managed cleanup.",
+    "Ruling: Creating an external issue was rejected by auto-review; detached implementation continues while explicit authorization is pending — no issue/branch publication.",
+    "Ruling: Cold browser measurements run from an installed Playwright library to control new contexts and CDP per visit — CLI wrapper stalled resolving npm — no product dependency added.",
+    "Ruling: Task 1 browser collection overlapped independent foundation edits only after freezing the baseline production build — measured source remains 5879517d.",
+    "Ruling: Preserve new SessionBootstrap only for a session detected before initial route render; inserting it after modal activation would remount start — keep its original restore/redirect behavior for saved sessions.",
+    "Task 5: Ruling: Production uses the _Board fork and BoardCopyBundle/BoardSlots, not UI Table — put the rules slot on that existing production interface and retain the old copy fallback; leave playground UI Table unchanged — cost: the production and kit slot APIs differ intentionally.",
+    "Task 6: Ruling: Board preloading belongs to app SessionActivation rather than a page importing app upward — preload only for an established in-lobby session — avoids downloading board for an unopened invitation.",
+    "Task 8: Ruling: Chromium 148 caches a failed native JS-module fetch; a reset importer made zero new requests (observed attempts=1). Known JS/CSS module failures now offer explicit refresh rather than a nonfunctional Retry; JSON failures retain real retry. No automatic reload; the session survives until user chooses refresh. Cost: a transient native module failure requires explicit session reconnect. New DeferredContent regression test failed then passed for this policy.",
+    "Task 4/6: Ruling: Commit session ownership and route composition together because main.tsx shares the injected store/router constructor — the intermediate main import must not reference uncommitted route files — separate tests still validate each deliverable.",
+    "Task 7: Ruling: Put vendorChunks.ts under config/ instead of build/ because the repository ignores build directories — keeps source tracked normally.",
+    "Task 7: Ruling: First hash experiment invalidated almost all app chunks via shared exports in entry. Add explicit start-screen and session-context chunks so async features do not import bootstrap. This follows cache-isolation acceptance; cost: two more initial requests, measured again.",
+    "Final: Ruling: Timing acceptance remains implementer-owned — five final cold visits per URL improve FCP/LCP under the baseline protocol; reviewer did not rerun them — cost if wrong: local timing gains may not reproduce on target devices.",
+    "Final: Ruling: Hosted cache acceptance stays unverified — final SHA-256 experiment proves unchanged URLs/content for 47 other JS/CSS files; no authorized deployment — cost if wrong: hosting policy may still force repeat downloads.",
+    "Final: Ruling: Transport/lifecycle acceptance uses the implementer browser evidence — same open DataChannel token/id across routes and next match; refreshed host/guest restore after saved checkpoint — cost if wrong: remote TURN/mobile lifecycle differences remain untested.",
+    "Final: Ruling: Full-suite acceptance uses fresh implementer output after review fix — 2907 tests, typechecks, lint, frontend and playground builds pass; reviewer did not rerun — cost if wrong: platform-specific issues may remain."
+  ],
+  "deferredMinors": [
+    "Final: minor (deferred): assert-start.mjs ignores emitted rules JSON URLs in network logs; separate final URL scan proves zero cold-start rules JSON requests."
+  ]
+}

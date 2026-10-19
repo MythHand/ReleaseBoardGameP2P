@@ -4,7 +4,7 @@
 
 **Application:** `@release/web`
 
-**Status:** Written spec approved on 2026-10-19; implementation plan awaiting review.
+**Status:** Implemented locally on 2026-10-19; validation and implementation rulings are recorded in [the performance report](../performance/2026-10-19-frontend-loading.md).
 
 ## Intent and success criteria
 
