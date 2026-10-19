@@ -549,5 +549,12 @@
     "windowClosed": "reaction over",
     "windowOpened": "reaction",
     "operationPlayed": "operation played"
+  },
+  "loading": {
+    "status": "Loading…",
+    "failed": "This part could not be loaded. Try again, or refresh the page if the application was updated.",
+    "offline": "You are offline. Reconnect and try again.",
+    "retry": "Try again",
+    "refresh": "Refresh page"
   }
 }

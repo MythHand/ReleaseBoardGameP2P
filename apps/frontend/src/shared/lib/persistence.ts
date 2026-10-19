@@ -7,8 +7,8 @@ import { type Event, parseEventLog } from '@release/engine'
 // that way is what lets the playground and every headless test exercise the
 // same code the network does (network/session/link.ts).
 
-import { read, readJson, remove, write } from './storage'
-import { RESTORE_TTL_MS } from './sessionPersistence'
+import { readJson, remove, write } from './storage'
+import { RESTORE_TTL_MS, type StoredLobbyConfig } from './sessionPersistence'
 export { clearSession, getResumeToken, readSession, RESTORE_TTL_MS, writeSession } from './sessionPersistence'
 export type { StoredSession, StoredLobbyConfig } from './sessionPersistence'
 
