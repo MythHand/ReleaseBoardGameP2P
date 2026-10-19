@@ -9,16 +9,18 @@ export function createModuleResource<T>(importer: () => Promise<T>): ModuleResou
   let pending: Promise<T> | undefined
   let value: T | undefined
   const load = () => {
-    pending ??= Promise.resolve().then(importer).then(
-      (module) => {
-        value = module
-        return module
-      },
-      (error: unknown) => {
-        pending = undefined
-        throw error
-      },
-    )
+    pending ??= Promise.resolve()
+      .then(importer)
+      .then(
+        (module) => {
+          value = module
+          return module
+        },
+        (error: unknown) => {
+          pending = undefined
+          throw error
+        },
+      )
     return pending
   }
   return { load, retry: load, peek: () => value }
