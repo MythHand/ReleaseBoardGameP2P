@@ -201,6 +201,9 @@ export default function BoardPage() {
           spectators,
           spectatorLimit: session.state?.maxSpectators,
           onSpectatorLimitChange: session.isHost ? session.setMaxSpectators : undefined,
+          // everyone sees the room's action time; only the host can change it
+          actionTime: session.state?.actionTime,
+          onActionTimeChange: session.isHost ? session.setActionTime : undefined,
           disconnected,
           // The overlay covers every way a peer can be off the table: a guest
           // dialing its way back, a host rebuilding the match it was keeping,

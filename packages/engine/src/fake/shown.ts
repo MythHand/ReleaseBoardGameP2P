@@ -1,7 +1,7 @@
 import type { Action } from '../actions'
 import type { Reduction } from '../engine'
 import type { CardUid, GameState, PlayerId } from '../state'
-import { createLog, type Log, reject, takeBack } from './core'
+import { createLog, type Log, reject, takeBack, timeFor } from './core'
 import { combosFor, playableFor } from './project'
 import { attackOut, canAttackWith, endSudoTime, respondersFor, SUDO_PARTNER_MS } from './window'
 
@@ -79,7 +79,7 @@ export function onShow(state: GameState, action: Action & { type: 'SHOW' }): Red
             ...using,
             held: action.player,
             openedAt: action.at,
-            deadline: action.at + SUDO_PARTNER_MS,
+            deadline: action.at + timeFor(state, SUDO_PARTNER_MS),
           }
         : using
     return { state: { ...shown, window }, events: log.events }

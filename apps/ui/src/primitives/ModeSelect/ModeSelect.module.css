@@ -10,14 +10,33 @@
   color: var(--fg);
 }
 
-/* дорожка с вариантами; колонки равной ширины */
+/* дорожка с вариантами; колонки равной ширины. A size sets four measures here
+   and nothing else: the track's inset, its rounding, the thumb's rounding and an
+   option's padding — the thumb works out its place from the inset. */
 .track {
   position: relative;
   display: flex;
-  padding: 4px;
+  padding: var(--pad);
   background: var(--white-04-5);
   border: 1px solid var(--white-08);
-  border-radius: 12px;
+  border-radius: var(--radius);
+}
+
+/* the match modes: a label and a line of description per option */
+.md {
+  --pad: 4px;
+  --radius: 12px;
+  --thumb-radius: 9px;
+  --opt-pad: 13px 16px;
+}
+
+/* a settings row: as tall as a toggle beside it (11px caps, 7px above and
+   below inside a 1px border) — 2px of inset and 5px of padding make the same */
+.sm {
+  --pad: 2px;
+  --radius: 6px;
+  --thumb-radius: 4px;
+  --opt-pad: 5px 8px;
 }
 
 /* «ползунок» — едет к активной колонке (ширина = одна колонка). A grey box
@@ -25,11 +44,11 @@
    you cannot is the colour of the chosen label, not the thumb. */
 .thumb {
   position: absolute;
-  inset-block: 4px;
-  inset-inline-start: 4px;
-  inline-size: calc((100% - 8px) / var(--n));
+  inset-block: var(--pad);
+  inset-inline-start: var(--pad);
+  inline-size: calc((100% - 2 * var(--pad)) / var(--n));
   background: var(--white-12);
-  border-radius: 9px;
+  border-radius: var(--thumb-radius);
   transform: translateX(calc(var(--i) * 100%));
   transition: transform 420ms cubic-bezier(0.32, 0.72, 0, 1);
 }
@@ -41,14 +60,20 @@
   flex-direction: column;
   gap: 5px;
   min-inline-size: 0;
-  padding: 13px 16px;
+  padding: var(--opt-pad);
   color: var(--white-55);
   text-align: start;
   cursor: pointer;
   background: transparent;
   border: 0;
-  border-radius: 9px;
+  border-radius: var(--thumb-radius);
   transition: color 200ms var(--ease-out);
+}
+
+/* a short label in a small column reads as a tab: centred, as a toggle's is */
+.sm .opt {
+  align-items: center;
+  text-align: center;
 }
 
 .opt:focus-visible {
@@ -82,12 +107,4 @@
 .readOnly .active,
 .readOnly .active:hover {
   color: var(--fg);
-}
-
-.label {
-  composes: mono-strong tk-02 from '../../design/typography.module.css';
-}
-
-.desc {
-  composes: mono-sm tk-01 from '../../design/typography.module.css';
 }

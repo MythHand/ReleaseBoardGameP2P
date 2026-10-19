@@ -1,5 +1,6 @@
 import type { GameConfig } from '../engine'
 import type { CardInstance, GameState, Setup } from '../state'
+import { DEFEND_MS } from './core'
 import { createFakeEngine, FAKE_DECK, FAKE_EVENTS } from './index'
 import { reduce } from './reduce'
 import { WINDOW_NEXT_MS } from './window'
@@ -72,6 +73,14 @@ it('turns an attack into a defence decision for the release owner', () => {
     canDefendWith: [HOTFIX.uid],
   })
   expect(r.events.map((e) => e.type)).toEqual(['attacked'])
+})
+
+it('gives the defence decision the action time', () => {
+  const r = reduce(
+    { ...staged([BUG], [HOTFIX]), actionTime: 2 },
+    { type: 'ATTACK', player: 'p2', card: BUG.uid, at: 1001 },
+  )
+  expect(r.state.pending).toMatchObject({ openedAt: 1001, deadline: 1001 + 2 * DEFEND_MS })
 })
 
 it('destroys the release when the owner takes the hit', () => {

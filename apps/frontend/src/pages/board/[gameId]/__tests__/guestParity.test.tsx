@@ -40,3 +40,39 @@ it('lets a spectator disable local card parallax without a player action', () =>
   expect(onParallaxChange).toHaveBeenCalledWith(false)
   expect(screen.queryByTestId('board-you')).toBeNull()
 })
+
+const withActionTime = (props: ReturnType<typeof makeBoardProps>) => ({
+  ...props.copy,
+  table: { ...props.copy.table, actionTime: 'action time', actionTimeHint: 'more time' },
+})
+
+it('lets the host give every action more time', () => {
+  const props = makeBoardProps()
+  const onActionTimeChange = vi.fn()
+  render(
+    <Board
+      {...props}
+      room={{ ...props.room, actionTime: 1, onActionTimeChange }}
+      copy={withActionTime(props)}
+    />,
+  )
+  fireEvent.click(screen.getByRole('button', { name: props.copy.table.settings }))
+  fireEvent.click(screen.getByRole('button', { name: '2x' }))
+  expect(onActionTimeChange).toHaveBeenCalledWith(2)
+})
+
+it('shows everyone else the host’s action time, and lets them change nothing', () => {
+  const props = makeBoardProps()
+  const onActionTimeChange = vi.fn()
+  render(
+    <Board
+      {...props}
+      room={{ ...props.room, role: 'guest', actionTime: 3, onActionTimeChange }}
+      copy={withActionTime(props)}
+    />,
+  )
+  fireEvent.click(screen.getByRole('button', { name: props.copy.table.settings }))
+  expect(screen.getByText('action time')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: '1x' }))
+  expect(onActionTimeChange).not.toHaveBeenCalled()
+})

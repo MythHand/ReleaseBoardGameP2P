@@ -125,7 +125,13 @@ export type Message =
   | { type: 'WHEREABOUTS'; payload: { where: Where } }
   | {
       type: 'LOBBY_CONFIG_UPDATED'
-      payload: { maxPlayers?: number; maxSpectators?: number; setup?: Setup; bots?: number }
+      payload: {
+        maxPlayers?: number
+        maxSpectators?: number
+        setup?: Setup
+        bots?: number
+        actionTime?: number
+      }
     }
   | { type: 'LOBBY_DISBANDED'; payload: Record<string, never> }
   | { type: 'PLAYER_KICKED'; payload: { peerId: string; reason?: string } }

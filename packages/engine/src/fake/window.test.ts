@@ -170,6 +170,15 @@ it('does not count DDoS as a reaction-window attack', () => {
   expect(engine.project(s, 'p2').window?.canAttackWith).toEqual([])
 })
 
+it('gives both rounds of the window the action time', () => {
+  const s = engine.createGame({ ...config(), actionTime: 3 })
+  const target = { player: 'p1', slot: 'frontend' as const, card: FE.uid }
+  const first = openWindow(s, createLog(s.eventSeq), target, 1, 1000)
+  const later = openWindow(s, createLog(s.eventSeq), target, 2, 1000)
+  expect(first.window?.deadline).toBe(1000 + 3 * WINDOW_FIRST_MS)
+  expect(later.window?.deadline).toBe(1000 + 3 * WINDOW_NEXT_MS)
+})
+
 it('opens a 10s window for a later round', () => {
   const s = engine.createGame(config())
   const log = createLog(s.eventSeq)
@@ -288,6 +297,12 @@ describe('one attack at a time', () => {
     expect(during.events).toMatchObject([
       { type: 'rejected', reason: 'an attack is being dealt with' },
     ])
+  })
+
+  it('gives the Sudo’s time the action time too', () => {
+    const s = { ...released({ p2: [SUDO, BUG] }), actionTime: 2 }
+    const sudo = reduce(s, { type: 'SHOW', player: 'p2', card: SUDO.uid, at: 2000 })
+    expect(sudo.state.window?.deadline).toBe(2000 + 2 * SUDO_PARTNER_MS)
   })
 
   it('gives a Sudo its own time for the attack to join it', () => {

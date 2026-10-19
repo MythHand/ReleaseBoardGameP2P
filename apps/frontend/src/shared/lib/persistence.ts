@@ -190,6 +190,7 @@ export interface StoredLobbyConfig {
   maxPlayers: number
   setup: unknown
   bots?: number
+  actionTime?: number
 }
 
 export interface StoredKeeper {

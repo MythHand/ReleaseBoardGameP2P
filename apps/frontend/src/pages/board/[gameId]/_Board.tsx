@@ -7,6 +7,7 @@
 // error instead of a misrender.
 
 import {
+  ACTION_TIME_SCALES,
   Arrow,
   Badge,
   Card,
@@ -27,6 +28,7 @@ import {
   LangSwitcher,
   LobbyCode,
   MAX_SPECTATORS,
+  ModeSelect,
   MoveHistory,
   Participants,
   PauseGame,
@@ -374,6 +376,8 @@ function BoardView({
     spectators,
     spectatorLimit,
     onSpectatorLimitChange,
+    actionTime: actionTimeProp,
+    onActionTimeChange,
     onKickSpectator,
     lang,
     onLangChange,
@@ -1298,7 +1302,27 @@ function BoardView({
   // секция управления хоста в настройках: лимит зрителей и/или пауза игры
   const canLimitSpectators = isHost && Boolean(onSpectatorLimitChange) && spectatorLimit != null
   const canPause = isHost && Boolean(onPauseChange) && Boolean(copy.table.pauseGame)
-  const hostControls = canLimitSpectators || canPause
+  const canActionTime = isHost && Boolean(onActionTimeChange) && Boolean(copy.table.actionTime)
+  const hostControls = canLimitSpectators || canPause || canActionTime
+  // Everyone else sees the host's choice where the host makes it, and cannot
+  // change it (owner, 19.10) — once the room has one.
+  const seesActionTime = !isHost && actionTimeProp != null && Boolean(copy.table.actionTime)
+  const actionTime = actionTimeProp ?? 1
+  // One row for both: the host's switch, and everyone else's read-only view of it.
+  const actionTimeField = (
+    <SettingsField label={copy.table.actionTime} hint={copy.table.actionTimeHint} inline>
+      <ModeSelect
+        size="sm"
+        readOnly={!isHost}
+        options={ACTION_TIME_SCALES.map((n) => ({ value: String(n), label: `${n}x` }))}
+        value={String(actionTime)}
+        onChange={(v) => {
+          const scale = ACTION_TIME_SCALES.find((n) => String(n) === v)
+          if (scale) onActionTimeChange?.(scale)
+        }}
+      />
+    </SettingsField>
+  )
   const hasChat = Boolean(slots?.chat) && Boolean(copy.table.tabChat)
   const hasVoice = Boolean(slots?.voice) && Boolean(copy.table.tabVoice)
   const canChatToasts = hasChat && Boolean(onChatToastsChange) && Boolean(copy.table.chatToasts)
@@ -1306,7 +1330,8 @@ function BoardView({
     Boolean(lang && onLangChange) ||
     Boolean(code) ||
     Boolean(onParallaxChange && copy.table.parallax) ||
-    canChatToasts
+    canChatToasts ||
+    seesActionTime
 
   // текстовые вкладки рейла (порядок = сверху вниз), подписи — по языку
   const textTabs: TabRailItem[] = [
@@ -2409,6 +2434,7 @@ function BoardView({
                     </Toggle>
                   </SettingsField>
                 )}
+                {seesActionTime && actionTimeField}
               </SettingsGroup>
             )}
             {hostControls && (
@@ -2428,6 +2454,7 @@ function BoardView({
                       />
                     </SettingsField>
                   )}
+                  {canActionTime && actionTimeField}
                   {canPause && (
                     <SettingsField label={copy.table.pauseGame} hint={copy.table.pauseHint} inline>
                       <Toggle

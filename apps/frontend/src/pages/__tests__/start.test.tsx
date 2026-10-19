@@ -70,6 +70,7 @@ it('does not offer an active session on the start screen', () => {
       hostId: 'h',
       maxPlayers: 4,
       maxSpectators: 8,
+      actionTime: 1,
       bots: 0,
       setup: {},
       peers: {

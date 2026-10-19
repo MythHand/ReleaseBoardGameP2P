@@ -12,6 +12,7 @@ import {
   type Log,
   reject,
   setHand,
+  timeFor,
 } from './core'
 
 const discard = (state: GameState, cards: CardInstance[]): GameState => bankToDiscard(state, cards)
@@ -42,7 +43,7 @@ export function openHandAttack(
       ...(combo ? { combo } : {}),
       canDefendWith: defencesFor(state, target, sudo),
       openedAt: at,
-      deadline: at + DEFEND_MS,
+      deadline: at + timeFor(state, DEFEND_MS),
       scope: 'hand',
     },
     eventSeq: log.seq,
@@ -60,7 +61,7 @@ export function openHandChoice(
   context: HandAttackContext,
   at: number,
 ): GameState {
-  const timing = { openedAt: at, deadline: at + HAND_CHOICE_MS }
+  const timing = { openedAt: at, deadline: at + timeFor(state, HAND_CHOICE_MS) }
   if (context.attack.id === 'attack-security-bug') {
     return {
       ...state,

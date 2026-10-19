@@ -2,7 +2,7 @@ import type { Action } from '../actions'
 import { RELEASE_ATTACKS } from '../cards'
 import type { Reduction } from '../engine'
 import type { CardUid, GameState, PlayerId, ReactionWindow } from '../state'
-import { checkWin, createLog, type Log, reject, takeBack } from './core'
+import { checkWin, createLog, type Log, reject, takeBack, timeFor } from './core'
 
 // understanding.md §7: the first reaction gets 15s; every later round in the same
 // exchange gets 10s.
@@ -69,7 +69,7 @@ export function openWindow(
 ): GameState {
   // With nobody able to answer there is no window to open.
   if (respondersFor(state, target.player).length === 0) return { ...state, eventSeq: log.seq }
-  const deadline = at + (round === 1 ? WINDOW_FIRST_MS : WINDOW_NEXT_MS)
+  const deadline = at + timeFor(state, round === 1 ? WINDOW_FIRST_MS : WINDOW_NEXT_MS)
   log.add({ type: 'windowOpened', player: target.player, slot: target.slot, round, deadline })
   return {
     ...state,

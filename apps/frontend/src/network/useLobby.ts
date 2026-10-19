@@ -6,7 +6,7 @@ import {
   parseEventLog,
 } from '@release/engine'
 import { createFakeEngine, FAKE_DECK, FAKE_EVENTS } from '@release/engine/fake'
-import { DEFAULT_SETUP } from '@release/ui'
+import { type ActionTimeScale, DEFAULT_SETUP, isActionTimeScale } from '@release/ui'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   botSeats,
@@ -50,6 +50,7 @@ import {
   type LobbyActionError,
   MAX_BOTS,
   type Outgoing,
+  setActionTime as setActionTimeFn,
   setBots as setBotsFn,
   setMaxPlayers as setMaxPlayersFn,
   setMaxSpectators as setMaxSpectatorsFn,
@@ -292,6 +293,7 @@ function normalizeRefereeSeats(value: unknown): RefereeSeat[] | null {
 
 interface NormalizedLobbyConfig {
   maxSpectators: number
+  actionTime: ActionTimeScale
   maxPlayers: number
   setup: Setup
   bots: number
@@ -299,8 +301,9 @@ interface NormalizedLobbyConfig {
 
 function normalizeLobbyConfig(value: unknown): NormalizedLobbyConfig | null {
   if (typeof value !== 'object' || value === null) return null
-  const { maxPlayers, maxSpectators, setup, bots } = value as {
+  const { maxPlayers, maxSpectators, setup, bots, actionTime } = value as {
     maxSpectators?: unknown
+    actionTime?: unknown
     maxPlayers?: unknown
     setup?: unknown
     bots?: unknown
@@ -320,12 +323,14 @@ function normalizeLobbyConfig(value: unknown): NormalizedLobbyConfig | null {
     return null
   }
   if (maxSpectators !== undefined && !validSpectatorLimit(maxSpectators)) return null
+  if (actionTime !== undefined && !isActionTimeScale(actionTime)) return null
   if (typeof setup !== 'object' || setup === null || Array.isArray(setup)) return null
   const entries = Object.entries(setup)
   if (!entries.every(([, option]) => typeof option === 'string')) return null
   return {
     maxPlayers,
     maxSpectators: maxSpectators ?? 8,
+    actionTime: isActionTimeScale(actionTime) ? actionTime : 1,
     setup: Object.fromEntries(entries),
     bots: bots ?? 0,
   }
@@ -538,6 +543,9 @@ export interface UseLobby {
   joinAvailability: JoinAvailability | null
   lobbyActionError: LobbyActionError | null
   setMaxSpectators(n: number): void
+  // Host-only: the room's action time, for everyone to see and the match on the
+  // table to take from its next clock.
+  setActionTime(actionTime: ActionTimeScale): void
   setParticipantRole(peerId: string, role: JoinRole): void
   ready(): void
   // Where this peer now is. The host applies its own move locally; a guest sends
@@ -859,6 +867,7 @@ export function useLobby(): UseLobby {
         ? {
             maxPlayers: lobby.maxPlayers,
             maxSpectators: lobby.maxSpectators,
+            actionTime: lobby.actionTime,
             setup: lobby.setup,
             bots: lobby.bots,
           }
@@ -887,12 +896,13 @@ export function useLobby(): UseLobby {
   }, [])
 
   const rememberLobbyConfig = useCallback(
-    (lobby: Pick<LobbyState, 'maxPlayers' | 'maxSpectators' | 'setup' | 'bots'>) => {
+    (lobby: Pick<LobbyState, 'maxPlayers' | 'maxSpectators' | 'setup' | 'bots' | 'actionTime'>) => {
       const stored = readSession()
       if (stored?.role !== 'host') return
       const lobbyConfig: StoredLobbyConfig = {
         maxPlayers: lobby.maxPlayers,
         maxSpectators: lobby.maxSpectators,
+        actionTime: lobby.actionTime,
         setup: lobby.setup,
         bots: lobby.bots,
       }
@@ -1638,6 +1648,7 @@ export function useLobby(): UseLobby {
           lobbyConfig: {
             maxPlayers: initial.maxPlayers,
             maxSpectators: initial.maxSpectators,
+            actionTime: initial.actionTime,
             setup: initial.setup,
             bots: initial.bots,
           },
@@ -1973,6 +1984,7 @@ export function useLobby(): UseLobby {
           hostId: t.id,
           maxPlayers: lobbyConfig?.maxPlayers ?? 6,
           maxSpectators: lobbyConfig?.maxSpectators ?? 8,
+          actionTime: lobbyConfig?.actionTime,
           bots: lobbyConfig?.bots ?? 0,
           setup: lobbyConfig?.setup ?? DEFAULT_SETUP,
           peers: [
@@ -2061,6 +2073,7 @@ export function useLobby(): UseLobby {
           hostId: t.id,
           maxPlayers: lobbyConfig?.maxPlayers ?? 6,
           maxSpectators: lobbyConfig?.maxSpectators ?? 8,
+          actionTime: lobbyConfig?.actionTime ?? normalized.state.actionTime,
           bots: lobbyConfig?.bots ?? 0,
           setup: (lobbyConfig?.setup as Setup | undefined) ?? normalized.state.setup,
           peers: [
@@ -2406,6 +2419,25 @@ export function useLobby(): UseLobby {
     [broadcastChatEntries, chatSession, commit, dispatch, rememberLobbyConfig],
   )
 
+  // The room's setting first, for everyone to see and the next match to start
+  // on; then the match on the table, which takes it from its next clock.
+  const setActionTime = useCallback(
+    (actionTime: ActionTimeScale) => {
+      const current = stateRef.current
+      if (!current || !isHostRef.current) return
+      const r = setActionTimeFn(current, actionTime)
+      commit(r.state)
+      rememberLobbyConfig(r.state)
+      dispatch(r.outgoing)
+      if (gameIdRef.current && sessionRef.current) {
+        keeperRef.current?.setActionTime(r.state.actionTime)
+        lastSavedRef.current = null
+        persistKeeper(sessionRef.current.current)
+      }
+    },
+    [commit, dispatch, rememberLobbyConfig, persistKeeper],
+  )
+
   const setMaxSpectators = useCallback(
     (n: number) => {
       const current = stateRef.current
@@ -2629,6 +2661,7 @@ export function useLobby(): UseLobby {
       // structurally satisfy.
       players: { playerId: PlayerId; peerId: string | null; name: string; bot?: boolean }[]
       setup: Setup
+      actionTime: number
       transport: Transport
       // Who the start gate waits for before the table may move. The match
       // waits on every human seat, spectators and bots excluded — a bot never
@@ -2638,7 +2671,15 @@ export function useLobby(): UseLobby {
     }) => {
       // Renamed off `gameId` on the way out of `params`: the hook already has
       // a state variable of that name, and this one is a plain local, not it.
-      const { gameId: matchId, keeperId, players, setup, transport, gateExpect } = params
+      const {
+        gameId: matchId,
+        keeperId,
+        players,
+        setup,
+        actionTime,
+        transport,
+        gateExpect,
+      } = params
 
       // The engine never sources randomness, so the seed is minted here and
       // the match is a pure function of it — determinism is what lets every
@@ -2658,6 +2699,7 @@ export function useLobby(): UseLobby {
           .filter((peer) => peer.role === 'guest')
           .map((peer) => peer.id),
         setup,
+        actionTime,
         deck: FAKE_DECK,
         events: FAKE_EVENTS,
       })
@@ -2751,6 +2793,7 @@ export function useLobby(): UseLobby {
         keeperId: mine.playerId,
         players: refereeSeats,
         setup: current.setup,
+        actionTime: current.actionTime,
         transport: t,
         // A bot runs no opening animation, so the gate waits only on the humans —
         // otherwise a match with bots seated would hold at the intro for the full
@@ -2893,6 +2936,7 @@ export function useLobby(): UseLobby {
       kick,
       setMaxPlayers,
       setMaxSpectators,
+      setActionTime,
       setParticipantRole,
       setBots,
       transferHost,
@@ -2942,6 +2986,7 @@ export function useLobby(): UseLobby {
       kick,
       setMaxPlayers,
       setMaxSpectators,
+      setActionTime,
       setParticipantRole,
       setBots,
       transferHost,

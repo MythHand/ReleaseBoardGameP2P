@@ -17,6 +17,9 @@ export interface GameConfig {
   seed: number
   players: { id: PlayerId; name: string }[]
   setup: Setup
+  // The room's action time multiple the match starts with (GameState.actionTime);
+  // 1 when left out
+  actionTime?: number
   deck: DeckEntry[]
   events: DeckEntry[]
 }

@@ -5,6 +5,7 @@ import LangSwitcher from '@/blocks/LangSwitcher'
 import LobbyCode from '@/blocks/LobbyCode'
 import Rules from '@/blocks/Rules'
 import { CardMotionProvider } from '@/cards/cardMotion'
+import { ACTION_TIME_SCALES } from '@/game/actionTime'
 import { MAX_SPECTATORS, spectatorLimitColor } from '@/game/spectatorLimit'
 import GearIcon from '@/icons/GearIcon'
 import HeadphonesIcon from '@/icons/HeadphonesIcon'
@@ -12,6 +13,7 @@ import Arrow, { centerOf, useArrow } from '@/primitives/Arrow'
 import Badge from '@/primitives/Badge'
 import Drawer from '@/primitives/Drawer'
 import HudBackground from '@/primitives/HudBackground'
+import ModeSelect from '@/primitives/ModeSelect'
 import Pile from '@/primitives/Pile'
 import ScrollArea from '@/primitives/ScrollArea'
 import Slider from '@/primitives/Slider'
@@ -161,6 +163,8 @@ function TableView({
     onChatToastsChange,
     timers = true,
     onTimersChange,
+    actionTime: actionTimeProp,
+    onActionTimeChange,
     paused = false,
     onPauseChange,
     pausePlayers = [],
@@ -249,13 +253,40 @@ function TableView({
   const canLimitSpectators = isHost && Boolean(onSpectatorLimitChange) && spectatorLimit != null
   const canPause = isHost && Boolean(onPauseChange) && Boolean(copy.table.pauseGame)
   const canTimers = isHost && Boolean(onTimersChange) && Boolean(copy.table.timers)
-  const hostControls = canLimitSpectators || canPause || canTimers
+  const canActionTime = isHost && Boolean(onActionTimeChange) && Boolean(copy.table.actionTime)
+  const hostControls = canLimitSpectators || canPause || canTimers || canActionTime
+  // Everyone else sees the host's choice where the host makes it, and cannot
+  // change it (owner, 19.10) — once the host has sent one.
+  const seesActionTime = !isHost && actionTimeProp != null && Boolean(copy.table.actionTime)
+  const actionTime = actionTimeProp ?? 1
+  // One row for both: the host's switch, and the guest's read-only view of it.
+  // With the clocks off, choosing their time means nothing to the table (owner,
+  // 19.10).
+  const actionTimeField = (
+    <SettingsField label={copy.table.actionTime} hint={copy.table.actionTimeHint} inline>
+      <ModeSelect
+        size="sm"
+        readOnly={!isHost}
+        disabled={!timers}
+        options={ACTION_TIME_SCALES.map((n) => ({ value: String(n), label: `${n}x` }))}
+        value={String(actionTime)}
+        onChange={(v) => {
+          const scale = ACTION_TIME_SCALES.find((n) => String(n) === v)
+          if (scale) onActionTimeChange?.(scale)
+        }}
+      />
+    </SettingsField>
+  )
   // есть ли на столе переписка вообще: от этого зависит и вкладка рейла, и
   // настройка её уведомлений — управлять тем, чего на экране нет, незачем
   const hasChat = Boolean(slots?.chat) && Boolean(copy.table.tabChat)
   const canChatToasts = hasChat && Boolean(onChatToastsChange) && Boolean(copy.table.chatToasts)
   const hasUpperSettings =
-    Boolean(lang && onLangChange) || Boolean(code) || Boolean(onParallaxChange) || canChatToasts
+    Boolean(lang && onLangChange) ||
+    Boolean(code) ||
+    Boolean(onParallaxChange) ||
+    canChatToasts ||
+    seesActionTime
 
   const hasVoice = Boolean(slots?.voice) && Boolean(copy.table.tabVoice)
 
@@ -562,6 +593,7 @@ function TableView({
                       </Toggle>
                     </SettingsField>
                   )}
+                  {seesActionTime && actionTimeField}
                 </SettingsGroup>
               )}
               {hostControls && (
@@ -593,6 +625,7 @@ function TableView({
                         </Toggle>
                       </SettingsField>
                     )}
+                    {canActionTime && actionTimeField}
                     {canPause && (
                       <SettingsField
                         label={copy.table.pauseGame}

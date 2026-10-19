@@ -475,6 +475,11 @@ export interface GameState {
   window: ReactionWindow | null
 
   setup: Setup
+  // How many times its own time every action gets — the host's setting, not a
+  // rule: 2 is twice the time for every turn and answer. Read when a clock is
+  // started (`timeFor`), so a change reaches the next clock and leaves a running
+  // one as it is. Absent reads as 1: a match saved before the setting existed.
+  actionTime?: number
   // What the engine could not honour from the config it was handed. Both halves
   // used to vanish: an unrecognised mode value fell through to Base, and a deck
   // entry with no rules was filtered out — a caller handing over the full
