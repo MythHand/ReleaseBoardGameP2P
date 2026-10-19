@@ -38,7 +38,7 @@ All paths below are relative to the repository root. Existing compatibility expo
 
 | Unit | Files and responsibility |
 |---|---|
-| Measurement | New `apps/frontend/perf/build-report.mjs`, `assert-start.mjs`; new `docs/performance/2026-10-19-frontend-loading.md` records evidence |
+| Measurement | Standard Vite CLI with manifest/hidden sourcemaps; `apps/frontend/perf/assert-start.mjs` checks the completed output; `docs/performance/2026-10-19-frontend-loading.md` records evidence |
 | Lightweight storage | New `shared/lib/storage.ts`, `shared/lib/sessionPersistence.ts`; existing `shared/lib/persistence.ts` re-exports session APIs and retains keeper/chat/log behavior |
 | Deferred loads | New `shared/lib/moduleResource.ts`, `shared/ui/DeferredContent.tsx`, `shared/ui/LoadingStatus.tsx`, `shared/lib/loadFailure.ts` |
 | Stable session owner | New `app/providers/sessionStore.ts`, `SessionRuntime.tsx`, `SessionActivation.tsx`, `SessionGate.tsx`; modify `SessionProvider.tsx` while retaining `useSession()` import compatibility |
@@ -47,20 +47,22 @@ All paths below are relative to the repository root. Existing compatibility expo
 | Rules data | New `packages/translation/src/common.ts`, `rulesResources.ts`, `assets.d.ts`; modify translation init and exports; retain static `catalog.ts` |
 | Rules views | Modify `features/rules/Rules.tsx`; new `features/rules/useRulesResource.ts`; modify board route and UI Table slots, retaining existing playground behavior |
 | Public UI entries | New `apps/ui/src/start.ts`, `src/foundation.ts`; update UI exports and consuming aliases/path mappings |
-| Build chunks | New `apps/frontend/build/vendorChunks.ts`; modify frontend Vite config only after module report |
+| Build chunks | New `apps/frontend/config/vendorChunks.ts`; modify frontend Vite config only after module report |
 
 Frontend files in this table are under `apps/frontend/src/` unless explicitly qualified.
 
 ## Task 1: Establish a reproducible production baseline
 
-**Files:** Create `apps/frontend/perf/build-report.mjs`, `apps/frontend/perf/assert-start.mjs`, `docs/performance/2026-10-19-frontend-loading.md`.
+**Files:** Create `apps/frontend/perf/assert-start.mjs`, `docs/performance/2026-10-19-frontend-loading.md`.
 
-**Interfaces:** `node apps/frontend/perf/build-report.mjs --out <absolute-directory>` builds production source with the existing Vite config and emits `dist/`, `chunks.json`, and `sizes.json` under that directory. Each chunk record includes `file`, `isEntry`, `imports`, `dynamicImports`, and module IDs/rendered lengths; size records include raw/gzip/Brotli bytes. Also emit Vite's manifest for CSS/asset dependency inspection. No report injection into normal published builds.
+**Tooling revision:** After implementation, the user approved replacing the programmatic build/report wrapper with the standard Vite CLI. The performance report retains the original measurements and records byte-for-byte output equivalence.
 
-- [x] **Step 1:** Record source SHA, Node/pnpm/Chromium versions, lockfile hash, public build settings, and base `/ReleaseBoardGameP2P/`. Never write TURN credentials into reports. Implement the report script using Vite's programmatic `build()` with `configFile` pointing to the existing frontend config, an explicit root/outDir, `manifest: true`, and an additional reporting plugin. Keep the original config/plugins.
-- [x] **Step 2:** Run `node apps/frontend/perf/build-report.mjs --out /tmp/release-fe-baseline`. Confirm the build succeeds and every emitted JS/CSS file has a size record; preserve the output for comparison. Check `git diff` for unintended generated-router changes.
+**Interfaces:** `pnpm --filter @release/web build --manifest --sourcemap hidden --base /ReleaseBoardGameP2P/ --outDir <absolute-directory>/dist --emptyOutDir` builds through the existing package script/config. Vite emits its manifest and hidden JavaScript source maps. `assert-start.mjs <absolute-directory> [browser.json]` reads those completed artifacts, rejects eager feature/runtime sources and deferred asset requests, and reports initial raw/gzip sizes. No custom build launcher, reporting plugin, or extra metadata format.
+
+- [x] **Step 1:** Record source SHA, Node/pnpm/Chromium versions, lockfile hash, public build settings, and base `/ReleaseBoardGameP2P/`. Never write TURN credentials into reports. Use the existing package build command with diagnostic CLI flags for manifest and hidden sourcemaps. Keep the existing config/plugins; normal builds do not need diagnostic maps.
+- [x] **Step 2:** Run `pnpm --filter @release/web build --manifest --sourcemap hidden --base /ReleaseBoardGameP2P/ --outDir /tmp/release-fe-baseline/dist --emptyOutDir`. Confirm the build succeeds and Vite emits its manifest and JS source maps; preserve the output for comparison. Check `git diff` for unintended generated-router changes.
 - [x] **Step 3:** Use the `playwright` skill and its available runtime for browser measurements; no product dependency is required. Serve that production build at its real base, including SPA fallback. Measure `/` and `/start` in five new contexts each: Chromium, 1440×900, `en`, cold HTTP cache/storage, CDP download 200,000 B/s, upload 93,750 B/s, latency 150 ms, CPU slowdown 4. Finalize LCP after a fixed 10-second observation window; record its element and screenshot, FCP, LCP, JS task time, request bytes, photo/logo/fonts, and request failures. An unfinished screen is a failed sample, not a faster measurement.
-- [x] **Step 4:** Implement `assert-start.mjs <report-directory> <request-log.json>`: union the static entry dependency closure with observed JS/CSS requests, then reject engine modules, `peerjs`, network/voice, board/stats routes, form implementations, locale rules text, and board-only CSS modules. Store its structured findings; run it against baseline and expect failure naming the current eager dependencies. Emitted but unrequested async assets are not initial requests. Permit tiny module URL maps without their content.
+- [x] **Step 4:** Implement `assert-start.mjs <report-directory> <request-log.json>`: union the static entry dependency closure with observed JS/CSS requests, then reject engine modules, `peerjs`, network/voice, board/stats routes, form implementations, locale rules text, and board-only CSS files. Read retained JS sources from Vite source maps and asset ownership from its manifest. Store structured findings and raw/gzip totals; run it against baseline and expect failure naming the current eager dependencies. Emitted but unrequested async assets are not initial requests. Permit tiny module URL maps without their content.
 - [x] **Step 5:** Add the baseline table and exact browser/server commands to the report. Check `git diff --check`; commit only these measurement files: `chore: record frontend loading baseline`.
 
 ## Task 2: Separate engine-independent persisted session access
@@ -168,14 +170,14 @@ Frontend files in this table are under `apps/frontend/src/` unless explicitly qu
 
 ## Task 7: Isolate start styles and stable vendor chunks
 
-**Files:** Create `apps/ui/src/start.ts`, `foundation.ts`, `apps/frontend/build/vendorChunks.ts`; modify UI package exports, frontend Vite/Vitest aliases, frontend/debug TypeScript mappings, and start/root/error/loading imports. Update playground configuration only for public subpaths it consumes.
+**Files:** Create `apps/ui/src/start.ts`, `foundation.ts`, `apps/frontend/config/vendorChunks.ts`; modify UI package exports, frontend Vite/Vitest aliases, frontend/debug TypeScript mappings, and start/root/error/loading imports. Update playground configuration only for public subpaths it consumes.
 
 **Interfaces:** `@release/ui/start` exports only start requirements: Menu/MenuButton/MenuGroup, VideoPlayer, HudBackground, PhysicalEdition, LangSwitcher. `@release/ui/foundation` exports Button, Typography, Modal, and ScrollArea. Entries import leaf modules rather than the root barrel. `vendorChunk(id: string): string | undefined` supplies Rollup `manualChunks` names based on exact normalized package boundaries, including pnpm paths.
 
 - [x] **Step 1:** Rebuild the report after Task 6 and run `assert-start.mjs`. Use retained module IDs/CSS to identify leaks from the UI barrel and root error/modal dependencies; the assertion must fail for those remaining leaks before changing entries.
 - [x] **Step 2:** Add the two narrow public UI entries and exact aliases before bare `@release/ui`; migrate the eager dependency closure to them. Preserve the existing root barrel for all old consumers. Do not globally change CSS side-effect flags. Resolve any internal barrel import reached by start to its existing leaf module, without changing visuals.
 - [x] **Step 3:** Use the report to configure these independent groups when the corresponding packages are present: `vendor-react` for react/react-dom/scheduler; `vendor-router` for react-router; `vendor-i18n` for i18next/react-i18next/language detector; `vendor-peer` for peerjs plus measured transport-only dependencies. Return undefined for application/workspace modules and unmatched packages. Do not sweep every node_modules package into one vendor. Check transitive closures: a vendor group shared by start must never import peer or board code. Retain `build.cssCodeSplit: true`.
-- [x] **Step 4:** Run `pnpm --filter @release/web build`, `pnpm --filter @release/playground build`, affected typechecks, then `node apps/frontend/perf/build-report.mjs --out /tmp/release-fe-split`. Expect no circular-chunk warnings and no duplicate React runtime. Run `assert-start.mjs` with a cold production request log; expect zero forbidden modules/styles/requests.
+- [x] **Step 4:** Run `pnpm --filter @release/web build`, `pnpm --filter @release/playground build`, affected typechecks, then `pnpm --filter @release/web build --manifest --sourcemap hidden --base /ReleaseBoardGameP2P/ --outDir /tmp/release-fe-split/dist --emptyOutDir`. Expect no circular-chunk warnings and no duplicate React runtime. Run `assert-start.mjs` with a cold production request log; expect zero forbidden modules/styles/requests.
 - [x] **Step 5:** Confirm unchanged start screenshot/layout and language switch, modal controls, and board appearance against the recorded baseline/reference. Run UI and frontend tests. Commit: `perf: isolate start assets and stable dependencies`.
 
 ## Task 8: Prove loading, retry, session lifetime, and cache isolation

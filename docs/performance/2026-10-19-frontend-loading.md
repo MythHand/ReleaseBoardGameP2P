@@ -113,10 +113,9 @@ requests beyond the vendor split, and the table above measures that final policy
   Unmatched dependencies stay under normal bundler placement.
 - Cold measurements use an installed Playwright library for fresh contexts and
   CDP control after the CLI wrapper stalled; no product dependency is added.
-- Deferred minor from review: `assert-start.mjs` does not itself reject emitted
-  rules JSON URLs in a supplied network log. The recorded production requests are
-  separately checked for that asset and contain zero such requests. Extend the
-  assertion tool to cover emitted assets in a follow-up.
+- The original review minor about emitted rules JSON is resolved in the tooling
+  simplification: `assert-start.mjs` now rejects such requests using the standard
+  Vite manifest. Regression tests also cover eager engine sources and board CSS.
 - The reviewer did not rerun browser timing, transport, or the final full suite.
   This report supplies those implementer-run checks and leaves hosted reuse
   unverified; the review is not independent acceptance of those measurements.
@@ -126,12 +125,33 @@ requests beyond the vendor split, and the table above measures that final policy
   was created. No remote branch, PR, or deployment was published. Main checkout
   remains untouched.
 
+## Standard Vite tooling after simplification
+
+After user review, the separate programmatic build launcher and its reporting
+plugin were removed. The existing `pnpm --filter @release/web build` remains the
+only build path. For diagnostics, CLI flags ask Vite to emit its standard manifest
+and hidden sourcemaps into a temporary output directory. Normal production builds
+keep their existing settings.
+
+`assert-start.mjs` only reads completed output: manifest imports/CSS determine the
+initial closure, manifest asset ownership detects premature JSON/CSS requests,
+and source maps identify retained engine/network/feature code. It calculates
+raw/gzip totals directly from the emitted files; custom `chunks.json` and
+`sizes.json` formats are no longer needed. Browser measurements remain separate.
+
+Both direct Vite CLI and the normal package build script with diagnostic flags
+produce all 50 JS/CSS assets byte-for-byte identical to the measured final build.
+Initial gzip totals remain 159,384 JS and 8,953 CSS bytes. The original cold timing
+samples therefore still describe the same delivered JS/CSS. Four new CLI
+regression checks pass against the standard artifact formats; the full-suite
+counts above describe the earlier application verification.
+
 ## Reproduction and evidence
 
 From the implementation worktree, using Node 24 and pnpm 9.15.0:
 
 ```sh
-node apps/frontend/perf/build-report.mjs --out /tmp/release-fe-report
+pnpm --filter @release/web build --manifest --sourcemap hidden --base /ReleaseBoardGameP2P/ --outDir /tmp/release-fe-report/dist --emptyOutDir
 node apps/frontend/perf/measure-browser.mjs /tmp/release-fe-report /absolute/path/to/playwright/index.mjs
 node apps/frontend/perf/assert-start.mjs /tmp/release-fe-report /tmp/release-fe-report/browser.json
 pnpm -r run test --maxWorkers=2
@@ -143,7 +163,7 @@ pnpm --filter @release/playground build
 
 The measurement tool accepts an installed Playwright module as its third process
 argument, or resolves `playwright` normally when omitted. For baseline, run the
-same report/measurement scripts against source `5879517d`; do not use stale dist.
+same Vite CLI flags and measurement tool against source `5879517d`; do not use stale dist.
 
 [Recorded samples, requests, cache hashes and browser results](./evidence/2026-10-19-frontend-loading.json)
 retain both sets of measurements with localhost origins normalized away. Raw build

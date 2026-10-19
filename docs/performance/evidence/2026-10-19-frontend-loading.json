@@ -5080,5 +5080,39 @@
   ],
   "deferredMinors": [
     "Final: minor (deferred): assert-start.mjs ignores emitted rules JSON URLs in network logs; separate final URL scan proves zero cold-start rules JSON requests."
-  ]
+  ],
+  "toolingSimplification": {
+    "buildCommand": "pnpm --filter @release/web build --manifest --sourcemap hidden --base /ReleaseBoardGameP2P/ --outDir /tmp/release-fe-report/dist --emptyOutDir",
+    "identicalJsCssFiles": 50,
+    "assertion": {
+      "loaded": [
+        "assets/index-BfkPVdNJ.js",
+        "assets/index-CDY3TLzC.css",
+        "assets/vendor-react-9LjzQdLw.js",
+        "assets/vendor-router-C7MaVHp2.js",
+        "assets/vendor-i18n-79SrbKY8.js",
+        "assets/session-context-BSLeE8w1.js",
+        "assets/start-screen-DBKv6xnj.js",
+        "assets/start-screen-BwSiytTw.css",
+        "assets/session-context-CoGuwXgX.css",
+        "assets/photo-CnpmufjY.jpg",
+        "assets/JetBrainsMono-VariableFont_wght-ByLpDV2T.woff2",
+        "assets/FiraMono-Regular-DZfKlnWR.woff2",
+        "assets/rubber-ducky-CPgscgOX.png"
+      ],
+      "sizes": {
+        "js": {
+          "raw": 471755,
+          "gzip": 159384
+        },
+        "css": {
+          "raw": 40235,
+          "gzip": 8953
+        }
+      },
+      "findings": []
+    },
+    "regressionChecks": 4,
+    "resolvedPriorMinor": "Manifest asset ownership now rejects emitted rules JSON in cold-start network logs."
+  }
 }
