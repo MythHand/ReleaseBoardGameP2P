@@ -68,6 +68,15 @@ function peerOptions() {
   }
 }
 
+// How long a channel's ICE may stay `disconnected` before the peer counts as
+// gone. When a peer's network drops, the other side's ICE goes `disconnected`
+// (after a few seconds without consent checks), which PeerJS only logs; it
+// closes the channel on `failed`, which can take much longer or never come.
+// Until then the channel looks open and nobody learns the peer left, so a
+// guest would sit in front of a frozen table while the host is offline. A short
+// blip that recovers inside the grace keeps the channel.
+export const ICE_DISCONNECT_GRACE_MS = 2_000
+
 export function createTransport(args: {
   peerId?: string
   signal?: AbortSignal
@@ -240,7 +249,29 @@ export function createTransport(args: {
           // Drop malformed frames rather than crash the relay.
         }
       })
+      let iceTimer: ReturnType<typeof setTimeout> | undefined
+      const clearIceTimer = () => {
+        if (iceTimer !== undefined) clearTimeout(iceTimer)
+        iceTimer = undefined
+      }
+      conn.on('iceStateChanged', (state) => {
+        if (state !== 'disconnected') {
+          clearIceTimer()
+          return
+        }
+        if (iceTimer !== undefined) return
+        iceTimer = setTimeout(() => {
+          iceTimer = undefined
+          if (closed || generation.retired || connections.get(conn.peer) !== generation) return
+          // Retired first, so the 'close' PeerJS emits next is not a second departure.
+          generation.retired = true
+          connections.delete(conn.peer)
+          conn.close()
+          args.onDisconnect?.(conn.peer)
+        }, ICE_DISCONNECT_GRACE_MS)
+      })
       conn.on('close', () => {
+        clearIceTimer()
         clearDataDial(conn)
         if (closed || connections.get(conn.peer) !== generation) return
         generation.retired = true

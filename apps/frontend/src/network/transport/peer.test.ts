@@ -93,8 +93,9 @@ class FakePeer {
 vi.mock('peerjs', () => ({ default: FakePeer, Peer: FakePeer }))
 
 let createTransport: typeof import('./peer').createTransport
+let iceGraceMs: number
 beforeEach(async () => {
-  ;({ createTransport } = await import('./peer'))
+  ;({ createTransport, ICE_DISCONNECT_GRACE_MS: iceGraceMs } = await import('./peer'))
 })
 afterEach(() => {
   vi.clearAllMocks()
@@ -625,5 +626,61 @@ describe('signaling re-registration', () => {
     await vi.advanceTimersByTimeAsync(60_000)
     window.dispatchEvent(new Event('online'))
     expect(lastPeer?.reconnect).not.toHaveBeenCalled()
+  })
+})
+
+// A peer whose network drops does not close its channels: the other side's
+// ICE only goes `disconnected`, which PeerJS merely logs, so the channel stays
+// "open" and nobody learns the peer is gone (a guest staring at a frozen table
+// while the host is offline). ICE that stays disconnected is treated as lost.
+describe('ICE that stays disconnected', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  async function connectedTo(peer: string) {
+    const onDisconnect = vi.fn()
+    const t = await createTransport({ peerId: 'guest-1', onMessage: () => {}, onDisconnect })
+    t.connectTo(peer)
+    await vi.advanceTimersByTimeAsync(0)
+    const conn = outboundConns.get(peer)
+    if (!conn) throw new Error('no connection')
+    return { t, conn, onDisconnect }
+  }
+
+  it('closes the channel and reports the peer gone once the grace runs out', async () => {
+    const { t, conn, onDisconnect } = await connectedTo('host')
+    conn.emit('iceStateChanged', 'disconnected')
+    await vi.advanceTimersByTimeAsync(iceGraceMs - 1)
+    expect(onDisconnect).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1)
+    expect(onDisconnect).toHaveBeenCalledExactlyOnceWith('host')
+    expect(conn.closed).toBe(true)
+    expect(t.connectedIds()).not.toContain('host')
+    // The close event PeerJS emits afterwards is not a second departure.
+    conn.emit('close')
+    expect(onDisconnect).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps a channel whose ICE recovers within the grace', async () => {
+    const { t, conn, onDisconnect } = await connectedTo('host')
+    conn.emit('iceStateChanged', 'disconnected')
+    await vi.advanceTimersByTimeAsync(iceGraceMs / 2)
+    conn.emit('iceStateChanged', 'connected')
+    await vi.advanceTimersByTimeAsync(iceGraceMs)
+    expect(onDisconnect).not.toHaveBeenCalled()
+    expect(conn.closed).toBe(false)
+    expect(t.connectedIds()).toContain('host')
+  })
+
+  it('arms nothing after the transport is closed', async () => {
+    const { t, conn, onDisconnect } = await connectedTo('host')
+    conn.emit('iceStateChanged', 'disconnected')
+    t.close()
+    await vi.advanceTimersByTimeAsync(iceGraceMs)
+    expect(onDisconnect).not.toHaveBeenCalled()
   })
 })
