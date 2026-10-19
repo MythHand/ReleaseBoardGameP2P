@@ -248,6 +248,10 @@
   --ach: var(--cat-protection);
 }
 
+.toneSupport {
+  --ach: var(--cat-support);
+}
+
 /* the lobby's mini-game — green, the server's colour in its art */
 .toneRelease {
   --ach: var(--cat-release);

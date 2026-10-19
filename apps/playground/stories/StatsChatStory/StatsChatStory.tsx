@@ -40,6 +40,7 @@ const COPY: Record<'ru' | 'en', StatsCopy> = {
       defense: { title: 'Решала', unit: 'карт обороны сыграно' },
       monitoring: { title: 'Параноик', unit: 'раз поставил Monitoring' },
       gitBranch: { title: 'Дровосек', unit: 'раз разделил колоду' },
+      codeReview: { title: 'Душнила', unit: 'релизов под Code Review' },
     },
     bugRunner: { title: 'Bug Runner', unit: 'очков' },
   },
@@ -69,6 +70,7 @@ const COPY: Record<'ru' | 'en', StatsCopy> = {
       defense: { title: 'Fixer', unit: 'defense cards played' },
       monitoring: { title: 'Paranoid', unit: 'times set up Monitoring' },
       gitBranch: { title: 'Woodcutter', unit: 'times split a deck' },
+      codeReview: { title: 'Nitpicker', unit: 'releases under Code Review' },
     },
     bugRunner: { title: 'Bug Runner', unit: 'points' },
   },
@@ -94,9 +96,9 @@ const NAMES: Record<NameSet, string[] | null> = {
   ],
 }
 
-// Ничья по показателю ачивку не отдаёт никому, поэтому все восемь плашек — это
+// Ничья по показателю ачивку не отдаёт никому, поэтому все девять плашек партии — это
 // удачный случай, а не данность. Набор `ties` доводит до ничьей два показателя:
-// «Забагованный» (широкая плашка) и «Кладоискатель». Остаётся шесть плашек, и
+// «Забагованный» (широкая плашка) и «Кладоискатель». Остаётся семь плашек партии, и
 // ряд обрывается на половине — так раскладку и надо смотреть.
 const TIES: Record<string, Partial<StatPlayer>> = {
   you: { attackedInto: 6 }, // вровень с p3

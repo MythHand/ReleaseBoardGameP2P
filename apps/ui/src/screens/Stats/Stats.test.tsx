@@ -23,6 +23,7 @@ const copy: StatsCopy = {
     defense: { title: 'Fixer', unit: 'defense cards played' },
     monitoring: { title: 'Paranoid', unit: 'times set up Monitoring' },
     gitBranch: { title: 'Woodcutter', unit: 'times split a deck' },
+    codeReview: { title: 'Nitpicker', unit: 'releases under Code Review' },
   },
   bugRunner: { title: 'Bug Runner', unit: 'points' },
 }
@@ -41,6 +42,7 @@ const players: StatPlayer[] = [
     cherryPick: 0,
     monitoring: 0,
     gitBranch: 0,
+    codeReview: 0,
   },
   {
     id: 'b',
@@ -55,6 +57,7 @@ const players: StatPlayer[] = [
     cherryPick: 0,
     monitoring: 0,
     gitBranch: 0,
+    codeReview: 0,
   },
 ]
 
@@ -78,6 +81,7 @@ const PLATE_TITLES = [
   'King of DDoS',
   'Paranoid',
   'Woodcutter',
+  'Nitpicker',
   'Bug Runner',
 ]
 
@@ -156,6 +160,7 @@ it('gives no plate for a metric nobody scored, even with nobody to tie against',
   expect(queryByText('Bug Magnet')).toBeNull()
   expect(queryByText('Paranoid')).toBeNull()
   expect(queryByText('Woodcutter')).toBeNull()
+  expect(queryByText('Nitpicker')).toBeNull()
 })
 
 it('still awards a plate to a lone player who actually scored', () => {
@@ -217,10 +222,10 @@ it('puts the Bug Runner plate after the match’s own', () => {
 })
 
 it('renders the plates in their designed order, the wide ones first', () => {
-  // Every metric given a sole leader, so all eight plates render and the order
+  // Every metric given a sole leader, so all nine plates render and the order
   // is the whole assertion. It is a design decision, not an incidental one:
   // «Забагованный» and «Решала» are the wide plates and come first, and the
-  // six ordinary ones follow.
+  // seven ordinary ones follow, ordered so that no two of one colour meet.
   const all: StatPlayer[] = [
     {
       ...players[0],
@@ -231,6 +236,7 @@ it('renders the plates in their designed order, the wide ones first', () => {
       ddos: 0,
       monitoring: 2,
       gitBranch: 0,
+      codeReview: 2,
     },
     {
       ...players[1],
@@ -241,6 +247,7 @@ it('renders the plates in their designed order, the wide ones first', () => {
       ddos: 1,
       monitoring: 0,
       gitBranch: 1,
+      codeReview: 0,
     },
   ]
   const { container } = render(<Stats winnerId="a" copy={copy} players={all} />)
@@ -248,11 +255,12 @@ it('renders the plates in their designed order, the wide ones first', () => {
   expect(platesInOrder(container)).toEqual([
     'Bug Magnet',
     'Fixer',
-    'AI Addict',
-    'Treasure Hunter',
-    'Lucky One',
-    'King of DDoS',
     'Paranoid',
+    'Treasure Hunter',
+    'King of DDoS',
+    'AI Addict',
+    'Nitpicker',
     'Woodcutter',
+    'Lucky One',
   ])
 })

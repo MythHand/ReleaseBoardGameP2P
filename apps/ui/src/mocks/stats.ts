@@ -19,7 +19,7 @@ const withAvatars = (players: StatPlayer[]): StatPlayer[] =>
 // отметка (selfId), а не подменённое имя.
 // Длины ников РАЗНЫЕ намеренно: 8 / 14 / 20 символов при пределе поля в 20.
 // Лидеры показателей — у каждого свой и без ничьих, поэтому до экрана доходят
-// все восемь плашек, и каждый из трёх шагов кегля имени виден на одном экране.
+// все девять плашек партии, и каждый из трёх шагов кегля имени виден на одном экране.
 export function makeStats(): StatsData {
   return {
     winnerId: 'you',
@@ -39,6 +39,7 @@ export function makeStats(): StatsData {
         cherryPick: 3,
         monitoring: 1,
         gitBranch: 0,
+        codeReview: 1,
       },
       {
         id: 'p2',
@@ -53,6 +54,7 @@ export function makeStats(): StatsData {
         cherryPick: 0,
         monitoring: 0,
         gitBranch: 2,
+        codeReview: 0,
       },
       {
         id: 'p3',
@@ -67,6 +69,7 @@ export function makeStats(): StatsData {
         cherryPick: 1,
         monitoring: 3,
         gitBranch: 1,
+        codeReview: 1,
       },
       {
         id: 'p4',
@@ -81,6 +84,7 @@ export function makeStats(): StatsData {
         cherryPick: 2,
         monitoring: 1,
         gitBranch: 0,
+        codeReview: 2,
       },
     ]),
     // Best runs in the lobby's mini-game. The best is a spectator's — someone

@@ -12,6 +12,7 @@ const tally = (over: Partial<PlayerTally> = {}): PlayerTally => ({
   attackedInto: 0,
   monitoring: 0,
   gitBranch: 0,
+  codeReview: 0,
   ...over,
 })
 
@@ -158,6 +159,7 @@ it('gives a seat with no counters a row of zeros rather than dropping it', () =>
     attackedInto: 0,
     monitoring: 0,
     gitBranch: 0,
+    codeReview: 0,
   })
 })
 
