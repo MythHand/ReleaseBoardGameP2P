@@ -17,6 +17,8 @@ export interface PlayerTally {
   monitoring: number
   // Git Branch played.
   gitBranch: number
+  // Releases played together with Code Review.
+  codeReview: number
 }
 
 export type Tallies = Record<PlayerId, PlayerTally>
@@ -31,6 +33,7 @@ export const emptyTally = (): PlayerTally => ({
   attackedInto: 0,
   monitoring: 0,
   gitBranch: 0,
+  codeReview: 0,
 })
 
 export function seedTally(seating: PlayerId[]): Tallies {
@@ -107,6 +110,11 @@ export function foldTally(prev: Tallies, events: Event[]): Tallies {
         break
       case 'operationPlayed':
         if (e.card === 'operation-git-branch') bump(e.player, 'gitBranch')
+        break
+      // Code Review is only ever played together with a release, and the release
+      // event names it. A release off the events deck carries none.
+      case 'released':
+        if (e.codeReview) bump(e.player, 'codeReview')
         break
       default:
         break

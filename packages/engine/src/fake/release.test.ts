@@ -159,6 +159,35 @@ it('carries a combo Code Review across the discard pause', () => {
   expect(r.state.players.p1.release.frontend).toEqual({ card: FE, codeReview: CR })
 })
 
+it('counts Code Review for the results on either way a release lands', () => {
+  // At once where the mode waives the cost, and after the discard pause where it
+  // does not — both end in the one release event the tally reads.
+  const free = reduce(handed([FE, CR], { ...BASE, releaseCond: 'easy' }), {
+    type: 'PLAY',
+    player: 'p1',
+    card: FE.uid,
+    combo: CR.uid,
+    at: 1000,
+  })
+  expect(free.state.tally.p1.codeReview).toBe(1)
+
+  const asked = reduce(handed([FE, CR, BUG]), {
+    type: 'PLAY',
+    player: 'p1',
+    card: FE.uid,
+    combo: CR.uid,
+    at: 1000,
+  })
+  expect(asked.state.tally.p1.codeReview).toBe(0)
+  const paid = reduce(asked.state, {
+    type: 'RESOLVE',
+    player: 'p1',
+    choice: { kind: 'discardForRelease', card: BUG.uid },
+    at: 1001,
+  })
+  expect(paid.state.tally.p1.codeReview).toBe(1)
+})
+
 it('rejects Code Review paired with something that is not a release', () => {
   const s = handed([MON, CR], { ...BASE, releaseCond: 'easy' })
   const r = reduce(s, { type: 'PLAY', player: 'p1', card: MON.uid, combo: CR.uid, at: 1000 })

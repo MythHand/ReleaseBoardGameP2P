@@ -110,6 +110,10 @@
         "title": "Дровосек",
         "unit": "раз разделил колоду"
       },
+      "codeReview": {
+        "title": "Душнила",
+        "unit": "релизов под Code Review"
+      },
       "bugRunner": {
         "title": "Bug Runner",
         "unit": "очков"
