@@ -1,4 +1,4 @@
-import { Modal } from '@release/ui'
+import { Modal } from '@release/ui/foundation'
 import type { MouseEvent, ReactNode } from 'react'
 import { useRef } from 'react'
 import { useSearchParams } from 'react-router'

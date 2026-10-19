@@ -1,5 +1,5 @@
 import { useTranslation } from '@release/translation'
-import { LangSwitcher, type SwitchLang } from '@release/ui'
+import { LangSwitcher, type SwitchLang } from '@release/ui/start'
 import styles from './LanguageSwitch.module.css'
 
 // Frontend adapter for the i18n-agnostic LangSwitcher block: binds it to

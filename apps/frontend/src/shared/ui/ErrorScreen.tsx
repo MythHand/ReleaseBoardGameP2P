@@ -1,5 +1,5 @@
 import { useTranslation } from '@release/translation'
-import { Button, Typography } from '@release/ui'
+import { Button, Typography } from '@release/ui/foundation'
 import { BASE_URL, IS_DEV } from '~/shared/config'
 import styles from './ErrorScreen.module.css'
 

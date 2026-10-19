@@ -1,12 +1,6 @@
 import { useTranslation } from '@release/translation'
-import {
-  HudBackground,
-  LangSwitcher,
-  PhysicalEdition,
-  ScrollArea,
-  type SwitchLang,
-  Typography,
-} from '@release/ui'
+import { ScrollArea, Typography } from '@release/ui/foundation'
+import { HudBackground, LangSwitcher, PhysicalEdition, type SwitchLang } from '@release/ui/start'
 import type { ReactNode } from 'react'
 import AppLogo from './AppLogo'
 import styles from './ScreenShell.module.css'

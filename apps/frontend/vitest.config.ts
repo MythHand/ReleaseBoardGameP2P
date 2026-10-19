@@ -20,6 +20,8 @@ export default defineConfig({
       // Must precede the '@' alias: these imports are matched by their suffix,
       // not their prefix, and the asset path would otherwise win.
       { find: /^.*\.svg\?react$/, replacement: svgStub },
+      { find: '@release/ui/start', replacement: `${uiSrc}/start.ts` },
+      { find: '@release/ui/foundation', replacement: `${uiSrc}/foundation.ts` },
       { find: '@release/ui/animations', replacement: `${uiSrc}/animations/index.ts` },
       { find: '@release/ui', replacement: `${uiSrc}/index.ts` },
       { find: '@release/engine/fake', replacement: `${engineSrc}/fake/index.ts` },

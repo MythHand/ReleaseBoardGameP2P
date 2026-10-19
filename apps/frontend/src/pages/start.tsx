@@ -1,5 +1,5 @@
 import { useTranslation } from '@release/translation'
-import { Credits, Menu, MenuButton, MenuGroup, VideoPlayer } from '@release/ui'
+import { Credits, Menu, MenuButton, MenuGroup, VideoPlayer } from '@release/ui/start'
 import { APP_VERSION } from '~/shared/config'
 import { useModalRoute } from '~/shared/ui/ModalRouter'
 import ScreenShell from '~/shared/ui/ScreenShell'
