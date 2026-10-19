@@ -21,6 +21,7 @@ import Modal from '@/primitives/Modal'
 import ScrollArea from '@/primitives/ScrollArea'
 import Slider from '@/primitives/Slider'
 import Toggle from '@/primitives/Toggle'
+import Typography from '@/primitives/Typography'
 import styles from './Lobby.module.css'
 
 export interface LobbyPlayer {
@@ -79,12 +80,17 @@ interface LobbyProps {
   // Nicknames speaking in the voice chat right now, as I am allowed to see them
   // (on the line, not muted by me) — the consumer decides; a ring on the avatar.
   speaking?: string[]
+  // The game's version, beside the beta mark — the consumer's build knows it,
+  // the kit does not. Without it the mark stands alone.
+  version?: string
 }
 
 // Весь видимый текст лобби приходит из набора по языку — экран сам переключает
 // язык встроенным свитчером, поэтому держит оба набора и выбирает по lang.
 export interface LobbyCopy {
   title: string
+  // the beta mark under the logo, before the version
+  beta: string
   subtitle: string
   language: string
   disband: string
@@ -171,6 +177,7 @@ export default function Lobby({
   meSpectator = false,
   onRename,
   speaking = [],
+  version,
 }: LobbyProps) {
   const isHost = role === 'host'
   const meId = isHost ? 1 : meSpectator ? 101 : 2 // кто «я» в этой сцене (мок)
@@ -328,7 +335,13 @@ export default function Lobby({
               </Button>
             )}
           </div>
-          <p className={styles.sub}>{copy.subtitle}</p>
+          <div className={styles.subRow}>
+            <Typography as="p" base="label" tk="tk-14" className={styles.release}>
+              <span>{copy.beta}</span>
+              {version && <span>{version}</span>}
+            </Typography>
+            <p className={styles.sub}>{copy.subtitle}</p>
+          </div>
         </div>
         {/* the room between the two sides of the header is the mini-game's */}
         <BugRunner label={copy.bugRunner} className={styles.runner} />

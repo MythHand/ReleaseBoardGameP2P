@@ -31,7 +31,7 @@ import { RoomVoice, useRoomVoiceView } from '~/features/voice-chat/RoomVoice'
 import { useSpeaking } from '~/features/voice-chat/useSpeaking'
 import { effectiveBots, nameTaken } from '~/network'
 import type { PeerInfo } from '~/network/types'
-import { BASE_URL } from '~/shared/config'
+import { APP_VERSION, BASE_URL } from '~/shared/config'
 import AppLogo from '~/shared/ui/AppLogo'
 import { useModalRoute } from '~/shared/ui/ModalRouter'
 import styles from './_LobbyView.module.css'
@@ -228,9 +228,15 @@ export default function LobbyView() {
               </Button>
             )}
           </div>
-          <Typography base="label" tk="tk-14" as="p" className={styles.sub}>
-            {t('lobbyScreen.subtitle')}
-          </Typography>
+          <div className={styles.subRow}>
+            <Typography as="p" base="label" tk="tk-14" className={styles.release}>
+              <span>{t('lobbyScreen.beta')}</span>
+              {APP_VERSION && <span>{APP_VERSION}</span>}
+            </Typography>
+            <Typography base="label" tk="tk-14" as="p" className={styles.sub}>
+              {t('lobbyScreen.subtitle')}
+            </Typography>
+          </div>
         </div>
         {/* the room between the two sides of the header is the mini-game's */}
         <BugRunner

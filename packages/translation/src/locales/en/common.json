@@ -5,7 +5,7 @@
   },
   "start": {
     "logoAlt": "Release at any cost",
-    "tagOpenP2P": "Open P2P project",
+    "tagProject": "Beta · Open source · no game server",
     "tagBoardCard": "Board card game",
     "description": "A strategic card game about the real grind of software development. Bugs, surprise events, rivals' attacks — beat it all and release first.",
     "createGame": "create game",
@@ -464,6 +464,7 @@
   },
   "lobbyScreen": {
     "title": "Lobby",
+    "beta": "Beta",
     "subtitle": "Waiting for players…",
     "language": "language",
     "disband": "disband",

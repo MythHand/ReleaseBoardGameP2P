@@ -82,7 +82,7 @@ export default function InviteScreen() {
 
   return (
     <ScreenShell
-      tags={[t('start.tagOpenP2P'), t('invite.tagBoardCard')]}
+      tags={[t('start.tagProject'), t('invite.tagBoardCard')]}
       description={t('invite.description')}
       // The compact rhythm keeps the invitation action within the scrollable column.
       density="compact"

@@ -62,10 +62,31 @@
   margin: 0;
 }
 
-/* aligned under the word "Lobby": logo 96 + gap 18 + rule 1 + gap 18 */
-.sub {
-  margin: 6px 0 0 133px;
+/* under the title row, one grey line: the beta mark and the version under the
+   logo, the subtitle under the word */
+.subRow {
+  display: flex;
+  align-items: baseline;
+  margin-block-start: 6px;
   color: var(--white-45);
+}
+
+/* at least as wide as the logo and the divider beside it (96 + 18 + 1 + 18), so
+   the subtitle starts under the title; a longer version pushes it on rather
+   than running into it. The gap is a space of this face: a 0.6em glyph and its
+   0.14em tracking. */
+.release {
+  box-sizing: border-box;
+  display: flex;
+  flex: none;
+  gap: 0.74em;
+  min-inline-size: 133px;
+  padding-inline-end: 12px;
+  margin: 0;
+}
+
+.sub {
+  margin: 0;
 }
 
 /* the mini-game takes whatever room the two sides of the header leave, and
