@@ -1,5 +1,5 @@
-import { clearSession, readSession, RESTORE_TTL_MS, writeSession } from './sessionPersistence'
 import { readSession as legacyRead } from './persistence'
+import { clearSession, RESTORE_TTL_MS, readSession, writeSession } from './sessionPersistence'
 
 afterEach(() => clearSession())
 

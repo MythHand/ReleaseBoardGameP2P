@@ -7,10 +7,17 @@ import { type Event, parseEventLog } from '@release/engine'
 // that way is what lets the playground and every headless test exercise the
 // same code the network does (network/session/link.ts).
 
-import { readJson, remove, write } from './storage'
 import { RESTORE_TTL_MS, type StoredLobbyConfig } from './sessionPersistence'
-export { clearSession, getResumeToken, readSession, RESTORE_TTL_MS, writeSession } from './sessionPersistence'
-export type { StoredSession, StoredLobbyConfig } from './sessionPersistence'
+import { readJson, remove, write } from './storage'
+
+export type { StoredLobbyConfig, StoredSession } from './sessionPersistence'
+export {
+  clearSession,
+  getResumeToken,
+  RESTORE_TTL_MS,
+  readSession,
+  writeSession,
+} from './sessionPersistence'
 
 const KEEPER_KEY = 'release:keeper'
 const LOG_KEY = 'release:log'
@@ -53,7 +60,6 @@ export function clearChat(): void {
 // here would tie a storage module to the engine's shape, and the only caller
 // that reads them (the host restore) casts once, where the engine types are
 // already in scope.
-
 
 export interface StoredKeeper {
   presentation?: unknown
