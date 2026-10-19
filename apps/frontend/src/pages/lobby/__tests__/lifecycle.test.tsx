@@ -1,7 +1,10 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { Link, MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, vi } from 'vitest'
+import SessionGate from '~/app/providers/SessionGate'
 import { SessionProvider, useSession } from '~/app/providers/SessionProvider'
+import SessionRuntime from '~/app/providers/SessionRuntime'
+import { createSessionStore } from '~/app/providers/sessionStore'
 import { useFollowGameStart } from '~/features/start-game/useStartGame'
 import type { WireMessage } from '~/network/types'
 import type { UseLobby } from '~/network/useLobby'
@@ -66,18 +69,25 @@ it.each([
   'another invitation',
   'start screen',
 ])('keeps the kick notice until navigating through %s and permits a fresh join', async (destination) => {
+  const store = createSessionStore(() => Promise.resolve({ default: SessionRuntime }))
+  const ready = store.request()
   render(
     <MemoryRouter initialEntries={['/lobby/F96-NMT']}>
-      <SessionProvider>
-        <Navigation />
-        <Routes>
-          <Route path="/lobby/:lobbyId" element={<LobbyPage />} />
-          <Route path="/start" element={<Link to="/lobby/ABC-23D">join from start</Link>} />
-          <Route path="/board/:gameId" element={<div>stale board</div>} />
-        </Routes>
+      <SessionProvider store={store}>
+        <SessionGate>
+          <Navigation />
+          <Routes>
+            <Route path="/lobby/:lobbyId" element={<LobbyPage />} />
+            <Route path="/start" element={<Link to="/lobby/ABC-23D">join from start</Link>} />
+            <Route path="/board/:gameId" element={<div>stale board</div>} />
+          </Routes>
+        </SessionGate>
       </SessionProvider>
     </MemoryRouter>,
   )
+  await act(async () => {
+    await ready
+  })
   await act(async () => {
     await session.joinRoom('F96-NMT', 'Bo')
   })

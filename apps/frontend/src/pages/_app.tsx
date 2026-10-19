@@ -1,27 +1,32 @@
 import { Outlet, useLocation, useRouteError } from 'react-router'
 import AppModals from '~/app/AppModals'
 import styles from '~/app/app.module.css'
-import FollowGameStart from '~/app/FollowGameStart'
-import { SessionProvider } from '~/app/providers/SessionProvider'
-import SessionBootstrap from '~/app/SessionBootstrap'
+import SessionActivation, { SessionRestore } from '~/app/providers/SessionActivation'
+import SessionGate from '~/app/providers/SessionGate'
 import ErrorScreen from '~/shared/ui/ErrorScreen'
 import LanguageSwitch from '~/shared/ui/LanguageSwitch'
 
 export default function App() {
   const { pathname } = useLocation()
   return (
-    <SessionProvider>
-      <FollowGameStart />
+    <>
+      <SessionActivation />
       <div className={styles.root}>
         {/* Only on the start screen — elsewhere (e.g. the lobby) it would
             overlay the page header. */}
-        <SessionBootstrap>
+        <SessionRestore>
           {pathname === '/start' && <LanguageSwitch />}
-          <Outlet />
+          {/^\/(lobby|board)\//.test(pathname) ? (
+            <SessionGate>
+              <Outlet />
+            </SessionGate>
+          ) : (
+            <Outlet />
+          )}
           <AppModals />
-        </SessionBootstrap>
+        </SessionRestore>
       </div>
-    </SessionProvider>
+    </>
   )
 }
 

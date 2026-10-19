@@ -30,8 +30,6 @@ export function useFollowGameStart() {
     if (!gameId) return
     // runViewTransition already wraps the navigation in a single View Transition;
     // passing { viewTransition: true } too would start a second, overlapping one.
-    runViewTransition(() => {
-      void navigate(`/board/${gameId}`)
-    })
+    runViewTransition(() => navigate(`/board/${gameId}`))
   }, [gameId, navigate])
 }

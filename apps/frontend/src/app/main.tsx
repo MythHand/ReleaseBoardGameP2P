@@ -1,9 +1,11 @@
-import { routes } from '@generouted/react-router'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createBrowserRouter, RouterProvider } from 'react-router'
 import { setRandomFavicon } from '@/assets/favicon'
 import { BASE_URL } from '~/shared/config'
+import { SessionProvider } from './providers/SessionProvider'
+import { createSessionStore } from './providers/sessionStore'
+import { createRoutes } from './routes'
 import '@release/ui/global.css'
 import './index.css'
 import '@release/translation'
@@ -18,12 +20,15 @@ setRandomFavicon()
 // `routes` ourselves so it knows the base path. Vite guarantees BASE_URL has a
 // trailing slash; react-router wants none except for the root "/".
 const basename = BASE_URL === '/' ? '/' : BASE_URL.replace(/\/$/, '')
-const router = createBrowserRouter(routes, { basename })
+const sessionStore = createSessionStore(() => import('./providers/SessionRuntime'))
+const router = createBrowserRouter(createRoutes(sessionStore), { basename })
 
 const root = document.getElementById('root')
 if (!root) throw new Error('Root element #root not found')
 createRoot(root).render(
   <StrictMode>
-    <RouterProvider router={router} />
+    <SessionProvider store={sessionStore}>
+      <RouterProvider router={router} />
+    </SessionProvider>
   </StrictMode>,
 )
