@@ -112,6 +112,13 @@ export const HAND_CHOICE_MS = 25_000
 // (docs/rules/README.md, "Что правилом НЕ является" — the value the docs name).
 export const TURN_ACTION_MS = 30_000
 
+// The time a clock started now gets: its own span times the host's action time
+// (GameState.actionTime). Every clock the engine starts goes through here, so
+// the setting reaches all of them alike.
+export function timeFor(state: GameState, ms: number): number {
+  return ms * (state.actionTime ?? 1)
+}
+
 // Cancel-type defences fail against a sudo attack; Unicorn-type never do.
 // Lives here rather than in attacks.ts or handAttacks.ts, both of which need it
 // and would otherwise import each other — see this module's own note above

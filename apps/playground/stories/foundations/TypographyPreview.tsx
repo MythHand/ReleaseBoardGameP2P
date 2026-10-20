@@ -359,8 +359,8 @@ const scale: ScaleRow[] = [
     upper: true,
     sample: { ru: 'Ваш никнейм', en: 'Your nickname' },
     where: {
-      ru: 'Лейблы полей (Input), бейджи, tech/danger-кнопки',
-      en: 'Field labels (Input), badges, tech/danger buttons',
+      ru: 'Лейблы полей (Input), бейджи, tech/danger-кнопки, малые табы (ModeSelect sm)',
+      en: 'Field labels (Input), badges, tech/danger buttons, small tabs (ModeSelect sm)',
     },
   },
   {

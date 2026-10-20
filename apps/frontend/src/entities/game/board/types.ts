@@ -9,6 +9,7 @@ import type { PresentationId } from '~/network/session/presentationGate'
 
 import type { Event, GameView } from '@release/engine'
 import type {
+  ActionTimeScale,
   CardData,
   DockView,
   GameModesCopy,
@@ -164,6 +165,10 @@ export interface BoardRoom {
   spectators: Spectator[]
   spectatorLimit?: number
   onSpectatorLimitChange?: (n: number) => void
+  // How much time every action gets, as a multiple of the game's own — the
+  // host's switch, and everyone else's read-only view of it
+  actionTime?: ActionTimeScale
+  onActionTimeChange?: (scale: ActionTimeScale) => void
   onKickSpectator?: (id: string) => void
   lang?: SwitchLang
   onLangChange?: (lang: SwitchLang) => void
@@ -213,6 +218,9 @@ export interface BoardChromeCopy {
   // заголовок группы управления хоста + подпись поля лимита зрителей
   hostTitle: string
   specLimit: string
+  // the action time row: its label and hint
+  actionTime?: string
+  actionTimeHint?: string
   // Gesture hints for decisions whose generic panel is suppressed.
   askCost: string
   askPartner: string

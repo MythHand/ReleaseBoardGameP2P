@@ -211,6 +211,12 @@ export interface KeeperHandle {
   // Both are idempotent.
   suspend(): void
   resume(): void
+  // The host gave the table more time to act (GameState.actionTime). Written
+  // into the match as it stands, like `resume` shifts it: the clocks running now
+  // keep their deadlines, and the next clock the engine starts takes the new
+  // time. No seat's view changes, so nothing is sent — the save carries it
+  // through a reload.
+  setActionTime(actionTime: number): void
   close(): void
 }
 
@@ -477,6 +483,12 @@ export function attachKeeper(args: {
       // Every seat's countdown is absolute keeper time, so the shifted
       // deadlines have to reach the boards, not just the referee.
       save({ session: args.ref.current, outgoing: syncAll(args.ref.current, []) })
+    },
+    setActionTime(actionTime) {
+      const session = args.ref.current
+      if (!keeping || session.state.actionTime === actionTime) return
+      args.ref.current = { ...session, state: { ...session.state, actionTime } }
+      save({ session: args.ref.current, outgoing: [] })
     },
     close() {
       keeping = false

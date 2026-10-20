@@ -67,6 +67,7 @@ export { CATEGORIES } from './cards/categories'
 // The card *type* is re-exported as `CardData` to avoid colliding with the `Card`
 // *component* default export below. Internally the type stays named `Card`.
 export type { Card as CardData, CardTag, Category, CategoryId } from './cards/types'
+export { ACTION_TIME_SCALES, type ActionTimeScale, isActionTimeScale } from './game/actionTime'
 export { BOT_NICKNAMES, botNames } from './game/botNames'
 export type { GameMode, GameModeCopy, GameModesCopy, Setup } from './game/modes'
 export { DEFAULT_SETUP, GAME_MODES } from './game/modes'

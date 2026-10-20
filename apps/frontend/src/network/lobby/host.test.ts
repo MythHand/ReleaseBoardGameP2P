@@ -9,12 +9,13 @@ import {
   handleWhereabouts,
   kick,
   MAX_BOTS,
+  setActionTime,
   setBots,
   setMaxPlayers,
   setMaxSpectators,
   setParticipantRole,
 } from './host'
-import { applyPeerLeft, createLobbyState, type LobbyState, playerCount } from './state'
+import { applyConfig, applyPeerLeft, createLobbyState, type LobbyState, playerCount } from './state'
 
 const host = {
   id: 'h',
@@ -616,4 +617,22 @@ it('keeps a member’s Bug Runner record across a reload', () => {
   const gone = applyPeerLeft(scored, 'p1')
   const back = handleJoinRequest(gone, 'p1-again', 'member-p1', 'Pam', { matchRunning: false })
   expect(back.state.peers['p1-again'].bugRunner).toBe(2315)
+})
+
+it('hands a newcomer the room’s action time with the rest of its settings', () => {
+  const room = setActionTime(base(4), 3).state
+  const { outgoing } = handleJoinRequest(room, 'p1', 'member-p1', 'Pam', { matchRunning: false })
+  expect(outgoing).toContainEqual({
+    to: 'p1',
+    message: {
+      type: 'LOBBY_CONFIG_UPDATED',
+      payload: expect.objectContaining({ actionTime: 3 }),
+    },
+  })
+})
+
+it('keeps the room’s action time when a config carries one the switch does not offer', () => {
+  const room = setActionTime(base(4), 2).state
+  expect(applyConfig(room, { actionTime: 5 }).actionTime).toBe(2)
+  expect(applyConfig(room, { actionTime: 1 }).actionTime).toBe(1)
 })

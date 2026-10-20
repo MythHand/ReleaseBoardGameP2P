@@ -1,3 +1,4 @@
+import type { GameState } from '@release/engine'
 import { createFakeEngine, FAKE_DECK, FAKE_EVENTS, WINDOW_FIRST_MS } from '@release/engine/fake'
 import { act, renderHook as renderTestingHook } from '@testing-library/react'
 import { afterEach, beforeEach, vi } from 'vitest'
@@ -1928,7 +1929,13 @@ it('keeps the latest host lobby configuration in the stored room session', async
     result.current.setBots(2)
   })
 
-  expect(storedSession()?.lobbyConfig).toEqual({ maxPlayers: 3, maxSpectators: 8, setup, bots: 2 })
+  expect(storedSession()?.lobbyConfig).toEqual({
+    maxPlayers: 3,
+    maxSpectators: 8,
+    setup,
+    bots: 2,
+    actionTime: 1,
+  })
 })
 
 it('persists the session when a room is joined', async () => {
@@ -2301,6 +2308,7 @@ it("stores private seating beside the referee's public seats", async () => {
       maxSpectators: 8,
       setup: result.current.state?.setup,
       bots: 2,
+      actionTime: 1,
     })
     expect(stored?.seats).toEqual([
       { playerId: 'p1', peerId: 'peer0', absentSince: null },
@@ -4983,6 +4991,51 @@ it('keeps a returning watcher in the lobby for the old game and follows the next
   })
   expect(result.current.gameId).not.toBe(oldGame)
   expect(publicSyncTo('returned-watcher').view.self).toBeNull()
+})
+
+it('tells everyone the room’s action time, keeps it, and starts the match on it', async () => {
+  vi.useFakeTimers()
+  try {
+    const { result } = await hostWithGuest()
+    expect(result.current.state?.actionTime).toBe(1)
+    act(() => result.current.setActionTime(2))
+    expect(result.current.state?.actionTime).toBe(2)
+    expect(sentAll()).toContainEqual({
+      type: 'LOBBY_CONFIG_UPDATED',
+      payload: { actionTime: 2 },
+    })
+    expect(readSession()?.lobbyConfig?.actionTime).toBe(2)
+    act(() => {
+      result.current.startGame([])
+      vi.advanceTimersByTime(KEEPER_SAVE_MS)
+    })
+    expect((readKeeper()?.state as GameState | undefined)?.actionTime).toBe(2)
+    expect(readKeeper()?.lobbyConfig?.actionTime).toBe(2)
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+it('gives a running match the new action time, leaving the clocks already running', async () => {
+  vi.useFakeTimers()
+  try {
+    const { result } = await hostWithGuest()
+    act(() => {
+      result.current.startGame([])
+      vi.advanceTimersByTime(KEEPER_SAVE_MS)
+    })
+    const before = readKeeper()?.state as GameState
+    act(() => {
+      result.current.setActionTime(3)
+      vi.advanceTimersByTime(KEEPER_SAVE_MS)
+    })
+    const after = readKeeper()?.state as GameState
+    expect(after.actionTime).toBe(3)
+    expect(after.turn.deadline).toBe(before.turn.deadline)
+    expect(after.window).toEqual(before.window)
+  } finally {
+    vi.useRealTimers()
+  }
 })
 
 it('exposes moderation errors and persists the spectator limit in room and keeper settings', async () => {

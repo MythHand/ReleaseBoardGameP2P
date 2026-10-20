@@ -6,6 +6,7 @@ import {
   drawObligationMet,
   HAND_CHOICE_MS,
   passiveAction,
+  timeFor,
 } from '@release/engine/fake'
 import { IS_DEV } from '~/shared/config'
 import type { Intent, Message } from '../types'
@@ -106,6 +107,8 @@ export function createSession(args: {
   spectators?: string[]
   players: { playerId: PlayerId; peerId: string | null; name: string; bot?: boolean }[]
   setup: Setup
+  // the room's action time the match starts on; 1 when left out
+  actionTime?: number
   deck: DeckEntry[]
   events: DeckEntry[]
 }): SessionResult {
@@ -114,6 +117,7 @@ export function createSession(args: {
     seed: args.seed,
     players: args.players.map((p) => ({ id: p.playerId, name: p.name })),
     setup: args.setup,
+    actionTime: args.actionTime,
     deck: args.deck,
     events: args.events,
   })
@@ -831,7 +835,7 @@ export function tick(session: Session, now: number): SessionResult {
         pending: {
           ...pending,
           openedAt: now,
-          deadline: now + HAND_CHOICE_MS,
+          deadline: now + timeFor(session.state, HAND_CHOICE_MS),
         },
       },
     }

@@ -13,7 +13,16 @@ import {
   type ReleaseSlot,
 } from '../state'
 import type { PendingView } from '../view'
-import { bankToDiscard, createLog, DEFEND_MS, defencesFor, type Log, reject, setHand } from './core'
+import {
+  bankToDiscard,
+  createLog,
+  DEFEND_MS,
+  defencesFor,
+  type Log,
+  reject,
+  setHand,
+  timeFor,
+} from './core'
 import { openHandChoice } from './handAttacks'
 import { destroySlot } from './triggers'
 import { canAttackWith, closeWindow, handOverWindow, openWindow, respondersFor } from './window'
@@ -173,7 +182,7 @@ export function onAttack(state: GameState, action: Action & { type: 'ATTACK' }):
         ...(sudoCard ? { combo: sudoCard } : {}),
         canDefendWith: defencesFor(state, w.target.player, sudo),
         openedAt: action.at,
-        deadline: action.at + DEFEND_MS,
+        deadline: action.at + timeFor(state, DEFEND_MS),
         scope: 'release',
       },
       eventSeq: log.seq,

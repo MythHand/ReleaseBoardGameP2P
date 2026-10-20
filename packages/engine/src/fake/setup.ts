@@ -122,6 +122,7 @@ export function createGame(config: GameConfig): GameState {
     pending: null,
     window: null,
     setup: normalized.setup,
+    actionTime: config.actionTime ?? 1,
     ignored: { cards: dropped, setup: normalized.ignored },
     tally: seedTally(seating),
     over: null,

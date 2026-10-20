@@ -18,6 +18,7 @@ import {
   reject,
   setHand,
   TURN_ACTION_MS,
+  timeFor,
 } from './core'
 import { onPickFromDiscard } from './discard'
 import { onGiveCard, onRequestCard, onStealCard } from './handAttacks'
@@ -259,7 +260,7 @@ function onClockStarted(state: GameState, action: Action & { type: 'CLOCK_STARTE
         ...state.turn,
         awaitingPresentation: undefined,
         openedAt: action.at,
-        deadline: action.at + TURN_ACTION_MS,
+        deadline: action.at + timeFor(state, TURN_ACTION_MS),
       },
     },
     events: [],
@@ -301,7 +302,7 @@ function stampTurnClock(state: GameState, at: number): GameState {
       ...state.turn,
       awaitingPresentation: undefined,
       openedAt: at,
-      deadline: at + TURN_ACTION_MS,
+      deadline: at + timeFor(state, TURN_ACTION_MS),
     },
   }
 }

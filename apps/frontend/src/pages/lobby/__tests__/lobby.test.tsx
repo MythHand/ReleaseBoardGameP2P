@@ -69,6 +69,7 @@ function base(): UseLobby {
     joinAvailability: null,
     lobbyActionError: null,
     setMaxSpectators: vi.fn(),
+    setActionTime: vi.fn(),
     setParticipantRole: vi.fn(),
     voice: createFakeVoiceFacade(),
     chat: { entries: [], notificationEntryIds: [], selfMemberId: null, send: vi.fn() },
@@ -166,6 +167,7 @@ function inSession(): UseLobby {
       hostId: 'h',
       maxPlayers: 4,
       maxSpectators: 8,
+      actionTime: 1,
       bots: 0,
       setup: {
         handLimit: 'base',
@@ -335,6 +337,7 @@ it('LobbyView renders spectator section when guests present', () => {
       hostId: 'h',
       maxPlayers: 4,
       maxSpectators: 8,
+      actionTime: 1,
       bots: 0,
       setup: {
         handLimit: 'base',

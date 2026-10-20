@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Chat, { type ChatMessage, type ChatRole } from '@/blocks/Chat'
 import { ToastStack } from '@/blocks/Toast'
 import { VoiceNotices, VoicePanel, VoiceTabIcon } from '@/blocks/VoiceChat'
+import type { ActionTimeScale } from '@/game/actionTime'
 import { CHAT_SELF, makeChat, mockAvatar, withMockAvatars } from '@/mocks/chat'
 import { makeSpectatorTable, makeTable } from '@/mocks/table'
 import Message from '@/primitives/Message'
@@ -146,6 +147,8 @@ export default function TableChatStory() {
   const [parallax, setParallax] = useState(true)
   // host switch: the action clocks for the whole table
   const [timers, setTimers] = useState(true)
+  // host switch: how many times the game's own time every action gets
+  const [actionTime, setActionTime] = useState<ActionTimeScale>(1)
   const [chatToasts, setChatToasts] = useState(true)
   const voice = useVoiceDemo()
   const [ready, setReady] = useState<Set<string>>(() => new Set())
@@ -386,6 +389,8 @@ export default function TableChatStory() {
             onChatToastsChange: setChatToasts,
             timers,
             onTimersChange: setTimers,
+            actionTime,
+            onActionTimeChange: setActionTime,
             paused,
             onPauseChange: togglePause,
             pausePlayers,
