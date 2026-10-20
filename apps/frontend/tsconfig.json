@@ -10,7 +10,9 @@
       "@release/translation": ["../../packages/translation/src/index.ts"],
       "@release/translation/*": ["../../packages/translation/src/*"],
       "@/*": ["../ui/src/*"],
-      "~/*": ["./src/*"]
+      "~/*": ["./src/*"],
+      "@release/ui/start": ["../ui/src/start.ts"],
+      "@release/ui/foundation": ["../ui/src/foundation.ts"]
     }
   },
   "include": ["src"]

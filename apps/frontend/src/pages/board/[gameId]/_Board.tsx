@@ -1363,10 +1363,10 @@ function BoardView({
   const rulesPanel = useMemo(
     () => (
       <ScrollArea className={kit.scrollPanel} contentClassName={kit.scrollPanelFlow}>
-        <Rules copy={copy.rules} />
+        {slots?.rules ?? (copy.rules ? <Rules copy={copy.rules} /> : null)}
       </ScrollArea>
     ),
-    [copy.rules],
+    [copy.rules, slots?.rules],
   )
 
   return (

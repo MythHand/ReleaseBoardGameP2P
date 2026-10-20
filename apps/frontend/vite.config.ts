@@ -6,6 +6,7 @@ import { defineConfig, type Plugin } from 'vite'
 import svgr from 'vite-plugin-svgr'
 // the game's version, read once for every config (Read in shared/config.ts)
 import { appVersionDefine } from '../../app-version'
+import { vendorChunk } from './config/vendorChunks'
 
 const uiSrc = fileURLToPath(new URL('../ui/src', import.meta.url))
 const appSrc = fileURLToPath(new URL('./src', import.meta.url))
@@ -75,6 +76,8 @@ export default defineConfig({
       // The animation layer is its own entry: a vocabulary and its steps, not
       // a component. Must precede the bare '@release/ui' find — these are matched
       // in order, and the shorter one would swallow the subpath.
+      { find: '@release/ui/start', replacement: `${uiSrc}/start.ts` },
+      { find: '@release/ui/foundation', replacement: `${uiSrc}/foundation.ts` },
       { find: '@release/ui/animations', replacement: `${uiSrc}/animations/index.ts` },
       { find: '@release/ui/global.css', replacement: `${uiSrc}/design/global.css` },
       { find: '@release/ui/tokens.css', replacement: `${uiSrc}/design/tokens.css` },
@@ -86,6 +89,7 @@ export default defineConfig({
       { find: '@', replacement: uiSrc },
     ],
   },
+  build: { cssCodeSplit: true, rollupOptions: { output: { manualChunks: vendorChunk } } },
   server: {
     // The /playground/ link opens the playground app (a separate Vite app on
     // :5180 — it pins that with strictPort, so this target must track it).

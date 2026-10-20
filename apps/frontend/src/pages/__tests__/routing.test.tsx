@@ -1,6 +1,8 @@
 import { render, screen } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { vi } from 'vitest'
+import { SessionProvider } from '~/app/providers/SessionProvider'
+import { createSessionStore } from '~/app/providers/sessionStore'
 import App from '~/pages/_app'
 import NotFound from '~/pages/404'
 import Index from '~/pages/index'
@@ -34,11 +36,19 @@ function routerFor(path: string) {
 }
 
 it('redirects / to the start screen', async () => {
-  render(<RouterProvider router={routerFor('/')} />)
+  render(
+    <SessionProvider store={createSessionStore(() => Promise.resolve({ default: () => null }))}>
+      <RouterProvider router={routerFor('/')} />
+    </SessionProvider>,
+  )
   expect(await screen.findByText('start screen')).toBeTruthy()
 })
 
 it('redirects unknown paths to the start screen', async () => {
-  render(<RouterProvider router={routerFor('/does-not-exist')} />)
+  render(
+    <SessionProvider store={createSessionStore(() => Promise.resolve({ default: () => null }))}>
+      <RouterProvider router={routerFor('/does-not-exist')} />
+    </SessionProvider>,
+  )
   expect(await screen.findByText('start screen')).toBeTruthy()
 })

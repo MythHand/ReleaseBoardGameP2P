@@ -1,7 +1,10 @@
 import { render, screen } from '@testing-library/react'
 import { vi } from 'vitest'
 import { createFakeVoiceFacade } from '~/network/voice/testing/fakeVoiceFacade'
+import SessionGate from './SessionGate'
 import { SessionProvider, useSession } from './SessionProvider'
+import SessionRuntime from './SessionRuntime'
+import { createSessionStore } from './sessionStore'
 
 vi.mock('~/network', () => ({
   useLobby: () => ({
@@ -28,13 +31,17 @@ function Probe() {
   return <span data-testid="code">{session.roomCode}</span>
 }
 
-it('exposes the lobby through context', () => {
+it('exposes the lobby through context after runtime activation', async () => {
+  const store = createSessionStore(() => Promise.resolve({ default: SessionRuntime }))
+  void store.request()
   render(
-    <SessionProvider>
-      <Probe />
+    <SessionProvider store={store}>
+      <SessionGate>
+        <Probe />
+      </SessionGate>
     </SessionProvider>,
   )
-  expect(screen.getByTestId('code').textContent).toBe('ABC-123')
+  expect((await screen.findByTestId('code')).textContent).toBe('ABC-123')
 })
 
 it('throws when useSession is used outside the provider', () => {

@@ -1,7 +1,7 @@
 import type { Event } from '@release/engine'
 import { useTranslation } from '@release/translation'
 import { isCounting, Message, Reconnect, ToastStack, VoiceNotices, VoiceTabIcon } from '@release/ui'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { useSession } from '~/app/providers/SessionProvider'
 import { type Panel, toBoardOver, toBoardState } from '~/entities/game/board'
@@ -10,6 +10,7 @@ import { RoomChat, useRoomChatView } from '~/features/chat/RoomChat'
 import { copyText } from '~/features/copy/copyText'
 import { useGame } from '~/features/play-game/useGame'
 import { useNow } from '~/features/play-game/useNow'
+import Rules from '~/features/rules/Rules'
 import { RoomVoice, useRoomVoiceView } from '~/features/voice-chat/RoomVoice'
 import { useSpeaking } from '~/features/voice-chat/useSpeaking'
 import Board from './_Board'
@@ -29,11 +30,6 @@ export default function BoardPage() {
   const [panel, setPanel] = useState<Panel | null>(null)
   const [chatToasts, setChatToasts] = useState(true)
   const [parallax, setParallax] = useState(true)
-  // `returnObjects` builds a fresh object on every call; the rules are the
-  // heaviest block the board holds (built ahead in the side panel), so their
-  // copy keeps one identity until the language changes and the board can skip
-  // re-rendering them.
-  const rulesCopy = useMemo(() => t('rulesBlock', { returnObjects: true }), [t])
 
   // Where this peer is, for everyone else's results table.
   const { setWhere } = session
@@ -243,6 +239,7 @@ export default function BoardPage() {
           onChatToastsChange: setChatToasts,
         }}
         slots={{
+          rules: <Rules enabled={panel === 'rules'} />,
           voice: <RoomVoice view={voice} panelTitle={t('table.tabVoice')} />,
           voiceTab: <VoiceTabIcon status={voice.status} micOff={voice.micOff} />,
           voiceNotices: <VoiceNotices issue={voice.issue} copy={voice.copy} />,
@@ -270,7 +267,6 @@ export default function BoardPage() {
         copy={{
           table: t('table', { returnObjects: true }),
           modes: t('gameModes', { returnObjects: true }),
-          rules: rulesCopy,
           seat: t('seat', { returnObjects: true }),
           participants: t('participants', { returnObjects: true }),
           history: t('moveHistory', { returnObjects: true }),

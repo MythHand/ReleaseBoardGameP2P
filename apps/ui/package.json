@@ -7,7 +7,9 @@
     ".": "./src/index.ts",
     "./animations": "./src/animations/index.ts",
     "./tokens.css": "./src/design/tokens.css",
-    "./global.css": "./src/design/global.css"
+    "./global.css": "./src/design/global.css",
+    "./start": "./src/start.ts",
+    "./foundation": "./src/foundation.ts"
   },
   "scripts": {
     "typecheck": "release-tsc --noEmit -p tsconfig.json",

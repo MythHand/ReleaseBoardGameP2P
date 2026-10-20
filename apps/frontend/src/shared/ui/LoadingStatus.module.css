@@ -1,0 +1,22 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+  color: var(--fg);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.pending {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
