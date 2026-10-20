@@ -791,10 +791,17 @@ export function useComboBeat(
       const el = await foldIn(plan.player, plan.card, plan.codeReview, ctx)
       if (plan.slot === 'monitoring') await wait(SHOW_HOLD)
       // …reading the way the slot it lands in reads, from the frame the flight
-      // starts. A zone draws a pair whole whoever's it is, so only a lone card
-      // has a reading to take.
-      if (!plan.codeReview && readsAtGlance(a.releaseSlot(plan.player, plan.slot))) {
-        flyer.patch('fold', { lod: true })
+      // starts. A pair rides as `content` (`foldIn`), so it takes the reading
+      // the way the zone draws it: the same pair, both halves at a glance.
+      if (readsAtGlance(a.releaseSlot(plan.player, plan.slot))) {
+        const main = cardById(plan.card)
+        const aux = plan.codeReview ? cardById(plan.codeReview) : null
+        flyer.patch(
+          'fold',
+          main && aux
+            ? { content: <CardPair main={main} aux={aux} width="100%" lod /> }
+            : { lod: true },
+        )
       }
       if (el) await play('playToReleaseZone', el, { to: toRect })?.finished
       setDown(ctx, inZone(), () => flyer.drop('fold'))
