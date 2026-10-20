@@ -133,7 +133,7 @@ export default function ReleaseZone({
           >
             {shown ? (
               aux ? (
-                <CardPair main={card} aux={aux} width="100%" />
+                <CardPair main={card} aux={aux} width="100%" lod={lod} />
               ) : (
                 <Card card={card} interactive={false} width="100%" lod={lod} />
               )

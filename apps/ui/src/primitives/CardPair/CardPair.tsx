@@ -24,19 +24,22 @@ interface CardPairProps {
   // вспомогательная (Sudo и т.п.) — подтыкается под основную под углом
   aux: CardType
   width?: string
+  // the at-a-glance reading of both halves (Card's `lod`) — the consumer decides
+  // where a pair is furniture: an opponent's release zone, never one's own
+  lod?: boolean
 }
 
 // Пара карт: основная сверху, вспомогательная подтыкается под углом снизу
 // (видна её верхняя кромка). data-main/data-aux — якоря для покадровой анимации
 // «сцепления» (см. ComboStory).
-export default function CardPair({ main, aux, width }: CardPairProps) {
+export default function CardPair({ main, aux, width, lod }: CardPairProps) {
   return (
     <div className={styles.pair} style={width ? { width } : undefined}>
       <div className={styles.aux} data-aux style={{ transform: PAIR_AUX_POSE }}>
-        <Card card={aux} interactive={false} width="100%" />
+        <Card card={aux} interactive={false} width="100%" lod={lod} />
       </div>
       <div className={styles.main} data-main>
-        <Card card={main} interactive={false} width="100%" />
+        <Card card={main} interactive={false} width="100%" lod={lod} />
       </div>
     </div>
   )
