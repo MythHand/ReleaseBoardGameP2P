@@ -5114,5 +5114,109 @@
     },
     "regressionChecks": 4,
     "resolvedPriorMinor": "Manifest asset ownership now rejects emitted rules JSON in cold-start network logs."
+  },
+  "pendingIndicatorFollowup": {
+    "date": "2026-10-20",
+    "component": "Existing UI-kit Spinner, size 40, narrow foundation export",
+    "browser": {
+      "reference": {
+        "width": "40px",
+        "height": "40px",
+        "borderTopWidth": "2px",
+        "borderTopColor": "rgb(255, 255, 255)",
+        "borderRightColor": "rgba(255, 255, 255, 0.2)",
+        "borderRadius": "50%",
+        "animationName": "_spin_1k61y_2",
+        "animationDuration": "0.8s"
+      },
+      "desktop-ru": {
+        "style": {
+          "width": "40px",
+          "height": "40px",
+          "borderTopWidth": "2px",
+          "borderTopColor": "rgb(255, 255, 255)",
+          "borderRightColor": "rgba(255, 255, 255, 0.2)",
+          "borderRadius": "50%",
+          "animationName": "_spin_1k61y_2",
+          "animationDuration": "0.8s"
+        },
+        "geometry": {
+          "dx": 3.0517578125e-5,
+          "dy": 0
+        },
+        "closedWhileLoading": true,
+        "formReady": true
+      },
+      "desktop-en": {
+        "style": {
+          "width": "40px",
+          "height": "40px",
+          "borderTopWidth": "2px",
+          "borderTopColor": "rgb(255, 255, 255)",
+          "borderRightColor": "rgba(255, 255, 255, 0.2)",
+          "borderRadius": "50%",
+          "animationName": "_spin_1k61y_2",
+          "animationDuration": "0.8s"
+        },
+        "geometry": {
+          "dx": 0,
+          "dy": 0
+        },
+        "closedWhileLoading": true,
+        "formReady": true
+      },
+      "mobile-ru": {
+        "style": {
+          "width": "40px",
+          "height": "40px",
+          "borderTopWidth": "2px",
+          "borderTopColor": "rgb(255, 255, 255)",
+          "borderRightColor": "rgba(255, 255, 255, 0.2)",
+          "borderRadius": "50%",
+          "animationName": "_spin_1k61y_2",
+          "animationDuration": "0.8s"
+        },
+        "geometry": {
+          "dx": 7.62939453125e-6,
+          "dy": 0
+        },
+        "closedWhileLoading": true,
+        "formReady": true
+      },
+      "error": {
+        "refreshVisible": true,
+        "spinnerRemoved": true
+      },
+      "pageErrors": []
+    },
+    "productionColdAssertion": {
+      "loaded": [
+        "assets/index-CmFJRMWi.js",
+        "assets/index-CDY3TLzC.css",
+        "assets/vendor-react-9LjzQdLw.js",
+        "assets/vendor-router-C7MaVHp2.js",
+        "assets/vendor-i18n-79SrbKY8.js",
+        "assets/start-screen-Cmxa9avP.js",
+        "assets/session-context-DLgoE1rE.js",
+        "assets/start-screen-HpapK2Hs.css",
+        "assets/session-context-DZQdIMJw.css"
+      ],
+      "sizes": {
+        "js": {
+          "raw": 472182,
+          "gzip": 159534
+        },
+        "css": {
+          "raw": 40557,
+          "gzip": 9083
+        }
+      },
+      "findings": []
+    },
+    "focusedTests": 9,
+    "typecheck": "passed",
+    "lint": "passed",
+    "frontendProductionBuild": "passed",
+    "timings": "Original timing samples precede this visual follow-up."
   }
 }

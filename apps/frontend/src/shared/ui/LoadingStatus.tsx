@@ -1,5 +1,5 @@
 import { useTranslation } from '@release/translation'
-import { Button, Typography } from '@release/ui/foundation'
+import { Button, Spinner, Typography } from '@release/ui/foundation'
 import { classifyLoadFailure } from '../lib/loadFailure'
 import styles from './LoadingStatus.module.css'
 
@@ -13,6 +13,18 @@ export default function LoadingStatus({
   onRefresh?: () => void
 }) {
   const { t } = useTranslation()
+  if (!error)
+    return (
+      <div
+        className={`${styles.root} ${styles.pending}`}
+        role="status"
+        aria-label={t('loading.status')}
+        aria-live="polite"
+        aria-busy="true"
+      >
+        <Spinner size={40} />
+      </div>
+    )
   const offline = error && classifyLoadFailure(error, navigator.onLine) === 'offline'
   const refreshRequired = error && classifyLoadFailure(error, true) === 'load'
   return (

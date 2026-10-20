@@ -7,7 +7,7 @@ Start/foundation UI entries keep unrelated styles out of the initial closure.
 
 ## Production comparison
 
-Baseline source: `5879517d` (main 0.10.5). Final production source: `eb12eddf`.
+Baseline source: `5879517d` (main 0.10.5). Measured application source: `eb12eddf` (before the pending-indicator follow-up below).
 Node 24.13.0, pnpm 9.15.0, frontend Vite 6.4.3, Chromium 148.0.7778.96.
 Both builds use `/ReleaseBoardGameP2P/`, the existing production configuration, and
 the same local gzip HTTP server. This measures local delivery, not GitHub Pages.
@@ -145,6 +145,27 @@ Initial gzip totals remain 159,384 JS and 8,953 CSS bytes. The original cold tim
 samples therefore still describe the same delivered JS/CSS. Four new CLI
 regression checks pass against the standard artifact formats; the full-suite
 counts above describe the earlier application verification.
+
+## Pending indicator follow-up (2026-10-20)
+
+Pending sections now use the existing UI-kit `Spinner` at 40 px, centered in the
+available modal body. The localized loading label remains accessible through
+`role=status`/`aria-label`; error text and explicit recovery actions remain visible
+on failure. Exporting Spinner through the narrow foundation entry avoids pulling
+the broad UI barrel into initial loading boundaries.
+
+Chromium checks cover delayed runtime and form imports, Russian/English desktop
+at 1440×900, Russian mobile at 390×844, closing while pending, reopening into the
+ready form, and native-import error recovery. Spinner dimensions, border colors,
+and 0.8 s animation match the existing `/playground/kit-spinner` reference;
+centering in the modal body is verified geometrically. Production-base loading
+was also checked. Nine focused tests, repository typechecks/lint, and the frontend
+production build pass.
+
+The follow-up's actual cold requests and native Vite artifacts pass the eager-code
+assertion: initial JS is 159,534 gzip bytes, CSS 9,083 gzip bytes (Node 24). The timing table
+above remains the earlier five-visit measurement, not a new timing claim. Local
+before/after screenshots are under `output/playwright/255-loader/`.
 
 ## Reproduction and evidence
 
