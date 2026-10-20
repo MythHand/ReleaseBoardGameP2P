@@ -3,6 +3,7 @@ import type { SwitchLang } from '@/blocks/LangSwitcher'
 import type { LobbyCodeCopy } from '@/blocks/LobbyCode'
 import type { RulesCopy } from '@/blocks/Rules'
 import type { Card } from '@/cards/types'
+import type { ActionTimeScale } from '@/game/actionTime'
 import type { GameModesCopy, Setup } from '@/game/modes'
 import type { HeapCard } from '@/primitives/Pile/Pile'
 import type { GameOverCopy } from '@/table/GameOver/GameOver'
@@ -113,6 +114,11 @@ export interface TableRoom {
   // a table without the pressure, not a table with different rules.
   timers?: boolean
   onTimersChange?: (on: boolean) => void
+  // How much time every action gets, as a multiple of the game's own — a host
+  // switch for the whole table. More time to think, not a faster game: 2 is
+  // twice the time for every turn and answer.
+  actionTime?: ActionTimeScale
+  onActionTimeChange?: (scale: ActionTimeScale) => void
   onChatToastsChange?: (on: boolean) => void
   paused?: boolean
   onPauseChange?: (on: boolean) => void
@@ -165,6 +171,10 @@ export interface TableChromeCopy {
   timersOn?: string
   timersOff?: string
   timersHint?: string
+  // the action time multiple, 1x / 2x / 3x — the host's switch and everyone
+  // else's read-only view of it: its label and hint
+  actionTime?: string
+  actionTimeHint?: string
   // поле параллакса карт (опционально — как и пауза, рендерится только вместе
   // со своим обработчиком): подпись поля, состояние тумблера и пояснение
   parallax?: string

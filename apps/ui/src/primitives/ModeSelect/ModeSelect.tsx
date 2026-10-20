@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react'
+import Typography from '@/primitives/Typography'
 import styles from './ModeSelect.module.css'
 
 export interface ModeOption {
@@ -14,6 +15,10 @@ interface ModeSelectProps {
   onChange?: (value: string) => void
   readOnly?: boolean
   disabled?: boolean
+  // md — the match modes, a label and a line of description per option; sm — a
+  // compact row for a settings panel, the height of a toggle beside it, labels
+  // only (a `desc` is not shown)
+  size?: 'md' | 'sm'
 }
 
 // Выбор режима: заголовок + варианты в строчку + «ползунок» (подсветка),
@@ -26,17 +31,19 @@ export default function ModeSelect({
   onChange,
   readOnly = false,
   disabled = false,
+  size = 'md',
 }: ModeSelectProps) {
   const index = Math.max(
     0,
     options.findIndex((o) => o.value === value),
   )
+  const sm = size === 'sm'
 
   return (
     <div className={styles.group}>
       {title && <h4 className={styles.title}>{title}</h4>}
       <div
-        className={`${styles.track} ${readOnly ? styles.readOnly : ''} ${disabled ? styles.disabled : ''}`}
+        className={`${styles.track} ${styles[size]} ${readOnly ? styles.readOnly : ''} ${disabled ? styles.disabled : ''}`}
         style={{ '--n': options.length, '--i': index } as CSSProperties}
       >
         <span className={styles.thumb} aria-hidden="true" />
@@ -49,8 +56,18 @@ export default function ModeSelect({
             onClick={() => !readOnly && !disabled && onChange?.(o.value)}
             tabIndex={readOnly || disabled ? -1 : 0}
           >
-            <span className={styles.label}>{o.label}</span>
-            {o.desc && <span className={styles.desc}>{o.desc}</span>}
+            <Typography
+              as="span"
+              base={sm ? 'label-sm' : 'mono-strong'}
+              tk={sm ? 'tk-12' : 'tk-02'}
+            >
+              {o.label}
+            </Typography>
+            {!sm && o.desc && (
+              <Typography as="span" base="mono-sm" tk="tk-01">
+                {o.desc}
+              </Typography>
+            )}
           </button>
         ))}
       </div>

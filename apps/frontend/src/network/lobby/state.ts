@@ -1,4 +1,4 @@
-import { MAX_SPECTATORS } from '@release/ui'
+import { type ActionTimeScale, isActionTimeScale, MAX_SPECTATORS } from '@release/ui'
 import type { PeerInfo, Setup } from '../types'
 
 export interface LobbyState {
@@ -6,6 +6,9 @@ export interface LobbyState {
   hostId: string
   maxPlayers: number
   maxSpectators: number
+  // How much time every action gets, as a multiple of the game's own — the
+  // host's setting, kept by the room so the next match starts on it too.
+  actionTime: ActionTimeScale
   // How many bots the host has ASKED for — a ceiling, not a reservation. What
   // the table can actually seat is `effectiveBots` below, which shrinks as
   // people take the seats and grows back when they leave. Storing the request
@@ -32,6 +35,7 @@ export function createLobbyState(args: {
   hostId: string
   maxPlayers: number
   maxSpectators?: number
+  actionTime?: number
   bots?: number
   setup?: Setup
   peers: PeerInfo[]
@@ -43,6 +47,7 @@ export function createLobbyState(args: {
     hostId: args.hostId,
     maxPlayers: args.maxPlayers,
     maxSpectators: validSpectatorLimit(args.maxSpectators) ? args.maxSpectators : 8,
+    actionTime: isActionTimeScale(args.actionTime) ? args.actionTime : 1,
     bots: args.bots ?? 0,
     setup: args.setup ?? {},
     peers,
@@ -73,6 +78,7 @@ export function applyPeerList(state: LobbyState, peers: PeerInfo[]): LobbyState 
     hostId: state.hostId,
     maxPlayers: state.maxPlayers,
     maxSpectators: state.maxSpectators,
+    actionTime: state.actionTime,
     // Forwarded like every other field here: rebuilding through
     // createLobbyState without it would silently reset a guest's bot count
     // to the `?? 0` default on every PEER_LIST, undoing whatever
@@ -101,7 +107,13 @@ export function applyPeerLeft(state: LobbyState, peerId: string): LobbyState {
 
 export function applyConfig(
   state: LobbyState,
-  patch: { maxSpectators?: number; maxPlayers?: number; setup?: Setup; bots?: number },
+  patch: {
+    maxSpectators?: number
+    maxPlayers?: number
+    setup?: Setup
+    bots?: number
+    actionTime?: number
+  },
 ): LobbyState {
   return {
     ...state,
@@ -109,6 +121,7 @@ export function applyConfig(
     ...(patch.maxPlayers !== undefined && { maxPlayers: patch.maxPlayers }),
     ...(patch.setup !== undefined && { setup: patch.setup }),
     ...(patch.bots !== undefined && { bots: patch.bots }),
+    ...(isActionTimeScale(patch.actionTime) && { actionTime: patch.actionTime }),
   }
 }
 

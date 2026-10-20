@@ -54,6 +54,7 @@ function base(): UseLobby {
     joinAvailability: null,
     lobbyActionError: null,
     setMaxSpectators: vi.fn(),
+    setActionTime: vi.fn(),
     setParticipantRole: vi.fn(),
     voice: createFakeVoiceFacade(),
     chat: { entries: [], notificationEntryIds: [], selfMemberId: null, send: vi.fn() },

@@ -1,5 +1,6 @@
 import { en as enCommon, ru as ruCommon } from '@release/translation/catalog'
 import { useEffect, useMemo, useState } from 'react'
+import type { ActionTimeScale } from '@/game/actionTime'
 import { makeSpectatorTable, makeTable } from '@/mocks/table'
 import Table from '@/table/Table'
 import { type Lang, pick, useLang } from '../../Playground/lang'
@@ -83,6 +84,8 @@ export default function TableStory() {
   const [parallax, setParallax] = useState(true)
   // host switch: the action clocks for the whole table
   const [timers, setTimers] = useState(true)
+  // host switch: how many times the game's own time every action gets
+  const [actionTime, setActionTime] = useState<ActionTimeScale>(1)
   const [ready, setReady] = useState<Set<string>>(() => new Set())
   // The reconnect overlay's own dial state — only meaningful while the
   // `youDisconnect` view is selected. `trying`/`failed` are both worth
@@ -318,6 +321,8 @@ export default function TableStory() {
             onParallaxChange: setParallax,
             timers,
             onTimersChange: setTimers,
+            actionTime,
+            onActionTimeChange: setActionTime,
             paused,
             onPauseChange: togglePause,
             pausePlayers,

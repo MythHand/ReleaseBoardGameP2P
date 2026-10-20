@@ -364,6 +364,8 @@
     "codeTitle": "game code",
     "hostTitle": "controls",
     "specLimit": "spectator limit",
+    "actionTime": "action time",
+    "actionTimeHint": "more time for every turn and answer",
     "askCost": "a release costs one card — pull any of them out",
     "askPartner": "click the defence the sudo will enhance",
     "askNeutralize": "neutralise the alarm — answer with a lit card",

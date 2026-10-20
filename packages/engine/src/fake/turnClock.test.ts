@@ -110,6 +110,29 @@ it('hands the next player a fresh clock when the turn ends', () => {
   expect(pushed.turn.deadline).toBe(12_000 + TURN_ACTION_MS)
 })
 
+it('starts a match on the room’s action time, and on 1x without one', () => {
+  expect(engine.createGame(config()).actionTime).toBe(1)
+  expect(engine.createGame({ ...config(), actionTime: 3 }).actionTime).toBe(3)
+})
+
+it('gives the turn clock the action time, and a change only the next clock', () => {
+  const doubled = reduce({ ...primed(), actionTime: 2 }, { type: 'CLOCK_STARTED', at: 5000 }).state
+  expect(doubled.turn.deadline).toBe(5000 + 2 * TURN_ACTION_MS)
+
+  // The host gives more time while the clock runs: the running one goes on as
+  // it was, and the clock the next action starts gets the new time.
+  const tripled = { ...doubled, actionTime: 3 }
+  expect(tripled.turn.deadline).toBe(5000 + 2 * TURN_ACTION_MS)
+  const drawn = reduce(tripled, { type: 'DRAW', player: 'p1', at: 9000 }).state
+  expect(drawn.turn.deadline).toBe(9000 + 3 * TURN_ACTION_MS)
+})
+
+it('reads a match saved without the setting as 1x', () => {
+  const { actionTime: _, ...saved } = primed()
+  const r = reduce(saved, { type: 'CLOCK_STARTED', at: 5000 })
+  expect(r.state.turn.deadline).toBe(5000 + TURN_ACTION_MS)
+})
+
 it('clears the clock while a reaction window holds the table', () => {
   const s = reduce(primed(), { type: 'CLOCK_STARTED', at: 5000 }).state
   const windowed = reduce(s, { type: 'PLAY', player: 'p1', card: FE.uid, at: 9000 }).state

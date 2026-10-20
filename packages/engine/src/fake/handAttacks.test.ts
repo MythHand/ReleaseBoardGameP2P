@@ -760,6 +760,27 @@ it('resolves a legacy giveCard snapshot while rejecting another card without los
   expect(done.state.decks.discard).toEqual([SEC])
 })
 
+it('gives the defence and the choice after it the action time', () => {
+  const played = reduce(
+    { ...table([BUG, SPARE], [WORKS, SUDO2]), actionTime: 2 },
+    {
+      type: 'PLAY',
+      player: 'p1',
+      card: BUG.uid,
+      target: { kind: 'player', player: 'p2' },
+      at: 1000,
+    },
+  )
+  expect(played.state.pending).toMatchObject({ openedAt: 1000, deadline: 1000 + 2 * 15_000 })
+  const opened = reduce(played.state, {
+    type: 'RESOLVE',
+    player: 'p2',
+    choice: { kind: 'defend', card: null },
+    at: 2000,
+  })
+  expect(opened.state.pending).toMatchObject({ openedAt: 2000, deadline: 2000 + 2 * 25_000 })
+})
+
 it.each([
   BUG,
   SEC,

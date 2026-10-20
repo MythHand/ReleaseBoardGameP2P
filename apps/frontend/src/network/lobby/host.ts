@@ -1,4 +1,4 @@
-import { maxBugRunnerScore } from '@release/ui'
+import { type ActionTimeScale, isActionTimeScale, maxBugRunnerScore } from '@release/ui'
 import type { JoinRole, Message, PeerInfo, Where } from '../types'
 import { type JoinAdmission, type JoinOptions, resolveJoinAdmission } from './admission'
 import { pickAvatar } from './profile'
@@ -106,6 +106,7 @@ export function handleJoinRequest(
             maxSpectators: state.maxSpectators,
             setup: state.setup,
             bots: state.bots,
+            actionTime: state.actionTime,
           },
         },
       },
@@ -287,6 +288,20 @@ export function disbandLobby(state: LobbyState): Result {
   return {
     state,
     outgoing: [{ to: 'broadcast', message: { type: 'LOBBY_DISBANDED', payload: {} } }],
+  }
+}
+
+// The room's action time, sent to everyone: they see it in their settings and
+// cannot change it. A match running on the table takes it from its next clock —
+// that half is the keeper's (KeeperHandle.setActionTime).
+export function setActionTime(state: LobbyState, actionTime: ActionTimeScale): Result {
+  // the switch offers nothing else, so there is nothing to tell the host about
+  if (!isActionTimeScale(actionTime)) return { state, outgoing: [] }
+  return {
+    state: applyConfig(state, { actionTime }),
+    outgoing: [
+      { to: 'broadcast', message: { type: 'LOBBY_CONFIG_UPDATED', payload: { actionTime } } },
+    ],
   }
 }
 

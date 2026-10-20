@@ -11,10 +11,18 @@ import styles from './TogglesKit.module.css'
 // demo mode: GAME_MODES[0] structure + copy from the language dictionary
 const SAMPLE = GAME_MODES[0]
 
+// the small size as the table's action time uses it
+const SCALES = [
+  { value: '1', label: '1x' },
+  { value: '2', label: '2x' },
+  { value: '3', label: '3x' },
+]
+
 const COPY = {
   ru: {
     segmented: 'ModeSelect — сегментированный выбор с ползунком',
     readOnly: 'ModeSelect — read-only (как у гостя)',
+    small: 'ModeSelect size="sm" — строка настроек, высотой с Toggle',
     toggle: 'Toggle — бинарный (готовность)',
     ready: 'готов',
     notReady: 'не готов',
@@ -22,6 +30,7 @@ const COPY = {
   en: {
     segmented: 'ModeSelect — segmented choice with a thumb',
     readOnly: 'ModeSelect — read-only (as for a guest)',
+    small: 'ModeSelect size="sm" — a settings row, as tall as a Toggle',
     toggle: 'Toggle — binary (readiness)',
     ready: 'ready',
     notReady: 'not ready',
@@ -43,6 +52,7 @@ export default function TogglesKit() {
 
   const [value, setValue] = useState(SAMPLE.options[0]?.value ?? '')
   const [ready, setReady] = useState(false)
+  const [scale, setScale] = useState('1')
 
   return (
     <KitPage title="Toggles">
@@ -61,6 +71,18 @@ export default function TogglesKit() {
         <div className={styles.wide}>
           <ModeSelect title={sampleTitle} options={sampleOptions} value={value} readOnly />
         </div>
+      </KitSection>
+
+      <KitSection title={t.small}>
+        <KitCell caption="interactive">
+          <ModeSelect size="sm" options={SCALES} value={scale} onChange={setScale} />
+        </KitCell>
+        <KitCell caption="read-only">
+          <ModeSelect size="sm" options={SCALES} value={scale} readOnly />
+        </KitCell>
+        <KitCell caption="disabled">
+          <ModeSelect size="sm" options={SCALES} value={scale} disabled />
+        </KitCell>
       </KitSection>
 
       <KitSection title={t.toggle}>
