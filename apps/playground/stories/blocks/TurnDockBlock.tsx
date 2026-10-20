@@ -19,6 +19,7 @@ const TOTAL: Record<TurnDockState, number> = {
   push: 30,
   waiting: 25,
   reaction: 15,
+  decide: 20,
   attack: 15,
   attacking: 10,
   exposed: 15,
@@ -42,6 +43,7 @@ const AUTO: Step[] = [
   { state: 'exposed' },
   { state: 'waiting', player: 'trinity' },
   { state: 'reaction', player: 'trinity' },
+  { state: 'decide' },
   { state: 'waiting', player: 'morpheus' },
   { state: 'reaction', player: 'morpheus', danger: true },
   { state: 'draw' },
@@ -133,6 +135,9 @@ function TurnDockLive({ copy, ctl }: { copy: Copy; ctl: Record<string, string> }
         >
           {ctl.danger}
         </Button>
+        <Button variant="tech" onClick={() => go({ state: 'decide' })}>
+          {ctl.decide}
+        </Button>
         <span className={styles.spacer} aria-hidden="true" />
         <Button variant="tech" onClick={() => setAuto((a) => !a)}>
           {auto ? ctl.autoOn : ctl.auto}
@@ -176,6 +181,8 @@ export default function TurnDockBlock() {
       waiting: 'Ход оппонента',
       reaction: 'Окно реакции — от вас ждут ответа (янтарь)',
       reactionDanger: 'Окно реакции — Error 503 (danger, красный)',
+      decide:
+        'Реакция без паса — от вас ждут решения на столе (сброс, выбор, порядок): янтарь, кольцо со своим сроком, без клавиши и подписи',
       attack: 'Атака — чужой свежий релиз открыт вам (фиолетовый)',
       attackPassed: 'Атака — вы спасовали: клавиша залита, нажатие вернёт пас',
       attacking:
@@ -199,6 +206,8 @@ export default function TurnDockBlock() {
       waiting: 'Opponent turn',
       reaction: 'Reaction window — an answer is owed by you (amber)',
       reactionDanger: 'Reaction window — Error 503 (danger, red)',
+      decide:
+        'Reaction without a pass — a decision on the table is owed by you (a discard, a pick, an order): amber, the ring on its own clock, no key and no caption',
       attack: 'Attack — somebody else’s fresh release is open to you (violet)',
       attackPassed: 'Attack — you passed: the key is lit, pressing it takes the pass back',
       attacking:
@@ -227,6 +236,7 @@ export default function TurnDockBlock() {
       exposed: 'ожидание атаки',
       reaction: 'реакция',
       danger: 'error 503',
+      decide: 'реакция без паса',
       auto: 'авто',
       autoOn: 'авто ⏸',
       pause: 'пауза',
@@ -242,6 +252,7 @@ export default function TurnDockBlock() {
       exposed: 'awaiting attack',
       reaction: 'reaction',
       danger: 'error 503',
+      decide: 'reaction, no pass',
       auto: 'auto',
       autoOn: 'auto ⏸',
       pause: 'pause',
@@ -316,6 +327,9 @@ export default function TurnDockBlock() {
             activePlayer="neo"
             danger
           />
+        </KitCell>
+        <KitCell caption={w.decide}>
+          <TurnDock state="decide" copy={copy} seconds={14} progress={0.7} />
         </KitCell>
       </KitSection>
 

@@ -97,7 +97,8 @@ it('leaves everyone else on `waiting` while your release waits to be paid', () =
 
 // The narrowness of that exclusion, not the exclusion itself: only the one
 // pending the cards on the table answer falls through to the turn. Every OTHER
-// decision owed to you still raises its panel and still reads as a reaction.
+// decision owed to you still raises its panel and still reads as owed to you —
+// here as `decide`, since a pass does not answer a discard down to the limit.
 // `handLimit` is the subject on purpose — the `defend` case above already
 // covers itself, so pointing this at `defend` too would be the same call with
 // fewer assertions and would guard nothing. Widen the exclusion past
@@ -105,7 +106,47 @@ it('leaves everyone else on `waiting` while your release waits to be paid', () =
 it('lets that one decision through only, not every pending of yours', () => {
   const pending: TablePending = { kind: 'handLimit', player: 'you', excess: 1, options: ['c1'] }
   const d = deriveDock({ ...base, turn: 'you', hasDrawn: true, pending }, 'you', 0)
-  expect(d.state).toBe('reaction')
+  expect(d.state).toBe('decide')
+})
+
+// The key is there only where a pass IS an answer: declining to neutralize a
+// 503, to defend against a Crush (and against an attack, above).
+it('keeps the reaction and its key where a pass answers the decision', () => {
+  const alarm: TablePending = {
+    kind: 'neutralize503',
+    player: 'you',
+    card: 'trigger-error-503',
+    methods: ['debugger'],
+  }
+  const crush: TablePending = {
+    kind: 'crush',
+    player: 'you',
+    slot: 'frontend',
+    methods: ['debugger'],
+  }
+  for (const pending of [alarm, crush]) {
+    expect(deriveDock({ ...base, turn: 'p2', pending }, 'you', 0).state).toBe('reaction')
+  }
+})
+
+// Every other decision owed to you is answered on the table, and a pass on it is
+// refused: the reaction's amber with no key — and the ring still counts its own
+// clock, carried on the pending the board hands over.
+it('is `decide`, on its own clock, where a pass does not answer the decision', () => {
+  const pending = {
+    kind: 'systemUpgrade',
+    actor: 'p2',
+    owed: ['you'],
+    thrown: [],
+    sudo: false,
+    phase: 'discarding',
+    source: 'operation-system-upgrade',
+    openedAt: 0,
+    deadline: 20_000,
+  } as TablePending
+  const d = deriveDock({ ...base, turn: 'p2', pending }, 'you', 5_000)
+  expect(d.state).toBe('decide')
+  expect(d.seconds).toBe(15)
 })
 
 // `isCounting` and the ring are one rule (see its own note in dock.ts). The
