@@ -5218,5 +5218,104 @@
     "lint": "passed",
     "frontendProductionBuild": "passed",
     "timings": "Original timing samples precede this visual follow-up."
+  },
+  "viewportSpinnerFollowup": {
+    "date": "2026-10-20",
+    "implementation": "Portal only the existing Spinner visual to document.body; fixed viewport centering, modal z-index token, pointer-events none. Keep the localized status inside its original dialog.",
+    "browser": {
+      "scenarios": [
+        {
+          "id": "desktop-ru",
+          "geometry": {
+            "dx": 0,
+            "dy": 0,
+            "width": 1440,
+            "height": 900
+          },
+          "entranceSamples": 11,
+          "maxCenterError": 0,
+          "resized": {
+            "dx": 1.52587890625e-5,
+            "dy": 0,
+            "width": 1024,
+            "height": 768
+          },
+          "statusInsideDialog": true,
+          "closeWhilePending": true,
+          "formReady": true
+        },
+        {
+          "id": "desktop-en",
+          "geometry": {
+            "dx": 0,
+            "dy": 0,
+            "width": 1440,
+            "height": 900
+          },
+          "entranceSamples": 9,
+          "maxCenterError": 0,
+          "statusInsideDialog": true,
+          "closeWhilePending": true,
+          "formReady": true
+        },
+        {
+          "id": "mobile-ru",
+          "geometry": {
+            "dx": 0,
+            "dy": 0,
+            "width": 390,
+            "height": 844
+          },
+          "entranceSamples": 25,
+          "maxCenterError": 0,
+          "statusInsideDialog": true,
+          "closeWhilePending": true,
+          "formReady": true
+        }
+      ],
+      "pageErrors": [],
+      "error": {
+        "refreshVisible": true,
+        "spinnerRemoved": true
+      }
+    },
+    "productionBrowser": {
+      "geometry": {
+        "dx": 0,
+        "dy": 0
+      },
+      "formReady": true,
+      "spinnerRemoved": true,
+      "pageErrors": []
+    },
+    "productionColdAssertion": {
+      "loaded": [
+        "assets/index-BNfGYRPL.js",
+        "assets/index-CDY3TLzC.css",
+        "assets/vendor-react-9LjzQdLw.js",
+        "assets/vendor-router-C7MaVHp2.js",
+        "assets/vendor-i18n-79SrbKY8.js",
+        "assets/start-screen-D08wOHyJ.js",
+        "assets/session-context-DC_MsUwo.js",
+        "assets/start-screen-HpapK2Hs.css",
+        "assets/session-context-B_B6xleq.css"
+      ],
+      "sizes": {
+        "js": {
+          "raw": 472492,
+          "gzip": 159706
+        },
+        "css": {
+          "raw": 40607,
+          "gzip": 9110
+        }
+      },
+      "findings": []
+    },
+    "focusedTests": 9,
+    "typecheck": "passed",
+    "lint": "passed",
+    "frontendProductionBuild": "passed",
+    "timings": "Original timing samples precede both spinner follow-ups."
   }
 }

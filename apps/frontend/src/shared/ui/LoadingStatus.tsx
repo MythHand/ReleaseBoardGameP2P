@@ -1,5 +1,6 @@
 import { useTranslation } from '@release/translation'
 import { Button, Spinner, Typography } from '@release/ui/foundation'
+import { createPortal } from 'react-dom'
 import { classifyLoadFailure } from '../lib/loadFailure'
 import styles from './LoadingStatus.module.css'
 
@@ -16,13 +17,18 @@ export default function LoadingStatus({
   if (!error)
     return (
       <div
-        className={`${styles.root} ${styles.pending}`}
+        className={styles.root}
         role="status"
         aria-label={t('loading.status')}
         aria-live="polite"
         aria-busy="true"
       >
-        <Spinner size={40} />
+        {createPortal(
+          <div className={styles.pending}>
+            <Spinner size={40} />
+          </div>,
+          document.body,
+        )}
       </div>
     )
   const offline = error && classifyLoadFailure(error, navigator.onLine) === 'offline'

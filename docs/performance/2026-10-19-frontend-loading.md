@@ -146,10 +146,11 @@ samples therefore still describe the same delivered JS/CSS. Four new CLI
 regression checks pass against the standard artifact formats; the full-suite
 counts above describe the earlier application verification.
 
-## Pending indicator follow-up (2026-10-20)
+## Pending indicator follow-ups (2026-10-20)
 
-Pending sections now use the existing UI-kit `Spinner` at 40 px, centered in the
-available modal body. The localized loading label remains accessible through
+The first pending-indicator follow-up reused the existing UI-kit `Spinner` at
+40 px, centered in the available modal body. The localized loading label remains
+accessible through
 `role=status`/`aria-label`; error text and explicit recovery actions remain visible
 on failure. Exporting Spinner through the narrow foundation entry avoids pulling
 the broad UI barrel into initial loading boundaries.
@@ -166,6 +167,17 @@ The follow-up's actual cold requests and native Vite artifacts pass the eager-co
 assertion: initial JS is 159,534 gzip bytes, CSS 9,083 gzip bytes (Node 24). The timing table
 above remains the earlier five-visit measurement, not a new timing claim. Local
 before/after screenshots are under `output/playwright/255-loader/`.
+
+The subsequent viewport-centering correction portals only the Spinner visual to
+`document.body`, escaping the modal's entrance transform. A fixed full-window
+layer centers it horizontally and vertically and allows pointer events through;
+the localized accessible status remains inside the dialog. Chromium geometry
+checks pass on RU/EN desktop and RU mobile, during the entrance animation, and
+after resizing to 1024×768. Closing while pending, reopening into the ready form,
+error recovery, and the production-base flow also pass. The current native Vite
+cold-start assertion reports 159,706 JS and 9,110 CSS gzip bytes with no eager-code
+findings. Nine focused tests, repository typechecks/lint, and the frontend build
+pass. New screenshots use the `viewport-` prefix in the same local output folder.
 
 ## Reproduction and evidence
 

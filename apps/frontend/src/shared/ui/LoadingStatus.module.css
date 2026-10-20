@@ -13,8 +13,10 @@
 }
 
 .pending {
-  flex: 1;
-  align-items: center;
-  justify-content: center;
-  min-block-size: 120px;
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: grid;
+  place-items: center;
+  pointer-events: none;
 }
