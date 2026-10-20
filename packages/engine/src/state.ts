@@ -164,6 +164,9 @@ export type Pending =
       // The AI event card this prompt belongs to. Absent for a pending raised
       // by anything other than an AI card.
       source?: CardId
+      awaitingPresentation?: true
+      openedAt?: number
+      deadline?: number
     }
   | {
       kind: 'crush'
@@ -173,6 +176,9 @@ export type Pending =
       // The AI event card this prompt belongs to. Absent for a pending raised
       // by anything other than an AI card.
       source?: CardId
+      awaitingPresentation?: true
+      openedAt?: number
+      deadline?: number
     }
   | {
       kind: 'stealCard'
@@ -214,6 +220,12 @@ export type Pending =
       // The AI event card this prompt belongs to. Absent for a pending raised
       // by anything other than an AI card.
       source?: CardId
+      // the cards laid out for the discard so far, as the player's board reports
+      // them (DRAFT) — they stay when the time runs out
+      draft?: CardUid[]
+      awaitingPresentation?: true
+      openedAt?: number
+      deadline?: number
     }
   // The options travel on the pending rather than opening the discard globally:
   // only discardTop/discardCount are ever public (project.ts) — the pile's
@@ -249,6 +261,9 @@ export type Pending =
        * on every peer, which a timestamp taken per peer would not be.
        */
       raisedAt: number
+      awaitingPresentation?: true
+      openedAt?: number
+      deadline?: number
     }
   // Git Rebase. The offered cards are private to the player using it — "не
   // показывая другим" — so pendingView gates `piles` behind `mine` exactly as
@@ -268,6 +283,12 @@ export type Pending =
       source: CardId
       /** which occasion this is — see `pickFromDiscard.raisedAt` */
       raisedAt: number
+      // the order on the player's screen so far, as their board reports it
+      // (DRAFT) — it stays when the time runs out, confirmed or not
+      draft?: { pile: number; cards: CardUid[] }[]
+      awaitingPresentation?: true
+      openedAt?: number
+      deadline?: number
     }
   // System Upgrade — the first pending owed to SEVERAL seats at once. It
   // carries no `player`, deliberately: every other variant has one, so the
@@ -290,6 +311,11 @@ export type Pending =
       // 'picking' is reachable only under sudo and only with something thrown.
       phase: 'discarding' | 'picking'
       source: CardId
+      // Each phase has its own clock: the roster discards on one, the actor
+      // picks on the next.
+      awaitingPresentation?: true
+      openedAt?: number
+      deadline?: number
     }
 
 // The part of a pending that says whose move it is — the only part the two

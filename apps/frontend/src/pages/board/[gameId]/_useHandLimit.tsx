@@ -19,7 +19,6 @@ import {
   type HandItem,
   type HandPlayDrop,
   handStep,
-  type TableActions,
 } from '@release/ui'
 import { play, type Rect, useFlyer } from '@release/ui/animations'
 import type React from 'react'
@@ -32,7 +31,7 @@ import {
   useRef,
   useState,
 } from 'react'
-import type { BoardAnchors, BoardState } from '~/entities/game/board'
+import type { BoardActions, BoardAnchors, BoardState } from '~/entities/game/board'
 import { useToHand } from '~/features/board-beats/toHand'
 import { useReducedMotion } from '~/shared/lib/useReducedMotion'
 import styles from './_useHandLimit.module.css'
@@ -81,7 +80,7 @@ export interface HandLimitStaging {
 export interface Options {
   state: BoardState
   anchors: BoardAnchors
-  actions?: TableActions
+  actions?: BoardActions
   events: Event[] // the feed — watched for `rejected` after dispatch
   enabled: boolean // false while the deal or an exclusive beat owns the table
   /** the match this gesture belongs to — the same boundary its siblings keep */
@@ -196,6 +195,17 @@ export function useHandLimit({
   const handItemsRef = useRef(handItems)
   handItemsRef.current = handItems
 
+  // WHAT THE GRID HOLDS, told to the keeper as it changes: if the time runs out
+  // before the last cell fills, these are the cards that stay. Picked rather
+  // than landed — a card already in the air is the player's word.
+  const draftSent = useRef('')
+  useEffect(() => {
+    const key = picked.join(',')
+    if (!latest.current.pending || dispatchedRef.current || key === draftSent.current) return
+    draftSent.current = key
+    latest.current.actions?.onDraft?.({ kind: 'handLimit', cards: [...picked] })
+  }, [picked])
+
   const restorePicked = useCallback((uids: string[]) => {
     const restored = new Set(uids)
     pickedRef.current = pickedRef.current.filter((uid) => !restored.has(uid))
@@ -238,6 +248,7 @@ export function useHandLimit({
   const cellAt = useCallback((slot: number) => cellEls.current[slot] ?? null, [])
 
   const wipe = useCallback(() => {
+    draftSent.current = ''
     claimed.current.clear()
     landed.current = 0
     cellEls.current = {}

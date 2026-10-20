@@ -1,4 +1,17 @@
-import type { Action, DeckEntry, Engine, Event, GameState, PlayerId, Setup } from '@release/engine'
+import {
+  type Action,
+  type DeckEntry,
+  type Engine,
+  type Event,
+  type GameState,
+  type Pending,
+  type PlayerId,
+  pendingOwes,
+  randomAt,
+  rulesFor,
+  type Setup,
+  shuffle,
+} from '@release/engine'
 import {
   activatePresentedClocks,
   botAction,
@@ -580,6 +593,8 @@ const PEER_INTENT_TYPES: ReadonlySet<string> = new Set<Action['type']>([
   'PASS',
   'UNPASS',
   'RESOLVE',
+  // Kept on the keeper alone, nothing sent back: see applyIntent.
+  'DRAFT',
   'SHOW',
   'TAKE_BACK',
   // Accepted from a peer, but never reduced as it arrives: see applyIntent.
@@ -636,6 +651,14 @@ export function applyIntent(
 
   const action = { ...intent, player: seat.playerId, at: now } as Action
   const { state, events } = session.engine.reduce(session.state, action)
+
+  // The answer as it stands on its owner's screen: the keeper holds it for the
+  // moment the decision's time runs out, and that is all. Nobody else's view
+  // changes, so nothing is sent; and a draft that does not fit is not kept,
+  // never answered with a refusal.
+  if (action.type === 'DRAFT') {
+    return { session: state === session.state ? session : { ...session, state }, outgoing: [] }
+  }
 
   // Referential, not structural: `reduce` hands back the identical object when
   // it refuses an action, which is exactly what "nothing happened" means here.
@@ -762,6 +785,90 @@ export function adoptSession(args: {
   }
 }
 
+const TIMED_DECISIONS = new Set<Pending['kind']>([
+  'neutralize503',
+  'crush',
+  'handLimit',
+  'pickFromDiscard',
+  'reorderTop',
+  'systemUpgrade',
+])
+
+// The answer to a decision whose time has run out: the one the player could
+// have given themselves (the owner's timing table). A Debugger before anything
+// it would cost; what the player has laid out on the screen stays; and wherever
+// a choice is left, it is random — never the first, which a player could leave
+// to the game on purpose.
+function expiredAnswer(state: GameState, player: PlayerId): Intent | null {
+  const pending = state.pending
+  const me = state.players[player]
+  const random = randomAt(state.seed, state.eventSeq)
+  const pick = <T>(items: readonly T[]): T | undefined =>
+    items[Math.min(items.length - 1, Math.floor(random * items.length))]
+  const shuffled = <T>(items: readonly T[]): T[] =>
+    shuffle([...items], state.seed, state.rngCursor).items
+  switch (pending?.kind) {
+    case 'neutralize503': {
+      if (pending.methods.includes('debugger')) {
+        return { type: 'RESOLVE', choice: { kind: 'neutralize503', method: 'debugger' } }
+      }
+      const release = pick(
+        (['frontend', 'backend', 'database'] as const).flatMap(
+          (slot) => me.release[slot]?.card.uid ?? [],
+        ),
+      )
+      if (pending.methods.includes('sacrifice') && release) {
+        return {
+          type: 'RESOLVE',
+          choice: { kind: 'neutralize503', method: 'sacrifice', card: release },
+        }
+      }
+      return { type: 'PASS' }
+    }
+    case 'crush':
+      return pending.methods.includes('debugger')
+        ? { type: 'RESOLVE', choice: { kind: 'crush', method: 'debugger' } }
+        : { type: 'PASS' }
+    case 'handLimit': {
+      const hand = me.hand.map((c) => c.uid)
+      const laid = (pending.draft ?? []).filter((uid) => hand.includes(uid))
+      const rest = shuffled(hand.filter((uid) => !laid.includes(uid)))
+      const cards = [...laid, ...rest].slice(0, pending.excess)
+      return { type: 'RESOLVE', choice: { kind: 'handLimit', cards } }
+    }
+    case 'pickFromDiscard': {
+      const card = pick(pending.options.filter((c) => rulesFor(c.id)?.kind !== 'trigger'))
+      if (!card) return null
+      const toDeck =
+        pending.picks === 2
+          ? shuffled(pending.options.filter((c) => c.uid !== card.uid))[0]?.uid
+          : undefined
+      return {
+        type: 'RESOLVE',
+        choice: { kind: 'pickFromDiscard', card: card.uid, ...(toDeck ? { toDeck } : {}) },
+      }
+    }
+    case 'reorderTop': {
+      const order =
+        pending.draft ??
+        pending.piles.map((e) => ({ pile: e.pile, cards: e.cards.map((c) => c.uid) }))
+      return { type: 'RESOLVE', choice: { kind: 'reorderTop', order } }
+    }
+    case 'systemUpgrade': {
+      if (pending.phase === 'picking') {
+        const taken = pick(pending.thrown)
+        return taken
+          ? { type: 'RESOLVE', choice: { kind: 'upgradeTake', card: taken.card.uid } }
+          : null
+      }
+      const card = pick(me.hand)
+      return card ? { type: 'RESOLVE', choice: { kind: 'upgradeDiscard', card: card.uid } } : null
+    }
+    default:
+      return null
+  }
+}
+
 // The keeper owns every clock in the session. `WINDOW_EXPIRED` carries no player
 // identity and the engine rejects it before the deadline regardless of sender,
 // so there is no owner rule to encode — the keeper simply fires it, and peers
@@ -822,6 +929,25 @@ export function tick(session: Session, now: number): SessionResult {
       { type: 'RESOLVE', choice: { kind: 'defend', card: null } },
       now,
     )
+  }
+
+  // A decision a card raised carries a deadline too, and past it the keeper
+  // answers on the owing player's behalf the same way and on the same terms as
+  // the stalled defence above. A System Upgrade owes several seats: each one
+  // still owing is answered in turn, one a tick.
+  if (
+    pending &&
+    TIMED_DECISIONS.has(pending.kind) &&
+    'deadline' in pending &&
+    pending.deadline !== undefined &&
+    !pending.awaitingPresentation &&
+    now >= pending.deadline
+  ) {
+    for (const seat of session.seats) {
+      if (!seat.peerId || !pendingOwes(pending, seat.playerId)) continue
+      const answer = expiredAnswer(session.state, seat.playerId)
+      if (answer) return applyIntent(session, seat.peerId, answer, now)
+    }
   }
 
   // Legacy snapshots spent Security Bug before opening its request, and had

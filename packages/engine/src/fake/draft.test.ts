@@ -1,0 +1,85 @@
+import { describe, expect, it } from 'vitest'
+import type { Action } from '../actions'
+import type { CardInstance, GameState, Pending } from '../state'
+import { createFakeEngine, FAKE_DECK, FAKE_EVENTS } from './index'
+import { reduce } from './reduce'
+
+// DRAFT — the answer as it stands on the player's screen, kept on the open
+// decision for the moment its time runs out.
+
+const engine = createFakeEngine()
+const bug = (tag: string): CardInstance => ({ uid: `attack-bug#${tag}`, id: 'attack-bug' })
+const clock = { openedAt: 0, deadline: 40_000 }
+
+function table(pending: Pending, held: CardInstance[] = []): GameState {
+  const base = engine.createGame({
+    gameId: 'g',
+    seed: 3,
+    players: [
+      { id: 'p1', name: 'Ann' },
+      { id: 'p2', name: 'Bo' },
+    ],
+    setup: {},
+    deck: FAKE_DECK,
+    events: FAKE_EVENTS,
+  })
+  return { ...base, players: { ...base.players, p1: { ...base.players.p1, hand: held } }, pending }
+}
+
+const limit: Pending = { kind: 'handLimit', player: 'p1', excess: 2, ...clock }
+const hand = [bug('a'), bug('b'), bug('c')]
+const laidOut = (cards: string[], player = 'p1'): Action => ({
+  type: 'DRAFT',
+  player,
+  draft: { kind: 'handLimit', cards },
+  at: 9000,
+})
+
+const rebase: Pending = {
+  kind: 'reorderTop',
+  player: 'p1',
+  piles: [{ pile: 0, cards: [bug('a'), bug('b'), bug('c')] }],
+  source: 'operation-git-rebase',
+  raisedAt: 1,
+  ...clock,
+}
+const ordered = (cards: string[]): Action => ({
+  type: 'DRAFT',
+  player: 'p1',
+  draft: { kind: 'reorderTop', order: [{ pile: 0, cards }] },
+  at: 9000,
+})
+
+describe('a draft', () => {
+  it('keeps the cards laid out against the hand limit, with no event and no clock moved', () => {
+    const s = table(limit, hand)
+    const r = reduce(s, laidOut(['attack-bug#b']))
+    expect(r.events).toEqual([])
+    expect(r.state.pending).toEqual({ ...limit, draft: ['attack-bug#b'] })
+    expect(r.state.turn).toEqual(s.turn)
+  })
+
+  it('keeps the Rebase order on the screen', () => {
+    const order = ['attack-bug#c', 'attack-bug#a', 'attack-bug#b']
+    expect(reduce(table(rebase), ordered(order)).state.pending).toEqual({
+      ...rebase,
+      draft: [{ pile: 0, cards: order }],
+    })
+  })
+
+  it('that does not fit the open decision is not kept, and never refused', () => {
+    const s = table(limit, hand)
+    for (const action of [
+      laidOut(['attack-bug#zz']), // not in the hand
+      laidOut(['attack-bug#a', 'attack-bug#b', 'attack-bug#c']), // more than is owed
+      laidOut(['attack-bug#a', 'attack-bug#a']), // the same card twice
+      laidOut(['attack-bug#a'], 'p2'), // not their decision
+    ]) {
+      const r = reduce(s, action)
+      expect(r.state).toBe(s)
+      expect(r.events).toEqual([])
+    }
+    const r = table(rebase)
+    expect(reduce(r, ordered(['attack-bug#a'])).state).toBe(r) // not the whole offer
+  })
+})

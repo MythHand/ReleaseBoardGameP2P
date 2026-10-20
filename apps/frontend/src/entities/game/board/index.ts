@@ -24,6 +24,7 @@ export type { HistoryLabels } from './toBoardState'
 export { standInScatter, toBoardState } from './toBoardState'
 export type {
   BeatRun,
+  BoardActions,
   BoardCopyBundle,
   BoardOpponent,
   BoardOver,

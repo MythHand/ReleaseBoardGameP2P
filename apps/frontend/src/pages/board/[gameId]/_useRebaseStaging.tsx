@@ -1,10 +1,10 @@
 import type { Event } from '@release/engine'
-import type { CardData, CardPreviewSlotProps, TableActions } from '@release/ui'
+import type { CardData, CardPreviewSlotProps } from '@release/ui'
 import { Card, ConfirmAction, cardAreaOf, cardById, TableSurface, Typography } from '@release/ui'
 import { play, useCardReorder } from '@release/ui/animations'
 import type { ReactNode } from 'react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { BoardAnchors, BoardState } from '~/entities/game/board'
+import type { BoardActions, BoardAnchors, BoardState } from '~/entities/game/board'
 import { useReducedMotion } from '~/shared/lib/useReducedMotion'
 import styles from './_useRebaseStaging.module.css'
 import { useResolveFeedback } from './_useResolveFeedback'
@@ -72,7 +72,7 @@ export function useRebaseStaging(args: {
   state: BoardState
   events?: Event[]
   anchors: BoardAnchors
-  actions?: TableActions
+  actions?: BoardActions
   copy: { prompt: string; position: string; confirm: string }
   /**
    * READING A CARD IN THE ROW. The cards are laid out to be REORDERED, which
@@ -170,6 +170,23 @@ export function useRebaseStaging(args: {
     }
     setOrder(Object.fromEntries(ours.piles.map((e) => [e.pile, e.cards.map((c) => c.uid)])))
   }, [offerKey])
+
+  // THE ORDER ON THE SCREEN, told to the keeper as it changes: unconfirmed when
+  // the time runs out, it is still the order that stays. Every offered pile, the
+  // same shape the confirmed answer takes.
+  const draftSent = useRef('')
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `order` is the trigger; the offer and the answered latch are read as they stand now
+  useEffect(() => {
+    if (!ours || answered) return
+    const draft = ours.piles.map((e) => ({
+      pile: e.pile,
+      cards: order[e.pile] ?? e.cards.map((c) => c.uid),
+    }))
+    const key = `${offerKey}|${JSON.stringify(draft)}`
+    if (key === draftSent.current) return
+    draftSent.current = key
+    actions?.onDraft?.({ kind: 'reorderTop', order: draft })
+  }, [order])
 
   // Deal the offer OUT of its pile into the row: every card starts at the
   // pile's own rect and flies to its slot, staggered. Cosmetic only — the row

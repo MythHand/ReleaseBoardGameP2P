@@ -159,20 +159,28 @@ export function onPlay(state: GameState, action: Action & { type: 'PLAY' }): Red
       // — the same reading Git Branch above gives an absent target.
       const chosen = action.target?.kind === 'pile' ? action.target.pile : 0
       return {
-        state: openReorderTop(withoutCards, log, action.player, card, sudoCombo, chosen),
+        state: openReorderTop(withoutCards, log, action.player, card, sudoCombo, chosen, action.at),
         events: log.events,
       }
     }
 
     if (card.id === 'operation-system-upgrade') {
       return {
-        state: openSystemUpgrade(withoutCards, log, action.player, card, sudoCombo),
+        state: openSystemUpgrade(withoutCards, log, action.player, card, sudoCombo, action.at),
         events: log.events,
       }
     }
 
     return {
-      state: openPickFromDiscard(withoutCards, log, action.player, card, sudoCombo, false),
+      state: openPickFromDiscard(
+        withoutCards,
+        log,
+        action.player,
+        card,
+        sudoCombo,
+        false,
+        action.at,
+      ),
       events: log.events,
     }
   }

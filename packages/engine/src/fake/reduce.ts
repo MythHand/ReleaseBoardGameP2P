@@ -185,7 +185,7 @@ function onPush(state: GameState, action: Action & { type: 'PUSH' }): Reduction 
   if (!drawObligationMet(state)) return reject(state, action, 'you must draw before pushing')
 
   const log = createLog(state.eventSeq)
-  return { state: endTurn(state, log), events: log.events }
+  return { state: endTurn(state, log, action.at), events: log.events }
 }
 
 function onHandLimit(state: GameState, action: Action & { type: 'RESOLVE' }): Reduction {
@@ -230,7 +230,48 @@ function onHandLimit(state: GameState, action: Action & { type: 'RESOLVE' }): Re
   if (pending.endsTurn === false) {
     return { state: { ...withDiscard, eventSeq: log.seq }, events: log.events }
   }
-  return { state: endTurn(withDiscard, log), events: log.events }
+  return { state: endTurn(withDiscard, log, action.at), events: log.events }
+}
+
+// The answer as it stands on its owner's screen, kept on the decision it belongs
+// to for the moment the time runs out. One that does not fit the open decision
+// is simply not kept — never refused: the board takes its staged answer back on
+// a refusal, and a draft must never cause that.
+function onDraft(state: GameState, action: Action & { type: 'DRAFT' }): Reduction {
+  const unchanged: Reduction = { state, events: [] }
+  const pending = state.pending
+  const draft = action.draft
+  if (!pending || typeof draft !== 'object' || draft === null) return unchanged
+  if (pending.kind === 'handLimit' && draft.kind === 'handLimit') {
+    if (pending.player !== action.player || !Array.isArray(draft.cards)) return unchanged
+    const hand = state.players[action.player].hand
+    const fits =
+      draft.cards.length <= pending.excess &&
+      new Set(draft.cards).size === draft.cards.length &&
+      draft.cards.every((uid) => hand.some((c) => c.uid === uid))
+    if (!fits) return unchanged
+    return { state: { ...state, pending: { ...pending, draft: [...draft.cards] } }, events: [] }
+  }
+  if (pending.kind === 'reorderTop' && draft.kind === 'reorderTop') {
+    if (pending.player !== action.player || !Array.isArray(draft.order)) return unchanged
+    // every offered pile once, each the very cards it offered in some order
+    const fits =
+      draft.order.length === pending.piles.length &&
+      pending.piles.every((entry) => {
+        const answer = draft.order.find((o) => o.pile === entry.pile)
+        if (!answer || !Array.isArray(answer.cards)) return false
+        const offered = entry.cards.map((c) => c.uid)
+        return (
+          answer.cards.length === offered.length &&
+          new Set(answer.cards).size === offered.length &&
+          answer.cards.every((uid) => offered.includes(uid))
+        )
+      })
+    if (!fits) return unchanged
+    const order = draft.order.map((o) => ({ pile: o.pile, cards: [...o.cards] }))
+    return { state: { ...state, pending: { ...pending, draft: order } }, events: [] }
+  }
+  return unchanged
 }
 
 // Keeper-only, like WINDOW_EXPIRED. Everything after the first turn is stamped
@@ -355,7 +396,7 @@ function onSurrender(state: GameState, action: Action & { type: 'SURRENDER' }): 
     return reject(state, action, 'table is busy')
   }
   const log = createLog(state.eventSeq)
-  return { state: eliminate(state, log, action.player), events: log.events }
+  return { state: eliminate(state, log, action.player, action.at), events: log.events }
 }
 
 export function reduce(state: GameState, action: Action): Reduction {
@@ -401,6 +442,8 @@ function dispatch(state: GameState, action: Action): Reduction {
       return onPush(state, action)
     case 'RESOLVE':
       return onResolve(state, action)
+    case 'DRAFT':
+      return onDraft(state, action)
     case 'PLAY':
       return onPlay(state, action)
     case 'PASS':

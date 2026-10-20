@@ -2,7 +2,7 @@ import type { Action } from '../actions'
 import { rulesFor } from '../cards'
 import type { Reduction } from '../engine'
 import type { CardInstance, GameState, PlayerId } from '../state'
-import { bankToDiscard, createLog, type Log, reject } from './core'
+import { bankToDiscard, CHERRY_PICK_MS, createLog, type Log, reject, timeFor } from './core'
 
 // Cherry-pick offers the whole pile; Inside offers only Releases. Everything
 // else about the two effects is identical, which is why they share a pending.
@@ -34,6 +34,7 @@ export function openPickFromDiscard(
   card: CardInstance,
   combo: CardInstance | undefined,
   releasesOnly: boolean,
+  at: number,
 ): GameState {
   const options = discardOptions(state, releasesOnly)
   const spent = combo ? [card, combo] : [card]
@@ -62,6 +63,8 @@ export function openPickFromDiscard(
       source: card.id,
       spent: spent.map((c) => c.uid),
       raisedAt: log.seq,
+      openedAt: at,
+      deadline: at + timeFor(state, CHERRY_PICK_MS),
     },
     eventSeq: log.seq,
   }

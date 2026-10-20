@@ -40,6 +40,9 @@ export type Choice =
   // centre in everyone's view, so taking it back is seen too (`takenBack`).
   | { kind: 'cancelRelease' }
 
+// The decisions whose answer is built up on the screen before it is confirmed.
+export type Draft = Extract<Choice, { kind: 'handLimit' | 'reorderTop' }>
+
 export type Action =
   | { type: 'DRAW'; player: PlayerId; pile?: number; at: number }
   | {
@@ -62,6 +65,10 @@ export type Action =
   // first turn, because createGame carries no timestamp to stamp it from.
   | { type: 'CLOCK_STARTED'; at: number }
   | { type: 'RESOLVE'; player: PlayerId; choice: Choice; at: number }
+  // The answer as it stands on the player's screen while the decision is still
+  // open — the cards laid out against a hand limit, the order of a Rebase. Not
+  // a move: it resolves nothing. When the time runs out, it is the answer.
+  | { type: 'DRAFT'; player: PlayerId; draft: Draft; at: number }
   // What the table sees while a play is being made (resolution.md §1): a card
   // of one's own hand put out at the centre, and everything put out taken back.
   // Neither is a move — the card stays in the hand and the play is still the
