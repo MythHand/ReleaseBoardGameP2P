@@ -41,7 +41,7 @@ export type Choice =
   | { kind: 'cancelRelease' }
 
 // The decisions whose answer is built up on the screen before it is confirmed.
-export type Draft = Extract<Choice, { kind: 'handLimit' | 'reorderTop' }>
+export type Draft = Extract<Choice, { kind: 'handLimit' | 'reorderTop' | 'upgradeTake' }>
 
 export type Action =
   | { type: 'DRAW'; player: PlayerId; pile?: number; at: number }

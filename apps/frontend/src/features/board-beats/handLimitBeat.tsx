@@ -19,8 +19,10 @@ import { withoutFlown } from './withoutFlown'
 // Two ways in, one way out:
 //   • ADOPT — the actor is us. The grid is already standing: the page's own
 //     gesture (`_useHandLimit.tsx`) built it card by card while the player was
-//     deciding, long before these events came back off the wire. Nothing flies
-//     in, and a carrier here would put a second copy of every card on screen.
+//     deciding, long before these events came back off the wire. What stands in
+//     it flies nothing in — a carrier there would put a second copy of the card
+//     on screen. A grid the player's time ran out on is partial: the cards the
+//     keeper added fly from the fan into its free cells first.
 //   • BUILD — every other peer, and ourselves with no handoff (a rejoin). The
 //     cells are computed rather than rendered: a gathered card needs no DOM cell
 //     of its own, it flies to a box and stands there as a carrier — the same
@@ -50,30 +52,35 @@ function cellBoxes(n: number, table: Rect): Rect[] {
   }))
 }
 
-function claimCards(
-  cards: DiscardCard[],
-  placed: HandLimitHandoff['cards'],
-): HandLimitHandoff['cards'] | null {
-  if (cards.length !== placed.length) return null
+type GatheredCard = NonNullable<ReturnType<typeof cardById>>
+
+// The grid against the cards the engine banked. A card standing in a cell
+// claims that cell; a card the grid does not hold — the keeper chose it when the
+// player's time ran out with cells still empty — claims none. A grid card the
+// bank does not name means the grid is not this decision's.
+type Claimed = HandLimitHandoff['cards'][number] | null
+
+function claimCards(cards: DiscardCard[], placed: HandLimitHandoff['cards']): Claimed[] | null {
   const spare = [...placed]
-  const claimed: HandLimitHandoff['cards'] = []
-  for (const card of cards) {
+  const claimed = cards.map((card) => {
     const at = spare.findIndex((item) => item.card.id === card.card)
-    if (at < 0) return null
-    claimed.push(spare.splice(at, 1)[0])
-  }
-  return claimed
+    return at < 0 ? null : spare.splice(at, 1)[0]
+  })
+  return spare.length === 0 ? claimed : null
 }
 
 export function useHandLimitBeat(
   anchors: BoardAnchors,
   handoff?: RefObject<HandLimitHandoff | null>,
+  // the grid as it stood before any answer of ours went out — taken only when
+  // none did: the keeper answered for us when our time ran out
+  grid?: RefObject<HandLimitHandoff | null>,
 ) {
   const { overlay: exitOverlay, send, reset: resetExit } = useDiscardExit(anchors.discardBox)
   const flyer = useFlyer()
-  const latest = useRef({ anchors, send, handoff })
+  const latest = useRef({ anchors, send, handoff, grid })
   const generation = useRef(0)
-  latest.current = { anchors, send, handoff }
+  latest.current = { anchors, send, handoff, grid }
 
   // where a card that has to be FLOWN in starts from — the same three sources
   // `discardBeat` knows, for the same reason it knows them
@@ -138,14 +145,51 @@ export function useHandLimitBeat(
       // `useBeats` starts this runner in an earlier layout effect than Board's
       // handoff effect, so the ref can legitimately be null at entry and live
       // by the time the shadow is ready to measure.
-      const held = earlyHeld ?? latest.current.handoff?.current
-      // Adopt only a grid that is REALLY ours and really complete: the same
-      // player, and a cell for every card the engine banked. Anything else
-      // falls through to the honest path — a flight from where the board can
-      // actually see the card.
+      //
+      // No answer of ours went out at all: the keeper answered for us when our
+      // time ran out, and the grid we had laid out so far is the one standing.
+      const held = earlyHeld ?? latest.current.handoff?.current ?? latest.current.grid?.current
+      // Adopt only a grid that is REALLY ours: the same player, and every card
+      // standing in it one the engine banked. Cells it lacks are the keeper's
+      // answer for a player whose time ran out. Anything else falls through to
+      // the honest path — a flight from where the board can actually see the
+      // card.
       const mine = plan.player === ctx.base.selfId
       const adopted =
         held && mine && held.player === plan.player ? claimCards(plan.cards, held.cards) : null
+      // The hand as the fan draws it now: without the cards standing in the
+      // grid. A card still to be flown in is found in THIS, not in the whole
+      // hand — the fan's slots are counted without the grid's cards.
+      const inGrid = new Set(held?.cards.map((p) => p.uid))
+      const fan = ctx.base.you?.hand.filter((h) => !inGrid.has(h.uid)) ?? []
+
+      // INTO THE GRID — cards flown from where they stand to their cells. I10:
+      // every carrier mounts on its OWN rect, and they travel at once, so the
+      // grid fills as one gesture, not as a queue of arrivals.
+      const gather = async (
+        flying: { key: string; card: GatheredCard; from: Rect; box: Rect; slot: number }[],
+      ): Promise<boolean> => {
+        if (flying.length === 0) return true
+        await flyer.raise(
+          flying.map((f) => ({ key: f.key, at: f.from, layer: f.slot, card: f.card })),
+        )
+        if (isStale()) return false
+        await Promise.all(
+          flying.map(async (f) => {
+            const el = flyer.elOf(f.key)
+            const movement = el ? play('playToCenter', el, { to: f.box }) : null
+            if (movement) {
+              await movement.finished
+              if (isStale()) return
+            }
+            if (isStale()) return
+            // I4 — it IS at the cell now; pin it, or the next render puts the
+            // carrier back where it was raised
+            flyer.pin(f.key, f.box)
+          }),
+        )
+        return !isStale()
+      }
 
       // TAKEOFF: the cards are gone from wherever they stood — publish before
       // the movement, or the board shows each card twice for its whole flight.
@@ -166,10 +210,33 @@ export function useHandLimitBeat(
         // been sitting in. Matched by card id with a claimed list, the same way
         // `sourceOf` claims a hand slot: two copies of one card are
         // interchangeable to look at, so the first unclaimed one is right.
+        //
+        // A card the grid lacks takes the first free cell and flies there from
+        // its place in the fan — found the same way, by id, in the hand the fan
+        // draws — before the grid leaves as a whole.
+        const filled = new Set(adopted.flatMap((p) => (p ? [p.slot] : [])))
+        const free = plan.cards.map((_, slot) => slot).filter((slot) => !filled.has(slot))
+        const fanClaimed = new Set<number>()
+        const fanSlot = (id: string): Rect | null => {
+          const at = fan.findIndex((h, i) => h.card.id === id && !fanClaimed.has(i))
+          if (at < 0) return null
+          fanClaimed.add(at)
+          return rectOf(a.handSlotAt(at))
+        }
         const measured = adopted
           .map((placed, i) => {
-            const box = rectOf(held?.cellAt(placed.slot) ?? null)
-            return box ? { box, card: plan.cards[i], placed } : null
+            const planCard = plan.cards[i]
+            const slot = placed ? placed.slot : free.shift()
+            const box = slot == null ? null : rectOf(held?.cellAt(slot) ?? null)
+            const card = placed ? placed.card : cardById(planCard.card)
+            const from = placed
+              ? null
+              : planCard.source.kind === 'hand'
+                ? fanSlot(planCard.card)
+                : whereFrom(planCard)
+            return box && card && slot != null && (placed || from)
+              ? { box, card, planCard, slot, from }
+              : null
           })
           .filter((entry): entry is NonNullable<typeof entry> => entry != null)
         if (measured.length !== plan.cards.length) {
@@ -189,13 +256,17 @@ export function useHandLimitBeat(
           flyer.drop()
           return
         }
-        items = measured.map(({ box, card: c, placed }) => ({
-          key: c.key,
-          card: placed.card,
+        const missing = measured.flatMap(({ box, card, planCard, slot, from }) =>
+          from ? [{ key: `hl${planCard.eventId}`, card, from, box, slot }] : [],
+        )
+        if (!(await gather(missing))) return
+        items = measured.map(({ box, card, planCard, slot }) => ({
+          key: planCard.key,
+          card,
           from: box,
-          layer: placed.slot,
-          delay: placed.slot * CLEAR_STEP,
-          scatter: scatterAt(c.eventId),
+          layer: slot,
+          delay: slot * CLEAR_STEP,
+          scatter: scatterAt(planCard.eventId),
         }))
       } else {
         // BUILD. Cells are computed, not rendered — a gathered card stands on
@@ -225,7 +296,7 @@ export function useHandLimitBeat(
         const flying: {
           key: string
           planCard: DiscardCard
-          card: NonNullable<ReturnType<typeof cardById>>
+          card: GatheredCard
           from: Rect
           box: Rect
           slot: number
@@ -238,29 +309,7 @@ export function useHandLimitBeat(
           if (!card || !from || !box) continue
           flying.push({ key: `hl${planCard.eventId}`, planCard, card, from, box, slot: i })
         }
-        if (flying.length > 0) {
-          // I10 — every carrier mounts on its OWN rect, and they travel at once:
-          // the grid fills as one gesture, not as a queue of arrivals.
-          await flyer.raise(
-            flying.map((f) => ({ key: f.key, at: f.from, layer: f.slot, card: f.card })),
-          )
-          if (isStale()) return
-          await Promise.all(
-            flying.map(async (f) => {
-              const el = flyer.elOf(f.key)
-              const movement = el ? play('playToCenter', el, { to: f.box }) : null
-              if (movement) {
-                await movement.finished
-                if (isStale()) return
-              }
-              if (isStale()) return
-              // I4 — it IS at the cell now; pin it, or the next render puts the
-              // carrier back where it was raised
-              flyer.pin(f.key, f.box)
-            }),
-          )
-          if (isStale()) return
-        }
+        if (!(await gather(flying))) return
         items = flying.map((f) => ({
           key: f.planCard.key,
           card: f.card,

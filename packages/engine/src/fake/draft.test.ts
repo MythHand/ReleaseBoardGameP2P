@@ -50,7 +50,34 @@ const ordered = (cards: string[]): Action => ({
   at: 9000,
 })
 
+const upgrade: Pending = {
+  kind: 'systemUpgrade',
+  actor: 'p1',
+  owed: [],
+  thrown: [
+    { player: 'p2', card: bug('a') },
+    { player: 'p2', card: bug('b') },
+  ],
+  sudo: true,
+  phase: 'picking',
+  source: 'operation-system-upgrade',
+  ...clock,
+}
+const marked = (card: string, player = 'p1'): Action => ({
+  type: 'DRAFT',
+  player,
+  draft: { kind: 'upgradeTake', card },
+  at: 9000,
+})
+
 describe('a draft', () => {
+  it('keeps the card the System Upgrade actor has marked to take', () => {
+    expect(reduce(table(upgrade), marked('attack-bug#b')).state.pending).toEqual({
+      ...upgrade,
+      draft: 'attack-bug#b',
+    })
+  })
+
   it('keeps the cards laid out against the hand limit, with no event and no clock moved', () => {
     const s = table(limit, hand)
     const r = reduce(s, laidOut(['attack-bug#b']))
@@ -81,5 +108,10 @@ describe('a draft', () => {
     }
     const r = table(rebase)
     expect(reduce(r, ordered(['attack-bug#a'])).state).toBe(r) // not the whole offer
+    const u = table(upgrade)
+    expect(reduce(u, marked('attack-bug#zz')).state).toBe(u) // not thrown this time
+    expect(reduce(u, marked('attack-bug#a', 'p2')).state).toBe(u) // not the actor
+    const d = table({ ...upgrade, phase: 'discarding' })
+    expect(reduce(d, marked('attack-bug#a')).state).toBe(d) // nothing to take yet
   })
 })

@@ -1,9 +1,9 @@
 import type { Event } from '@release/engine'
-import type { HandCardState, HandPlayDrop, TableActions } from '@release/ui'
+import type { HandCardState, HandPlayDrop } from '@release/ui'
 import { Card, ConfirmAction, cardById, rowPlaceStyle, TableSurface, Typography } from '@release/ui'
 import { play, useFlyer } from '@release/ui/animations'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { BoardAnchors, BoardState } from '~/entities/game/board'
+import type { BoardActions, BoardAnchors, BoardState } from '~/entities/game/board'
 import { upgradeSlot } from '~/entities/game/board/upgradeSlot'
 import { useReducedMotion } from '~/shared/lib/useReducedMotion'
 import opening from './_Board.module.css'
@@ -32,7 +32,7 @@ export function useUpgradeStaging(args: {
   state: BoardState
   anchors: BoardAnchors
   events?: Event[]
-  actions?: TableActions
+  actions?: BoardActions
   copy: { prompt: string; takePrompt: string; confirm: string }
   enabled: boolean
 }) {
@@ -73,6 +73,20 @@ export function useUpgradeStaging(args: {
       setTaken(null)
     }
   }, [pending, confirmed, given, reduced, flyer.drop])
+
+  // THE MARKED CARD, told to the keeper as it changes: unconfirmed when the time
+  // runs out, it is still the card that is taken.
+  const draftSent = useRef<string | null>(null)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `taken` is the trigger; the phase and the answered latch are read as they stand now
+  useEffect(() => {
+    if (taken == null) {
+      draftSent.current = null
+      return
+    }
+    if (!picking || confirmed || taken === draftSent.current) return
+    draftSent.current = taken
+    actions?.onDraft?.({ kind: 'upgradeTake', card: taken })
+  }, [taken])
 
   const resolve = useResolveFeedback(args.events ?? [], state.selfId, actions, () => {
     attempt.current += 1

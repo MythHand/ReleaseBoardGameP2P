@@ -80,6 +80,9 @@ function harness(
     seats?: boolean
     local?: StagedHandoff
     handOver?: Parameters<typeof useUpgradeBeat>[2]
+    // the seats the row has a place for, and the fan's own slots
+    players?: string[]
+    handSlotAt?: (index: number) => HTMLElement | null
   } = {},
 ) {
   const root = node()
@@ -88,7 +91,7 @@ function harness(
   // The place and the card inside it, as the surface really renders them: the
   // place carries the row's own positioning and the card is the node a flight
   // takes over, so the two are never the same element.
-  for (const [index, player] of ['p2', 'p3'].entries()) {
+  for (const [index, player] of (opts.players ?? ['p2', 'p3']).entries()) {
     const slot = node()
     slot.dataset.upgradeSlot = player
     slot.getBoundingClientRect = () =>
@@ -106,7 +109,7 @@ function harness(
     pileBox: () => null,
     seatBox: () => (opts.seats === false ? null : { left: 0, top: 0, width: 200, height: 280 }),
     seatOf: () => null,
-    handSlotAt: () => null,
+    handSlotAt: opts.handSlotAt ?? (() => null),
     releaseSlot: () => null,
     bindPile: () => {},
     bindSeat: () => {},
@@ -223,6 +226,34 @@ it('carries the operation card out in the same send as the row', async () => {
   expect(items.at(-1)?.layer).toBe(2)
   expect(takeOff).toHaveBeenCalledTimes(1)
   expect(settle).toHaveBeenCalledTimes(1)
+})
+
+// Our own answer with no gesture behind it: the keeper discarded for us when our
+// time ran out. We have no seat on our own table, so the card flies from its
+// place in the fan, and the fan lets go of it as its carrier goes up.
+it('flies our own keeper-chosen card from its place in the fan', async () => {
+  timeline.starts = []
+  const handSlotAt = vi.fn(() => node())
+  const { api, ctx } = harness({ players: ['p1', 'p3'], handSlotAt })
+  const hand = [
+    { uid: 'h1', card: cardById('defense-hotfix') },
+    { uid: 'h2', card: cardById('attack-bug') },
+  ]
+  const run = {
+    ...ctx,
+    base: {
+      ...base,
+      you: { ...base.you, hand },
+      pending: { ...base.pending, actor: 'p2', owed: ['p1', 'p3'] },
+    } as BoardState,
+  }
+  await drive(() => api.beat?.run(plan([{ eventId: 1, player: 'p1', card: 'attack-bug' }]), run))
+  expect(timeline.starts).toHaveLength(1)
+  expect(handSlotAt).toHaveBeenCalledWith(1)
+  // the fan let go of it at takeoff, and the landed board keeps it out
+  for (const [published] of ctx.publish.mock.calls) {
+    expect((published as BoardState).you?.hand.map((h) => h.uid)).toEqual(['h1'])
+  }
 })
 
 it('flies nothing for a seat the board cannot aim at', async () => {

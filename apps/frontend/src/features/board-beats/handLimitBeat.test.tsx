@@ -158,7 +158,12 @@ async function drive(run: () => Promise<void> | undefined, afterStart?: () => vo
   }
 }
 
-function harness(handoff?: HandLimitHandoff | null, overrides: Partial<BoardAnchors> = {}) {
+function harness(
+  handoff?: HandLimitHandoff | null,
+  overrides: Partial<BoardAnchors> = {},
+  // the grid as it stood before any answer of ours went out
+  grid?: HandLimitHandoff | null,
+) {
   const anchors = {
     bg: { current: node() },
     centre: { current: node() },
@@ -179,9 +184,10 @@ function harness(handoff?: HandLimitHandoff | null, overrides: Partial<BoardAnch
     ...overrides,
   } as unknown as BoardAnchors
   const ref = { current: handoff ?? null }
+  const gridRef = { current: grid ?? null }
   const api: { beat?: ReturnType<typeof useHandLimitBeat> } = {}
   function Probe() {
-    api.beat = useHandLimitBeat(anchors, ref)
+    api.beat = useHandLimitBeat(anchors, ref, gridRef)
     return <>{api.beat.overlay}</>
   }
   return { api, Probe, ref, anchors }
@@ -247,11 +253,32 @@ it('keeps the handoff captured when the page clears its ref during the first fra
   expect(exits.items).toHaveLength(2)
 })
 
-it.each([
-  {
-    shape: 'missing',
+// The player's time ran out with one cell of two filled, and the keeper banked
+// that card and a second. No answer of ours went out, so the grid comes as it
+// stood before any did: its card leaves from its own cell, and only the
+// keeper's card flies in — from its place in the fan, counted on the hand the
+// fan draws, which no longer holds the grid's card.
+it('adopts the grid left partial when the time ran out, flying only the missing card in', async () => {
+  raises.keys.length = 0
+  exits.items.length = 0
+  const grid: HandLimitHandoff = {
+    player: 'p1',
     cards: [{ uid: 'u1', card: attackCard, slot: 0 }],
-  },
+    cellAt: () => node(),
+    release: vi.fn(),
+  }
+  const handSlotAt = vi.fn(() => node())
+  const { api, Probe } = harness(null, { handSlotAt }, grid)
+  render(<Probe />)
+  await drive(() => api.beat?.run(plan(), { base, publish: () => {} }))
+  expect(raises.keys).toEqual(['hl5'])
+  // the fan draws u2 alone, so it stands in the fan's first slot, not its second
+  expect(handSlotAt).toHaveBeenCalledWith(0)
+  expect(grid.release).toHaveBeenCalledTimes(1)
+  expect(exits.items).toHaveLength(2)
+})
+
+it.each([
   {
     shape: 'extra',
     cards: [

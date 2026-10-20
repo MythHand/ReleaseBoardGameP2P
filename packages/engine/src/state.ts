@@ -311,6 +311,9 @@ export type Pending =
       // 'picking' is reachable only under sudo and only with something thrown.
       phase: 'discarding' | 'picking'
       source: CardId
+      // the card the actor has marked to take so far, as their board reports it
+      // (DRAFT) — it is taken when the time runs out
+      draft?: CardUid
       // Each phase has its own clock: the roster discards on one, the actor
       // picks on the next.
       awaitingPresentation?: true

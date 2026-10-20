@@ -166,6 +166,8 @@ export function useUpgradeBeat(
       }
       const local = latest.current.staging?.current
       let adopted = false
+      // the fan card our own throw took off as its carrier went up, if one did
+      let lifted: string | undefined
       // The queue's pre-arrival shadow must paint its row before measuring.
       await nextFrames()
       await Promise.all(
@@ -176,9 +178,26 @@ export function useUpgradeBeat(
           }
           await wait(i * THROW_STEP)
           const target = rectOf(upgradeSlot(a, t.player))
-          const seat = a.seatBox(t.player)
           const card = cardById(t.card)
-          if (!target || !seat || !card) return
+          if (!target || !card) return
+          // OUR OWN THROW with no gesture behind it: the keeper answered for us
+          // when our time ran out. We have no seat on our own table — the card
+          // leaves from its place in the fan, and the fan lets go of it as its
+          // carrier goes up, the way a played attack or a defence leaves it.
+          if (t.player === beat.base.selfId) {
+            const index = beat.base.you?.hand.findIndex((h) => h.card.id === t.card) ?? -1
+            const held = index >= 0 ? beat.base.you?.hand[index] : undefined
+            const from = held ? rectOf(a.handSlotAt(index)) : null
+            if (!held || !from) return
+            const raised = raise([{ key: `upgrade:${t.eventId}`, card, at: from }])
+            lifted = held.uid
+            liftOff(beat, [{ kind: 'hand', uid: held.uid }])
+            const [el] = await raised
+            if (el) await play('playToCenter', el, { to: target, duration: THROW_DUR })?.finished
+            return
+          }
+          const seat = a.seatBox(t.player)
+          if (!seat) return
           const from = {
             left: seat.left + (seat.width - target.width * THROW_SCALE) / 2,
             top: seat.top + (seat.height - target.height * THROW_SCALE) / 2,
@@ -212,7 +231,8 @@ export function useUpgradeBeat(
       const answered = new Set(plan.throws.map((t) => t.player))
       const own = plan.throws.find((t) => t.player === beat.base.selfId)
       const ownUid =
-        own && (local?.mainUid ?? beat.base.you?.hand.find((c) => c.card.id === own.card)?.uid)
+        own &&
+        (local?.mainUid ?? lifted ?? beat.base.you?.hand.find((c) => c.card.id === own.card)?.uid)
       const landed = {
         ...beat.base,
         ...(beat.base.you

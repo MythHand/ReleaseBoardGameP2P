@@ -1530,6 +1530,29 @@ describe('a decision a card raised, when its time runs out', () => {
     expect(answers(build, handOf('a')).size).toBeGreaterThan(1)
   })
 
+  it('takes the card the actor marked for the System Upgrade pick under sudo', () => {
+    const thrown = ['a', 'b', 'c'].map((t) => ({ player: 'b', card: card('attack-bug', t) }))
+    const mark = thrown[2].card.uid
+    for (const seed of [1, 2, 3]) {
+      const s = expired(
+        {
+          kind: 'systemUpgrade',
+          actor: 'a',
+          owed: [],
+          thrown,
+          sudo: true,
+          phase: 'picking',
+          source: 'operation-system-upgrade',
+          draft: mark,
+          ...ran,
+        },
+        hold('a', []),
+        seed,
+      )
+      expect(tick(s, afterDeadline).session.state.players.a.hand.map((c) => c.uid)).toEqual([mark])
+    }
+  })
+
   it('answers nothing for a seat that has dropped', () => {
     const s = expired(
       { kind: 'handLimit', player: 'a', excess: 1, ...ran },

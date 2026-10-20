@@ -856,7 +856,9 @@ function expiredAnswer(state: GameState, player: PlayerId): Intent | null {
     }
     case 'systemUpgrade': {
       if (pending.phase === 'picking') {
-        const taken = pick(pending.thrown)
+        // the card the actor marked, if they marked one; a random one if not
+        const taken =
+          pending.thrown.find((t) => t.card.uid === pending.draft) ?? pick(pending.thrown)
         return taken
           ? { type: 'RESOLVE', choice: { kind: 'upgradeTake', card: taken.card.uid } }
           : null

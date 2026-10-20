@@ -271,6 +271,12 @@ function onDraft(state: GameState, action: Action & { type: 'DRAFT' }): Reductio
     const order = draft.order.map((o) => ({ pile: o.pile, cards: [...o.cards] }))
     return { state: { ...state, pending: { ...pending, draft: order } }, events: [] }
   }
+  if (pending.kind === 'systemUpgrade' && draft.kind === 'upgradeTake') {
+    // the actor's mark, and only one of the cards thrown this time
+    if (pending.phase !== 'picking' || pending.actor !== action.player) return unchanged
+    if (!pending.thrown.some((t) => t.card.uid === draft.card)) return unchanged
+    return { state: { ...state, pending: { ...pending, draft: draft.card } }, events: [] }
+  }
   return unchanged
 }
 
