@@ -1,0 +1,67 @@
+/* The video at the head of the rules: the full width of the rules text, 16:9. */
+.video {
+  position: relative;
+  inline-size: 100%;
+  aspect-ratio: 16 / 9;
+  margin-block-end: 18px;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.preview {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+}
+
+.frame {
+  position: absolute;
+  inset: 0;
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  user-select: none;
+  object-fit: cover;
+}
+
+/* The play button — the start screen video's (VideoPlayer), value for value:
+   a 76px circle, its fill, blur and border, and the size on hover. */
+.play {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 76px;
+  block-size: 76px;
+  color: var(--fg);
+  background: color-mix(in srgb, var(--bg) 35%, transparent);
+  border: 1.5px solid color-mix(in srgb, var(--fg) 70%, transparent);
+  border-radius: 50%;
+  backdrop-filter: blur(2px);
+  transition: transform 200ms var(--ease-out);
+}
+
+/* optical centring of ▶ — shifted right to its visual centre */
+.playIcon {
+  font-size: 23px;
+  transform: translateX(2px);
+}
+
+.preview:hover .play {
+  transform: scale(1.06);
+}
+
+.player {
+  position: absolute;
+  inset: 0;
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  border: 0;
+}

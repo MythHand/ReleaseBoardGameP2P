@@ -1,0 +1,10 @@
+All rights reserved by BoardGameLab (https://www.youtube.com/@byboardgamelab).
+
+The files this identifier is applied to in REUSE.toml are BoardGameLab's work. They
+are used in this project by agreement with BoardGameLab. That agreement is not passed
+on: it does not extend to anyone who copies or changes this project, and none of the
+project's other licences — AGPL-3.0-or-later for the source code, CC BY-NC-SA 4.0
+for the game content — apply to these files.
+
+Anyone else may use them only as YouTube's Terms of Service allow for content
+published there by BoardGameLab.

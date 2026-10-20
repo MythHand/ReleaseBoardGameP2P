@@ -136,3 +136,11 @@ path = [
 ]
 SPDX-FileCopyrightText = "2025 Bitterbutter"
 SPDX-License-Identifier = "CC-BY-SA-4.0"
+
+# The preview frame of "Release любой ценой. Разбор правил", the rules breakdown by
+# BoardGameLab on YouTube — https://www.youtube.com/watch?v=YPYbkgJZfdI — shown at
+# the head of the rules until the video is played. Used by agreement with them.
+[[annotations]]
+path = "apps/ui/src/assets/rules/rules-video-preview.png"
+SPDX-FileCopyrightText = "BoardGameLab (https://www.youtube.com/@byboardgamelab)"
+SPDX-License-Identifier = "LicenseRef-BoardGameLab"
