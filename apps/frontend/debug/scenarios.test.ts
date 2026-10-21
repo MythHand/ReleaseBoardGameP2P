@@ -88,7 +88,23 @@ it.each(AI_CARDS)('reveals %s and lets it act on the table laid for it', (card) 
   )
   const { pending } = drawn.state
   const zone = drawn.state.players.you.release
-  if (card.startsWith('ai-crush-'))
+  if (card === 'ai-crush-database') {
+    // a Monitoring in hand and no Debugger: drawn at once, nothing meets the Crush
+    expect(pending).toBeNull()
+    expect(zone.database).toBeUndefined()
+    // put down first, the Monitoring stands it off by itself
+    const monitoring = state.players.you.hand.find((c) => c.id === 'protection-monitoring')
+    expect(monitoring).toBeDefined()
+    const placed = engine.reduce(state, {
+      type: 'PLAY',
+      player: 'you',
+      card: monitoring?.uid ?? '',
+      at: 1,
+    })
+    const guarded = engine.reduce(placed.state, { type: 'DRAW', player: 'you', at: 2 })
+    expect(guarded.state.players.you.release.monitoring).toBeDefined()
+    expect(guarded.state.players.you.release.database).toBeDefined()
+  } else if (card.startsWith('ai-crush-'))
     expect(pending).toMatchObject({ kind: 'crush', slot: card.slice('ai-crush-'.length) })
   if (card.startsWith('ai-release-'))
     expect(zone[card.slice('ai-release-'.length) as ReleaseSlot]).toBeDefined()
