@@ -415,10 +415,28 @@ export function useNeutralizeStaging({
         actions?.onResolve?.({ kind: pending.kind, method: 'monitoring' })
         return
       }
-      pull.render(<Card card={card} interactive={false} width="100%" />)
+      // A release under its Code Review is taken up as it lies — the pair, the
+      // same one the flight to the cover slot then carries (`commit`)
+      const aux = state.you?.support?.[key]
+      pull.render(
+        aux ? (
+          <CardPair main={card} aux={aux} width="100%" />
+        ) : (
+          <Card card={card} interactive={false} width="100%" />
+        ),
+      )
       pull.begin(key, e.currentTarget, e)
     },
-    [pending, grabbable, state.you?.release, actions, flight.mark, pull.render, pull.begin],
+    [
+      pending,
+      grabbable,
+      state.you?.release,
+      state.you?.support,
+      actions,
+      flight.mark,
+      pull.render,
+      pull.begin,
+    ],
   )
 
   // the engine said no: the answer goes home and the offer opens again. Scoped
