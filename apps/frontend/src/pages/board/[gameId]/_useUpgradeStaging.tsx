@@ -5,6 +5,7 @@ import { play, useFlyer } from '@release/ui/animations'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { BoardActions, BoardAnchors, BoardState } from '~/entities/game/board'
 import { upgradeSlot } from '~/entities/game/board/upgradeSlot'
+import { useToHand } from '~/features/board-beats/toHand'
 import { useReducedMotion } from '~/shared/lib/useReducedMotion'
 import opening from './_Board.module.css'
 import { useResolveFeedback } from './_useResolveFeedback'
@@ -45,6 +46,11 @@ export function useUpgradeStaging(args: {
 
   const reduced = useReducedMotion()
   const flyer = useFlyer()
+  // the way home for our own throw when the keeper's answer threw another card
+  const arrival = useToHand(args.anchors.hand)
+  // our throw's flight, for the beat that adopts it: it lands before the row
+  // takes it over, wherever in the flight the keeper's answer came in
+  const landing = useRef<Promise<void>>(Promise.resolve())
   const [given, setGiven] = useState<string | null>(null)
   const [taken, setTaken] = useState<string | null>(null)
   const [confirmed, setConfirmed] = useState(false)
@@ -109,22 +115,47 @@ export function useUpgradeStaging(args: {
       current.current.asked &&
       current.current.enabled
     setGiven(uid)
+    // LET GO OF IS THROWN: the answer goes the moment the card leaves the hand,
+    // not when it lands — a card let go of before the time ran out is the one
+    // thrown (owner, 22.10). The flight below only shows it; the beat that
+    // plays the answer adopts it and waits for it to land (`whenLanded`).
+    setConfirmed(true)
+    resolve({ kind: 'upgradeDiscard', card: uid })
+    let landed = () => {}
+    landing.current = new Promise<void>((done) => {
+      landed = done
+    })
     void (async () => {
       const target = upgradeSlot(args.anchors, state.selfId)?.getBoundingClientRect()
       if (!reduced && target && drop.rect) {
         const [el] = await flyer.raise([{ key: 'upgrade-local', card: item.card, at: drop.rect }])
+        // IN THE AIR, it is still ours: if the keeper's answer threw another
+        // card for us, this one goes home from where it is (`anchors.heldCard`)
+        args.anchors.hold('upgrade-local', {
+          uid,
+          el: () => flyer.elOf('upgrade-local'),
+          take: () => {},
+          release: () => flyer.drop('upgrade-local'),
+          home: () => {
+            const from = flyer.elOf('upgrade-local')
+            args.anchors.hold('upgrade-local', null)
+            if (!from) {
+              flyer.drop('upgrade-local')
+              setGiven(null)
+              return
+            }
+            void arrival
+              .home([{ key: 'upgrade-home', card: item.card, el: from }], () => {
+                setGiven(null)
+                setConfirmed(false)
+                inFlight.current = false
+              })
+              .then(() => flyer.drop('upgrade-local'))
+          },
+        })
         if (el && valid()) await play('playToCenter', el, { to: target, duration: 460 })?.finished
       }
-      if (!valid()) {
-        if (token === attempt.current) {
-          inFlight.current = false
-          setGiven(null)
-          flyer.drop()
-        }
-        return
-      }
-      setConfirmed(true)
-      resolve({ kind: 'upgradeDiscard', card: uid })
+      landed()
     })()
     return true
   }
@@ -148,13 +179,15 @@ export function useUpgradeStaging(args: {
     // fan.
     answering: Boolean(pending && enabled && (picking || confirmed)),
     el: () => flyer.elOf('upgrade-local'),
+    whenLanded: () => landing.current,
     release: () => {
+      args.anchors.hold('upgrade-local', null)
       flyer.drop()
       setGiven(null)
       setConfirmed(false)
       inFlight.current = false
     },
-    overlay: flyer.overlay,
+    overlay: [...flyer.overlay, ...arrival.overlay],
   }
   if (!pending || !enabled) return { surface: null, ...interaction }
 

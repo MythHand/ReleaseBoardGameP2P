@@ -67,6 +67,7 @@ import {
 } from 'react'
 import type { BoardAnchors, BoardState } from '~/entities/game/board'
 import { COVER_POSE, MERGE_MS, SUDO_POSE } from '~/entities/game/board'
+import { sendHeldHome } from '~/features/board-beats/held'
 import { useToHand } from '~/features/board-beats/toHand'
 import { useReducedMotion } from '~/shared/lib/useReducedMotion'
 import { useCoverFlight } from './_useCoverFlight'
@@ -725,6 +726,36 @@ export function useDefenseStaging({
       cancel()
     }
   }, [events, cancel, coverFlight.since])
+
+  // THE KEEPER ANSWERED FOR US — passed, when our time ran out — and nothing of
+  // ours was taken: whatever we were holding goes home from where it is (owner,
+  // 22.10). A defence on the cursor glides back into its slot; a Sudo still
+  // waiting for a partner flies home off its place; a defence let go of too
+  // late, standing over an attack that has already gone through, takes the same
+  // road a refused one does — no answer of ours is taken after the time is up.
+  // An accepted answer of ours never reaches this: its beat takes the staged
+  // card over first (`release`, `handed`).
+  const owed = useRef(false)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `pending` is the trigger; the staging and the hand are read as they stand now
+  useEffect(() => {
+    if (pending) {
+      owed.current = true
+      return
+    }
+    if (!owed.current) return
+    owed.current = false
+    sendHeldHome(
+      anchors,
+      (state.you?.hand ?? EMPTY_HAND).map((c) => c.uid),
+      [],
+    )
+    const s = stagedRef.current
+    if (s?.phase === 'partner') cancel()
+    else if (s?.phase === 'dispatched' && !s.handed && s.main) {
+      commitStaged({ ...s, phase: 'rejected' })
+      cancel()
+    }
+  }, [pending])
 
   // the beat's own clear (Task 13's `defenseBeat.runCovered`) — no flight,
   // just done: the staged node was already standing where the cover goes, so

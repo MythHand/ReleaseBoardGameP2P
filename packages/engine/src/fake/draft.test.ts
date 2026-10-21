@@ -155,3 +155,91 @@ describe('a draft', () => {
     expect(reduce(one, picked({ toDeck: 'attack-bug#b' })).state).toBe(one) // no deck without Sudo
   })
 })
+
+// AN ANSWER TO A THREAT is a draft only while its card is held — taken up off
+// the zone, pulled out of the fan — and putting it back clears it (owner, 22.10).
+const debugger_: CardInstance = { uid: 'protection-debugger#d', id: 'protection-debugger' }
+const frontend: CardInstance = { uid: 'release-frontend#f', id: 'release-frontend' }
+const alarm: Pending = {
+  kind: 'neutralize503',
+  player: 'p1',
+  card: null,
+  methods: ['debugger', 'sacrifice'],
+  ...clock,
+}
+const crush: Pending = {
+  kind: 'crush',
+  player: 'p1',
+  slot: 'frontend',
+  methods: ['debugger'],
+  ...clock,
+}
+const holding = (draft: Extract<Action, { type: 'DRAFT' }>['draft'], player = 'p1'): Action => ({
+  type: 'DRAFT',
+  player,
+  draft,
+  at: 9000,
+})
+function threatTable(pending: Pending): GameState {
+  const s = table(pending, [debugger_])
+  return {
+    ...s,
+    players: {
+      ...s.players,
+      p1: { ...s.players.p1, release: { ...s.players.p1.release, frontend: { card: frontend } } },
+    },
+  }
+}
+const request: Pending = { kind: 'requestCard', player: 'p1', target: 'p2', ...clock }
+
+describe('a draft of an answer held on the screen', () => {
+  it('keeps the release taken up off the zone, and the Debugger pulled out of the fan', () => {
+    const s = threatTable(alarm)
+    expect(
+      reduce(s, holding({ kind: 'neutralize503', method: 'sacrifice', card: frontend.uid })).state
+        .pending,
+    ).toEqual({ ...alarm, draft: { method: 'sacrifice', card: frontend.uid } })
+    expect(reduce(s, holding({ kind: 'neutralize503', method: 'debugger' })).state.pending).toEqual(
+      { ...alarm, draft: { method: 'debugger' } },
+    )
+    expect(
+      reduce(threatTable(crush), holding({ kind: 'crush', method: 'debugger' })).state.pending,
+    ).toEqual({ ...crush, draft: { method: 'debugger' } })
+  })
+
+  it('lets go of it when the card is put back', () => {
+    const held = reduce(
+      threatTable(alarm),
+      holding({ kind: 'neutralize503', method: 'sacrifice', card: frontend.uid }),
+    ).state
+    expect(reduce(held, holding({ kind: 'neutralize503' })).state.pending).toEqual(alarm)
+  })
+
+  it('keeps the card marked in the Security Bug catalogue, and lets go of an unmarked one', () => {
+    const marked_ = reduce(
+      table(request),
+      holding({ kind: 'requestCard', card: 'defense-hotfix' }),
+    ).state
+    expect(marked_.pending).toEqual({ ...request, draft: 'defense-hotfix' })
+    expect(reduce(marked_, holding({ kind: 'requestCard' })).state.pending).toEqual(request)
+  })
+
+  it('that is not something this prompt can be answered with is not kept', () => {
+    const s = threatTable(alarm)
+    for (const action of [
+      holding({ kind: 'neutralize503', method: 'sacrifice', card: 'release-backend#x' }), // not in the zone
+      holding({ kind: 'neutralize503', method: 'sacrifice' }), // a sacrifice names its release
+      holding({ kind: 'neutralize503', method: 'monitoring' }), // offered? not here — and pressed, not held
+      holding({ kind: 'crush', method: 'debugger' }), // the other prompt's draft
+      holding({ kind: 'neutralize503', method: 'debugger' }, 'p2'), // not their decision
+    ]) {
+      expect(reduce(s, action).state).toBe(s)
+    }
+    const noDebugger = { ...s, players: { ...s.players, p1: { ...s.players.p1, hand: [] } } }
+    expect(reduce(noDebugger, holding({ kind: 'neutralize503', method: 'debugger' })).state).toBe(
+      noDebugger,
+    )
+    const r = table(request)
+    expect(reduce(r, holding({ kind: 'requestCard', card: 'no-such-card' })).state).toBe(r)
+  })
+})

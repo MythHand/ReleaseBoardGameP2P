@@ -321,6 +321,7 @@ export function useRebaseStaging(args: {
           setFlying(false)
           setFaceDown(false)
           closingRef.current = false
+          reorder.release()
         },
         last + BACK_DUR + BACK_SETTLE,
       )
@@ -344,6 +345,9 @@ export function useRebaseStaging(args: {
     if (!closing) return
     answeredKey.current = lastKey.current
     closingRef.current = true
+    // a card still held over the row goes home from under the cursor, in the
+    // order the keeper applied — the last one let go of (owner, 22.10)
+    reorder.take()
     flyBack(
       piles.map((e) => ({ pile: e.pile, cards: order[e.pile] ?? e.cards.map((c) => c.uid) })),
       null,

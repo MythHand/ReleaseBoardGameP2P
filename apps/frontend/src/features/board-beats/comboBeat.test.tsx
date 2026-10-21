@@ -177,6 +177,8 @@ function harness() {
     handSlotAt: (i: number) => (i === 0 ? handSlot : null),
     releaseSlot: (player: string) => (player === 'p1' ? releaseSlot : theirSlot),
     bindPile: () => {},
+    heldCard: () => null,
+    hold: () => {},
     bindSeat: () => {},
     bindReleaseSlot: () => {},
   } as unknown as BoardAnchors

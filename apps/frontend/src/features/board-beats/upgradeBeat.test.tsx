@@ -18,6 +18,8 @@ const timeline = vi.hoisted(() => ({
   targets: [] as { left: number; width: number }[],
   arrivals: vi.fn(),
   motions: [] as string[],
+  // the node each travel was played on
+  els: [] as HTMLElement[],
   exits: vi.fn(async (_items: unknown) => {}),
 }))
 vi.mock('@release/ui/animations', async (importOriginal) => ({
@@ -46,6 +48,7 @@ vi.mock('@release/ui/animations', async (importOriginal) => ({
   }),
   play: (_name: string, _el: HTMLElement, params: { to: { left: number; width: number } }) => {
     timeline.motions.push(_name)
+    timeline.els.push(_el)
     timeline.targets.push(params.to)
     timeline.starts.push(Date.now())
     return { finished: Promise.resolve() } as unknown as Animation
@@ -83,6 +86,8 @@ function harness(
     // the seats the row has a place for, and the fan's own slots
     players?: string[]
     handSlotAt?: (index: number) => HTMLElement | null
+    // a card of ours still in a gesture's hands, by uid
+    held?: Record<string, import('@release/ui/animations').HeldCard>
   } = {},
 ) {
   const root = node()
@@ -112,6 +117,8 @@ function harness(
     handSlotAt: opts.handSlotAt ?? (() => null),
     releaseSlot: () => null,
     bindPile: () => {},
+    heldCard: (uid: string) => opts.held?.[uid] ?? null,
+    hold: () => {},
     bindSeat: () => {},
     bindReleaseSlot: () => {},
   } as unknown as BoardAnchors
@@ -483,4 +490,75 @@ it('has the card left in the row in the heap while the taken one is still on its
   expect(filedAfter).not.toBeNull()
   expect(filedAfter).not.toContain('dealToSeat')
   expect(timeline.motions).toContain('dealToSeat')
+})
+
+// The keeper answered for us when our time ran out (owner, 22.10). Our throw is
+// adopted only if it IS the card thrown; a different one goes home from where it
+// is. A card still on the cursor that was thrown goes on into the row from there.
+const heldNode = () => {
+  const el = node()
+  return {
+    el,
+    held: (uid: string) => ({
+      uid,
+      el: () => el,
+      take: vi.fn(),
+      release: vi.fn(),
+      home: vi.fn(),
+    }),
+  }
+}
+
+it('sends our own throw home when the keeper threw another card for us', async () => {
+  timeline.els = []
+  const release = vi.fn()
+  const { held } = heldNode()
+  const given = held('given')
+  const { api, ctx } = harness({
+    local: { mainUid: 'given', el: node(), release },
+    held: { given },
+    handSlotAt: () => node(),
+    players: ['p1'],
+  })
+  const mine = {
+    ...ctx,
+    base: {
+      ...base,
+      you: {
+        ...base.you,
+        hand: [
+          { uid: 'given', card: cardById('defense-hotfix') },
+          { uid: 'h2', card: cardById('attack-bug') },
+        ],
+      },
+    } as BoardState,
+  }
+  await drive(() => api.beat?.run(plan([{ eventId: 1, player: 'p1', card: 'attack-bug' }]), mine))
+  expect(given.home).toHaveBeenCalledOnce()
+  expect(release).not.toHaveBeenCalled()
+  // the card the keeper threw flew out of the fan instead
+  expect(timeline.motions).toContain('playToCenter')
+})
+
+it('carries a card thrown by the keeper on into the row from under the cursor', async () => {
+  timeline.els = []
+  const { el, held } = heldNode()
+  const onCursor = held('h1')
+  const { api, ctx } = harness({
+    held: { h1: onCursor },
+    handSlotAt: () => node(),
+    players: ['p1'],
+  })
+  const mine = {
+    ...ctx,
+    base: {
+      ...base,
+      you: { ...base.you, hand: [{ uid: 'h1', card: cardById('attack-bug') }] },
+    } as BoardState,
+  }
+  await drive(() => api.beat?.run(plan([{ eventId: 1, player: 'p1', card: 'attack-bug' }]), mine))
+  expect(onCursor.take).toHaveBeenCalledOnce()
+  // flown on from the cursor itself, not raised a second time out of the fan
+  expect(timeline.els).toEqual([el])
+  expect(onCursor.release).toHaveBeenCalledOnce()
 })

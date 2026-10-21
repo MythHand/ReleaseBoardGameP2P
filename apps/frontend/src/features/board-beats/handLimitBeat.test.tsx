@@ -181,6 +181,8 @@ function harness(
     handSlotAt: () => node(),
     releaseSlot: () => node(),
     seatBox: () => ({ left: 0, top: 0, width: 150, height: 210 }) as Rect,
+    heldCard: () => null,
+    hold: () => {},
     ...overrides,
   } as unknown as BoardAnchors
   const ref = { current: handoff ?? null }

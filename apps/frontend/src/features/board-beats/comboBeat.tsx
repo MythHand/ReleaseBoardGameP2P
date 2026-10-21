@@ -725,6 +725,14 @@ export function useComboBeat(
         adoptStaged(ctx, handoff)
         return
       }
+      // A plain play of ours the keeper played for us when the turn ran out may
+      // still be in the air to the centre (owner, 22.10): it lands first, and
+      // the node it stands on is read only then.
+      if (handoff?.whenLanded && plan.player === ctx.base.selfId) {
+        await handoff.whenLanded()
+        await nextFrames()
+        handoff = latest.current.staging?.current ?? handoff
+      }
       if (handoff && plan.player === ctx.base.selfId && handoff.el && cRect) {
         // the actor's staged PAIR is at the centre: fly THAT node to the slot.
         // Only a merged pair ever gets here — `_Board.tsx`'s `soloStaged`

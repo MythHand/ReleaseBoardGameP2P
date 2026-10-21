@@ -351,3 +351,55 @@ it('flies the order on the screen home when the keeper answers for the player', 
     vi.useRealTimers()
   }
 })
+
+// …and a card still HELD over the row when the keeper answers goes home from
+// under the cursor, in the order the keeper applied — the last one let go of
+// (owner, 22.10). It does not jump back into its slot first.
+it('flies a card held over the row home from where it is held', async () => {
+  vi.useFakeTimers()
+  mockReducedMotion(false)
+  try {
+    const actions = { onResolve: vi.fn(), onDraft: vi.fn() }
+    const base = makeBoardProps()
+    const state = {
+      ...base.state,
+      pending: rebasePending([
+        { uid: 'r0', id: 'attack-bug' },
+        { uid: 'r1', id: 'release-frontend' },
+        { uid: 'r2', id: 'defense-hotfix' },
+      ]),
+    }
+    const { rerender } = render(<Board {...base} state={state} actions={actions} />)
+    await act(() => vi.advanceTimersByTimeAsync(1200))
+    const last = screen.getByTestId('rebase-card-r2')
+    last.getBoundingClientRect = () => new DOMRect(760, 200, 150, 210)
+    if (last.parentElement)
+      last.parentElement.getBoundingClientRect = () => new DOMRect(400, 200, 510, 210)
+    // picked up and carried towards the front, NOT let go of
+    fireEvent.pointerDown(last, { button: 0, clientX: 780, clientY: 230 })
+    fireEvent.pointerMove(window, { clientX: 420, clientY: 230 })
+    const held = screen.getByTestId('rebase-card-r2').style.transform
+    // nothing let go of, nothing told
+    expect(actions.onDraft).not.toHaveBeenCalledWith({
+      kind: 'reorderTop',
+      order: [{ pile: 0, cards: ['r2', 'r0', 'r1'] }],
+    })
+
+    rerender(<Board {...base} state={{ ...state, pending: null }} actions={actions} />)
+    // still where the cursor held it while the row turns its backs
+    await act(() => vi.advanceTimersByTimeAsync(300))
+    expect(screen.getByTestId('rebase-card-r2').style.transform).toBe(held)
+    // a pointer let go of now changes nothing
+    fireEvent.pointerUp(window, { clientX: 420, clientY: 230 })
+    expect(screen.getByTestId('rebase-card-r2').style.transform).toBe(held)
+    await act(() => vi.advanceTimersByTimeAsync(400))
+    // pinned for the flight home in the order the keeper applied: r2 last
+    const layer = (uid: string) => screen.getByTestId(`rebase-card-${uid}`).style.zIndex
+    expect([layer('r0'), layer('r1'), layer('r2')]).toEqual(['53', '52', '51'])
+    await act(() => vi.advanceTimersByTimeAsync(3000))
+    expect(screen.queryByTestId('board-rebase-row')).toBeNull()
+    expect(actions.onResolve).not.toHaveBeenCalled()
+  } finally {
+    vi.useRealTimers()
+  }
+})

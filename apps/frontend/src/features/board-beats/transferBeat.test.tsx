@@ -79,6 +79,8 @@ const anchors = {
   handSlotAt: () => node(),
   releaseSlot: () => null,
   bindPile: () => {},
+  heldCard: () => null,
+  hold: () => {},
   bindSeat: () => {},
   bindReleaseSlot: () => {},
 } as unknown as BoardAnchors

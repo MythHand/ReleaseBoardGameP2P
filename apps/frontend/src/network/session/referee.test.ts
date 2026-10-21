@@ -570,6 +570,40 @@ it('only pushes on expiry when the draw obligation is already met', () => {
   expect(result.session.state.turn.player).toBe('b')
 })
 
+// A card let go of before the turn ran out, needing nothing more — no target,
+// no partner — stands at the centre only for the table to read it, and is
+// played when the turn runs out (owner, 22.10). A card still waiting on a
+// target goes back, as the ⚙️ timeout note says.
+it.each([
+  ['plays a Monitoring put out with nothing left to choose', 'protection-monitoring', true],
+  ['takes back a Bug still waiting for its target', 'attack-bug', false],
+])('on the turn running out, %s', (_, id, played) => {
+  const { session } = twoPlayerSession()
+  const drawn = applyIntent(session, 'peer-a', { type: 'DRAW' }, 1_000).session
+  const card = { uid: `${id}#out`, id }
+  const holding: Session = {
+    ...drawn,
+    state: {
+      ...drawn.state,
+      players: {
+        ...drawn.state.players,
+        a: { ...drawn.state.players.a, hand: [...drawn.state.players.a.hand, card] },
+      },
+    },
+  }
+  const out = applyIntent(holding, 'peer-a', { type: 'SHOW', card: card.uid }, 1_500).session
+  expect(out.state.players.a.shown).toEqual([card.uid])
+  const deadline = out.state.turn.deadline ?? 0
+
+  const after = tick(out, deadline + 1).session
+
+  expect(after.state.players.a.shown).toEqual([])
+  expect(after.state.players.a.release.monitoring?.uid === card.uid).toBe(played)
+  expect(after.state.players.a.hand.some((c) => c.uid === card.uid)).toBe(!played)
+  expect(after.log.some((e) => e.type === 'takenBack')).toBe(!played)
+  expect(after.state.turn.player).toBe('b')
+})
+
 // #101 (review round 2). Paying a release's price is the turn's own owner
 // acting inside their own turn, so the engine keeps stamping the deadline
 // through it — which means the keeper has to keep firing it. Deferring here
@@ -1162,6 +1196,48 @@ it('times out a Security Bug request with a holdable catalogue type even when di
   ])
 })
 
+// The card marked in the catalogue and not yet confirmed is the one named when
+// the time runs out — the same rule as a marked pick out of the discard (owner,
+// 22.10).
+it('names the card marked in the Security Bug catalogue when its time runs out', () => {
+  const { session: base } = twoPlayerSession()
+  const state: GameState = {
+    ...base.state,
+    players: {
+      ...base.state.players,
+      a: { ...base.state.players.a, hand: [{ uid: 'security#test', id: 'attack-security-bug' }] },
+      b: { ...base.state.players.b, hand: [{ uid: 'sudo#test', id: 'support-sudo' }] },
+    },
+  }
+  const played = applyIntent(
+    { ...base, state },
+    'peer-a',
+    { type: 'PLAY', card: 'security#test', target: { kind: 'player', player: 'b' } },
+    1000,
+  )
+  const offered = applyIntent(
+    played.session,
+    'peer-b',
+    { type: 'RESOLVE', choice: { kind: 'defend', card: null } },
+    1001,
+  )
+  const marked = applyIntent(
+    offered.session,
+    'peer-a',
+    { type: 'DRAFT', draft: { kind: 'requestCard', card: 'defense-not-a-bug' } },
+    1002,
+  )
+  expect(marked.outgoing).toEqual([])
+  const pending = marked.session.state.pending
+  if (pending?.kind !== 'requestCard' || pending.deadline === undefined)
+    throw new Error('no request deadline')
+  const done = tick(marked.session, pending.deadline)
+  const request = done.session.log.find((e) => e.type === 'requested')
+  // named as marked — a miss, which a random pick over the catalogue would only
+  // rarely land on
+  expect(request).toMatchObject({ type: 'requested', card: 'defense-not-a-bug', hit: false })
+})
+
 it('starts a 25-second deadline for a legacy request without re-banking its spent attack', () => {
   const { session: base } = twoPlayerSession()
   const state: GameState = {
@@ -1383,6 +1459,62 @@ describe('a decision a card raised, when its time runs out', () => {
     expect(
       tick(crush(false), afterDeadline).session.state.players.a.release.frontend,
     ).toBeUndefined()
+  })
+
+  // The answer HELD when the time ran out is the answer (owner, 22.10): a release
+  // taken up off the zone is the one sacrificed — even with a Debugger in hand —
+  // and a Debugger held answers a Crush. Held no longer, the usual order rules.
+  it('answers an Error 503 with the release the player is holding', () => {
+    const build = (seed: number) =>
+      expired(
+        {
+          kind: 'neutralize503',
+          player: 'a',
+          card: alarm,
+          methods: ['debugger', 'sacrifice'],
+          draft: { method: 'sacrifice', card: 'release-backend#x' },
+          ...ran,
+        },
+        (st) => zone(['frontend', 'backend'])(hold('a', [debuggerCard])(st)),
+        seed,
+      )
+    const lost = answers(build, (after) =>
+      (['frontend', 'backend'] as const)
+        .filter((slot) => !after.state.players.a.release[slot])
+        .join(),
+    )
+    expect(lost).toEqual(new Set(['backend']))
+    expect(methodOf(tick(build(1), afterDeadline).session)).toBe('sacrifice')
+  })
+
+  it('answers with a Debugger first again once a held release is no longer there', () => {
+    const s = expired(
+      {
+        kind: 'neutralize503',
+        player: 'a',
+        card: alarm,
+        methods: ['debugger', 'sacrifice'],
+        draft: { method: 'sacrifice', card: 'release-database#x' },
+        ...ran,
+      },
+      (st) => zone(['frontend'])(hold('a', [debuggerCard])(st)),
+    )
+    expect(methodOf(tick(s, afterDeadline).session)).toBe('debugger')
+  })
+
+  it('answers an AI Crush with the Debugger the player is holding', () => {
+    const s = expired(
+      {
+        kind: 'crush',
+        player: 'a',
+        slot: 'frontend',
+        methods: ['debugger'],
+        draft: { method: 'debugger' },
+        ...ran,
+      },
+      (st) => zone(['frontend'])(hold('a', [debuggerCard])(st)),
+    )
+    expect(methodOf(tick(s, afterDeadline).session)).toBe('debugger')
   })
 
   it('keeps the cards laid out against the hand limit and fills the rest at random', () => {

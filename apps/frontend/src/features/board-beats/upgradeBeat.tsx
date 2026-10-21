@@ -5,6 +5,7 @@ import { type RefObject, useCallback, useRef } from 'react'
 import type { BeatRun, BoardAnchors, StagedHandoff } from '~/entities/game/board'
 import { upgradeCard, upgradeSlot } from '~/entities/game/board/upgradeSlot'
 import { liftOff, type Place } from './cardPlace'
+import { sendHeldHome, type Taken, takeHeld } from './held'
 import type { BeatPlan } from './planBeats'
 import { SEAT_SHRINK } from './seat'
 import { useToHand } from './toHand'
@@ -164,16 +165,31 @@ export function useUpgradeBeat(
         beat.publish({ ...ctx.base, pending: null, decks: beat.after?.decks ?? ctx.base.decks })
         return
       }
-      const local = latest.current.staging?.current
+      const staged = latest.current.staging?.current
+      // OUR OWN THROW, adopted only if it IS the card the answer threw: our
+      // gesture lets go of a card the moment it leaves the hand, but the keeper
+      // answers for us when our time runs out, and the card that went could be
+      // another one. Ours then goes home from where it is (`anchors.heldCard`).
+      const own = plan.throws.find((t) => t.player === beat.base.selfId)
+      const stagedId = staged
+        ? beat.base.you?.hand.find((h) => h.uid === staged.mainUid)?.card.id
+        : undefined
+      // Read off our hand: a card the hand no longer shows is taken as it was.
+      const local = staged && own && stagedId !== undefined && stagedId !== own.card ? null : staged
+      if (staged && own && !local) a.heldCard(staged.mainUid)?.home()
       let adopted = false
       // the fan card our own throw took off as its carrier went up, if one did
       let lifted: string | undefined
+      // a card of ours still on the cursor, carried on into the row
+      const taken: Taken[] = []
       // The queue's pre-arrival shadow must paint its row before measuring.
       await nextFrames()
       await Promise.all(
         plan.throws.map(async (t, i) => {
           if (t.player === beat.base.selfId && local) {
             adopted = true
+            // it lands before the row takes it over
+            await local.whenLanded?.()
             return
           }
           await wait(i * THROW_STEP)
@@ -185,8 +201,27 @@ export function useUpgradeBeat(
           // leaves from its place in the fan, and the fan lets go of it as its
           // carrier goes up, the way a played attack or a defence leaves it.
           if (t.player === beat.base.selfId) {
-            const index = beat.base.you?.hand.findIndex((h) => h.card.id === t.card) ?? -1
-            const held = index >= 0 ? beat.base.you?.hand[index] : undefined
+            const hand = beat.base.you?.hand ?? []
+            // the card still on our cursor, if it is the one thrown — it goes
+            // on into the row from under the cursor; whatever else we hold
+            // goes home (owner, 22.10)
+            const onCursor = hand.find((h) => h.card.id === t.card && a.heldCard(h.uid))
+            const carried = takeHeld(a, onCursor?.uid)
+            if (carried) taken.push(carried)
+            sendHeldHome(
+              a,
+              // our own throw the answer did not take has been sent home above
+              hand.map((h) => h.uid).filter((uid) => uid !== staged?.mainUid),
+              taken,
+            )
+            if (carried) {
+              lifted = carried.uid
+              liftOff(beat, [{ kind: 'hand', uid: carried.uid }])
+              await play('playToCenter', carried.el, { to: target, duration: THROW_DUR })?.finished
+              return
+            }
+            const index = hand.findIndex((h) => h.card.id === t.card)
+            const held = index >= 0 ? hand[index] : undefined
             const from = held ? rectOf(a.handSlotAt(index)) : null
             if (!held || !from) return
             const raised = raise([{ key: `upgrade:${t.eventId}`, card, at: from }])
@@ -212,6 +247,7 @@ export function useUpgradeBeat(
       if (pending?.kind !== 'systemUpgrade') {
         drop()
         if (adopted) local?.release()
+        for (const t of taken) t.release()
         return
       }
       const afterPending = beat.after?.pending
@@ -229,7 +265,6 @@ export function useUpgradeBeat(
         )
       }
       const answered = new Set(plan.throws.map((t) => t.player))
-      const own = plan.throws.find((t) => t.player === beat.base.selfId)
       const ownUid =
         own &&
         (local?.mainUid ?? lifted ?? beat.base.you?.hand.find((c) => c.card.id === own.card)?.uid)
@@ -251,6 +286,7 @@ export function useUpgradeBeat(
       beat.publish(landed)
       drop()
       if (adopted) local?.release()
+      for (const t of taken) t.release()
       if (!plan.clear) return
       await nextFrames()
       await wait(HOLD_MS)

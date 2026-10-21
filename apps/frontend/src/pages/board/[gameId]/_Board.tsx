@@ -1037,6 +1037,7 @@ function BoardView({
       handoffRef.current = {
         mainUid: upgrade.stagedUid,
         el: upgrade.el(),
+        whenLanded: upgrade.whenLanded,
         release: upgrade.release,
       }
       return
@@ -1086,14 +1087,19 @@ function BoardView({
           : null
       return
     }
+    // …and a plain play from the moment it is let go of, before its own
+    // dispatch: it is played, and if the turn runs out while it stands for the
+    // table to read, the keeper plays it (owner, 22.10). The beat that plays it
+    // takes it from here, once its flight to the centre has landed.
     const s = staging.staged
     handoffRef.current =
-      s?.phase === 'dispatched' && s.main
+      (s?.phase === 'dispatched' || (s?.plain && s.phase === 'aim')) && s.main
         ? {
             mainUid: s.main.uid,
             supportUid: s.support?.uid,
             el: s.merged ? staging.pairNode() : soloStagedRef.current,
             release: staging.release,
+            ...(s.plain ? { whenLanded: staging.stageLanded } : {}),
           }
         : null
   }
@@ -1108,19 +1114,33 @@ function BoardView({
   // when our time ran out, with the cards laid out so far still in their cells.
   // Two refs, not one: the RESOLVE's grid is the complete one, and a grid read
   // before it would hand the beat the last card missing.
+  //
+  // The grid before our RESOLVE stands for the WHOLE decision, not only once a
+  // card has landed in it: the keeper's answer has to be able to close it and
+  // to find what is still in our hands — a card in the air to its cell, one on
+  // the cursor — even before anything has landed (#266, ditayler's P2).
   useLayoutEffect(() => {
     const grid =
-      state.selfId !== null && handLimit.placed.length > 0
+      state.selfId !== null && (discarding || handLimit.placed.length > 0)
         ? {
             player: state.selfId,
             cards: handLimit.placed,
             cellAt: handLimit.cellAt,
             release: handLimit.release,
+            close: handLimit.close,
           }
         : null
     handLimitRef.current = handLimit.dispatched ? grid : null
     handLimitGridRef.current = handLimit.dispatched ? null : grid
-  }, [handLimit.dispatched, handLimit.placed, handLimit.cellAt, handLimit.release, state.selfId])
+  }, [
+    discarding,
+    handLimit.dispatched,
+    handLimit.placed,
+    handLimit.cellAt,
+    handLimit.release,
+    handLimit.close,
+    state.selfId,
+  ])
 
   // The same seam's second fact (#101, Task 11): `clearPaidCostRef` kept
   // current the same way `handoffRef` above is. `staging.clearPaidCost` is
@@ -2215,6 +2235,12 @@ function BoardView({
                       ? undefined
                       : (uid, to) => handOrder.commit(you.hand, fanItems, uid, to)
                   }
+                  // the card under the cursor, for an answer someone else gives
+                  // while it is held (`anchors.heldCard`)
+                  onHold={(held) => {
+                    anchors.hold('fan', held)
+                    if (neutralizeOwnsHand) neutralizing.onFanHold(held)
+                  }}
                   renderFace={
                     deal.active
                       ? (item, ctx) => (

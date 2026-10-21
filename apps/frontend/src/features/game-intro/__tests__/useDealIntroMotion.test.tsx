@@ -46,6 +46,8 @@ const refs = () => ({
   bindReleaseSlot: () => {},
   pileBox: () => null,
   bindPile: () => {},
+  heldCard: () => null,
+  hold: () => {},
 })
 
 const view = (): PlayerView => ({

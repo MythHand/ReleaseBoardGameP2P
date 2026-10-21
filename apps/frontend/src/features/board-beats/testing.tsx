@@ -243,6 +243,8 @@ export function anchorsFixture(overrides: Partial<BoardAnchors> = {}): AnchorsFi
     bindReleaseSlot: () => {},
     pileBox: (index) => piles[index] ?? null,
     bindPile: () => {},
+    heldCard: () => null,
+    hold: () => {},
   }
   return { ...base, ...overrides, exitSpy: animationsTrace.exitSpy }
 }

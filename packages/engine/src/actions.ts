@@ -43,9 +43,18 @@ export type Choice =
 // The decisions whose answer is built up on the screen before it is confirmed.
 // A pick out of the discard may be marked in part, so both of its roles are
 // optional — what is left unmarked is drawn at random when the time runs out.
+//
+// An answer to a threat is a draft only while its card is HELD: taken up off
+// the zone or out of the fan, not yet put down. Putting it back sends the draft
+// empty, so a card the player held once and let go of answers nothing.
+// Security Bug's draft is the card type marked in the catalogue, not yet
+// confirmed — the same mark the table already watches.
 export type Draft =
   | Extract<Choice, { kind: 'handLimit' | 'reorderTop' | 'upgradeTake' }>
   | { kind: 'pickFromDiscard'; card?: CardUid; toDeck?: CardUid }
+  | { kind: 'neutralize503'; method?: NeutralizeMethod; card?: CardUid }
+  | { kind: 'crush'; method?: NeutralizeMethod }
+  | { kind: 'requestCard'; card?: CardId }
 
 export type Action =
   | { type: 'DRAW'; player: PlayerId; pile?: number; at: number }

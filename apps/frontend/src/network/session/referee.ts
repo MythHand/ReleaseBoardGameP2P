@@ -807,8 +807,27 @@ function expiredAnswer(state: GameState, player: PlayerId): Intent | null {
     items[Math.min(items.length - 1, Math.floor(random * items.length))]
   const shuffled = <T>(items: readonly T[]): T[] =>
     shuffle([...items], state.seed, state.rngCursor).items
+  // The answer the player was HOLDING when the time ran out — a Debugger out of
+  // the fan, a release taken up off the zone — is the answer, if it still is
+  // one. Held, not merely taken once: putting the card back clears the draft.
+  const threat = pending?.kind === 'neutralize503' || pending?.kind === 'crush' ? pending : null
+  const draft = threat?.draft
+  const heldRelease = draft && 'card' in draft ? draft.card : undefined
+  const held =
+    draft &&
+    threat.methods.includes(draft.method) &&
+    (draft.method === 'debugger'
+      ? me.hand.some((c) => c.id === 'protection-debugger')
+      : draft.method === 'sacrifice' &&
+        heldRelease !== undefined &&
+        (['frontend', 'backend', 'database'] as const).some(
+          (slot) => me.release[slot]?.card.uid === heldRelease,
+        ))
+      ? draft
+      : null
   switch (pending?.kind) {
     case 'neutralize503': {
+      if (held) return { type: 'RESOLVE', choice: { kind: 'neutralize503', ...held } }
       if (pending.methods.includes('debugger')) {
         return { type: 'RESOLVE', choice: { kind: 'neutralize503', method: 'debugger' } }
       }
@@ -826,6 +845,7 @@ function expiredAnswer(state: GameState, player: PlayerId): Intent | null {
       return { type: 'PASS' }
     }
     case 'crush':
+      if (held) return { type: 'RESOLVE', choice: { kind: 'crush', method: held.method } }
       return pending.methods.includes('debugger')
         ? { type: 'RESOLVE', choice: { kind: 'crush', method: 'debugger' } }
         : { type: 'PASS' }
@@ -991,6 +1011,15 @@ export function tick(session: Session, now: number): SessionResult {
   ) {
     const seat = session.seats.find((s) => s.playerId === pending.player)
     if (!seat?.peerId) return { session, outgoing: [] }
+    // the card marked in the catalogue and not yet confirmed is the one named,
+    // as a marked pick out of the discard is the one taken
+    if (pending.kind === 'requestCard' && pending.draft)
+      return applyIntent(
+        session,
+        seat.peerId,
+        { type: 'RESOLVE', choice: { kind: 'requestCard', card: pending.draft } },
+        now,
+      )
     const action = botAction(session.engine, session.state, pending.player, now)
     if (action?.type === 'RESOLVE')
       return applyIntent(session, seat.peerId, { type: 'RESOLVE', choice: action.choice }, now)
@@ -1052,10 +1081,41 @@ export function tick(session: Session, now: number): SessionResult {
         state = taken.state
         events = taken.events
       }
-      // Anything else still out at the centre goes back too, in everyone's view
-      // — the turn is over, and nothing is left to complete its play
-      // (resolution.md §1, the ⚙️ timeout note).
-      if (state.players[turn.player].shown.length > 0) {
+      // A card put out that needs nothing more — no target, no partner, an
+      // Operation or a Protection — was played the moment it was let go of: it
+      // stands at the centre only for the table to read it before its effect.
+      // The turn running out after that does not take it back; it is played.
+      // Picked by the rule the player's own board picks a plain play by
+      // (`_useBoardStaging`'s `onHandPlay`), off the same projection (owner,
+      // 22.10).
+      const seen = session.engine.project(state, turn.player).self
+      const letGo = state.players[turn.player].shown.filter((uid) => {
+        const card = seen.hand.find((c) => c.uid === uid)
+        const kind = card ? rulesFor(card.id)?.kind : undefined
+        return (
+          seen.playable.includes(uid) &&
+          (seen.targets[uid] ?? []).length === 0 &&
+          (seen.combos[uid] ?? []).length === 0 &&
+          (kind === 'operation' || kind === 'protection')
+        )
+      })
+      for (const card of letGo) {
+        const played = session.engine.reduce(state, {
+          type: 'PLAY',
+          player: turn.player,
+          card,
+          at: now,
+        })
+        if (played.events.some((e) => e.type === 'rejected')) continue
+        state = played.state
+        events = [...events, ...played.events]
+      }
+      // Anything else still out at the centre goes back, in everyone's view —
+      // the turn is over, and nothing is left to complete its play
+      // (resolution.md §1, the ⚙️ timeout note). Not while a decision the play
+      // above opened is waiting (a Cherry-pick's pick): that decision owns the
+      // clock now, and the engine refuses all three below until it is answered.
+      if (!state.pending && state.players[turn.player].shown.length > 0) {
         const back = session.engine.reduce(state, {
           type: 'TAKE_BACK',
           player: turn.player,
@@ -1064,7 +1124,7 @@ export function tick(session: Session, now: number): SessionResult {
         state = back.state
         events = [...events, ...back.events]
       }
-      if (!drawObligationMet(state)) {
+      if (!state.pending && !drawObligationMet(state)) {
         const drawn = session.engine.reduce(state, { type: 'DRAW', player: turn.player, at: now })
         state = drawn.state
         // Appended, not assigned: the take-backs above may have run first.

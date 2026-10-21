@@ -49,6 +49,8 @@ const refs = () => ({
   bindReleaseSlot: () => {},
   pileBox: () => null,
   bindPile: () => {},
+  heldCard: () => null,
+  hold: () => {},
 })
 
 // Minimal but real: the shapes the sequencer reads. No `as unknown as` cast —

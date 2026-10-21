@@ -164,6 +164,9 @@ export type Pending =
       // The AI event card this prompt belongs to. Absent for a pending raised
       // by anything other than an AI card.
       source?: CardId
+      // the answer the player is holding on the screen right now (DRAFT) — it
+      // answers when the time runs out
+      draft?: { method: NeutralizeMethod; card?: CardUid }
       awaitingPresentation?: true
       openedAt?: number
       deadline?: number
@@ -176,6 +179,8 @@ export type Pending =
       // The AI event card this prompt belongs to. Absent for a pending raised
       // by anything other than an AI card.
       source?: CardId
+      // as on `neutralize503`
+      draft?: { method: NeutralizeMethod }
       awaitingPresentation?: true
       openedAt?: number
       deadline?: number
@@ -195,6 +200,9 @@ export type Pending =
       player: PlayerId
       target: PlayerId
       context?: HandAttackContext
+      // the card type marked in the catalogue and not yet confirmed (DRAFT) —
+      // named when the time runs out
+      draft?: CardId
       awaitingPresentation?: true
       openedAt?: number
       deadline?: number

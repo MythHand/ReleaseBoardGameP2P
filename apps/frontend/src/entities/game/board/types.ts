@@ -367,6 +367,8 @@ export interface HandLimitHandoff {
   cards: { uid: string; card: CardData; slot: number }[]
   cellAt: (slot: number) => HTMLElement | null
   release: () => void
+  /** the keeper answered for us: the grid takes nothing more and sends nothing */
+  close?: () => void
 }
 
 /**

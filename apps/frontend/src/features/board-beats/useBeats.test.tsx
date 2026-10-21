@@ -137,6 +137,8 @@ const stub = {
   bindReleaseSlot: () => {},
   pileBox: () => null,
   bindPile: () => {},
+  heldCard: () => null,
+  hold: () => {},
 } as unknown as BoardAnchors
 
 // The opening's own shadow: a table with no hand at all, because the cards have

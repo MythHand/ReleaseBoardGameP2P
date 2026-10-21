@@ -1497,3 +1497,63 @@ it('removes the in-flight cost when a newer hand projection has already spent it
     animateSpy.mockRestore()
   }
 })
+
+// LET GO OF IS PAID (owner, 22.10): the cost goes to the keeper the moment the
+// card leaves the hand, not when it lands beside the release.
+it('pays the cost the moment the card is let go of, before it lands', async () => {
+  const animateSpy = holdFlightsOpen()
+  try {
+    const onResolve = vi.fn()
+    render(releaseBoard({ pending: costPending(['attack-bug#0']) }, { onResolve }))
+    await payFromFan('attack-bug#0')
+    // still in the air, and already paid
+    expect(onResolve).toHaveBeenCalledWith({ kind: 'discardForRelease', card: 'attack-bug#0' })
+  } finally {
+    animateSpy.mockRestore()
+  }
+})
+
+// …and a cost that reached the keeper too late — the turn ran out and the
+// keeper took the release back first — is not taken: the release and the card
+// that was to pay for it both go home from where they are.
+it('sends the release and its cost home when the keeper takes the release back', async () => {
+  const onResolve = vi.fn()
+  const pending = costPending(['attack-bug#0'])
+  const { rerender } = render(releaseBoard({}, { onResolve }))
+  await pullCardFromFan('release-frontend#0')
+  rerender(releaseBoard({ pending }, { onResolve }))
+  await payFromFan('attack-bug#0')
+  expect(onResolve).toHaveBeenCalledWith({ kind: 'discardForRelease', card: 'attack-bug#0' })
+  const base = makeBoardProps()
+  const takenBack = {
+    id: 21,
+    type: 'takenBack',
+    player: 'you',
+    cards: ['release-frontend'],
+  } as unknown as import('@release/engine').Event
+  rerender(
+    <Board
+      {...makeBoardProps({
+        state: {
+          ...base.state,
+          you: { ...base.state.you, hand: HAND },
+          turn: 'p2',
+          hasDrawn: true,
+          playable: [],
+          pending: null,
+          shown: [],
+        },
+        actions: { onResolve },
+        intro: { gameId: null, view: null, events: [takenBack], onDone: () => {} },
+      })}
+    />,
+  )
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 900))
+  })
+  expect(document.querySelectorAll('[data-hand-slot]')).toHaveLength(HAND.length)
+  expect(document.querySelector('[data-centre-slot="stage"] [data-card]')).toBeNull()
+  expect(document.querySelector('[data-centre-slot="cost"] [data-card]')).toBeNull()
+  // nothing more was sent: the keeper's take-back needs no answer
+  expect(onResolve).toHaveBeenCalledTimes(1)
+})

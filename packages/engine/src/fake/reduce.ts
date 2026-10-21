@@ -1,8 +1,8 @@
 import type { Action, Target } from '../actions'
-import { rulesFor } from '../cards'
+import { CARD_RULES, rulesFor } from '../cards'
 import type { Reduction } from '../engine'
 import { shuffle } from '../rng'
-import type { CardUid, GameState, PlayerId } from '../state'
+import type { CardUid, GameState, PlayerId, ReleaseSlot } from '../state'
 import { foldTally } from '../tally'
 import { onAbandon } from './abandon'
 import { onAttack, onDefend } from './attacks'
@@ -30,6 +30,8 @@ import { onShow, onTakeBack } from './shown'
 import { eliminate, fireTrigger, onDecline503, onDeclineCrush, onNeutralize } from './triggers'
 import { onUpgradeDiscard, onUpgradeTake } from './upgrade'
 import { onPass, onUnpass, onWindowExpired } from './window'
+
+const SLOTS: readonly ReleaseSlot[] = ['frontend', 'backend', 'database']
 
 export { handLimitFor, nextSeat }
 
@@ -285,6 +287,41 @@ function onDraft(state: GameState, action: Action & { type: 'DRAFT' }): Reductio
     if (!fits) return unchanged
     const marked = { ...(hand ? { card: hand.uid } : {}), ...(deck ? { toDeck: deck.uid } : {}) }
     return { state: { ...state, pending: { ...pending, draft: marked } }, events: [] }
+  }
+  if (
+    (pending.kind === 'neutralize503' || pending.kind === 'crush') &&
+    draft.kind === pending.kind
+  ) {
+    if (pending.player !== action.player) return unchanged
+    // put back: the card held is held no longer, and nothing answers
+    if (draft.method == null) {
+      const { draft: _letGo, ...open } = pending
+      return { state: { ...state, pending: open }, events: [] }
+    }
+    // only what can be HELD — a Debugger out of the fan, a release off the
+    // zone — and only what this prompt offers; a Monitoring is pressed, not held
+    const me = state.players[action.player]
+    const card = 'card' in draft ? draft.card : undefined
+    const held =
+      draft.method === 'debugger'
+        ? me.hand.some((c) => c.id === 'protection-debugger')
+        : draft.method === 'sacrifice' &&
+          card != null &&
+          SLOTS.some((slot) => me.release[slot]?.card.uid === card)
+    if (!pending.methods.includes(draft.method) || !held) return unchanged
+    const answer =
+      draft.method === 'sacrifice' ? { method: draft.method, card } : { method: draft.method }
+    return { state: { ...state, pending: { ...pending, draft: answer } }, events: [] }
+  }
+  if (pending.kind === 'requestCard' && draft.kind === 'requestCard') {
+    if (pending.player !== action.player) return unchanged
+    if (draft.card == null) {
+      const { draft: _unmarked, ...open } = pending
+      return { state: { ...state, pending: open }, events: [] }
+    }
+    // the same terms the confirmed request is held to (onRequestCard)
+    if (typeof draft.card !== 'string' || !Object.hasOwn(CARD_RULES, draft.card)) return unchanged
+    return { state: { ...state, pending: { ...pending, draft: draft.card } }, events: [] }
   }
   if (pending.kind === 'systemUpgrade' && draft.kind === 'upgradeTake') {
     // the actor's mark, and only one of the cards thrown this time

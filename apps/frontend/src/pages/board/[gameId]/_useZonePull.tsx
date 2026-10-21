@@ -42,6 +42,15 @@ export interface ZonePull<K extends string = string> {
   overlay: ReactNode
   /** bind the card the carrier should show while `dragging` is set */
   render: (node: ReactNode) => void
+  /** the carrier's node while a card is held */
+  el: () => HTMLElement | null
+  /**
+   * Someone else carries the card on (`HeldCard`): the carrier stops following
+   * the pointer and decides nothing when it lets go. It stays up until `release`.
+   */
+  take: () => void
+  /** the carrier comes down */
+  release: () => void
 }
 
 export function useZonePull<K extends string = string>(opts: {
@@ -59,6 +68,8 @@ export function useZonePull<K extends string = string>(opts: {
   // extra render per `render()` call (pick-up only, not per frame); the rAF
   // loop below still writes style.left/top/width straight onto the node.
   const [content, setContent] = useState<ReactNode>(null)
+  // the running drag's own way to stop listening, for `take`
+  const stop = useRef<() => void>(() => {})
 
   function begin(key: K, el: HTMLElement, e: ReactMouseEvent) {
     // Only a primary press starts a drag — a right- or middle-press on the
@@ -131,12 +142,18 @@ export function useZonePull<K extends string = string>(opts: {
       else onCancel(drag.key)
       setDrag(null)
     }
+    stop.current = () => {
+      cancelAnimationFrame(raf)
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)
     return () => {
       cancelAnimationFrame(raf)
       window.removeEventListener('mousemove', onMove)
       window.removeEventListener('mouseup', onUp)
+      stop.current = () => {}
     }
   }, [drag])
 
@@ -149,5 +166,8 @@ export function useZonePull<K extends string = string>(opts: {
       </div>
     ),
     render: (node: ReactNode) => setContent(node),
+    el: () => dragRef.current,
+    take: () => stop.current(),
+    release: () => setDrag(null),
   }
 }

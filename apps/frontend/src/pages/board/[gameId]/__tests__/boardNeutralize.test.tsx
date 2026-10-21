@@ -14,7 +14,7 @@ import type { CardData, TableActions } from '@release/ui'
 import { cardById } from '@release/ui'
 import { act, fireEvent, render, renderHook, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { useBoardAnchors } from '~/entities/game/board'
+import { type BoardActions, useBoardAnchors } from '~/entities/game/board'
 import Board from '../_Board'
 import { useNeutralizeStaging } from '../_useNeutralizeStaging'
 import { makeBoardProps } from './fixture'
@@ -40,7 +40,7 @@ describe.each(['neutralize503', 'crush'] as const)('%s card gestures', (kind) =>
   // shape (`packages/engine/src/view.ts`'s `Pending`): `card` is a CardId (or
   // null for the AI-deck mimic), and `methods` is the projection's answer to what
   // may answer it. Legality is read from there and never re-derived.
-  function withAlarm(over: Over, actions: TableActions = {}, events: Event[] = []) {
+  function withAlarm(over: Over, actions: BoardActions = {}, events: Event[] = []) {
     const base = makeBoardProps()
     const hand = (over.hand ?? []).map((id, i) => ({ uid: `${id}#${i}`, card: card(id) }))
     const release: Record<string, CardData | undefined> = {}
@@ -178,6 +178,55 @@ describe.each(['neutralize503', 'crush'] as const)('%s card gestures', (kind) =>
       reason: 'illegal',
     } as Event
   }
+
+  // THE ANSWER HELD IS THE ANSWER when the time runs out (owner, 22.10): told to
+  // the keeper while the card is held, and let go of when it is put back — a
+  // card held once and put back answers nothing.
+  it('tells the keeper the Debugger it is holding, and lets go of it when put back', async () => {
+    const onDraft = vi.fn()
+    const actions = { onDraft }
+    const { container } = render(
+      withAlarm({ methods: ['debugger'], hand: ['protection-debugger', 'attack-bug'] }, actions),
+    )
+    layOut(container)
+    const slot = document.querySelectorAll<HTMLElement>('[data-hand-slot]')[0]
+    fireEvent.mouseDown(slot, { clientX: 500, clientY: 900 })
+    fireEvent.mouseMove(window, { clientX: 500, clientY: 300 })
+    expect(onDraft).toHaveBeenLastCalledWith({ kind, method: 'debugger' })
+    // let go of over your own fan: given back, and holding nothing
+    fireEvent.mouseUp(window, { clientX: 500, clientY: 900 })
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 600))
+    })
+    expect(onDraft).toHaveBeenLastCalledWith({ kind })
+  })
+
+  if (kind === 'neutralize503')
+    it('tells the keeper the release taken up off the zone, and lets go of it when put back', async () => {
+      const onDraft = vi.fn()
+      const actions = { onDraft }
+      const { container } = render(
+        withAlarm(
+          {
+            methods: ['sacrifice'],
+            release: { frontend: 'release-frontend' },
+            releaseUid: { frontend: 'release-frontend#z' },
+          },
+          actions,
+        ),
+      )
+      layOut(container)
+      fireEvent.mouseDown(slotNode(container, 'frontend'), { clientX: 420, clientY: 620 })
+      expect(onDraft).toHaveBeenLastCalledWith({
+        kind,
+        method: 'sacrifice',
+        card: 'release-frontend#z',
+      })
+      // let go of over the zone: back in its slot, and holding nothing
+      fireEvent.mouseUp(window, { clientX: 420, clientY: 620 })
+      await act(async () => {})
+      expect(onDraft).toHaveBeenLastCalledWith({ kind })
+    })
 
   it('offers only the methods the pending names', () => {
     const { container } = render(

@@ -1,5 +1,5 @@
 import { CARD_W, cardBoxIn } from '@release/ui'
-import type { Rect } from '@release/ui/animations'
+import type { HeldCard, Rect } from '@release/ui/animations'
 import type { RefObject } from 'react'
 import { useCallback, useMemo, useRef } from 'react'
 
@@ -54,6 +54,18 @@ export interface BoardAnchors {
   /** a draw pile's CARD box, by the index the engine names in `drawn.pile` */
   pileBox: (index: number) => HTMLElement | null
   bindPile: (index: number, el: HTMLDivElement | null) => void
+  /**
+   * A CARD IN A GESTURE'S HANDS, by its uid — under the cursor, or in a flight
+   * the gesture started — for the answer that has to carry it on when someone
+   * else answered the decision (`HeldCard`). Null when no gesture holds it.
+   */
+  heldCard: (uid: string) => HeldCard | null
+  /**
+   * What one holder holds right now, or null once it holds nothing: the fan,
+   * the zone pull, a gesture's own flights. By the holder rather than by the
+   * card, so a holder letting go never needs to remember what it held.
+   */
+  hold: (holder: string, held: HeldCard | null) => void
 }
 
 export function useBoardAnchors(): BoardAnchors {
@@ -78,6 +90,9 @@ export function useBoardAnchors(): BoardAnchors {
   const seatEls = useRef<Record<string, HTMLElement | null>>({})
   const slotEls = useRef<Record<string, HTMLElement | null>>({})
   const pileEls = useRef<Record<number, HTMLDivElement | null>>({})
+  // Not a node registry like the rest, and the one place here keyed by uid: a
+  // gesture names its own card, so nothing here reads the hand to find it.
+  const holders = useRef<Record<string, HeldCard>>({})
 
   const seatOf = useCallback((player: string) => seatEls.current[player] ?? null, [])
   const bindSeat = useCallback((player: string, el: HTMLElement | null) => {
@@ -108,6 +123,15 @@ export function useBoardAnchors(): BoardAnchors {
     if (el) pileEls.current[index] = el
     else delete pileEls.current[index]
   }, [])
+
+  const hold = useCallback((holder: string, held: HeldCard | null) => {
+    if (held) holders.current[holder] = held
+    else delete holders.current[holder]
+  }, [])
+  const heldCard = useCallback(
+    (uid: string) => Object.values(holders.current).find((h) => h.uid === uid) ?? null,
+    [],
+  )
 
   // One identity for the life of the mount: every consumer takes this through a
   // ref into a long-running sequence, and a fresh object per render would arm
@@ -140,7 +164,20 @@ export function useBoardAnchors(): BoardAnchors {
       bindReleaseSlot,
       pileBox,
       bindPile,
+      heldCard,
+      hold,
     }),
-    [seatOf, seatBox, handSlotAt, releaseSlot, bindSeat, bindReleaseSlot, pileBox, bindPile],
+    [
+      seatOf,
+      seatBox,
+      handSlotAt,
+      releaseSlot,
+      bindSeat,
+      bindReleaseSlot,
+      pileBox,
+      bindPile,
+      heldCard,
+      hold,
+    ],
   )
 }

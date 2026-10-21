@@ -111,6 +111,8 @@ function harness(opts: { base?: BoardState; live?: number[] } = {}) {
     handSlotAt: () => null,
     releaseSlot: () => null,
     bindPile: () => {},
+    heldCard: () => null,
+    hold: () => {},
     bindSeat: () => {},
     bindReleaseSlot: () => {},
   } as unknown as BoardAnchors

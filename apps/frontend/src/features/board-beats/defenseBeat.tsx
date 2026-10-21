@@ -8,6 +8,7 @@ import { ALARM_POSE, ATTACK_POSE, COVER_POSE, SHOW_HOLD } from '~/entities/game/
 import { aiCauseExit, withoutAiCause } from './aiCauseExit'
 import { liftOff, type Place, setDown } from './cardPlace'
 import { exchange } from './exchange'
+import { takeHeld } from './held'
 import type { BeatPlan } from './planBeats'
 import { adoptStaged } from './shownBeat'
 import { toEventsDeck } from './toEventsDeck'
@@ -366,6 +367,20 @@ export function useDefenseBeat(
         // everyone else, and finally the cover slot itself — a no-travel raise
         // is the honest answer to "it is here and I cannot say where it came
         // from", and it leaves the exit starting from something real.
+        //
+        // …unless the answer is the card STILL IN OUR HANDS: the keeper answered
+        // for us with the release we had taken up off the zone, or the Debugger
+        // we had pulled out of the fan, when our time ran out (owner, 22.10).
+        // Then it comes from under the cursor, where it is — the carrier goes up
+        // on it and the gesture lets go of its own in the same commit (I12).
+        const heldUid = mine
+          ? plan.method === 'sacrifice' && plan.slot
+            ? ctx.base.you?.releaseUid?.[plan.slot as ZoneSlot]
+            : ctx.base.you?.hand.find(
+                (h) => h.card.id === plan.spent[0]?.card && a.heldCard(h.uid) != null,
+              )?.uid
+          : undefined
+        const carried = takeHeld(a, heldUid)
         const fromSlot =
           plan.method === 'sacrifice' && plan.slot
             ? rectOf(a.releaseSlot(plan.player, plan.slot))
@@ -374,6 +389,7 @@ export function useDefenseBeat(
           ? (ctx.base.you?.hand.findIndex((h) => h.card.id === plan.spent[0]?.card) ?? -1)
           : -1
         const from =
+          (carried ? rectOf(carried.el) : null) ??
           fromSlot ??
           (handIndex >= 0 ? rectOf(a.handSlotAt(handIndex)) : null) ??
           a.seatBox(plan.player) ??
@@ -399,6 +415,7 @@ export function useDefenseBeat(
               : a.seatBox(plan.player)
                 ? [{ kind: 'seat', player: plan.player }]
                 : [],
+          carried,
         )
         const [el] = await raised
         if (el) {
