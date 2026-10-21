@@ -1,5 +1,5 @@
 import type { Event } from '@release/engine'
-import type { CardData, HeapCard, TableActions } from '@release/ui'
+import type { CardData, HeapCard } from '@release/ui'
 import { Card, ConfirmAction, cardAreaOf, cardById, TableSurface, Typography } from '@release/ui'
 import {
   exitLayer,
@@ -12,7 +12,7 @@ import {
 } from '@release/ui/animations'
 import type { ReactNode, RefObject } from 'react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import type { BoardAnchors, BoardState } from '~/entities/game/board'
+import type { BeatRun, BoardActions, BoardAnchors, BoardState } from '~/entities/game/board'
 import type { DiscardPickHandoff } from '~/entities/game/board/types'
 import { SEAT_SHRINK } from '~/features/board-beats/seat'
 import { useToHand } from '~/features/board-beats/toHand'
@@ -77,7 +77,7 @@ export function useCherryPickStaging(args: {
   state: BoardState
   events?: Event[]
   anchors: BoardAnchors
-  actions?: TableActions
+  actions?: BoardActions
   onHandArrival: (order: string[], uid: string, at: number) => void
   copy: {
     prompt: string
@@ -154,6 +154,9 @@ export function useCherryPickStaging(args: {
   const [flying, setFlying] = useState(false)
   const [dealing, setDealing] = useState(false)
   const [flipped, setFlipped] = useState<Set<string>>(new Set())
+  // the keeper's answer, marked in the grid for the moment before it plays out
+  // — nothing is picked or confirmed over it
+  const [taking, setTaking] = useState(false)
 
   const cellRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
   // The last offer this hook actually saw — read during render (the same
@@ -353,6 +356,22 @@ export function useCherryPickStaging(args: {
     send(card)
   }, [send, ours, roles.hand, options])
 
+  // WHAT IS MARKED, told to the keeper as it changes: unconfirmed when the time
+  // runs out, it is still what is taken — each role on its own, so a pick made
+  // in part keeps the half that was made.
+  const draftSent = useRef('')
+  useEffect(() => {
+    if (!ours || confirmed || taking) return
+    const key = `${offerKey(ours)}|${roles.hand ?? ''}|${roles.deck ?? ''}`
+    if (key === draftSent.current) return
+    draftSent.current = key
+    actions?.onDraft?.({
+      kind: 'pickFromDiscard',
+      ...(roles.hand ? { card: roles.hand } : {}),
+      ...(roles.deck ? { toDeck: roles.deck } : {}),
+    })
+  }, [ours, confirmed, taking, roles.hand, roles.deck, actions])
+
   const max = ours?.picks ?? (sudo ? 2 : 1)
 
   // A trigger may only ever hold the DECK slot, and that slot exists only when
@@ -385,10 +404,160 @@ export function useCherryPickStaging(args: {
 
   const ready = ours ? picks.length === ours.picks : false
 
+  // THE ANSWER, PLAYED OUT OF THE GRID — the card to the hand through the
+  // centre, the deck card turned over and onto the deck, the rest home to the
+  // pile. One movement whoever gave the answer: the player's confirm, or the
+  // keeper's when their time ran out. What it flies is handed in (I8), never
+  // read from the render that armed it.
+  const flyAnswer = async (
+    ctx: BeatRun,
+    offered: { player: string; raisedAt: number; options: { uid: string; id: string }[] },
+    hand: string,
+    deck: string | null,
+  ) => {
+    setFlying(true)
+    const handData = cardById(offered.options.find((o) => o.uid === hand)?.id ?? '')
+    const deckOpt = deck ? offered.options.find((o) => o.uid === deck) : undefined
+    const deckData = deckOpt ? cardById(deckOpt.id) : undefined
+    const deckRect = anchors.pileBox(0)?.getBoundingClientRect()
+
+    // pass 1: read EVERY cell's rect first, before touching layout.
+    const rects = new Map<string, DOMRect>()
+    for (const o of offered.options) {
+      const el = cellRefs.current.get(o.uid)
+      if (el) rects.set(o.uid, el.getBoundingClientRect())
+    }
+
+    const remaining = offered.options.filter((o) => o.uid !== hand && o.uid !== deck)
+    // THE PILE THE CARDS CAME OUT OF, less what was taken: the topmost copy
+    // of each taken card leaves it, the copy the projection itself takes out
+    // (`toDiscardHeap`). This is the heap the board draws once the grid has
+    // gone, so it is the one every card that goes home lands in.
+    const takenIds = [hand, deck].flatMap((uid) => {
+      const id = uid ? (offered.options.find((o) => o.uid === uid)?.id ?? '') : ''
+      return id ? [id] : []
+    })
+    const heapLeft = [...(ctx.base.decks.discardHeap ?? [])]
+    let taken = 0
+    for (const id of takenIds) {
+      for (let i = heapLeft.length - 1; i >= 0; i--) {
+        if (heapLeft[i].card.id !== id) continue
+        heapLeft.splice(i, 1)
+        taken++
+        break
+      }
+    }
+    // Where each unpicked card ENDS UP — ITS OWN entry in that pile: the
+    // spot it was lifted from, at its own pose (I7), and its depth there is
+    // the layer it travels on (I9), so it lands under what lies over it and
+    // over what lies under it. It used to be claimed by card in the heap
+    // AFTER the answer, which already holds the copy of an operation still
+    // standing at the centre: a Cherry-pick played over a Cherry-pick sent
+    // the first one home onto the second's pose and on top, and the pile then
+    // turned it back to its own the moment it took over (owner's
+    // recording, 04.10).
+    const resting = claimInHeap(remaining, heapLeft)
+    const zOf = (uid: string, i: number) =>
+      uid === hand
+        ? homeZ(heapLeft.length) + 1
+        : uid === deck
+          ? homeZ(heapLeft.length)
+          : homeZ(resting.get(uid)?.depth ?? i)
+
+    // pass 2: pin them all at their captured rects (no more reflow matters),
+    // each on the layer it travels on
+    offered.options.forEach((o, i) => {
+      const el = cellRefs.current.get(o.uid)
+      const r = rects.get(o.uid)
+      if (!el || !r) return
+      el.style.transition = 'none'
+      el.style.transform = 'none'
+      el.style.position = 'fixed'
+      el.style.left = `${r.left}px`
+      el.style.top = `${r.top}px`
+      el.style.width = `${r.width}px`
+      el.style.margin = '0'
+      el.style.zIndex = String(zOf(o.uid, i))
+    })
+
+    const handFlight = (async () => {
+      const el = cellRefs.current.get(hand)
+      const from = rects.get(hand)
+      const centre = anchors.centre.current?.getBoundingClientRect()
+      if (!el || !from || !centre || !handData) return
+      const to = {
+        left: centre.left + (centre.width - REVEAL_W) / 2,
+        top: centre.top + (centre.height - (REVEAL_W * from.height) / from.width) / 2,
+        width: REVEAL_W,
+        height: (REVEAL_W * from.height) / from.width,
+      }
+      await nextFrames()
+      await play('playToCenter', el, { to, duration: REVEAL_DUR })?.finished
+      await wait(REVEAL_HOLD)
+      await arrival.land(ctx, { card: handData, el, fallbackKey: hand })
+    })()
+    const deckFlight = (async () => {
+      if (!deck || !deckData || !deckRect) return
+      const el = cellRefs.current.get(deck)
+      const from = rects.get(deck)
+      if (!el || !from) return
+      setFlipped(new Set([deck]))
+      await wait(FLIP_DUR)
+      await play('returnToDeck', el, { to: deckRect })?.finished
+      await wait(DECK_HOLD)
+    })()
+    const returnFlight = exit.send(
+      remaining.flatMap((o, i) => {
+        const card = cardById(o.id)
+        if (!card) return []
+        const found = resting.get(o.uid)
+        return [
+          {
+            key: o.uid,
+            card,
+            node: cellRefs.current.get(o.uid),
+            scatter: found?.rest ?? scatterAt(i, 116),
+            // Nothing dissolves on the way: the pile draws every card it
+            // holds (`_Board.tsx`'s discard has no `heapShow`), so a card
+            // that faded out mid-flight would still be there at rest — it
+            // would simply appear, already lying, instead of landing. Only
+            // a card the pile has no place for at all sinks out of sight.
+            fade: !found,
+            delay: Math.min(i, STAGGER_CAP) * RETURN_STEP,
+            layer: found?.depth ?? i,
+          },
+        ]
+      }),
+      // nothing stands: every card is handed over as its own grid cell
+      // (`node`), so the step flies those very nodes
+      null,
+    )
+    await Promise.all([handFlight, deckFlight, returnFlight])
+    // The picked cards have LEFT the pile. The projection says so a batch
+    // later; until then the queue draws the shadow — the table as it was
+    // BEFORE the answer — so without this the heap comes back the moment
+    // the grid goes, with the card the player just took lying in it.
+    if (taken > 0) {
+      ctx.base = {
+        ...ctx.base,
+        decks: {
+          ...ctx.base.decks,
+          discardHeap: heapLeft,
+          discard: heapLeft.at(-1)?.card,
+          discardCount: Math.max(0, ctx.base.decks.discardCount - taken),
+        },
+      }
+      ctx.publish(ctx.base)
+    }
+    answeredKey.current = offerKey(offered)
+    setFlying(false)
+    setConfirmed(false)
+  }
+
   // Pin all cells together only after acceptance. The queue owns the
   // lifetime, so a refused choice never plays a success animation.
   const confirmPick = () => {
-    if (!ours || confirmed || !ready) return
+    if (!ours || confirmed || taking || !ready) return
     const hand = roles.hand
     // re-checked against THIS render's offer, the discipline every branch of
     // the kit's own panel keeps
@@ -410,150 +579,61 @@ export function useCherryPickStaging(args: {
     }
 
     setConfirmed(true)
+    const offered = ours
     args.handoff.current = {
-      card: ours.options.find((o) => o.uid === hand)?.id ?? '',
-      run: async (ctx) => {
-        setFlying(true)
-        const handData = cardById(ours.options.find((o) => o.uid === hand)?.id ?? '')
-        const deckOpt = deck ? ours.options.find((o) => o.uid === deck) : undefined
-        const deckData = deckOpt ? cardById(deckOpt.id) : undefined
-        const deckRect = anchors.pileBox(0)?.getBoundingClientRect()
-
-        // pass 1: read EVERY cell's rect first, before touching layout.
-        const rects = new Map<string, DOMRect>()
-        for (const o of ours.options) {
-          const el = cellRefs.current.get(o.uid)
-          if (el) rects.set(o.uid, el.getBoundingClientRect())
-        }
-
-        const remaining = ours.options.filter((o) => o.uid !== hand && o.uid !== deck)
-        // THE PILE THE CARDS CAME OUT OF, less what was taken: the topmost copy
-        // of each taken card leaves it, the copy the projection itself takes out
-        // (`toDiscardHeap`). This is the heap the board draws once the grid has
-        // gone, so it is the one every card that goes home lands in.
-        const takenIds = [hand, deck].flatMap((uid) => {
-          const id = uid ? (ours.options.find((o) => o.uid === uid)?.id ?? '') : ''
-          return id ? [id] : []
-        })
-        const heapLeft = [...(ctx.base.decks.discardHeap ?? [])]
-        let taken = 0
-        for (const id of takenIds) {
-          for (let i = heapLeft.length - 1; i >= 0; i--) {
-            if (heapLeft[i].card.id !== id) continue
-            heapLeft.splice(i, 1)
-            taken++
-            break
-          }
-        }
-        // Where each unpicked card ENDS UP — ITS OWN entry in that pile: the
-        // spot it was lifted from, at its own pose (I7), and its depth there is
-        // the layer it travels on (I9), so it lands under what lies over it and
-        // over what lies under it. It used to be claimed by card in the heap
-        // AFTER the answer, which already holds the copy of an operation still
-        // standing at the centre: a Cherry-pick played over a Cherry-pick sent
-        // the first one home onto the second's pose and on top, and the pile then
-        // turned it back to its own the moment it took over (owner's
-        // recording, 04.10).
-        const resting = claimInHeap(remaining, heapLeft)
-        const zOf = (uid: string, i: number) =>
-          uid === hand
-            ? homeZ(heapLeft.length) + 1
-            : uid === deck
-              ? homeZ(heapLeft.length)
-              : homeZ(resting.get(uid)?.depth ?? i)
-
-        // pass 2: pin them all at their captured rects (no more reflow matters),
-        // each on the layer it travels on
-        ours.options.forEach((o, i) => {
-          const el = cellRefs.current.get(o.uid)
-          const r = rects.get(o.uid)
-          if (!el || !r) return
-          el.style.transition = 'none'
-          el.style.transform = 'none'
-          el.style.position = 'fixed'
-          el.style.left = `${r.left}px`
-          el.style.top = `${r.top}px`
-          el.style.width = `${r.width}px`
-          el.style.margin = '0'
-          el.style.zIndex = String(zOf(o.uid, i))
-        })
-
-        const handFlight = (async () => {
-          const el = cellRefs.current.get(hand)
-          const from = rects.get(hand)
-          const centre = anchors.centre.current?.getBoundingClientRect()
-          if (!el || !from || !centre || !handData) return
-          const to = {
-            left: centre.left + (centre.width - REVEAL_W) / 2,
-            top: centre.top + (centre.height - (REVEAL_W * from.height) / from.width) / 2,
-            width: REVEAL_W,
-            height: (REVEAL_W * from.height) / from.width,
-          }
-          await nextFrames()
-          await play('playToCenter', el, { to, duration: REVEAL_DUR })?.finished
-          await wait(REVEAL_HOLD)
-          await arrival.land(ctx, { card: handData, el, fallbackKey: hand })
-        })()
-        const deckFlight = (async () => {
-          if (!deck || !deckData || !deckRect) return
-          const el = cellRefs.current.get(deck)
-          const from = rects.get(deck)
-          if (!el || !from) return
-          setFlipped(new Set([deck]))
-          await wait(FLIP_DUR)
-          await play('returnToDeck', el, { to: deckRect })?.finished
-          await wait(DECK_HOLD)
-        })()
-        const returnFlight = exit.send(
-          remaining.flatMap((o, i) => {
-            const card = cardById(o.id)
-            if (!card) return []
-            const found = resting.get(o.uid)
-            return [
-              {
-                key: o.uid,
-                card,
-                node: cellRefs.current.get(o.uid),
-                scatter: found?.rest ?? scatterAt(i, 116),
-                // Nothing dissolves on the way: the pile draws every card it
-                // holds (`_Board.tsx`'s discard has no `heapShow`), so a card
-                // that faded out mid-flight would still be there at rest — it
-                // would simply appear, already lying, instead of landing. Only
-                // a card the pile has no place for at all sinks out of sight.
-                fade: !found,
-                delay: Math.min(i, STAGGER_CAP) * RETURN_STEP,
-                layer: found?.depth ?? i,
-              },
-            ]
-          }),
-          // nothing stands: every card is handed over as its own grid cell
-          // (`node`), so the step flies those very nodes
-          null,
-        )
-        await Promise.all([handFlight, deckFlight, returnFlight])
-        // The picked cards have LEFT the pile. The projection says so a batch
-        // later; until then the queue draws the shadow — the table as it was
-        // BEFORE the answer — so without this the heap comes back the moment
-        // the grid goes, with the card the player just took lying in it.
-        if (taken > 0) {
-          ctx.base = {
-            ...ctx.base,
-            decks: {
-              ...ctx.base.decks,
-              discardHeap: heapLeft,
-              discard: heapLeft.at(-1)?.card,
-              discardCount: Math.max(0, ctx.base.decks.discardCount - taken),
-            },
-          }
-          ctx.publish(ctx.base)
-        }
-        answeredKey.current = offerKey(ours)
-        setFlying(false)
-        setConfirmed(false)
-      },
+      card: offered.options.find((o) => o.uid === hand)?.id ?? '',
+      run: (ctx) => flyAnswer(ctx, offered, hand, deck),
     }
     resolve(choice)
   }
+
+  // THE KEEPER'S ANSWER, ON THIS SEAT'S OWN GRID. When the time runs out the
+  // keeper answers for us, and the beat that says so is the first this grid
+  // hears of it — so it is armed while the pick is open and unconfirmed, the
+  // same arm the watching seat keeps below. The cards the keeper took are
+  // marked as if picked, held for the grid's own pause, and then leave exactly
+  // as a confirm sends them (`flyAnswer`). Not armed where the grid answers
+  // itself and is never shown: there is no grid to fly out of.
+  const answer = { ours, roles, events: args.events ?? [], selfId: state.selfId, fly: flyAnswer }
+  const answerRef = useRef(answer)
+  answerRef.current = answer
+  const showsGrid = !(answersItself && (ours?.options.length ?? 0) < 2)
+  useEffect(() => {
+    if (!ours || confirmed || reduced || !showsGrid) return
+    args.handoff.current = {
+      run: async (ctx, takenId) => {
+        const { ours: offered, roles: marked, events, selfId, fly } = answerRef.current
+        if (!offered) return
+        // the cell a taken card stands in — the one the player marked, if it is
+        // that card; otherwise the topmost copy, the one the pile gives up
+        const cellOf = (id: string, prefer: string | null, not: string | null) =>
+          offered.options.find((o) => o.uid === prefer && o.id === id && o.uid !== not)?.uid ??
+          [...offered.options].reverse().find((o) => o.id === id && o.uid !== not)?.uid
+        const hand = cellOf(takenId, marked.hand, marked.deck)
+        if (!hand) return
+        // the deck card is named to this seat alone, in the same answer
+        const toDeck =
+          offered.picks === 2
+            ? [...events]
+                .reverse()
+                .find(
+                  (e): e is Extract<Event, { type: 'takenFromDiscard' }> =>
+                    e.type === 'takenFromDiscard' &&
+                    e.to === 'deck' &&
+                    e.player === selfId &&
+                    e.id > offered.raisedAt,
+                )
+            : undefined
+        const deck = toDeck ? (cellOf(toDeck.card, marked.deck, hand) ?? null) : null
+        setTaking(true)
+        setPicks(deck ? [hand, deck] : [hand])
+        await wait(REVEAL_HOLD)
+        setTaking(false)
+        setConfirmed(true)
+        await fly(ctx, offered, hand, deck)
+      },
+    }
+  }, [ours, confirmed, reduced, showsGrid, args.handoff])
 
   // THE SAME SCENE FROM THE OTHER SIDE. Armed while the pick is open, because
   // this seat has no gesture to arm it with: the beat that says which card was
@@ -713,7 +793,7 @@ export function useCherryPickStaging(args: {
   // confirmed yet. Selection states, badges and the confirm bar live only here.
   // Only the seat that can ANSWER chooses. Across the table the same cards are
   // up in the same places and nothing else: no lighting, no role tags, no bar.
-  const choosing = ours != null && !confirmed && !dealing
+  const choosing = ours != null && !confirmed && !dealing && !taking
   // The MARKS are both seats': one shows what it is choosing, the other watches
   // that choice being made. Only the controls are the actor's alone.
   const marking = !confirmed && !dealing
@@ -756,7 +836,7 @@ export function useCherryPickStaging(args: {
                 }`}
                 disabled={!ours}
                 onClick={() => {
-                  if (confirmed || !ours) return
+                  if (confirmed || taking || !ours) return
                   setPicks((p) => nextPicks(p, o.uid))
                 }}
               >

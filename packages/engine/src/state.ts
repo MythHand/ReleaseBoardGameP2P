@@ -261,6 +261,9 @@ export type Pending =
        * on every peer, which a timestamp taken per peer would not be.
        */
       raisedAt: number
+      // the cards marked on the player's screen so far, each role on its own, as
+      // their board reports them (DRAFT) — they stay when the time runs out
+      draft?: { card?: CardUid; toDeck?: CardUid }
       awaitingPresentation?: true
       openedAt?: number
       deadline?: number

@@ -271,6 +271,21 @@ function onDraft(state: GameState, action: Action & { type: 'DRAFT' }): Reductio
     const order = draft.order.map((o) => ({ pile: o.pile, cards: [...o.cards] }))
     return { state: { ...state, pending: { ...pending, draft: order } }, events: [] }
   }
+  if (pending.kind === 'pickFromDiscard' && draft.kind === 'pickFromDiscard') {
+    if (pending.player !== action.player) return unchanged
+    // the same terms the confirmed answer is held to (onPickFromDiscard), each
+    // role checked only if it is marked
+    const offered = (uid: unknown) => pending.options.find((c) => c.uid === uid)
+    const hand = draft.card == null ? undefined : offered(draft.card)
+    const deck = draft.toDeck == null ? undefined : offered(draft.toDeck)
+    const fits =
+      (draft.card == null || (hand !== undefined && rulesFor(hand.id)?.kind !== 'trigger')) &&
+      (draft.toDeck == null || (deck !== undefined && pending.picks === 2)) &&
+      (hand === undefined || hand.uid !== deck?.uid)
+    if (!fits) return unchanged
+    const marked = { ...(hand ? { card: hand.uid } : {}), ...(deck ? { toDeck: deck.uid } : {}) }
+    return { state: { ...state, pending: { ...pending, draft: marked } }, events: [] }
+  }
   if (pending.kind === 'systemUpgrade' && draft.kind === 'upgradeTake') {
     // the actor's mark, and only one of the cards thrown this time
     if (pending.phase !== 'picking' || pending.actor !== action.player) return unchanged

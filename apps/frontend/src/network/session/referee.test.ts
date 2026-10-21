@@ -1462,6 +1462,38 @@ describe('a decision a card raised, when its time runs out', () => {
     expect(answers(build, handOf('a')).size).toBeGreaterThan(1)
   })
 
+  it('keeps what was marked out of the discard, each role on its own, and draws only the rest', () => {
+    const options = [alarm, ...['a', 'b', 'c'].map((t) => card('attack-bug', t))]
+    const build = (draft: { card?: string; toDeck?: string }) => (seed: number) =>
+      expired(
+        {
+          kind: 'pickFromDiscard',
+          player: 'a',
+          options,
+          picks: 2,
+          source: 'operation-git-cherry-pick',
+          raisedAt: 1,
+          draft,
+          ...ran,
+        },
+        (st) => hold('a', [])({ ...st, decks: { ...st.decks, discard: options } }),
+        seed,
+      )
+    const onDeck = (after: Session) => after.state.decks.main[0][0].uid
+    // both marked: both stay, whatever the seed
+    const both = build({ card: 'attack-bug#b', toDeck: alarm.uid })
+    expect(answers(both, handOf('a'))).toEqual(new Set(['attack-bug#b']))
+    expect(answers(both, onDeck)).toEqual(new Set([alarm.uid]))
+    // the deck marked alone: it stays, the hand is drawn
+    const deckOnly = build({ toDeck: alarm.uid })
+    expect(answers(deckOnly, onDeck)).toEqual(new Set([alarm.uid]))
+    expect(answers(deckOnly, handOf('a')).size).toBeGreaterThan(1)
+    // the hand marked alone: it stays, the deck is drawn
+    const handOnly = build({ card: 'attack-bug#a' })
+    expect(answers(handOnly, handOf('a'))).toEqual(new Set(['attack-bug#a']))
+    expect(answers(handOnly, onDeck).size).toBeGreaterThan(1)
+  })
+
   it('leaves a Rebase in the order on the screen, or as offered when nothing was moved', () => {
     const top = ['a', 'b', 'c'].map((t) => card('attack-bug', t))
     const build = (draft?: string[]) =>

@@ -837,11 +837,20 @@ function expiredAnswer(state: GameState, player: PlayerId): Intent | null {
       return { type: 'RESOLVE', choice: { kind: 'handLimit', cards } }
     }
     case 'pickFromDiscard': {
-      const card = pick(pending.options.filter((c) => rulesFor(c.id)?.kind !== 'trigger'))
+      // what the player marked stays, each role on its own; a role left empty
+      // is drawn at random — never a trigger for the hand
+      // — and a deck mark gives way when it holds the only card the hand can take
+      const marked = pending.draft
+      const forHand = pending.options.filter((c) => rulesFor(c.id)?.kind !== 'trigger')
+      const free = forHand.filter((c) => c.uid !== marked?.toDeck)
+      const card =
+        pending.options.find((c) => c.uid === marked?.card) ??
+        pick(free.length > 0 ? free : forHand)
       if (!card) return null
       const toDeck =
         pending.picks === 2
-          ? shuffled(pending.options.filter((c) => c.uid !== card.uid))[0]?.uid
+          ? (pending.options.find((c) => c.uid === marked?.toDeck && c.uid !== card.uid)?.uid ??
+            shuffled(pending.options.filter((c) => c.uid !== card.uid))[0]?.uid)
           : undefined
       return {
         type: 'RESOLVE',

@@ -70,7 +70,36 @@ const marked = (card: string, player = 'p1'): Action => ({
   at: 9000,
 })
 
+const trigger: CardInstance = { uid: 'trigger-ai#t', id: 'trigger-ai' }
+const pick = (picks: 1 | 2): Pending => ({
+  kind: 'pickFromDiscard',
+  player: 'p1',
+  options: [bug('a'), bug('b'), trigger],
+  picks,
+  source: 'operation-git-cherry-pick',
+  raisedAt: 1,
+  ...clock,
+})
+const picked = (draft: { card?: string; toDeck?: string }, player = 'p1'): Action => ({
+  type: 'DRAFT',
+  player,
+  draft: { kind: 'pickFromDiscard', ...draft },
+  at: 9000,
+})
+
 describe('a draft', () => {
+  it('keeps the cards marked out of the discard, each role on its own', () => {
+    expect(
+      reduce(table(pick(2)), picked({ card: 'attack-bug#a', toDeck: 'trigger-ai#t' })).state
+        .pending,
+    ).toEqual({ ...pick(2), draft: { card: 'attack-bug#a', toDeck: 'trigger-ai#t' } })
+    // a pick made in part keeps the half that was made
+    expect(reduce(table(pick(2)), picked({ toDeck: 'trigger-ai#t' })).state.pending).toEqual({
+      ...pick(2),
+      draft: { toDeck: 'trigger-ai#t' },
+    })
+  })
+
   it('keeps the card the System Upgrade actor has marked to take', () => {
     expect(reduce(table(upgrade), marked('attack-bug#b')).state.pending).toEqual({
       ...upgrade,
@@ -113,5 +142,16 @@ describe('a draft', () => {
     expect(reduce(u, marked('attack-bug#a', 'p2')).state).toBe(u) // not the actor
     const d = table({ ...upgrade, phase: 'discarding' })
     expect(reduce(d, marked('attack-bug#a')).state).toBe(d) // nothing to take yet
+    const p = table(pick(2))
+    for (const action of [
+      picked({ card: 'trigger-ai#t' }), // a trigger never goes to a hand
+      picked({ card: 'attack-bug#zz' }), // not on offer
+      picked({ card: 'attack-bug#a', toDeck: 'attack-bug#a' }), // one card, both places
+      picked({ card: 'attack-bug#a' }, 'p2'), // not their decision
+    ]) {
+      expect(reduce(p, action).state).toBe(p)
+    }
+    const one = table(pick(1))
+    expect(reduce(one, picked({ toDeck: 'attack-bug#b' })).state).toBe(one) // no deck without Sudo
   })
 })

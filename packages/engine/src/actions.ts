@@ -41,7 +41,11 @@ export type Choice =
   | { kind: 'cancelRelease' }
 
 // The decisions whose answer is built up on the screen before it is confirmed.
-export type Draft = Extract<Choice, { kind: 'handLimit' | 'reorderTop' | 'upgradeTake' }>
+// A pick out of the discard may be marked in part, so both of its roles are
+// optional — what is left unmarked is drawn at random when the time runs out.
+export type Draft =
+  | Extract<Choice, { kind: 'handLimit' | 'reorderTop' | 'upgradeTake' }>
+  | { kind: 'pickFromDiscard'; card?: CardUid; toDeck?: CardUid }
 
 export type Action =
   | { type: 'DRAW'; player: PlayerId; pile?: number; at: number }
