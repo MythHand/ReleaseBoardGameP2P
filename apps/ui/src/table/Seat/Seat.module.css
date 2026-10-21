@@ -1,4 +1,5 @@
 .seat {
+  position: relative; /* the anchor of the attack mark */
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -65,5 +66,27 @@
   cursor: pointer;
   border-color: var(--turn-accent);
   box-shadow: 0 0 18px color-mix(in srgb, var(--turn-accent) 32%, transparent);
+}
+
+/* the seat an attack at the centre is aimed at: a 2px line in the attack
+   card's colour, 80% of the seat wide, 6px off its outer edge. Insets are taken
+   from the padding box, so each steps over the 1px outline first. */
+.seat[data-targeted]::after {
+  position: absolute;
+  inset-inline-start: 50%;
+  inline-size: calc((100% + 2px) * 0.8);
+  block-size: 2px;
+  pointer-events: none;
+  content: "";
+  background: color-mix(in srgb, var(--cat-attack) 50%, transparent);
+  transform: translateX(-50%);
+}
+
+.seat[data-targeted="below"]::after {
+  inset-block-start: calc(100% + 1px + 6px);
+}
+
+.seat[data-targeted="above"]::after {
+  inset-block-end: calc(100% + 1px + 6px);
 }
 

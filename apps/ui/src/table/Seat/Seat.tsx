@@ -37,6 +37,10 @@ interface SeatProps {
   // nothing about which plays are legal.
   onPick?: (target: TableTarget) => void
   targets?: TableTarget[]
+  // the seat an attack laid at the centre is aimed at, and the edge its mark
+  // stands on: 'below' as a rule, 'above' for a seat the spectator layout puts
+  // in its lower row. Who is attacked is the consumer's to say.
+  targeted?: 'below' | 'above'
 }
 
 // Место оппонента: имя, индикатор хода, число карт / статус, мини-зона релиза.
@@ -50,6 +54,7 @@ export default function Seat({
   slotRef,
   onPick,
   targets = [],
+  targeted,
 }: SeatProps) {
   // status dot — colour by state; idle seats hold a static dot, offline and the
   // active turn pulse to read as live
@@ -76,6 +81,7 @@ export default function Seat({
       className={`${styles.seat} ${active ? styles.active : ''} ${
         eliminated ? styles.eliminated : ''
       } ${disconnected ? styles.disconnected : ''} ${playerTargetable ? styles.targetable : ''}`}
+      data-targeted={targeted}
       onClick={playerTargetable ? pickPlayer : undefined}
       onKeyDown={
         playerTargetable
