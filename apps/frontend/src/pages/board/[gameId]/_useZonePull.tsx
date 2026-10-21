@@ -31,6 +31,8 @@ interface DragState<K extends string> {
   fracX: number
   fracY: number
   startW: number // source on-screen width (eases to CARD_W)
+  left: number // where it lay — the carrier mounts here, at that size (I10)
+  top: number
 }
 
 export interface ZonePull<K extends string = string> {
@@ -74,6 +76,8 @@ export function useZonePull<K extends string = string>(opts: {
       fracX: (e.clientX - r.left) / r.width,
       fracY: (e.clientY - r.top) / r.height,
       startW: r.width,
+      left: r.left,
+      top: r.top,
     })
   }
 
@@ -81,6 +85,12 @@ export function useZonePull<K extends string = string>(opts: {
   // (same position + size), then eases to the normal card size while the grab
   // point stays under the cursor (no snap-to-centre); on release, hit-test via
   // `accepts` and hand the drop (or cancel) back to the caller.
+  //
+  // THE SIZE IS A SCALE, never the width. The carrier is always the normal card
+  // width and grows by `transform`, the way every flight resizes a card (`move`
+  // in the presets). The card's own layers are sized off its width and ease
+  // their sizes for the LOD reading — a width changing every frame restarts
+  // those eases every frame, and the face lags behind its frame.
   // biome-ignore lint/correctness/useExhaustiveDependencies: drag is the trigger; the handlers use the closures captured when the drag began
   useEffect(() => {
     if (!drag) return
@@ -105,7 +115,7 @@ export function useZonePull<K extends string = string>(opts: {
         const ease = 1 - (1 - t) ** 3
         const w = drag.startW + (CARD_W - drag.startW) * ease
         const h = (w * CARD_H) / CARD_W
-        node.style.width = `${w}px`
+        node.style.transform = `scale(${w / CARD_W})`
         node.style.left = `${cursor.x - drag.fracX * w}px`
         node.style.top = `${cursor.y - drag.fracY * h}px`
       }
@@ -144,7 +154,16 @@ export function useZonePull<K extends string = string>(opts: {
     dragging: drag?.key ?? null,
     begin,
     overlay: drag && (
-      <div className={styles.carrier} ref={dragRef} style={{ width: CARD_W }}>
+      <div
+        className={styles.carrier}
+        ref={dragRef}
+        style={{
+          width: CARD_W,
+          left: drag.left,
+          top: drag.top,
+          transform: `scale(${drag.startW / CARD_W})`,
+        }}
+      >
         {content}
       </div>
     ),
