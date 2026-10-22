@@ -1,8 +1,12 @@
 /* Keep every row reachable above confirmation. The enlarged reading copy
-   lives in catalogPreview outside this scroller, including for other viewers. */
+   lives in catalogPreview outside this scroller, including for other viewers.
+   Only the asker has the confirm bar, so only the asker keeps its 170px
+   (`[data-bar]`); a watching seat reads the catalogue down to the bottom of the
+   screen rather than cut off along an edge nothing on its screen explains
+   (owner, 22.10). */
 .catalog {
   position: absolute;
-  inset-block: 160px 170px;
+  inset-block: 160px 0;
   inset-inline: 24px 72px;
   padding: 64px 48px;
   overflow: auto;
@@ -19,10 +23,15 @@
    and left of the rail. Its transparent hit area leaves every choice reachable. */
 .catalogPreview {
   position: absolute;
-  inset-block: 12px 170px;
+  inset-block: 12px 0;
   inset-inline: 24px 72px;
   z-index: 20;
   pointer-events: none;
+}
+
+.catalog[data-bar],
+.catalogPreview[data-bar] {
+  inset-block-end: 170px;
 }
 
 

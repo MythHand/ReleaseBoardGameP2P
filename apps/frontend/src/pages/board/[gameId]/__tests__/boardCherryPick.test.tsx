@@ -752,6 +752,84 @@ it('sends a watched pick home to the spots the cards were lifted from', async ()
   ])
 })
 
+// THE ROOM KEPT FOR THE CONFIRM BAR IS THE CHOOSER'S. A seat watching the pick
+// has no bar, and its cards were cut off along the bar's edge all the same
+// (owner, 22.10). The chooser keeps the room through the flights home: the
+// edge does not move under a card in the air.
+it('keeps room for the confirm bar on the choosing screen alone, flights home included', async () => {
+  vi.useFakeTimers()
+  mockReducedMotion(false)
+  let finishReturn = () => {}
+  exits.pending = new Promise<void>((resolve) => {
+    finishReturn = resolve
+  })
+  try {
+    const base = makeBoardProps()
+    const actor = base.state.opponents[0].id
+    const lying = [
+      { uid: 'd1', card: handItem('x', 'attack-bug').card, ...scatterAt(1) },
+      { uid: 'd2', card: handItem('x', 'release-frontend').card, ...scatterAt(2) },
+    ]
+    const decks = { ...base.state.decks, discardCount: 2, discardHeap: lying }
+    const watched = render(
+      <Board
+        {...base}
+        state={{ ...base.state, decks, pending: { ...cherryPending([]), player: actor } }}
+      />,
+    )
+    await afterDeal()
+    expect(screen.getByTestId('cherry-cells').hasAttribute('data-bar')).toBe(false)
+    watched.unmount()
+
+    const options = [
+      { uid: 'picked', id: 'release-frontend' },
+      { uid: 'rest', id: 'attack-bug' },
+    ]
+    const state = { ...base.state, pending: cherryPending(options) }
+    const intro = { gameId: 'cherry-bar-room', view: null, onDone: () => {}, events: [] }
+    const props = { ...base, state, intro, actions: { onResolve: vi.fn() } }
+    const { rerender } = render(<Board {...props} />)
+    await afterDeal()
+    expect(screen.getByTestId('cherry-cells').hasAttribute('data-bar')).toBe(true)
+    fireEvent.click(screen.getByTestId('cherry-cell-picked'))
+    fireEvent.click(screen.getByRole('button', { name: /confirm/i }))
+    // the answer closes the pick before its events have played: the cards are
+    // in the air already, and the edge stays where it was
+    rerender(<Board {...props} state={{ ...state, pending: null }} />)
+    await act(() => vi.advanceTimersByTimeAsync(100))
+    expect(screen.getByTestId('cherry-cells').hasAttribute('data-bar')).toBe(true)
+    rerender(
+      <Board
+        {...props}
+        state={{
+          ...state,
+          pending: null,
+          you: { ...state.you, hand: [...state.you.hand, handItem('picked', 'release-frontend')] },
+        }}
+        intro={{
+          ...intro,
+          events: [
+            {
+              id: 1,
+              type: 'takenFromDiscard',
+              player: 'you',
+              card: 'release-frontend',
+              to: 'hand',
+            },
+          ],
+        }}
+      />,
+    )
+    for (let i = 0; i < 25; i++) await act(() => vi.advanceTimersByTimeAsync(100))
+    // the rest is still flying home, and the edge has not moved under it
+    expect(screen.getByTestId('cherry-cells').hasAttribute('data-bar')).toBe(true)
+  } finally {
+    finishReturn()
+    exits.pending = null
+    vi.useRealTimers()
+  }
+})
+
 it.each([false, true])('reopens a refused Cherry-pick choice (single offer: %s)', (single) => {
   mockReducedMotion(true)
   const base = makeBoardProps()

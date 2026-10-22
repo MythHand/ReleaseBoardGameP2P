@@ -167,18 +167,24 @@ export function useCherryPickStaging(args: {
   const optionsRef = useRef<{ uid: string; id: string }[]>([])
   const sudoRef = useRef(false)
   const insideRef = useRef(false)
+  const actorRef = useRef(false)
   if (ours) {
     optionsRef.current = ours.options
     sudoRef.current = ours.picks === 2
     insideRef.current = releasesOnly
+    actorRef.current = true
   } else if (theirs) {
     // the same carry-forward, for the seat that only watches: the pending goes
     // the instant the engine answers, and the cards are still in the air
     optionsRef.current = watched
     sudoRef.current = theirs.picks === 2
     insideRef.current = releasesOnly
+    actorRef.current = false
   }
   const inside = ours || theirs ? releasesOnly : insideRef.current
+  // whether this seat is the one choosing — for the whole episode, flights
+  // home included, so nothing about the surface changes under a card mid-air
+  const actor = ours ? true : theirs ? false : actorRef.current
   const options = ours ? ours.options : theirs ? watched : optionsRef.current
   const sudo = ours ? ours.picks === 2 : theirs ? theirs.picks === 2 : sudoRef.current
   // ONE OFFER FOR BOTH SEATS — the actor's own, or the same pick seen from
@@ -814,7 +820,12 @@ export function useCherryPickStaging(args: {
         testId={inside ? 'board-inside-row' : 'board-cherry-grid'}
         blockTestId="board-cherry-scrim"
       >
-        <div className={`${styles.cells} ${dealing ? styles.dealing : ''}`}>
+        <div
+          className={`${styles.cells} ${dealing ? styles.dealing : ''}`}
+          // the confirm bar is the actor's alone, and so is the room kept for it
+          data-bar={actor ? '' : undefined}
+          data-testid="cherry-cells"
+        >
           {options.map((o) => {
             const data = cardById(o.id)
             if (!data) return null
