@@ -752,6 +752,126 @@ it('sends a watched pick home to the spots the cards were lifted from', async ()
   ])
 })
 
+// THE GRID IS DRAWN FOR ITS VIEWER — the actor, who chooses and has the confirm
+// bar, or a seat that watches (owner, 22.10). A watcher's cards were cut off
+// along the edge of a bar it never had. The actor stays the actor through the
+// flights home: nothing about its grid changes under a card in the air.
+it('draws the grid for the actor or for a watcher, flights home included', async () => {
+  vi.useFakeTimers()
+  mockReducedMotion(false)
+  let finishReturn = () => {}
+  exits.pending = new Promise<void>((resolve) => {
+    finishReturn = resolve
+  })
+  try {
+    const base = makeBoardProps()
+    const actor = base.state.opponents[0].id
+    const lying = [
+      { uid: 'd1', card: handItem('x', 'attack-bug').card, ...scatterAt(1) },
+      { uid: 'd2', card: handItem('x', 'release-frontend').card, ...scatterAt(2) },
+    ]
+    const decks = { ...base.state.decks, discardCount: 2, discardHeap: lying }
+    const watched = render(
+      <Board
+        {...base}
+        state={{ ...base.state, decks, pending: { ...cherryPending([]), player: actor } }}
+      />,
+    )
+    await afterDeal()
+    expect(screen.getByTestId('cherry-cells').getAttribute('data-viewer')).toBe('watcher')
+    watched.unmount()
+
+    const options = [
+      { uid: 'picked', id: 'release-frontend' },
+      { uid: 'rest', id: 'attack-bug' },
+    ]
+    const state = { ...base.state, pending: cherryPending(options) }
+    const intro = { gameId: 'cherry-bar-room', view: null, onDone: () => {}, events: [] }
+    const props = { ...base, state, intro, actions: { onResolve: vi.fn() } }
+    const { rerender } = render(<Board {...props} />)
+    await afterDeal()
+    expect(screen.getByTestId('cherry-cells').getAttribute('data-viewer')).toBe('actor')
+    fireEvent.click(screen.getByTestId('cherry-cell-picked'))
+    fireEvent.click(screen.getByRole('button', { name: /confirm/i }))
+    // the answer closes the pick before its events have played: the cards are
+    // in the air already, and the edge stays where it was
+    rerender(<Board {...props} state={{ ...state, pending: null }} />)
+    await act(() => vi.advanceTimersByTimeAsync(100))
+    expect(screen.getByTestId('cherry-cells').getAttribute('data-viewer')).toBe('actor')
+    rerender(
+      <Board
+        {...props}
+        state={{
+          ...state,
+          pending: null,
+          you: { ...state.you, hand: [...state.you.hand, handItem('picked', 'release-frontend')] },
+        }}
+        intro={{
+          ...intro,
+          events: [
+            {
+              id: 1,
+              type: 'takenFromDiscard',
+              player: 'you',
+              card: 'release-frontend',
+              to: 'hand',
+            },
+          ],
+        }}
+      />,
+    )
+    for (let i = 0; i < 25; i++) await act(() => vi.advanceTimersByTimeAsync(100))
+    // the rest is still flying home, and the edge has not moved under it
+    expect(screen.getByTestId('cherry-cells').getAttribute('data-viewer')).toBe('actor')
+  } finally {
+    finishReturn()
+    exits.pending = null
+    vi.useRealTimers()
+  }
+})
+
+// THE ACTOR READS THE CARD IT POINTS AT — in the table's own preview, on the
+// right of its grid (owner, 23.10). Not while the cards are still being dealt
+// out of the pile, and not on a watcher's screen: its grid is as it was.
+it('reads a grid card in the table preview on the actor’s screen alone', async () => {
+  vi.useFakeTimers()
+  mockReducedMotion(false)
+  try {
+    const base = makeBoardProps()
+    const previewed = () =>
+      document.querySelector('[data-card-preview] [data-card]')?.getAttribute('data-card') ?? null
+    const options = [
+      { uid: 'picked', id: 'release-frontend' },
+      { uid: 'rest', id: 'attack-bug' },
+    ]
+    const acting = render(
+      <Board {...base} state={{ ...base.state, pending: cherryPending(options) }} />,
+    )
+    // dealing: nothing to read yet
+    fireEvent.mouseEnter(screen.getByTestId('cherry-cell-picked'))
+    expect(previewed()).toBeNull()
+    await afterDeal()
+    fireEvent.mouseEnter(screen.getByTestId('cherry-cell-picked'))
+    expect(previewed()).toBe('release-frontend')
+    acting.unmount()
+
+    const actor = base.state.opponents[0].id
+    const lying = [{ uid: 'd1', card: handItem('x', 'attack-bug').card, ...scatterAt(1) }]
+    const decks = { ...base.state.decks, discardCount: 1, discardHeap: lying }
+    render(
+      <Board
+        {...base}
+        state={{ ...base.state, decks, pending: { ...cherryPending([]), player: actor } }}
+      />,
+    )
+    await afterDeal()
+    fireEvent.mouseEnter(screen.getByTestId('cherry-cell-d1'))
+    expect(previewed()).toBeNull()
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
 it.each([false, true])('reopens a refused Cherry-pick choice (single offer: %s)', (single) => {
   mockReducedMotion(true)
   const base = makeBoardProps()

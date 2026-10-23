@@ -62,6 +62,12 @@ export function useRequestStaging(args: {
   // across the table: the card the asker's own surface is naming right now
   const watchedName =
     watching && args.pickPreview?.player === watching.player ? args.pickPreview.card : null
+  // whether this seat is the one naming — kept past the pending, through the
+  // beat's hold, so nothing about the surface changes under the card it holds
+  const askerRef = useRef(false)
+  if (asking) askerRef.current = true
+  else if (watching) askerRef.current = false
+  const asker = asking ? true : watching ? false : askerRef.current
   const [confirmed, setConfirmed] = useState(false)
   const [picked, setPicked] = useState<{ index: number; rect: DOMRect } | null>(null)
   // The fan comes down FROM ABOVE THE SCREEN, so it has to be mounted out of
@@ -256,8 +262,17 @@ export function useRequestStaging(args: {
         >
           {(Boolean(asking) || watching != null || held != null) && (
             <>
-              <div className={styles.catalogPreview} ref={catalogPreview} />
-              <div className={styles.catalog}>
+              {/* the confirm bar is the asker's alone, and so is the room kept for it */}
+              <div
+                className={styles.catalogPreview}
+                ref={catalogPreview}
+                data-bar={asker ? '' : undefined}
+              />
+              <div
+                className={styles.catalog}
+                data-bar={asker ? '' : undefined}
+                data-testid="request-catalog"
+              >
                 {/* A CARD IS NAMED BY CLICKING IT — the scene's own gesture
                     (`PickSpecificCardStory`, `OpponentTakesCardStory`, both of
                     which call this catalogue exactly like this) and what the

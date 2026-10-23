@@ -8,7 +8,7 @@
 // panel at all — the copies differ only by uid, so there is nothing to choose.
 
 import type { TablePending } from '@release/ui'
-import { fireEvent, render, renderHook, within } from '@testing-library/react'
+import { act, fireEvent, render, renderHook, within } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import type { PlayerBoardState } from '~/entities/game/board'
 import type { RequestPickHandoff } from '~/entities/game/board/types'
@@ -279,4 +279,40 @@ it('tells the keeper the card marked in the catalogue, and the table too', () =>
   fireEvent.click(within(band).getAllByRole('button', { name: /Hotfix/ })[0])
   expect(onDraft).toHaveBeenLastCalledWith({ kind: 'requestCard', card: 'defense-hotfix' })
   expect(onPickPreview).toHaveBeenLastCalledWith('defense-hotfix')
+})
+
+// THE ROOM KEPT FOR THE CONFIRM BAR IS THE ASKER'S. A seat watching the request
+// has no bar, and its catalogue was cut off along the bar's edge all the same
+// (owner, 22.10). The asker keeps the room while the beat holds the named card
+// after the answer: the edge does not move under the card being shown.
+it('keeps room for the confirm bar on the asking screen alone, through the hold', () => {
+  const watching = withPending({ kind: 'requestCard', player: 'p2', target: 'p3' })
+  const watched = render(<Board {...watching} />)
+  const watchedCatalog = watched.getByTestId('request-catalog')
+  expect(watchedCatalog.hasAttribute('data-bar')).toBe(false)
+  expect(watchedCatalog.previousElementSibling?.hasAttribute('data-bar')).toBe(false)
+  watched.unmount()
+
+  const handoff: { current: RequestPickHandoff | null } = { current: null }
+  const asking = withPending({ kind: 'requestCard', player: 'you', target: 'p2' })
+  const staging = renderHook(
+    (state: PlayerBoardState) =>
+      useRequestStaging({
+        state,
+        actions: {},
+        copy: { prompt: '', action: '', confirm: '', steal: '' },
+        enabled: true,
+        matchKey: 'bar-room',
+        handoff,
+      }),
+    { initialProps: asking.state },
+  )
+  const catalog = () => render(staging.result.current.band).getAllByTestId('request-catalog').at(-1)
+  expect(catalog()?.hasAttribute('data-bar')).toBe(true)
+  expect(catalog()?.previousElementSibling?.hasAttribute('data-bar')).toBe(true)
+  // the answer is in and the pending is gone; the beat holds the named card
+  act(() => handoff.current?.hold('defense-hotfix'))
+  staging.rerender({ ...asking.state, pending: null })
+  expect(catalog()?.hasAttribute('data-bar')).toBe(true)
+  expect(catalog()?.previousElementSibling?.hasAttribute('data-bar')).toBe(true)
 })

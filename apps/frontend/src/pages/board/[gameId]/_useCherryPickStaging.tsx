@@ -1,6 +1,15 @@
 import type { Event } from '@release/engine'
-import type { CardData, HeapCard } from '@release/ui'
-import { Card, ConfirmAction, cardAreaOf, cardById, TableSurface, Typography } from '@release/ui'
+import type { CardData, CardPreviewSlotProps, HeapCard } from '@release/ui'
+import {
+  CARD_PREVIEW_INSET,
+  CARD_PREVIEW_W,
+  Card,
+  ConfirmAction,
+  cardAreaOf,
+  cardById,
+  TableSurface,
+  Typography,
+} from '@release/ui'
 import {
   exitLayer,
   nextFrames,
@@ -10,7 +19,7 @@ import {
   useFlyer,
   wait,
 } from '@release/ui/animations'
-import type { ReactNode, RefObject } from 'react'
+import type { CSSProperties, ReactNode, RefObject } from 'react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { BeatRun, BoardActions, BoardAnchors, BoardState } from '~/entities/game/board'
 import type { DiscardPickHandoff } from '~/entities/game/board/types'
@@ -79,6 +88,12 @@ export function useCherryPickStaging(args: {
   anchors: BoardAnchors
   actions?: BoardActions
   onHandArrival: (order: string[], uid: string, at: number) => void
+  /**
+   * READING A CARD IN THE GRID. The board's own preview, at its own place, the
+   * same one Rebase's row reads by: the actor points at a card and reads it on
+   * the right of the grid (owner, 23.10). A watcher's grid does not read.
+   */
+  preview: (card?: CardData | null, faceDown?: boolean) => CardPreviewSlotProps
   copy: {
     prompt: string
     /** Inside's own caption — the offer is the releases, not the whole discard */
@@ -104,7 +119,7 @@ export function useCherryPickStaging(args: {
    *  the rest */
   lifted: { uids: ReadonlySet<string>; count: number } | null
 } {
-  const { state, anchors, actions, copy, enabled } = args
+  const { state, anchors, actions, copy, enabled, preview } = args
   const reduced = useReducedMotion()
   const pending = state.pending
   const ours =
@@ -167,18 +182,24 @@ export function useCherryPickStaging(args: {
   const optionsRef = useRef<{ uid: string; id: string }[]>([])
   const sudoRef = useRef(false)
   const insideRef = useRef(false)
+  const actorRef = useRef(false)
   if (ours) {
     optionsRef.current = ours.options
     sudoRef.current = ours.picks === 2
     insideRef.current = releasesOnly
+    actorRef.current = true
   } else if (theirs) {
     // the same carry-forward, for the seat that only watches: the pending goes
     // the instant the engine answers, and the cards are still in the air
     optionsRef.current = watched
     sudoRef.current = theirs.picks === 2
     insideRef.current = releasesOnly
+    actorRef.current = false
   }
   const inside = ours || theirs ? releasesOnly : insideRef.current
+  // whether this seat is the one choosing — for the whole episode, flights
+  // home included, so nothing about the surface changes under a card mid-air
+  const actor = ours ? true : theirs ? false : actorRef.current
   const options = ours ? ours.options : theirs ? watched : optionsRef.current
   const sudo = ours ? ours.picks === 2 : theirs ? theirs.picks === 2 : sudoRef.current
   // ONE OFFER FOR BOTH SEATS — the actor's own, or the same pick seen from
@@ -814,7 +835,22 @@ export function useCherryPickStaging(args: {
         testId={inside ? 'board-inside-row' : 'board-cherry-grid'}
         blockTestId="board-cherry-scrim"
       >
-        <div className={`${styles.cells} ${dealing ? styles.dealing : ''}`}>
+        <div
+          className={`${styles.cells} ${dealing ? styles.dealing : ''}`}
+          // WHO IS LOOKING. The grid is one, and it is drawn for two viewers: the
+          // actor, who chooses and has the confirm bar, and a seat that watches
+          // the choice — an opponent or a spectator. What the two share is the
+          // grid's own; what differs is styled per viewer (owner, 22.10).
+          data-viewer={actor ? 'actor' : 'watcher'}
+          // the preview's own place, so the actor's grid keeps clear of it
+          style={
+            {
+              '--preview-inset': `${CARD_PREVIEW_INSET}px`,
+              '--preview-w': `${CARD_PREVIEW_W}px`,
+            } as CSSProperties
+          }
+          data-testid="cherry-cells"
+        >
           {options.map((o) => {
             const data = cardById(o.id)
             if (!data) return null
@@ -830,6 +866,8 @@ export function useCherryPickStaging(args: {
                   else cellRefs.current.delete(o.uid)
                 }}
                 type="button"
+                // read while it is being chosen, by the one choosing
+                {...(choosing ? preview(data) : {})}
                 data-testid={`cherry-cell-${o.uid}`}
                 className={`${styles.cell} ${selected ? styles.selected : ''} ${
                   blocked ? styles.blocked : ''

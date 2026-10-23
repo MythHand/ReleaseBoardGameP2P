@@ -6,8 +6,8 @@
   position: fixed;
   inset-block-start: 50%;
 
-  /* clear of the right rail (56px) by the same 26px the decks keep from the left */
-  inset-inline-end: 82px;
+  /* the distance from the right edge is `CARD_PREVIEW_INSET`, set inline: it is
+     exported, so whatever stands beside the preview keeps clear of it */
   z-index: var(--z-card-preview);
   pointer-events: auto;
   transform: translateY(-50%);
