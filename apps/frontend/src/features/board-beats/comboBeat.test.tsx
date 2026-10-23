@@ -807,8 +807,19 @@ it('takes an opponent’s shown Code Review combo off its place in the row, stra
   expect(played.starts).toEqual([{ left: 316, top: 300, width: 150 }])
   // its standing render went down as the carrier took it
   expect(published.at(-1)?.shown ?? []).toEqual([])
-  // a zone draws a pair whole whoever's it is: no reading to take
-  expect(played.patches).toEqual([])
+  // their zone reads at a glance, and the pair is handed that reading BEFORE its
+  // flight starts — both halves, the way the zone then draws it
+  expect(played.patches).toHaveLength(1)
+  const [{ flights, next }] = played.patches as {
+    flights: number
+    next: { content: { props: Record<string, unknown> } }
+  }[]
+  expect(flights).toBe(0)
+  expect(next.content.props).toMatchObject({
+    lod: true,
+    main: { id: 'release-backend' },
+    aux: { id: 'support-code-review' },
+  })
 })
 
 it('takes an opponent’s shown lone release off the stage slot, reading at a glance from takeoff', async () => {

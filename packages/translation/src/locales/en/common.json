@@ -466,7 +466,11 @@
   },
   "rulesBlock": {
     "searchPlaceholder": "search the rules…",
-    "notFound": "Nothing found"
+    "notFound": "Nothing found",
+    "video": {
+      "play": "Watch the rules breakdown",
+      "title": "Release at any cost. Rules breakdown"
+    }
   },
   "lobbyScreen": {
     "title": "Lobby",

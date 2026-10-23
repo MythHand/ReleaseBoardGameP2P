@@ -466,7 +466,11 @@
   },
   "rulesBlock": {
     "searchPlaceholder": "поиск по правилам…",
-    "notFound": "Ничего не найдено"
+    "notFound": "Ничего не найдено",
+    "video": {
+      "play": "Смотреть разбор правил",
+      "title": "Release любой ценой. Разбор правил"
+    }
   },
   "lobbyScreen": {
     "title": "Лобби",

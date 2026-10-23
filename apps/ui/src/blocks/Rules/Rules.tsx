@@ -16,6 +16,7 @@ import CardParallax, {
   type ParallaxCardConfig,
 } from '@/cards/CardParallax'
 import styles from './Rules.module.css'
+import RulesVideo, { type RulesVideoCopy } from './RulesVideo'
 
 // Правила = скелет (структура, язык-независимая) + copy (тексты по id, на язык).
 // Имена карт в скелете общие для всех языков (они же ключи арта в каталоге).
@@ -221,6 +222,8 @@ export interface RulesCopy {
   meta: string[]
   searchPlaceholder: string
   notFound: string
+  // the rules breakdown video at the head of the rules
+  video: RulesVideoCopy
   text: Record<string, RuleText>
 }
 
@@ -674,6 +677,9 @@ export default function Rules({ copy, lang = 'ru' }: RulesProps) {
           </div>
         )}
       </div>
+
+      {/* the breakdown leads the rules; a search hides it like the table below */}
+      {!query && <RulesVideo copy={copy.video} />}
 
       {!query && (
         <ul className={styles.meta}>
