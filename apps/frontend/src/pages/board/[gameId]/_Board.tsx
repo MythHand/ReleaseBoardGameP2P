@@ -570,6 +570,8 @@ function BoardView({
     anchors,
     actions,
     onHandArrival: (order) => handOrder.place(order),
+    // the grid's cards are read the way every card on the table is
+    preview: previewProps,
     copy: {
       prompt: copy.table.cherryPickPrompt,
       insidePrompt: copy.table.insidePrompt,
