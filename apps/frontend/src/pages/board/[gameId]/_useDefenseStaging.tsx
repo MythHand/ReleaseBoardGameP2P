@@ -567,7 +567,9 @@ export function useDefenseStaging({
       // standing Sudo.
       const box = anchors.cover.current?.getBoundingClientRect()
       const sudoBox = anchors.sudo.current?.getBoundingClientRect()
-      const fromRect = rectOf(anchors.handSlotAt(index)) ?? undefined
+      // the card's own box in the fan, not the slot's bounding rect (I6); its
+      // tilt is not carried — the fold starts square (`foldIntoPair`)
+      const fromRect = anchors.handCardAt(index)?.box
       if (!box || !sudoBox) return
       arrowCtl.stop() // the choice is made — nothing is pointed at while the pair folds
       const mainIndex = (state.you?.hand ?? EMPTY_HAND).findIndex((c) => c.uid === item.uid)

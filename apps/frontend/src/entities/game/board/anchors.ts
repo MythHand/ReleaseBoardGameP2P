@@ -14,6 +14,33 @@ import { useCallback, useMemo, useRef } from 'react'
 // lookup would make the registry depend on the very hand it is meant to be
 // independent of. A caller already holds the hand it planned against, and
 // resolves the index there.
+/** a card of our fan, as it is drawn: its card box and the pose it stands in */
+export interface HandCard {
+  box: Rect
+  /** its tilt in the fan, deg — 0 when it stands straight */
+  rot: number
+  /** …the same tilt as a carrier's pose to rise in, absent when straight */
+  pose?: string
+}
+
+/**
+ * The card standing in one slot of our fan, read off the slot as it is drawn
+ * (`BoardAnchors.handCardAt`). A pure rotation and scale leave the card's centre
+ * where it was, so the box is centred on the slot's bounding rect.
+ */
+export function handCardOf(slot: HTMLElement | null): HandCard | null {
+  if (!slot) return null
+  const look = getComputedStyle(slot).transform
+  const m =
+    look && look !== 'none' && typeof DOMMatrixReadOnly !== 'undefined'
+      ? new DOMMatrixReadOnly(look)
+      : null
+  const scale = m ? Math.hypot(m.a, m.b) : 1
+  const rot = m ? (Math.atan2(m.b, m.a) * 180) / Math.PI : 0
+  const box = cardBoxIn(slot.getBoundingClientRect(), CARD_W * scale)
+  return rot ? { box, rot, pose: `rotate(${rot}deg)` } : { box, rot }
+}
+
 export interface BoardAnchors {
   rail: RefObject<HTMLDivElement | null>
   bg: RefObject<HTMLDivElement | null>
@@ -48,6 +75,15 @@ export interface BoardAnchors {
   /** a card-sized box centred on a seat: a seat is far wider than a card (I6) */
   seatBox: (player: string) => Rect | null
   handSlotAt: (index: number) => HTMLElement | null
+  /**
+   * WHERE A CARD OF OUR FAN STANDS, as it is drawn right now — what a flight out
+   * of the fan rises on. A slot is rotated, so its bounding rect is the box
+   * AROUND the tilted card: a carrier raised on it started bigger and square,
+   * and the card jumped on the first frame (I6). Read off the slot's own
+   * transform, so a card straightened and lifted under the cursor reads as it
+   * stands.
+   */
+  handCardAt: (index: number) => HandCard | null
   releaseSlot: (player: string, slot: string) => HTMLElement | null
   bindSeat: (player: string, el: HTMLElement | null) => void
   bindReleaseSlot: (player: string, slot: string, el: HTMLElement | null) => void
@@ -116,6 +152,7 @@ export function useBoardAnchors(): BoardAnchors {
       hand.current?.querySelectorAll<HTMLElement>('[data-hand-slot]')[index] ?? null,
     [],
   )
+  const handCardAt = useCallback((index: number) => handCardOf(handSlotAt(index)), [handSlotAt])
   const pileBox = useCallback((index: number) => pileEls.current[index] ?? null, [])
   // A merge takes piles off the table, so an unbound index must answer null
   // rather than keep a node that is no longer rendered.
@@ -183,6 +220,7 @@ export function useBoardAnchors(): BoardAnchors {
       seatOf,
       seatBox,
       handSlotAt,
+      handCardAt,
       releaseSlot,
       bindSeat,
       bindReleaseSlot,
@@ -195,6 +233,7 @@ export function useBoardAnchors(): BoardAnchors {
       seatOf,
       seatBox,
       handSlotAt,
+      handCardAt,
       releaseSlot,
       bindSeat,
       bindReleaseSlot,

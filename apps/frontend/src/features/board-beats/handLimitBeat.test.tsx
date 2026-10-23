@@ -4,6 +4,7 @@ import { scatterAt } from '@release/ui/animations'
 import { act, render } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
 import type { BeatRun, BoardAnchors, BoardState, HandLimitHandoff } from '~/entities/game/board'
+import { handCardOf } from '~/entities/game/board'
 import { useHandLimitBeat } from './handLimitBeat'
 import type { BeatPlan } from './planBeats'
 import { spot } from './testing'
@@ -12,7 +13,11 @@ import { spot } from './testing'
 // `raise` recorded (that is what says whether cards were flown INTO the grid),
 // and `useDiscardExit` is replaced at the leaf — its own `send` reaches `play`
 // through a sibling import the barrel mock never sees.
-const raises = vi.hoisted(() => ({ keys: [] as string[], at: [] as Rect[] }))
+const raises = vi.hoisted(() => ({
+  keys: [] as string[],
+  at: [] as Rect[],
+  poses: [] as (string | undefined)[],
+}))
 const played = vi.hoisted(() => ({
   // `from` is where the flown element STOOD as the flight began — the start a
   // travel reads off the card itself (`testing.tsx`'s `standing`)
@@ -38,6 +43,7 @@ vi.mock('@release/ui/animations', async (importOriginal) => {
           order.calls.push('raise')
           raises.keys.push(...items.map((i) => i.key))
           raises.at.push(...items.map((i) => i.at))
+          raises.poses.push(...items.map((i) => i.pose))
           return flyer.raise(items)
         },
         drop: (key?: string) => {
@@ -179,6 +185,9 @@ function harness(
     picked: { current: nodeAt(PICKED_BOX) },
     eventsBox: { current: nodeAt({ left: 20, top: 20, width: 150, height: 210 }) },
     handSlotAt: () => node(),
+    handCardAt(this: { handSlotAt: (i: number) => HTMLElement | null }, i: number) {
+      return handCardOf(this.handSlotAt(i))
+    },
     releaseSlot: () => node(),
     seatBox: () => ({ left: 0, top: 0, width: 150, height: 210 }) as Rect,
     heldCard: () => null,
@@ -225,6 +234,53 @@ it('adopts the grid the actor already filled', async () => {
   // release and send are one handover: the static grid comes down immediately
   // before the exit carriers go up, with no awaited gap between them.
   expect(order.calls).toEqual(['release', 'send'])
+})
+
+// THE LAYER IS THE HEAP'S ORDER, NOT THE GRID'S. A grid we filled ourselves
+// stands in the order we filled it; the heap files the cards in the order they
+// were discarded. Riding their cells' layers, they landed in one order and the
+// heap re-laid them in the other (owner, 23.10; I9). They still leave cell by cell.
+it('lands an adopted grid in the heap’s order whatever cells the cards stand in', async () => {
+  raises.keys.length = 0
+  exits.items.length = 0
+  const cells = [node(), node()]
+  const handoff: HandLimitHandoff = {
+    player: 'p1',
+    cards: [
+      // filled the other way round: the Bug, discarded first, in the second cell
+      // biome-ignore lint/style/noNonNullAssertion: known catalogue entry
+      { uid: 'u2', card: cardById('protection-debugger')!, slot: 0 },
+      // biome-ignore lint/style/noNonNullAssertion: known catalogue entry
+      { uid: 'u1', card: cardById('attack-bug')!, slot: 1 },
+    ],
+    cellAt: (slot: number) => cells[slot] ?? null,
+    release: vi.fn(),
+  }
+  const { api, Probe } = harness(handoff)
+  render(<Probe />)
+  await drive(() => api.beat?.run(plan(), { base, publish: () => {} }))
+  expect(exits.items.map((i) => i.key)).toEqual(['d4', 'd5'])
+  expect(exits.items.map((i) => i.layer)).toEqual([0, 1])
+  // …and still leave cell by cell: the Debugger's cell first
+  expect(exits.items.map((i) => i.delay)).toEqual([90, 0])
+})
+
+// OUT OF OUR FAN, A CARD RISES AS IT STANDS THERE — on its own card box and in
+// its tilt (`handCardAt`), and the flight straightens it on the way. Raised on
+// the slot's bounding rect, the box AROUND the tilted card, it started bigger
+// and square, and jumped on its first frame (owner, 23.10; I6).
+it('raises a card the keeper took out of our fan on its own box, in its tilt', async () => {
+  raises.keys.length = 0
+  raises.at.length = 0
+  raises.poses.length = 0
+  const box = (i: number) => ({ left: 300 + i * 90, top: 600, width: 150, height: 210 })
+  const { api, Probe } = harness(null, {
+    handCardAt: (i: number) => ({ box: box(i), rot: 6 + i, pose: `rotate(${6 + i}deg)` }),
+  })
+  render(<Probe />)
+  await drive(() => api.beat?.run(plan(), { base, publish: () => {} }))
+  expect(raises.at).toEqual([box(0), box(1)])
+  expect(raises.poses).toEqual(['rotate(6deg)', 'rotate(7deg)'])
 })
 
 it('keeps the handoff captured when the page clears its ref during the first frame wait', async () => {

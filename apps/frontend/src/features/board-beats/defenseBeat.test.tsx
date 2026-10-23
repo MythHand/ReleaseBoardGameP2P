@@ -5,7 +5,7 @@ import { act, render } from '@testing-library/react'
 import type { RefObject } from 'react'
 import { expect, it, vi } from 'vitest'
 import type { BeatRun, BoardAnchors, BoardState, StagedHandoff } from '~/entities/game/board'
-import { ALARM_POSE, COVER_POSE } from '~/entities/game/board'
+import { ALARM_POSE, COVER_POSE, handCardOf } from '~/entities/game/board'
 import { useDefenseBeat } from './defenseBeat'
 import type { BeatPlan } from './planBeats'
 
@@ -183,6 +183,9 @@ function harness(handSlot: HTMLElement | null = null) {
       player === 'p1' ? null : { left: 0, top: 0, width: 150, height: 210 },
     seatOf: () => node(),
     handSlotAt: () => handSlot,
+    handCardAt(this: { handSlotAt: (i: number) => HTMLElement | null }, i: number) {
+      return handCardOf(this.handSlotAt(i))
+    },
     // …and an opponent's zone reads at a glance, ours in full: `Seat` hands
     // its zone `lod` and the zone says so on every slot (`zoneReading.ts`)
     releaseSlot: (player: string) => {

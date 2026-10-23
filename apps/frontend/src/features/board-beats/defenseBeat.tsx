@@ -143,11 +143,15 @@ export function useDefenseBeat(
           ? (ctx.base.you?.hand.findIndex((h) => h.card.id === plan.card) ?? -1)
           : -1
         const seat = a.seatBox(plan.defender)
-        const from = (handIndex >= 0 ? rectOf(a.handSlotAt(handIndex)) : null) ?? seat ?? coverBox
+        // out of our fan: the card's own box and the tilt it stands at
+        // (`handCardAt`), not the slot's bounding rect (I6)
+        const fan = handIndex >= 0 ? a.handCardAt(handIndex) : null
+        const from = fan?.box ?? seat ?? coverBox
         const raised = flyer.raise([
           {
             key: 'cover',
             at: from,
+            pose: fan?.pose,
             content: ownSudo ? <CardPair main={defence} aux={ownSudo} width="100%" /> : undefined,
             card: ownSudo ? undefined : defence,
           },
@@ -388,16 +392,16 @@ export function useDefenseBeat(
         const handIndex = mine
           ? (ctx.base.you?.hand.findIndex((h) => h.card.id === plan.spent[0]?.card) ?? -1)
           : -1
-        const from =
-          (carried ? rectOf(carried.el) : null) ??
-          fromSlot ??
-          (handIndex >= 0 ? rectOf(a.handSlotAt(handIndex)) : null) ??
-          a.seatBox(plan.player) ??
-          coverBox
+        const carriedFrom = carried ? rectOf(carried.el) : null
+        // out of our fan: the card's own box and the tilt it stands at
+        // (`handCardAt`), not the slot's bounding rect (I6)
+        const fan = !carriedFrom && !fromSlot && handIndex >= 0 ? a.handCardAt(handIndex) : null
+        const from = carriedFrom ?? fromSlot ?? fan?.box ?? a.seatBox(plan.player) ?? coverBox
         const raised = flyer.raise([
           {
             key: 'cover',
             at: from,
+            pose: fan?.pose,
             content: aux ? <CardPair main={answer} aux={aux} width="100%" /> : undefined,
             card: aux ? undefined : answer,
           },

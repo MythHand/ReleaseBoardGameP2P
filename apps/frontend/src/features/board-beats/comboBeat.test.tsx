@@ -12,6 +12,7 @@ import type {
   PlayerBoardState,
   StagedHandoff,
 } from '~/entities/game/board'
+import { handCardOf } from '~/entities/game/board'
 import { useComboBeat } from './comboBeat'
 import type { BeatPlan } from './planBeats'
 import { spot } from './testing'
@@ -175,6 +176,9 @@ function harness() {
       player === 'p1' ? null : { left: 0, top: 0, width: 150, height: 210 },
     seatOf: () => node(),
     handSlotAt: (i: number) => (i === 0 ? handSlot : null),
+    handCardAt(this: { handSlotAt: (i: number) => HTMLElement | null }, i: number) {
+      return handCardOf(this.handSlotAt(i))
+    },
     releaseSlot: (player: string) => (player === 'p1' ? releaseSlot : theirSlot),
     bindPile: () => {},
     heldCard: () => null,

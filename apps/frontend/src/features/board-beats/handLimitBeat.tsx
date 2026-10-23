@@ -38,6 +38,14 @@ const rectOf = (el: Element | null): Rect | null => {
   return { left: r.left, top: r.top, width: r.width, height: r.height }
 }
 
+// where a flown card starts: the rect its carrier rises on, and — for a card
+// out of our fan — the tilt it stands at there (`handCardAt`)
+interface Start {
+  at: Rect
+  pose?: string
+}
+const startAt = (at: Rect | null): Start | null => (at ? { at } : null)
+
 // The grid's cells in viewport coordinates. `gridCells` gives offsets from the
 // grid's own point; the point itself is `GRID_TOP` of the table, measured off
 // the ambience layer, which is `inset: 0` of the table (I6 — these are card
@@ -85,11 +93,15 @@ export function useHandLimitBeat(
 
   // where a card that has to be FLOWN in starts from — the same three sources
   // `discardBeat` knows, for the same reason it knows them
-  const whereFrom = useCallback((c: DiscardCard): Rect | null => {
+  const whereFrom = useCallback((c: DiscardCard): Start | null => {
     const a = latest.current.anchors
-    if (c.source.kind === 'hand') return rectOf(a.handSlotAt(c.source.index))
-    if (c.source.kind === 'release') return rectOf(a.releaseSlot(c.source.player, c.source.slot))
-    return a.seatBox(c.source.player)
+    if (c.source.kind === 'hand') {
+      const fan = a.handCardAt(c.source.index)
+      return fan ? { at: fan.box, pose: fan.pose } : null
+    }
+    if (c.source.kind === 'release')
+      return startAt(rectOf(a.releaseSlot(c.source.player, c.source.slot)))
+    return startAt(a.seatBox(c.source.player))
   }, [])
 
   // The AI card standing behind this prompt goes home now that the batch has
@@ -180,11 +192,12 @@ export function useHandLimitBeat(
       const notHeld = hand.filter((h) => latest.current.anchors.heldCard(h.uid) == null)
       const slotsIn = (drawn: typeof hand) => {
         const claimed = new Set<number>()
-        return (id: string): Rect | null => {
+        return (id: string): Start | null => {
           const at = drawn.findIndex((h, i) => h.card.id === id && !claimed.has(i))
           if (at < 0) return null
           claimed.add(at)
-          return rectOf(latest.current.anchors.handSlotAt(at))
+          const fan = latest.current.anchors.handCardAt(at)
+          return fan ? { at: fan.box, pose: fan.pose } : null
         }
       }
       // the grid adopted, its cards are drawn in it and not in the fan
@@ -222,15 +235,19 @@ export function useHandLimitBeat(
         flying: {
           key: string
           card: GatheredCard
-          from: Rect | null
+          from: Start | null
           node?: HTMLElement
           box: Rect
           slot: number
         }[],
       ): Promise<boolean> => {
         if (flying.length === 0) return true
+        // a card out of the fan rises in the tilt it stands at, and the flight
+        // straightens it on the way (`move` starts from the carrier's own pose)
         const raised = flying.flatMap((f) =>
-          f.node || !f.from ? [] : [{ key: f.key, at: f.from, layer: f.slot, card: f.card }],
+          f.node || !f.from
+            ? []
+            : [{ key: f.key, at: f.from.at, pose: f.from.pose, layer: f.slot, card: f.card }],
         )
         if (raised.length > 0) await flyer.raise(raised)
         if (isStale()) return false
@@ -322,11 +339,17 @@ export function useHandLimitBeat(
           from || node ? [{ key: `hl${planCard.eventId}`, card, from, node, box, slot }] : [],
         )
         if (!(await gather(missing))) return
-        items = measured.map(({ box, card, planCard, slot }) => ({
+        // THE LAYER IS THE HEAP'S ORDER, NOT THE GRID'S. The cards are filed in
+        // the order they were discarded (`withLanded`, and the keeper's own
+        // heap), and a grid we filled ourselves stands in the order we filled
+        // it, the keeper's cards in whatever cells were left. Riding their
+        // cells' layers, they landed in one order and the heap re-laid them in
+        // another (owner, 23.10; I9). They still leave cell by cell.
+        items = measured.map(({ box, card, planCard, slot }, i) => ({
           key: planCard.key,
           card,
           from: box,
-          layer: slot,
+          layer: i,
           delay: slot * CLEAR_STEP,
           scatter: scatterAt(planCard.eventId),
         }))
@@ -359,7 +382,7 @@ export function useHandLimitBeat(
           key: string
           planCard: DiscardCard
           card: GatheredCard
-          from: Rect | null
+          from: Start | null
           node?: HTMLElement
           box: Rect
           slot: number

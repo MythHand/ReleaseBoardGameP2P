@@ -6,6 +6,7 @@ import { cardById } from '@release/ui'
 import { act, render } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
 import type { BoardAnchors, BoardState, StagedHandoff } from '~/entities/game/board'
+import { handCardOf } from '~/entities/game/board'
 import type { BeatPlan } from './planBeats'
 import { settleInto } from './toHeap'
 import { useUpgradeBeat } from './upgradeBeat'
@@ -115,6 +116,9 @@ function harness(
     seatBox: () => (opts.seats === false ? null : { left: 0, top: 0, width: 200, height: 280 }),
     seatOf: () => null,
     handSlotAt: opts.handSlotAt ?? (() => null),
+    handCardAt(this: { handSlotAt: (i: number) => HTMLElement | null }, i: number) {
+      return handCardOf(this.handSlotAt(i))
+    },
     releaseSlot: () => null,
     bindPile: () => {},
     heldCard: (uid: string) => opts.held?.[uid] ?? null,

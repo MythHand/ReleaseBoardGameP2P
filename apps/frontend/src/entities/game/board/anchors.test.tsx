@@ -2,7 +2,7 @@ import { CARD_RATIO, CARD_W } from '@release/ui'
 import { render } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
 import type { BoardAnchors } from './anchors'
-import { useBoardAnchors } from './anchors'
+import { handCardOf, useBoardAnchors } from './anchors'
 
 // The registry's own behaviour, tested directly — a DOM query through the
 // whole board (as boardAnchors.test.tsx does) can never see a ref, so those
@@ -154,4 +154,48 @@ it('forgets a held card once it is let go of or sent home, and only that one', (
   stale?.release()
   expect(first.release).toHaveBeenCalledOnce()
   expect(anchors.heldCard('bug#1')?.uid).toBe('bug#1')
+})
+
+// WHERE A CARD OF OUR FAN STANDS — the card's own box and the tilt it stands
+// at, read off its slot. A slot is rotated, so its bounding rect is the box
+// AROUND the tilted card: a carrier raised on it started bigger and square,
+// and the card jumped on its first frame (owner, 23.10; I6). jsdom has no
+// `DOMMatrixReadOnly`, so a rotation-and-scale one stands in for it here.
+it('reads a fan card’s own box and tilt off its rotated slot', () => {
+  class Matrix {
+    a: number
+    b: number
+    constructor(look: string) {
+      const deg = Number(look.match(/rotate\(([-\d.]+)deg\)/)?.[1] ?? 0)
+      const scale = Number(look.match(/scale\(([\d.]+)\)/)?.[1] ?? 1)
+      this.a = Math.cos((deg * Math.PI) / 180) * scale
+      this.b = Math.sin((deg * Math.PI) / 180) * scale
+    }
+  }
+  vi.stubGlobal('DOMMatrixReadOnly', Matrix)
+  try {
+    const slot = document.createElement('div')
+    slot.style.transform = 'rotate(10deg)'
+    // the box AROUND the tilted card — wider and taller than the card itself
+    slot.getBoundingClientRect = () => ({ left: 100, top: 200, width: 140, height: 170 }) as DOMRect
+    const fan = handCardOf(slot)
+    expect(fan?.box.width).toBeCloseTo(CARD_W)
+    expect(fan?.box.height).toBeCloseTo(CARD_W * CARD_RATIO)
+    // centred where the card is: a rotation leaves the centre in place
+    expect((fan?.box.left ?? 0) + (fan?.box.width ?? 0) / 2).toBeCloseTo(170)
+    expect((fan?.box.top ?? 0) + (fan?.box.height ?? 0) / 2).toBeCloseTo(285)
+    expect(fan?.rot).toBeCloseTo(10)
+    expect(fan?.pose).toMatch(/^rotate\(10(\.\d+)?deg\)$/)
+
+    // lifted and straightened under the cursor: read as it stands, scale included
+    const up = document.createElement('div')
+    up.style.transform = 'scale(1.2)'
+    up.getBoundingClientRect = slot.getBoundingClientRect
+    const lifted = handCardOf(up)
+    expect(lifted?.box.width).toBeCloseTo(CARD_W * 1.2)
+    expect(lifted?.rot).toBeCloseTo(0)
+    expect(lifted?.pose).toBeUndefined()
+  } finally {
+    vi.unstubAllGlobals()
+  }
 })

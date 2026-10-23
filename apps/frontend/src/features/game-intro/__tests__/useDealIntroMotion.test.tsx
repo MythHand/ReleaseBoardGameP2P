@@ -3,6 +3,7 @@ import { act, renderHook } from '@testing-library/react'
 import { createRef } from 'react'
 import { expect, it, vi } from 'vitest'
 import type { BoardState } from '~/entities/game/board'
+import { handCardOf } from '~/entities/game/board'
 import { useDealIntro } from '../useDealIntro'
 
 // The counterpart of useDealIntro.test.tsx: there the opening is collapsed and
@@ -41,6 +42,9 @@ const refs = () => ({
   seatOf: () => null,
   seatBox: () => null,
   handSlotAt: () => null,
+  handCardAt(this: { handSlotAt: (i: number) => HTMLElement | null }, i: number) {
+    return handCardOf(this.handSlotAt(i))
+  },
   releaseSlot: () => null,
   bindSeat: () => {},
   bindReleaseSlot: () => {},

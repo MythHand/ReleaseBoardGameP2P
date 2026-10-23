@@ -4,6 +4,7 @@ import { act, render } from '@testing-library/react'
 import { useState } from 'react'
 import { expect, it, vi } from 'vitest'
 import type { BoardAnchors, BoardState, PlayerBoardState } from '~/entities/game/board'
+import { handCardOf } from '~/entities/game/board'
 import { useDrawBeat } from './drawBeat'
 import type { PlannedDraw } from './planBeats'
 import { TABLE_HOLD } from './toCentre'
@@ -123,6 +124,9 @@ const anchors = {
   seatBox: () => ({ left: 0, top: 0, width: 150, height: 210 }),
   seatOf: () => node(),
   handSlotAt: () => null,
+  handCardAt(this: { handSlotAt: (i: number) => HTMLElement | null }, i: number) {
+    return handCardOf(this.handSlotAt(i))
+  },
   releaseSlot: () => null,
   bindPile: () => {},
   heldCard: () => null,

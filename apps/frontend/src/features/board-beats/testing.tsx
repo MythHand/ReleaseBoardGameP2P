@@ -238,6 +238,11 @@ export function anchorsFixture(overrides: Partial<BoardAnchors> = {}): AnchorsFi
     seatOf: () => null,
     seatBox: () => boxed(0, 0),
     handSlotAt: () => null,
+    // no fan, as above. Not read off `handCardOf`: this harness is loaded from
+    // inside the tests' mock of the animation layer, and the registry's own
+    // file loads `@release/ui`, which loads that layer back — the import waits
+    // on itself and the run hangs
+    handCardAt: () => null,
     releaseSlot: (player, slot) => slots[`${player}:${slot}`] ?? null,
     bindSeat: () => {},
     bindReleaseSlot: () => {},

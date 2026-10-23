@@ -222,9 +222,13 @@ export function useUpgradeBeat(
             }
             const index = hand.findIndex((h) => h.card.id === t.card)
             const held = index >= 0 ? hand[index] : undefined
-            const from = held ? rectOf(a.handSlotAt(index)) : null
-            if (!held || !from) return
-            const raised = raise([{ key: `upgrade:${t.eventId}`, card, at: from }])
+            // the card's own box and the tilt it stands at in the fan
+            // (`handCardAt`), not the slot's bounding rect (I6)
+            const fan = held ? a.handCardAt(index) : null
+            if (!held || !fan) return
+            const raised = raise([
+              { key: `upgrade:${t.eventId}`, card, at: fan.box, pose: fan.pose },
+            ])
             lifted = held.uid
             liftOff(beat, [{ kind: 'hand', uid: held.uid }])
             const [el] = await raised
