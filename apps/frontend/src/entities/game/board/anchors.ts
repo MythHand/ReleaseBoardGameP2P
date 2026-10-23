@@ -124,9 +124,33 @@ export function useBoardAnchors(): BoardAnchors {
     else delete pileEls.current[index]
   }, [])
 
+  // A CARD LET GO OF, OR SENT HOME, IS NO LONGER HELD — and the registry says
+  // so itself, rather than each holder remembering to. A flight handed to the
+  // keeper's answer used to stay registered after the answer let go of it, its
+  // node long gone; when the same card came back into the hand, that stale
+  // entry was found ahead of the gesture now holding it, and the next answer
+  // could not take the card off the cursor (ditayler, #266). Only the entry
+  // that was let go of is dropped: a holder may already hold its next card.
   const hold = useCallback((holder: string, held: HeldCard | null) => {
-    if (held) holders.current[holder] = held
-    else delete holders.current[holder]
+    if (!held) {
+      delete holders.current[holder]
+      return
+    }
+    const forget = () => {
+      if (holders.current[holder] === own) delete holders.current[holder]
+    }
+    const own: HeldCard = {
+      ...held,
+      release: () => {
+        forget()
+        held.release()
+      },
+      home: () => {
+        forget()
+        held.home()
+      },
+    }
+    holders.current[holder] = own
   }, [])
   const heldCard = useCallback(
     (uid: string) => Object.values(holders.current).find((h) => h.uid === uid) ?? null,

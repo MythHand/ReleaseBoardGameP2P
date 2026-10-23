@@ -13,7 +13,7 @@ import { cardById } from '@release/ui'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
 import handArrivalStyles from '@/animations/useHandArrival.module.css'
-import type { BoardActions } from '~/entities/game/board'
+import type { BoardActions, BoardAnchors } from '~/entities/game/board'
 import Board from '../_Board'
 import { introFixture, makeBoardProps } from './fixture'
 
@@ -27,6 +27,19 @@ const flights = vi.hoisted(() => ({
 }))
 const arrivals = vi.hoisted(() => ({ refuse: false }))
 const exits = vi.hoisted(() => ({ items: [] as string[][], release: () => {} }))
+// the board's own registry, to read what it still holds
+const captured = vi.hoisted(() => ({ anchors: null as BoardAnchors | null }))
+vi.mock('~/entities/game/board', async (importOriginal) => {
+  const real = await importOriginal<typeof import('~/entities/game/board')>()
+  return {
+    ...real,
+    useBoardAnchors: () => {
+      const anchors = real.useBoardAnchors()
+      captured.anchors = anchors
+      return anchors
+    },
+  }
+})
 
 vi.mock('~/shared/lib/useReducedMotion', () => ({ useReducedMotion: () => motion.reduced }))
 vi.mock('@release/ui/animations', async (importOriginal) => {
@@ -123,14 +136,18 @@ function handLimitIntro(events: Event[] = []) {
   return { gameId: 'hand-limit-handoff', view: introFixture().view, events, onDone: vi.fn() }
 }
 
-function boardAfterAcceptedHandLimit(events: Event[], intro: ReturnType<typeof handLimitIntro>) {
+function boardAfterAcceptedHandLimit(
+  events: Event[],
+  intro: ReturnType<typeof handLimitIntro>,
+  hand = [HAND[2]],
+) {
   const base = makeBoardProps()
   return (
     <Board
       {...makeBoardProps({
         state: {
           ...base.state,
-          you: { ...base.state.you, hand: [HAND[2]] },
+          you: { ...base.state.you, hand },
           turn: base.state.selfId,
           hasDrawn: true,
           pending: null,
@@ -714,6 +731,76 @@ it('carries the card in the air on beside the one already in the grid', async ()
     expect(onResolve).not.toHaveBeenCalled()
   } finally {
     exits.release()
+    motion.reduced = true
+  }
+})
+
+// A FLIGHT THE ANSWER TOOK IS FORGOTTEN ONCE THE ANSWER LETS GO OF IT. It used
+// to stay registered, its node long gone, and the same card coming back into
+// the hand was found there ahead of the gesture now holding it: the next
+// answer could not take it off the cursor (ditayler, #266).
+it('forgets a flight the keeper answer took, so the same card is found in its next holder', async () => {
+  try {
+    await keeperAnswersMidFlight(1, false)
+    await act(async () => {
+      exits.release()
+      await new Promise((r) => setTimeout(r, 20))
+    })
+    expect(captured.anchors?.heldCard('attack-bug#0')).toBeNull()
+    // the same card, back in the hand and held again: the answer finds THIS node
+    const node = document.createElement('div')
+    captured.anchors?.hold('fan', {
+      uid: 'attack-bug#0',
+      el: () => node,
+      take: () => {},
+      release: () => {},
+      home: () => {},
+    })
+    expect(captured.anchors?.heldCard('attack-bug#0')?.el()).toBe(node)
+  } finally {
+    captured.anchors?.hold('fan', null)
+    exits.release()
+    motion.reduced = true
+  }
+})
+
+// A FLIGHT SENT HOME STOPS FLYING TO ITS CELL. When the keeper's answer does
+// not take a card still in the air, it sends it home from where it is — and
+// the flight it was on must not go on and land it in the grid anyway, whatever
+// is left of the hand limit by then (ditayler, #266). Sent home while the hand
+// limit is still open, so nothing else stops that flight.
+it('stops a flight to its cell once it is sent home, and frees the cell', async () => {
+  motion.reduced = true
+  flights.raises = []
+  flights.release = []
+  flights.els.clear()
+  try {
+    const intro = handLimitIntro()
+    const view = render(boardOverLimit(2, {}, [], true, intro))
+    await until(() => intro.onDone.mock.calls.length === 1)
+    motion.reduced = false
+    view.rerender(boardOverLimit(2, {}, [], true, intro))
+    await pullCardFromFan(0)
+    act(() => captured.anchors?.heldCard('attack-bug#0')?.home())
+    // the flight it was on comes down now
+    await act(async () => {
+      for (const land of flights.release.splice(0)) land()
+      await new Promise((r) => setTimeout(r, 40))
+    })
+    expect(document.querySelector('[data-grid-card="attack-bug#0"]')).toBeNull()
+    expect(filledCells()).toBe(0)
+    expect(captured.anchors?.heldCard('attack-bug#0')).toBeNull()
+    // back in the fan, and its cell is free again: two cards fill both cells
+    await until(() => document.querySelectorAll('[data-hand-slot]').length === 3)
+    for (let i = 0; i < 2; i++) {
+      await pullCardFromFan(0)
+      await act(async () => {
+        for (const land of flights.release.splice(0)) land()
+        await new Promise((r) => setTimeout(r, 40))
+      })
+    }
+    expect(filledCells()).toBe(2)
+  } finally {
     motion.reduced = true
   }
 })

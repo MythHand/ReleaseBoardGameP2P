@@ -261,6 +261,49 @@ export function useHandLimit({
   }
   ending.current = landedBack
 
+  // INTO THE FAN from where the card is: `at` is the slot the pointer named
+  // when it let go over the hand — a placement — and absent when the card
+  // simply goes home, which is an arrival and lands in the middle. One way
+  // back for a card carried out of the grid and for a flight to a cell sent
+  // home; `run` is the run the card left in.
+  const returnToFan = useCallback(
+    (uid: string, card: CardData, rect: DOMRect | undefined, run: number, at?: number) => {
+      if (reduced || !rect) {
+        restorePicked([uid])
+        carryActive.current = false
+        return
+      }
+      void (async () => {
+        const context: ArrivalContext = {
+          kind: 'placement',
+          run,
+          entry: {
+            key: `hl-arrival-${++arrivalSeq.current}`,
+            uid,
+            slot: at,
+          },
+        }
+        arrivalContext.current = context
+        setPlacementReturning(true)
+        const taken = await arrival.home(
+          [{ key: context.entry.key, card, from: rect }],
+          ending.current,
+          at,
+        )
+        if (runId.current !== run || taken) return
+        if (arrivalContext.current !== context) return
+        arrivalContext.current = null
+        // Nothing will ever land — there is no fan to measure — so the
+        // logical return is preserved rather than leaving the card absent
+        // from both places.
+        restorePicked([uid])
+        carryActive.current = false
+        setPlacementReturning(false)
+      })()
+    },
+    [reduced, restorePicked, arrival.home],
+  )
+
   const bindCell = useCallback((slot: number, el: HTMLDivElement | null) => {
     if (el) cellEls.current[slot] = el
     else delete cellEls.current[slot]
@@ -326,20 +369,29 @@ export function useHandLimit({
       // (`anchors.heldCard`), rather than flying a second one out of the fan.
       // Held from the moment it is raised: its node is read when it is taken,
       // and the answer's beat waits two frames before it reads anything.
-      let taken = false
+      // `over` once the flight is no longer this gesture's: taken over by the
+      // answer, or sent home — either way it never lands in its cell
+      let over = false
       anchors.hold(key, {
         uid,
         el: () => flyer.elOf(key),
         take: () => {
-          taken = true
+          over = true
         },
         release: () => flyer.drop(key),
-        home: () => flyer.drop(key),
+        // the answer did not take it: the flight stops where it is, its cell
+        // is free again, and the card goes back into the fan from there
+        home: () => {
+          over = true
+          claimed.current.delete(slot)
+          returnToFan(uid, card, flyer.elOf(key)?.getBoundingClientRect(), mine)
+          flyer.drop(key)
+        },
       })
       // raising also lets the grid's cells mount before they are measured
       // a run wiped under the flight lets go of what it held
       const gone = () => {
-        if (taken) return true
+        if (over) return true
         if (runId.current === mine) return false
         anchors.hold(key, null)
         return true
@@ -355,7 +407,7 @@ export function useHandLimit({
       commit()
       flyer.drop(key)
     },
-    [reduced, finish, anchors, flyer.raise, flyer.drop, flyer.elOf],
+    [reduced, finish, anchors, flyer.raise, flyer.drop, flyer.elOf, returnToFan],
   )
 
   // Where the pointer is pointing along the fan, by the fan's own arithmetic:
@@ -409,43 +461,9 @@ export function useHandLimit({
       const over = hr ? e.clientY >= hr.top - BAND_PAD : false
       setDropSlot(over ? slotAt(e.clientX, handItemsRef.current.length) : null)
     }
-    // INTO THE FAN from where the card is: `at` is the slot the pointer named
-    // when it let go over the hand — a placement — and absent when the card
-    // simply goes home, which is an arrival and lands in the middle.
     const carryHome = (rect: DOMRect | undefined, at?: number) => {
       setBack(null)
-      if (reduced || !rect) {
-        restorePicked([back.uid])
-        carryActive.current = false
-        return
-      }
-      void (async () => {
-        const context: ArrivalContext = {
-          kind: 'placement',
-          run: mine,
-          entry: {
-            key: `hl-arrival-${++arrivalSeq.current}`,
-            uid: back.uid,
-            slot: at,
-          },
-        }
-        arrivalContext.current = context
-        setPlacementReturning(true)
-        const taken = await arrival.home(
-          [{ key: context.entry.key, card: back.card, from: rect }],
-          ending.current,
-          at,
-        )
-        if (runId.current !== mine || taken) return
-        if (arrivalContext.current !== context) return
-        arrivalContext.current = null
-        // Nothing will ever land — there is no fan to measure — so the
-        // logical return is preserved rather than leaving the card absent
-        // from both places.
-        restorePicked([back.uid])
-        carryActive.current = false
-        setPlacementReturning(false)
-      })()
+      returnToFan(back.uid, back.card, rect, mine, at)
     }
     const onUp = async (e: MouseEvent) => {
       window.removeEventListener('mousemove', onMove)

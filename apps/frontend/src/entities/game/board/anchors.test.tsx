@@ -1,6 +1,6 @@
 import { CARD_RATIO, CARD_W } from '@release/ui'
 import { render } from '@testing-library/react'
-import { expect, it } from 'vitest'
+import { expect, it, vi } from 'vitest'
 import type { BoardAnchors } from './anchors'
 import { useBoardAnchors } from './anchors'
 
@@ -115,4 +115,43 @@ it('pileBox keys by index — a draw aims at the pile its event names', () => {
   // not linger in the registry.
   anchors.bindPile(1, null)
   expect(anchors.pileBox(1)).toBeNull()
+})
+
+// A CARD LET GO OF, OR SENT HOME, IS NO LONGER HELD — and the registry forgets
+// it itself. A holder whose own release forgets nothing (System Upgrade's
+// flight, a flight to a hand-limit cell) used to leave its entry behind, and
+// the same card coming back was found there ahead of its next holder
+// (ditayler, #266). A holder already holding its next card keeps it.
+it('forgets a held card once it is let go of or sent home, and only that one', () => {
+  const { seen } = mount()
+  const anchors = seen[0]
+  const held = (uid: string) => ({
+    uid,
+    el: () => null,
+    take: vi.fn(),
+    release: vi.fn(),
+    home: vi.fn(),
+  })
+
+  const flight = held('sudo#0')
+  anchors.hold('upgrade-local', flight)
+  anchors.heldCard('sudo#0')?.release()
+  expect(flight.release).toHaveBeenCalledOnce()
+  expect(anchors.heldCard('sudo#0')).toBeNull()
+
+  const sent = held('sudo#0')
+  anchors.hold('hl1', sent)
+  anchors.heldCard('sudo#0')?.home()
+  expect(sent.home).toHaveBeenCalledOnce()
+  expect(anchors.heldCard('sudo#0')).toBeNull()
+
+  // the holder let go of one card and already holds the next one
+  const first = held('bug#0')
+  anchors.hold('fan', first)
+  const stale = anchors.heldCard('bug#0')
+  const next = held('bug#1')
+  anchors.hold('fan', next)
+  stale?.release()
+  expect(first.release).toHaveBeenCalledOnce()
+  expect(anchors.heldCard('bug#1')?.uid).toBe('bug#1')
 })
