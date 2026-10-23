@@ -27,12 +27,23 @@ export function useCardReorder(args: {
     to: number
   } | null>(null)
 
-  useLayoutEffect(() => {
-    if (!args.enabled) {
-      setDrag(null)
-      grab.current = null
-    }
-  }, [args.enabled])
+  // A card held while the row is switched off STAYS where it is held: it stops
+  // following the pointer, commits nothing, and goes home when the pointer lets
+  // go. Dropping it on the spot jumped it back into its slot, and whatever was
+  // to carry it on next — the row flying home when the keeper answered on a
+  // clock — started from a place the card had never been (owner, 22.10).
+  //
+  // Taken, it is the consumer's: the pointer is no longer listened to at all,
+  // and the card stays where it is until `release`.
+  const taken = useRef(false)
+  const take = () => {
+    if (grab.current) taken.current = true
+  }
+  const release = () => {
+    taken.current = false
+    grab.current = null
+    setDrag(null)
+  }
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: subscribe per grab; pointer movement reads refs
   useLayoutEffect(() => {
@@ -40,17 +51,19 @@ export function useCardReorder(args: {
     const { row, uid } = drag
     const move = (e: PointerEvent) => {
       const g = grab.current
-      if (!g || !latest.current.enabled) return
+      if (!g || !latest.current.enabled || taken.current) return
       const x = e.clientX - g.gx - g.left
       const y = e.clientY - g.gy - g.top
       g.to = Math.max(0, Math.min(g.cards.length - 1, Math.round(x / latest.current.step)))
       setDrag({ row, uid, x, y, to: g.to })
     }
     const cancel = () => {
+      if (taken.current) return
       grab.current = null
       setDrag(null)
     }
     const up = (e: PointerEvent) => {
+      if (taken.current) return
       move(e)
       const g = grab.current
       if (g && latest.current.enabled) {
@@ -100,5 +113,5 @@ export function useCardReorder(args: {
     const slot = at >= drag.to ? at + 1 : at
     return { x: slot * args.step, y: 0, dragging: false }
   }
-  return { drag, onPointerDown, position }
+  return { drag, onPointerDown, position, take, release }
 }

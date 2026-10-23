@@ -40,6 +40,22 @@ export type Choice =
   // centre in everyone's view, so taking it back is seen too (`takenBack`).
   | { kind: 'cancelRelease' }
 
+// The decisions whose answer is built up on the screen before it is confirmed.
+// A pick out of the discard may be marked in part, so both of its roles are
+// optional — what is left unmarked is drawn at random when the time runs out.
+//
+// An answer to a threat is a draft only while its card is HELD: taken up off
+// the zone or out of the fan, not yet put down. Putting it back sends the draft
+// empty, so a card the player held once and let go of answers nothing.
+// Security Bug's draft is the card type marked in the catalogue, not yet
+// confirmed — the same mark the table already watches.
+export type Draft =
+  | Extract<Choice, { kind: 'handLimit' | 'reorderTop' | 'upgradeTake' }>
+  | { kind: 'pickFromDiscard'; card?: CardUid; toDeck?: CardUid }
+  | { kind: 'neutralize503'; method?: NeutralizeMethod; card?: CardUid }
+  | { kind: 'crush'; method?: NeutralizeMethod }
+  | { kind: 'requestCard'; card?: CardId }
+
 export type Action =
   | { type: 'DRAW'; player: PlayerId; pile?: number; at: number }
   | {
@@ -62,6 +78,10 @@ export type Action =
   // first turn, because createGame carries no timestamp to stamp it from.
   | { type: 'CLOCK_STARTED'; at: number }
   | { type: 'RESOLVE'; player: PlayerId; choice: Choice; at: number }
+  // The answer as it stands on the player's screen while the decision is still
+  // open — the cards laid out against a hand limit, the order of a Rebase. Not
+  // a move: it resolves nothing. When the time runs out, it is the answer.
+  | { type: 'DRAFT'; player: PlayerId; draft: Draft; at: number }
   // What the table sees while a play is being made (resolution.md §1): a card
   // of one's own hand put out at the centre, and everything put out taken back.
   // Neither is a move — the card stays in the hand and the play is still the

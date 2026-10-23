@@ -1,4 +1,4 @@
-import type { Choice, Event, GameView, Target } from '@release/engine'
+import type { Choice, Draft, Event, GameView, Target } from '@release/engine'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSession } from '~/app/providers/SessionProvider'
 import type { Intent } from '~/network'
@@ -32,6 +32,8 @@ export interface Game {
   // a pass taken back while the time to attack still runs
   unpass(): void
   resolve(choice: Choice): void
+  // the answer as it stands on the screen while its decision is still open
+  draft(draft: Draft): void
   // a card put out at the centre while a play is made, and taken back
   show(card: string): void
   takeBack(): void
@@ -194,6 +196,7 @@ export function useGame(): Game {
     pass: () => submit({ type: 'PASS' }),
     unpass: () => submit({ type: 'UNPASS' }),
     resolve: (choice) => submit({ type: 'RESOLVE', choice }),
+    draft: (draft) => submit({ type: 'DRAFT', draft }),
     show: (card) => submit({ type: 'SHOW', card }),
     takeBack: () => submit({ type: 'TAKE_BACK' }),
   }

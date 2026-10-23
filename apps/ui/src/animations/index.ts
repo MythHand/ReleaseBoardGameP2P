@@ -1,3 +1,5 @@
+// What a gesture offers when someone else's answer has to carry its card on.
+export type { HeldCard } from './held'
 export { play, presetNames } from './play'
 export {
   enterPose,

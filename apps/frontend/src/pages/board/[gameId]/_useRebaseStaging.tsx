@@ -1,10 +1,10 @@
 import type { Event } from '@release/engine'
-import type { CardData, CardPreviewSlotProps, TableActions } from '@release/ui'
+import type { CardData, CardPreviewSlotProps } from '@release/ui'
 import { Card, ConfirmAction, cardAreaOf, cardById, TableSurface, Typography } from '@release/ui'
 import { play, useCardReorder } from '@release/ui/animations'
 import type { ReactNode } from 'react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import type { BoardAnchors, BoardState } from '~/entities/game/board'
+import type { BoardActions, BoardAnchors, BoardState } from '~/entities/game/board'
 import { useReducedMotion } from '~/shared/lib/useReducedMotion'
 import styles from './_useRebaseStaging.module.css'
 import { useResolveFeedback } from './_useResolveFeedback'
@@ -72,7 +72,7 @@ export function useRebaseStaging(args: {
   state: BoardState
   events?: Event[]
   anchors: BoardAnchors
-  actions?: TableActions
+  actions?: BoardActions
   copy: { prompt: string; position: string; confirm: string }
   /**
    * READING A CARD IN THE ROW. The cards are laid out to be REORDERED, which
@@ -145,6 +145,11 @@ export function useRebaseStaging(args: {
   // same latch for the same board behaviour. Cleared only by a refusal, because
   // only then is the choice really open again.
   const answeredKey = useRef<string | null>(null)
+  // The offer this row last stood for, and whether the keeper's answer to it is
+  // flying home right now — see the effect that starts that flight below.
+  const lastKey = useRef<string | null>(null)
+  if (offerKey) lastKey.current = offerKey
+  const closingRef = useRef(false)
   const timers = useRef<number[]>([])
   const later = (fn: () => void, ms: number) => {
     timers.current.push(window.setTimeout(fn, ms))
@@ -164,12 +169,30 @@ export function useRebaseStaging(args: {
   // biome-ignore lint/correctness/useExhaustiveDependencies: reseed only for a different offer, not a fresh projection object
   useEffect(() => {
     if (!ours) {
-      setOrder({})
+      // the keeper's answer is still flying home in the order on the screen
+      if (!closingRef.current) setOrder({})
       setConfirmed(false)
       return
     }
     setOrder(Object.fromEntries(ours.piles.map((e) => [e.pile, e.cards.map((c) => c.uid)])))
   }, [offerKey])
+
+  // THE ORDER ON THE SCREEN, told to the keeper as it changes: unconfirmed when
+  // the time runs out, it is still the order that stays. Every offered pile, the
+  // same shape the confirmed answer takes.
+  const draftSent = useRef('')
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `order` is the trigger; the offer and the answered latch are read as they stand now
+  useEffect(() => {
+    if (!ours || answered) return
+    const draft = ours.piles.map((e) => ({
+      pile: e.pile,
+      cards: order[e.pile] ?? e.cards.map((c) => c.uid),
+    }))
+    const key = `${offerKey}|${JSON.stringify(draft)}`
+    if (key === draftSent.current) return
+    draftSent.current = key
+    actions?.onDraft?.({ kind: 'reorderTop', order: draft })
+  }, [order])
 
   // Deal the offer OUT of its pile into the row: every card starts at the
   // pile's own rect and flies to its slot, staggered. Cosmetic only — the row
@@ -255,31 +278,11 @@ export function useRebaseStaging(args: {
     )
   })
 
-  if (!flying && (!ours || confirmed || (ours != null && answeredKey.current === offerKey)))
-    return { row: null }
-
-  const confirm = () => {
-    if (!ours || confirmed || !ready || reorder.drag || suspended) return
-    // Answered from this click on: the row never reopens for this offer, and the
-    // deal never replays it, whichever projection the queue hands over next.
-    answeredKey.current = offerKey
-    // Committed against THIS render's offer: every offered pile, answered
-    // exactly once, or the engine rejects it.
-    const committed = ours.piles.map((e) => ({
-      pile: e.pile,
-      cards: order[e.pile] ?? e.cards.map((c) => c.uid),
-    }))
-    const choice = { kind: 'reorderTop' as const, order: committed }
-
-    // A game action must never wait on an animation nobody plays. The engine gets its answer either way;
-    // only the moment differs.
-    if (reduced) {
-      setConfirmed(true)
-      resolve(choice)
-      return
-    }
-
-    setConfirmed(true)
+  // THE ORDER, FLOWN HOME — the cards turn their backs and go onto their piles,
+  // position 1 on top. One movement whoever gave the answer: the player's
+  // confirm, which sends it once the last card is home (`send`), or the
+  // keeper's when their time ran out, which has nothing left to send.
+  const flyBack = (committed: { pile: number; cards: string[] }[], send: (() => void) | null) => {
     setFlying(true)
     // The order stays secret, so the cards turn their backs before they travel.
     setFaceDown(true)
@@ -310,17 +313,77 @@ export function useRebaseStaging(args: {
       }
       // The answer goes when the last card is home — see the divergence note
       // in this file's header for why this one waits and Cherry-pick's does not.
-      later(() => resolve(choice), last + BACK_DUR)
+      if (send) later(send, last + BACK_DUR)
       // The row itself goes a beat later, the scene's own slack: taking it away
       // on the very frame the last card lands cuts the arrival off mid-motion.
       later(
         () => {
           setFlying(false)
           setFaceDown(false)
+          closingRef.current = false
+          reorder.release()
         },
         last + BACK_DUR + BACK_SETTLE,
       )
     }, FLIP_DUR + FLIP_HOLD)
+  }
+
+  // THE KEEPER'S ANSWER. A Rebase answer carries no event — the order is the
+  // secret — so the one sign of the keeper answering for us when our time ran
+  // out is the offer closing with no answer of ours behind it. The row stays,
+  // and the order on the screen flies home as a confirm sends it: it is the
+  // order the keeper applied, the last one the board told it.
+  const closing =
+    !ours &&
+    !confirmed &&
+    !flying &&
+    !reduced &&
+    lastKey.current !== null &&
+    answeredKey.current !== lastKey.current
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `closing` is the trigger; the order and the flight are read as they stand now
+  useLayoutEffect(() => {
+    if (!closing) return
+    answeredKey.current = lastKey.current
+    closingRef.current = true
+    // a card still held over the row goes home from under the cursor, in the
+    // order the keeper applied — the last one let go of (owner, 22.10)
+    reorder.take()
+    flyBack(
+      piles.map((e) => ({ pile: e.pile, cards: order[e.pile] ?? e.cards.map((c) => c.uid) })),
+      null,
+    )
+  }, [closing])
+
+  if (
+    !flying &&
+    !closing &&
+    (!ours || confirmed || (ours != null && answeredKey.current === offerKey))
+  )
+    return { row: null }
+
+  const confirm = () => {
+    if (!ours || confirmed || !ready || reorder.drag || suspended) return
+    // Answered from this click on: the row never reopens for this offer, and the
+    // deal never replays it, whichever projection the queue hands over next.
+    answeredKey.current = offerKey
+    // Committed against THIS render's offer: every offered pile, answered
+    // exactly once, or the engine rejects it.
+    const committed = ours.piles.map((e) => ({
+      pile: e.pile,
+      cards: order[e.pile] ?? e.cards.map((c) => c.uid),
+    }))
+    const choice = { kind: 'reorderTop' as const, order: committed }
+
+    // A game action must never wait on an animation nobody plays. The engine gets its answer either way;
+    // only the moment differs.
+    if (reduced) {
+      setConfirmed(true)
+      resolve(choice)
+      return
+    }
+
+    setConfirmed(true)
+    flyBack(committed, () => resolve(choice))
   }
 
   return {

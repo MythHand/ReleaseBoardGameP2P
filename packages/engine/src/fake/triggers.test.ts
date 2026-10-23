@@ -51,6 +51,8 @@ it('reveals Error 503 to everyone and demands neutralization', () => {
     player: 'p1',
     card: E503,
     methods: ['debugger'],
+    openedAt: 1000,
+    deadline: 1000 + 20_000,
   })
 })
 

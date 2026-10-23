@@ -38,6 +38,11 @@ const longest = (...xs: string[]): string => xs.reduce((a, b) => (b.length > a.l
 //  - 'push'     my turn, already drawn      → PUSH key + "drawn" badge
 //  - 'waiting'  an opponent's turn          → active player in the key's slot
 //  - 'reaction' a decision is owed BY ME — a defence, a 503 (amber, or red danger)
+//  - 'decide'   a decision is owed BY ME that a pass does not answer — a discard
+//               down to the limit, a pick, an order: the reaction's amber and its
+//               ring counting that decision's clock, but no key and no caption.
+//               The table itself asks for the answer, and the key's slot stays
+//               empty at its own size.
 //  - 'attack'   somebody else's fresh release is open to me → PASS key, violet.
 //               Passing says only "not this moment": the window ends early when
 //               every responder has passed, and until it does the same key
@@ -69,6 +74,7 @@ export type TurnDockState =
   | 'push'
   | 'waiting'
   | 'reaction'
+  | 'decide'
   | 'attack'
   | 'attacking'
   | 'exposed'
@@ -172,6 +178,7 @@ const PHASE_KEY: Record<TurnDockState, keyof TurnDockCopy> = {
   push: 'yourTurn',
   waiting: 'turnOf',
   reaction: 'reaction',
+  decide: 'reaction',
   attack: 'attack',
   attacking: 'attack',
   exposed: 'exposed',
@@ -179,7 +186,7 @@ const PHASE_KEY: Record<TurnDockState, keyof TurnDockCopy> = {
 }
 
 function accentFor(state: TurnDockState, danger: boolean): string {
-  if (state === 'reaction' || state === 'hold') {
+  if (state === 'reaction' || state === 'decide' || state === 'hold') {
     return danger ? 'var(--danger-accent)' : 'var(--reaction-accent)'
   }
   // The offensive half of a window gets its own hue: the same ring, the same
@@ -229,10 +236,17 @@ export default function TurnDock({
             : null
 
   // key/label states share one Button frame (draw / push / reaction / attack);
-  // 'waiting' and 'attacking' show a player's name instead, and 'exposed' the dots.
+  // 'waiting' and 'attacking' show a player's name instead, 'exposed' the dots,
+  // and 'decide' nothing at all.
   const buttonMode = mine || state === 'reaction' || state === 'attack'
-  // three things can fill the action slot, and exactly one of them at a time
-  const actionMode = buttonMode ? 'btn' : state === 'exposed' ? 'dots' : 'name'
+  // what fills the action slot, exactly one of them at a time
+  const actionMode = buttonMode
+    ? 'btn'
+    : state === 'exposed'
+      ? 'dots'
+      : state === 'decide'
+        ? 'empty'
+        : 'name'
   const label = state === 'draw' ? copy.draw : state === 'push' ? copy.push : copy.pass
   const handler =
     state === 'draw' ? onDraw : state === 'push' ? onPush : attackPassed ? onUnpass : onPass
@@ -323,6 +337,9 @@ export default function TurnDock({
                       {label}
                     </Swap>
                   </Button>
+                ) : actionMode === 'empty' ? (
+                  // the answer is given on the table — the slot holds its size
+                  <span aria-hidden="true" />
                 ) : actionMode === 'dots' ? (
                   // my own release under the window: nothing to press, so the
                   // key's slot carries the one thing worth watching — how many

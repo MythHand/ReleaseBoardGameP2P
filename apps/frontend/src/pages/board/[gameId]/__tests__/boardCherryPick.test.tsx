@@ -35,14 +35,14 @@ const exits = vi.hoisted(() => ({
   sent: [] as { key: string; scatter?: { rot: number }; layer?: number }[],
   pending: null as Promise<void> | null,
   // every preset played, and what it was told — the deal out of the pile is one
-  played: [] as [string, Record<string, unknown> | undefined][],
+  played: [] as [string, Record<string, unknown> | undefined, (Element | null)?][],
 }))
 vi.mock('@release/ui/animations', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@release/ui/animations')>()
   return {
     ...actual,
     play: (...args: Parameters<typeof actual.play>) => {
-      exits.played.push([args[0], args[2]])
+      exits.played.push([args[0], args[2], args[1]])
       return actual.play(...args)
     },
     useDiscardExit: () => ({
@@ -134,6 +134,79 @@ it.each([
   } finally {
     finishReturn()
     exits.pending = null
+    vi.useRealTimers()
+  }
+})
+
+// THE KEEPER'S ANSWER, WHEN THE TIME RUNS OUT. Nothing was confirmed: the
+// keeper answered for the player, and the grid plays that answer as a confirm
+// would — the cards it took marked first, then the same flight. The card taken
+// is on the screen once throughout: not a second copy out of the pile.
+it('plays the keeper’s answer out of the grid when the time runs out', async () => {
+  vi.useFakeTimers()
+  mockReducedMotion(false)
+  exits.played = []
+  try {
+    const base = makeBoardProps()
+    const hand = ['defense-hotfix', 'attack-bug'].map((id, i) => handItem(`original-${i}`, id))
+    const picked = handItem('picked', 'release-frontend')
+    const pending = cherryPending(
+      [
+        { uid: picked.uid, id: picked.card.id },
+        { uid: 'deck', id: 'release-backend' },
+        { uid: 'rest', id: 'protection-debugger' },
+      ],
+      2,
+    )
+    const state = { ...base.state, you: { ...base.state.you, hand }, pending }
+    const intro = { gameId: 'cherry-expired', view: null, onDone: () => {}, events: [] }
+    const actions = { onResolve: vi.fn(), onDraft: vi.fn() }
+    const props = { ...base, state, intro, actions }
+    const { container, rerender } = render(<Board {...props} />)
+    await afterDeal()
+    fireEvent.click(screen.getByTestId('cherry-cell-picked'))
+    // the mark is the keeper's to keep — a pick made in part
+    expect(actions.onDraft).toHaveBeenLastCalledWith({ kind: 'pickFromDiscard', card: 'picked' })
+
+    const answered = {
+      ...props,
+      state: { ...state, pending: null, you: { ...state.you, hand: [...hand, picked] } },
+      intro: {
+        ...intro,
+        events: [
+          {
+            id: 2,
+            type: 'takenFromDiscard' as const,
+            player: 'you',
+            card: picked.card.id,
+            to: 'hand' as const,
+          },
+          {
+            id: 3,
+            type: 'takenFromDiscard' as const,
+            player: 'you',
+            card: 'release-backend',
+            to: 'deck' as const,
+          },
+        ],
+      },
+    }
+    rerender(<Board {...answered} />)
+    await act(() => vi.advanceTimersByTimeAsync(100))
+    // the keeper's picks, marked where they stand
+    const cell = screen.getByTestId('cherry-cell-picked')
+    expect(cell.textContent).toContain('→ hand')
+    expect(screen.getByTestId('cherry-cell-deck').textContent).toContain('→ deck')
+    for (let i = 0; i < 40; i++) await act(() => vi.advanceTimersByTimeAsync(100))
+    // the card taken leaves its own cell — not a second copy out of the pile
+    expect(exits.played.some(([name, , el]) => name === 'playToCenter' && el === cell)).toBe(true)
+    expect(exits.played.map(([name]) => name)).toContain('returnToDeck')
+    expect(actions.onResolve).not.toHaveBeenCalled()
+    const names = [...container.querySelectorAll('[data-hand-slot]')].map((slot) =>
+      ['Hotfix', 'Bug', 'Frontend'].find((name) => slot.textContent?.includes(name)),
+    )
+    expect(names).toContain('Frontend')
+  } finally {
     vi.useRealTimers()
   }
 })

@@ -92,11 +92,15 @@
   pointer-events: auto;
 }
 
-/* служебный док хода — нижний-левый угол, под колодами, слева от руки */
+/* служебный док хода — нижний-левый угол, под колодами, слева от руки.
+   Above the surface a step lays over the table (--z-flight + 45): the dock is
+   where the player reads that step's clock, so the dimming must not cover it.
+   The same rung the Upgrade's fan is lifted to (`.handWrap` below). */
 .turnDock {
   position: absolute;
   inset-block-end: 20px;
   inset-inline-start: 26px;
+  z-index: calc(var(--z-flight) + 46);
 }
 
 .you {

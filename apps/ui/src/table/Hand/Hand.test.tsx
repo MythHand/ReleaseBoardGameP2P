@@ -1,4 +1,4 @@
-import { fireEvent, render, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, waitFor } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
 import { cardById } from '@/cards'
 import Hand from './Hand'
@@ -65,4 +65,88 @@ it('keeps a disabled card readable but refuses its click and drag', async () => 
   fireEvent.mouseUp(window, { clientX: 0, clientY: -200 })
   expect(onCardClick).not.toHaveBeenCalled()
   expect(onPlay).not.toHaveBeenCalled()
+})
+
+// THE CARD UNDER THE CURSOR, offered to whoever carries it on when someone else
+// answers the decision while it is held (`HeldCard`). Taken, the fan stops
+// following the cursor and decides nothing on release; sent home, the card
+// glides back into its own slot from where it is.
+it('offers the card under the cursor while it is held, and stops offering it after', () => {
+  const onHold = vi.fn()
+  const onPlay = vi.fn(() => true)
+  const { container } = render(
+    <Hand
+      items={[
+        { uid: 'attack-bug#0', card: knownCard('attack-bug') },
+        { uid: 'protection-debugger#0', card: knownCard('protection-debugger') },
+      ]}
+      onPlay={onPlay}
+      onHold={onHold}
+    />,
+  )
+  const first = container.querySelectorAll<HTMLElement>('[data-hand-slot]')[0]
+  fireEvent.mouseDown(first, { clientX: 0, clientY: 0 })
+  fireEvent.mouseMove(window, { clientX: 0, clientY: -20 })
+  const held = onHold.mock.lastCall?.[0]
+  expect(held).toMatchObject({ uid: 'attack-bug#0' })
+  expect(held.el()).toBeInstanceOf(HTMLElement)
+  fireEvent.mouseUp(window, { clientX: 0, clientY: -200 })
+  expect(onPlay).toHaveBeenCalledTimes(1)
+  expect(onHold).toHaveBeenLastCalledWith(null)
+})
+
+it('lets a taken card go nowhere on its own: no drop, until it is released', () => {
+  const onHold = vi.fn()
+  const onPlay = vi.fn(() => true)
+  const { container } = render(
+    <Hand
+      items={[{ uid: 'attack-bug#0', card: knownCard('attack-bug') }]}
+      onPlay={onPlay}
+      onHold={onHold}
+    />,
+  )
+  const slot = container.querySelector<HTMLElement>('[data-hand-slot]')
+  if (!slot) throw new Error('Missing hand slot')
+  fireEvent.mouseDown(slot, { clientX: 0, clientY: 0 })
+  fireEvent.mouseMove(window, { clientX: 0, clientY: -20 })
+  const held = onHold.mock.lastCall?.[0]
+  held.take()
+  const flyer = held.el() as HTMLElement
+  const left = flyer.style.left
+  fireEvent.mouseMove(window, { clientX: 300, clientY: -300 })
+  expect(flyer.style.left).toBe(left) // no longer follows the cursor
+  fireEvent.mouseUp(window, { clientX: 0, clientY: -200 })
+  expect(onPlay).not.toHaveBeenCalled() // and the release decides nothing
+  expect(container.querySelectorAll('[data-hand-slot]')).toHaveLength(0) // still up
+  act(() => held.release())
+  expect(container.querySelectorAll('[data-hand-slot]')).toHaveLength(1)
+  expect(onHold).toHaveBeenLastCalledWith(null)
+})
+
+// jsdom ships no WAAPI and this package has no global test setup to add one —
+// the same smallest stub `useHandArrival.test.tsx` keeps, so the glide home can
+// reach its own landing.
+if (!Element.prototype.animate) {
+  Element.prototype.animate = (() =>
+    ({ cancel: () => {}, finished: Promise.resolve() }) as unknown as Animation) as never
+}
+
+it('sends a held card home into its own slot, from where it is', async () => {
+  const onHold = vi.fn()
+  const onPlay = vi.fn(() => true)
+  const { container } = render(
+    <Hand
+      items={[{ uid: 'attack-bug#0', card: knownCard('attack-bug') }]}
+      onPlay={onPlay}
+      onHold={onHold}
+    />,
+  )
+  const slot = container.querySelector<HTMLElement>('[data-hand-slot]')
+  if (!slot) throw new Error('Missing hand slot')
+  fireEvent.mouseDown(slot, { clientX: 0, clientY: 0 })
+  fireEvent.mouseMove(window, { clientX: 0, clientY: -20 })
+  act(() => onHold.mock.lastCall?.[0].home())
+  fireEvent.mouseUp(window, { clientX: 0, clientY: -200 })
+  expect(onPlay).not.toHaveBeenCalled()
+  await waitFor(() => expect(container.querySelectorAll('[data-hand-slot]')).toHaveLength(1))
 })

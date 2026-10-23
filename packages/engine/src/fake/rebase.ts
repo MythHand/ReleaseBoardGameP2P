@@ -1,7 +1,7 @@
 import type { Action } from '../actions'
 import type { Reduction } from '../engine'
 import type { CardInstance, CardUid, GameState, PlayerId } from '../state'
-import { bankToDiscard, type Log, reject } from './core'
+import { bankToDiscard, type Log, REBASE_ORDER_MS, reject, timeFor } from './core'
 
 // Git Rebase — look at the top three of a draw pile and reorder them, showing
 // nobody. The privacy is the pendingView gate (attacks.ts), not anything here:
@@ -20,6 +20,7 @@ export function openReorderTop(
   card: CardInstance,
   combo: CardInstance | undefined,
   pile: number,
+  at: number,
 ): GameState {
   const spent = combo ? [card, combo] : [card]
   for (const c of spent) log.add({ type: 'discarded', player, card: c.id, reason: 'effect' })
@@ -40,6 +41,8 @@ export function openReorderTop(
       source: card.id,
       spent: spent.map((c) => c.uid),
       raisedAt: log.seq,
+      openedAt: at,
+      deadline: at + timeFor(state, REBASE_ORDER_MS),
     },
     eventSeq: log.seq,
   }

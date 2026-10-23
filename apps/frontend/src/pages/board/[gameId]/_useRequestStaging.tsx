@@ -1,5 +1,4 @@
 import type { Event } from '@release/engine'
-import type { TableActions } from '@release/ui'
 import {
   CARDS,
   Card,
@@ -11,7 +10,7 @@ import {
 } from '@release/ui'
 import type { RefObject } from 'react'
 import { useEffect, useRef, useState } from 'react'
-import type { BoardState } from '~/entities/game/board'
+import type { BoardActions, BoardState } from '~/entities/game/board'
 import type { RequestPickHandoff } from '~/entities/game/board/types'
 import styles from './_useRequestStaging.module.css'
 import { useResolveFeedback } from './_useResolveFeedback'
@@ -27,7 +26,7 @@ const BACK = HOLDABLE[0]
 export function useRequestStaging(args: {
   state: BoardState
   events?: Event[]
-  actions?: TableActions
+  actions?: BoardActions
   copy: { prompt: string; action: string; confirm: string; steal: string }
   enabled: boolean
   matchKey: string | null
@@ -182,15 +181,25 @@ export function useRequestStaging(args: {
   // …and it is told, so the table watches the choosing and not only its result.
   // Cleared when the surface goes: a mark left standing on a card nobody is
   // naming any more is worse than none.
+  //
+  // …and the keeper keeps it: the card marked and not yet confirmed is the one
+  // named when the time runs out (owner, 22.10) — the same rule as a marked
+  // pick out of the discard.
   const sentRef = useRef<string | null>(null)
+  const draftRef = useRef<string | null>(null)
   const sendPreview = args.onPickPreview
   useEffect(() => {
-    if (!sendPreview) return
     const card = asking ? named : null
+    if (asking && draftRef.current !== card) {
+      draftRef.current = card
+      actions?.onDraft?.(card ? { kind: 'requestCard', card } : { kind: 'requestCard' })
+    }
+    if (!asking) draftRef.current = null
+    if (!sendPreview) return
     if (sentRef.current === card) return
     sentRef.current = card
     sendPreview(card)
-  }, [sendPreview, asking, named])
+  }, [sendPreview, asking, named, actions])
 
   // Restored legacy snapshots may still owe a giveCard. Copies are equivalent:
   // resolve the first matching card without a donor decision or gesture.

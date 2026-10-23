@@ -1,8 +1,8 @@
 import type { Action, Target } from '../actions'
-import { rulesFor } from '../cards'
+import { CARD_RULES, rulesFor } from '../cards'
 import type { Reduction } from '../engine'
 import { shuffle } from '../rng'
-import type { CardUid, GameState, PlayerId } from '../state'
+import type { CardUid, GameState, PlayerId, ReleaseSlot } from '../state'
 import { foldTally } from '../tally'
 import { onAbandon } from './abandon'
 import { onAttack, onDefend } from './attacks'
@@ -30,6 +30,8 @@ import { onShow, onTakeBack } from './shown'
 import { eliminate, fireTrigger, onDecline503, onDeclineCrush, onNeutralize } from './triggers'
 import { onUpgradeDiscard, onUpgradeTake } from './upgrade'
 import { onPass, onUnpass, onWindowExpired } from './window'
+
+const SLOTS: readonly ReleaseSlot[] = ['frontend', 'backend', 'database']
 
 export { handLimitFor, nextSeat }
 
@@ -185,7 +187,7 @@ function onPush(state: GameState, action: Action & { type: 'PUSH' }): Reduction 
   if (!drawObligationMet(state)) return reject(state, action, 'you must draw before pushing')
 
   const log = createLog(state.eventSeq)
-  return { state: endTurn(state, log), events: log.events }
+  return { state: endTurn(state, log, action.at), events: log.events }
 }
 
 function onHandLimit(state: GameState, action: Action & { type: 'RESOLVE' }): Reduction {
@@ -230,7 +232,104 @@ function onHandLimit(state: GameState, action: Action & { type: 'RESOLVE' }): Re
   if (pending.endsTurn === false) {
     return { state: { ...withDiscard, eventSeq: log.seq }, events: log.events }
   }
-  return { state: endTurn(withDiscard, log), events: log.events }
+  return { state: endTurn(withDiscard, log, action.at), events: log.events }
+}
+
+// The answer as it stands on its owner's screen, kept on the decision it belongs
+// to for the moment the time runs out. One that does not fit the open decision
+// is simply not kept — never refused: the board takes its staged answer back on
+// a refusal, and a draft must never cause that.
+function onDraft(state: GameState, action: Action & { type: 'DRAFT' }): Reduction {
+  const unchanged: Reduction = { state, events: [] }
+  const pending = state.pending
+  const draft = action.draft
+  if (!pending || typeof draft !== 'object' || draft === null) return unchanged
+  if (pending.kind === 'handLimit' && draft.kind === 'handLimit') {
+    if (pending.player !== action.player || !Array.isArray(draft.cards)) return unchanged
+    const hand = state.players[action.player].hand
+    const fits =
+      draft.cards.length <= pending.excess &&
+      new Set(draft.cards).size === draft.cards.length &&
+      draft.cards.every((uid) => hand.some((c) => c.uid === uid))
+    if (!fits) return unchanged
+    return { state: { ...state, pending: { ...pending, draft: [...draft.cards] } }, events: [] }
+  }
+  if (pending.kind === 'reorderTop' && draft.kind === 'reorderTop') {
+    if (pending.player !== action.player || !Array.isArray(draft.order)) return unchanged
+    // every offered pile once, each the very cards it offered in some order
+    const fits =
+      draft.order.length === pending.piles.length &&
+      pending.piles.every((entry) => {
+        const answer = draft.order.find((o) => o.pile === entry.pile)
+        if (!answer || !Array.isArray(answer.cards)) return false
+        const offered = entry.cards.map((c) => c.uid)
+        return (
+          answer.cards.length === offered.length &&
+          new Set(answer.cards).size === offered.length &&
+          answer.cards.every((uid) => offered.includes(uid))
+        )
+      })
+    if (!fits) return unchanged
+    const order = draft.order.map((o) => ({ pile: o.pile, cards: [...o.cards] }))
+    return { state: { ...state, pending: { ...pending, draft: order } }, events: [] }
+  }
+  if (pending.kind === 'pickFromDiscard' && draft.kind === 'pickFromDiscard') {
+    if (pending.player !== action.player) return unchanged
+    // the same terms the confirmed answer is held to (onPickFromDiscard), each
+    // role checked only if it is marked
+    const offered = (uid: unknown) => pending.options.find((c) => c.uid === uid)
+    const hand = draft.card == null ? undefined : offered(draft.card)
+    const deck = draft.toDeck == null ? undefined : offered(draft.toDeck)
+    const fits =
+      (draft.card == null || (hand !== undefined && rulesFor(hand.id)?.kind !== 'trigger')) &&
+      (draft.toDeck == null || (deck !== undefined && pending.picks === 2)) &&
+      (hand === undefined || hand.uid !== deck?.uid)
+    if (!fits) return unchanged
+    const marked = { ...(hand ? { card: hand.uid } : {}), ...(deck ? { toDeck: deck.uid } : {}) }
+    return { state: { ...state, pending: { ...pending, draft: marked } }, events: [] }
+  }
+  if (
+    (pending.kind === 'neutralize503' || pending.kind === 'crush') &&
+    draft.kind === pending.kind
+  ) {
+    if (pending.player !== action.player) return unchanged
+    // put back: the card held is held no longer, and nothing answers
+    if (draft.method == null) {
+      const { draft: _letGo, ...open } = pending
+      return { state: { ...state, pending: open }, events: [] }
+    }
+    // only what can be HELD — a Debugger out of the fan, a release off the
+    // zone — and only what this prompt offers; a Monitoring is pressed, not held
+    const me = state.players[action.player]
+    const card = 'card' in draft ? draft.card : undefined
+    const held =
+      draft.method === 'debugger'
+        ? me.hand.some((c) => c.id === 'protection-debugger')
+        : draft.method === 'sacrifice' &&
+          card != null &&
+          SLOTS.some((slot) => me.release[slot]?.card.uid === card)
+    if (!pending.methods.includes(draft.method) || !held) return unchanged
+    const answer =
+      draft.method === 'sacrifice' ? { method: draft.method, card } : { method: draft.method }
+    return { state: { ...state, pending: { ...pending, draft: answer } }, events: [] }
+  }
+  if (pending.kind === 'requestCard' && draft.kind === 'requestCard') {
+    if (pending.player !== action.player) return unchanged
+    if (draft.card == null) {
+      const { draft: _unmarked, ...open } = pending
+      return { state: { ...state, pending: open }, events: [] }
+    }
+    // the same terms the confirmed request is held to (onRequestCard)
+    if (typeof draft.card !== 'string' || !Object.hasOwn(CARD_RULES, draft.card)) return unchanged
+    return { state: { ...state, pending: { ...pending, draft: draft.card } }, events: [] }
+  }
+  if (pending.kind === 'systemUpgrade' && draft.kind === 'upgradeTake') {
+    // the actor's mark, and only one of the cards thrown this time
+    if (pending.phase !== 'picking' || pending.actor !== action.player) return unchanged
+    if (!pending.thrown.some((t) => t.card.uid === draft.card)) return unchanged
+    return { state: { ...state, pending: { ...pending, draft: draft.card } }, events: [] }
+  }
+  return unchanged
 }
 
 // Keeper-only, like WINDOW_EXPIRED. Everything after the first turn is stamped
@@ -355,7 +454,7 @@ function onSurrender(state: GameState, action: Action & { type: 'SURRENDER' }): 
     return reject(state, action, 'table is busy')
   }
   const log = createLog(state.eventSeq)
-  return { state: eliminate(state, log, action.player), events: log.events }
+  return { state: eliminate(state, log, action.player, action.at), events: log.events }
 }
 
 export function reduce(state: GameState, action: Action): Reduction {
@@ -401,6 +500,8 @@ function dispatch(state: GameState, action: Action): Reduction {
       return onPush(state, action)
     case 'RESOLVE':
       return onResolve(state, action)
+    case 'DRAFT':
+      return onDraft(state, action)
     case 'PLAY':
       return onPlay(state, action)
     case 'PASS':

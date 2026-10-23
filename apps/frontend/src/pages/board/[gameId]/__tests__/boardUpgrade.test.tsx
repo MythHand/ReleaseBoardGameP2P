@@ -135,7 +135,11 @@ function stagingProbe() {
       pending: upgradePending(),
       you: { ...base.you, hand: [{ uid: 'h1', card: card('attack-bug') }] },
     },
-    anchors: { centre: { current: centre } } as BoardAnchors,
+    anchors: {
+      centre: { current: centre },
+      hold: () => {},
+      heldCard: () => null,
+    } as unknown as BoardAnchors,
     actions: { onResolve },
     events: [] as import('@release/engine').Event[],
     copy: { prompt: '', takePrompt: '', confirm: '' },
@@ -144,7 +148,10 @@ function stagingProbe() {
   return { args, onResolve }
 }
 
-it('does not send a delayed discard after the pending is removed or the hook unmounts', async () => {
+// A card let go of is the one thrown (owner, 22.10): the discard goes the moment
+// the card leaves the hand, once, and nothing is sent again after the pending is
+// removed or the hook unmounts while the card is still on its way to the row.
+it('sends the discard once as the card is let go of, and never again afterwards', async () => {
   vi.useFakeTimers()
   try {
     for (const unmount of [false, true]) {
@@ -155,12 +162,14 @@ it('does not send a delayed discard after the pending is removed or the hook unm
           rect: { left: 0, top: 0, width: 150, height: 210 },
         } as import('@release/ui').HandPlayDrop)
       })
+      expect(onResolve).toHaveBeenCalledTimes(1)
+      expect(onResolve).toHaveBeenCalledWith({ kind: 'upgradeDiscard', card: 'h1' })
       if (unmount) hook.unmount()
       else hook.rerender({ ...args, state: { ...args.state, pending: null } })
       await act(async () => {
         await vi.advanceTimersByTimeAsync(1000)
       })
-      expect(onResolve).not.toHaveBeenCalled()
+      expect(onResolve).toHaveBeenCalledTimes(1)
       hook.unmount()
     }
   } finally {

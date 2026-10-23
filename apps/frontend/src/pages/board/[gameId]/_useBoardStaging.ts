@@ -105,6 +105,14 @@ export interface StagedPlay {
   main: StagedCard | null // the partner once picked, or the plain pulled card
   phase: 'aim' | 'partner' | 'target' | 'dispatched'
   merged: boolean // the pair flyer owns the centre
+  /**
+   * A play that needs nothing more — no target, no partner. Let go of, it is
+   * played (owner, 22.10): it stands at the centre only for the table to read
+   * it, and if the turn runs out meanwhile the keeper plays it rather than
+   * taking it back — so the turn leaving does not send it home, and the beat
+   * that plays it takes it from here (`_Board.tsx`'s staging handoff).
+   */
+  plain?: boolean
 }
 
 export interface BoardStaging {
@@ -140,6 +148,8 @@ export interface BoardStaging {
   onCardClick: (index: number) => boolean
   onTargetPick: (target: TableTarget) => void
   cancel: () => void
+  /** the plain play's own flight to the centre, landed — for the beat that adopts it */
+  stageLanded: () => Promise<void>
   /** the hand uids that may pay a staged release's cost — [] when none is owed */
   costOptions: string[]
   /** the cost is PULLED out of the fan, the same gesture every other "give a
@@ -353,6 +363,11 @@ export function useBoardStaging({
     [actions],
   )
   const plainAttempt = useRef(0)
+  // A plain play's own flight, for the beat that adopts it (`stageLanded`), and
+  // whether the table took the card home while it was still in the air — the
+  // flight's own ending then goes no further (`homeFromTheAir`).
+  const stageLanding = useRef<Promise<void>>(Promise.resolve())
+  const turnedBack = useRef(false)
   // the board has had its one look at the table for a play to take up (below)
   const lookedRef = useRef(false)
   // Whose turn it was when the current staging began. An attack answering a
@@ -848,6 +863,89 @@ export function useBoardStaging({
   const cancelRef = useRef(cancel)
   cancelRef.current = cancel
 
+  // THE TABLE TAKES THE CARD HOME WHILE IT IS STILL IN THE AIR to the centre —
+  // the turn ran out on it (owner, 22.10). It goes home from where it is: this
+  // very node, measured as it flies (`arrive` reads it before it awaits), not a
+  // second copy from the place it was heading for, and the flight's own landing
+  // goes no further. Only the table's own take-back takes this road; a miss in
+  // mid-flight still waits for the card to stand (`arrivingRef`). False when
+  // there is nothing in the air to take.
+  const homeFromTheAir = (): boolean => {
+    const s = stagedRef.current
+    const card = s?.main ?? s?.support
+    const el = flyer.elOf('stage')
+    if (!s || s.phase === 'dispatched' || !card || !el) return false
+    turnedBack.current = true
+    plainAttempt.current += 1
+    arrowCtl.stop()
+    cancellingRef.current = true
+    setCancelling(true)
+    flyHome([{ key: card.uid, card: card.card, el }])
+    flyer.drop('stage')
+    return true
+  }
+  const homeFromTheAirRef = useRef(homeFromTheAir)
+  homeFromTheAirRef.current = homeFromTheAir
+
+  // THE KEEPER TOOK OUR RELEASE BACK — the turn ran out before a cost reached
+  // it, and a cost let go of too late is not taken (owner, 22.10). Nobody here
+  // asked: the price was simply no longer owed, with the release still in our
+  // hand. Both go home from where they are — the release off its place at the
+  // centre, the cost from the air or from beside it — rather than the release
+  // reappearing in the fan and the cost hanging at its place.
+  //
+  // Read off the table's own `takenBack` of the release (the effect below that
+  // watches the table taking our cards back), never off the price merely
+  // disappearing: a price the player took back himself, or one that was paid,
+  // clears the same way.
+  const lastCost = useRef(cost)
+  if (cost) lastCost.current = cost
+  const homeTakenRelease = (releaseUid: string) => {
+    const hand = state.you?.hand ?? EMPTY_HAND
+    const release = hand.find((c) => c.uid === releaseUid)
+    if (!release) return
+    const paid = costPayment.current
+    const paidCard = paid ? hand.find((c) => c.uid === paid.uid) : undefined
+    const costEl = costCarrier.elOf('cost')
+    const costBox = anchors.cost.current?.getBoundingClientRect()
+    const items: Arriving[] = []
+    const merged = stagedRef.current
+    if (merged?.merged && merged.support && merged.main) {
+      const el = pairApi.current.node()
+      const from = anchors.centre.current?.getBoundingClientRect()
+      if (el && from) {
+        items.push(
+          { key: merged.support.uid, card: merged.support.card, el, anchor: 'aux', from },
+          { key: merged.main.uid, card: merged.main.card, el, anchor: 'main', from },
+        )
+      }
+    } else {
+      const from = anchors.stage.current?.getBoundingClientRect()
+      if (from) items.push({ key: release.uid, card: release.card, from })
+    }
+    if (paidCard) {
+      if (costEl) items.push({ key: paidCard.uid, card: paidCard.card, el: costEl })
+      else if (costBox) items.push({ key: paidCard.uid, card: paidCard.card, from: costBox })
+    }
+    if (reduced || items.length === 0) {
+      pairApi.current.release()
+      commitStaged(null)
+      setStage('none')
+      resetCostPayment()
+      return
+    }
+    setStage('leaving')
+    cancellingRef.current = true
+    setCancelling(true)
+    flyHome(items)
+    // measured while they were still up; what drew them goes in the commit the
+    // way home goes up
+    pairApi.current.release()
+    resetCostPayment()
+  }
+  const homeTakenReleaseRef = useRef(homeTakenRelease)
+  homeTakenReleaseRef.current = homeTakenRelease
+
   // A refused play goes home through the ordinary cancel. Its phase is moved off
   // 'dispatched' first, synchronously — same reason as `onTargetPick`'s own
   // write: `cancel()` runs in the same tick and its own guard reads this ref's
@@ -867,15 +965,21 @@ export function useBoardStaging({
     refuse()
     return true
   }, [refuse])
+  //
+  // A plain play is not one of these: let go of, it is played, and the keeper
+  // plays it when the turn runs out (owner, 22.10). One still in the air goes
+  // home from there (`homeFromTheAir`), not after it has stood.
   useEffect(() => {
     const waiting = stagedRef.current
     if (
       waiting &&
       waiting.phase !== 'dispatched' &&
+      !waiting.plain &&
       stagedOnTurnRef.current === state.selfId &&
       state.turn !== state.selfId
-    )
-      cancelRef.current()
+    ) {
+      if (!(arrivingRef.current && homeFromTheAirRef.current())) cancelRef.current()
+    }
   }, [state.turn, state.selfId])
 
   // While a support waits for a partner, the cards it can fold with keep
@@ -1031,6 +1135,11 @@ export function useBoardStaging({
             // the flight is how it got there, not whether it did.
           }
           arrivingRef.current = false
+          // taken home while it was in the air: the way home owns it now
+          if (turnedBack.current) {
+            turnedBack.current = false
+            return
+          }
           flyer.drop('stage')
           setCarrying([])
           if (refusedOnLanding()) return
@@ -1049,8 +1158,12 @@ export function useBoardStaging({
   const stagePlain = useCallback(
     (card: StagedCard, from: Rect | undefined, attack: boolean) => {
       const attempt = ++plainAttempt.current
-      commitStaged({ support: null, main: card, phase: 'aim', merged: false })
+      commitStaged({ support: null, main: card, phase: 'aim', merged: false, plain: true })
       setStage('none')
+      let landed = () => {}
+      stageLanding.current = new Promise<void>((done) => {
+        landed = done
+      })
       // read at the centre by the whole table while it waits (resolution.md §1)
       showOut(card.uid)
       const current = () =>
@@ -1065,6 +1178,7 @@ export function useBoardStaging({
         else actions?.onPlay?.(card.uid, undefined, undefined)
       }
       if (reduced) {
+        landed()
         dispatch()
         return
       }
@@ -1081,13 +1195,21 @@ export function useBoardStaging({
             // the same `rotate`/`dx`/`dy` the combo and defence flights pass, for
             // the same reason.
             if (el) await play('playToCenter', el, { to, ...attackPose(card.card) })?.finished
+          } catch {
+            // taken home in mid-air: the node it was flying is gone
           } finally {
             arrivingRef.current = false
+            landed()
+          }
+          if (turnedBack.current) {
+            turnedBack.current = false
+            return
           }
           if (!current()) return
           flyer.drop('stage')
           if (refusedOnLanding()) return
         }
+        landed()
         await wait(SHOW_HOLD)
         dispatch()
       })()
@@ -1200,6 +1322,13 @@ export function useBoardStaging({
       costPayment.current = attempt
       setPaying(uid)
       setCostGone(uid)
+      // LET GO OF IS PAID: the cost goes the moment the card leaves the hand,
+      // not when it lands — paid before the turn ran out, the release is paid
+      // (owner, 22.10). The flight below only shows it, and it always lands
+      // before the beat moves it on: that beat starts a round trip after this,
+      // and holds the cost open for SHOW_HOLD (1200ms) against a 480ms flight.
+      costWatermarkRef.current = eventsRef.current.length
+      actions?.onResolve?.({ kind: 'discardForRelease', card: uid })
       void (async () => {
         const to = anchors.cost.current?.getBoundingClientRect()
         // WHERE IT PHYSICALLY IS — the rect the pull let go at when there is one,
@@ -1227,8 +1356,6 @@ export function useBoardStaging({
         setPaidCost({ uid, card: item.card, index })
         setPaying(null)
         costCarrier.drop('cost')
-        costWatermarkRef.current = eventsRef.current.length
-        actions?.onResolve?.({ kind: 'discardForRelease', card: uid })
       })().catch(() => {
         if (costPayment.current === attempt) resetCostPayment()
       })
@@ -1866,6 +1993,22 @@ export function useBoardStaging({
     takenBackRead.current = events.length
     // what we asked back is our own take-back answered, not the table's doing
     if (askedBack.size > 0) return
+    // our release, standing for its price when the turn ran out
+    const priced = lastCost.current
+    const pricedId = priced
+      ? (state.you?.hand ?? EMPTY_HAND).find((c) => c.uid === priced.release)?.card.id
+      : undefined
+    if (
+      priced &&
+      pricedId &&
+      fresh.some(
+        (e) => e.type === 'takenBack' && e.player === state.selfId && e.cards.includes(pricedId),
+      )
+    ) {
+      lastCost.current = null
+      homeTakenReleaseRef.current(priced.release)
+      return
+    }
     const s = stagedRef.current
     if (!s || s.phase === 'dispatched') return
     const held = [s.support?.card.id, s.main?.card.id]
@@ -1875,8 +2018,9 @@ export function useBoardStaging({
         e.player === state.selfId &&
         e.cards.some((id) => held.includes(id)),
     )
-    if (sentHome) cancelRef.current()
-  }, [events, askedBack, state.selfId])
+    // …from the air, if it is still on its way to the table (owner, 22.10)
+    if (sentHome && !(arrivingRef.current && homeFromTheAirRef.current())) cancelRef.current()
+  }, [events, askedBack, state.selfId, state.you?.hand])
 
   // the release's own place at the stage slot, for the stand's recorder
   useEffect(() => trace('stage', { stage }), [stage])
@@ -1915,9 +2059,12 @@ export function useBoardStaging({
     [],
   )
 
+  const stageLanded = useCallback(() => stageLanding.current, [])
+
   return {
     staged,
     dispatched: staged?.phase === 'dispatched',
+    stageLanded,
     targets,
     arrow: arrowCtl,
     // the fold's own node only while it is carrying one: consumers read this

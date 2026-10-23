@@ -263,3 +263,20 @@ it.each([
     geometry.mockRestore()
   }
 })
+
+// The card marked in the catalogue and not yet confirmed goes to the keeper as a
+// draft — it is the one named when the time runs out (owner, 22.10) — and a mark
+// taken off clears it. The table watches the same mark through `onPickPreview`.
+it('tells the keeper the card marked in the catalogue, and the table too', () => {
+  const onDraft = vi.fn()
+  const onPickPreview = vi.fn()
+  const props = withPending({ kind: 'requestCard', player: 'you', target: 'p2' })
+  const { getByTestId } = render(
+    <Board {...props} actions={{ onDraft }} onPickPreview={onPickPreview} />,
+  )
+  expect(onDraft).not.toHaveBeenCalled()
+  const band = getByTestId('board-request-band')
+  fireEvent.click(within(band).getAllByRole('button', { name: /Hotfix/ })[0])
+  expect(onDraft).toHaveBeenLastCalledWith({ kind: 'requestCard', card: 'defense-hotfix' })
+  expect(onPickPreview).toHaveBeenLastCalledWith('defense-hotfix')
+})

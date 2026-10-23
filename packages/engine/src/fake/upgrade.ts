@@ -1,7 +1,16 @@
 import type { Action } from '../actions'
 import type { Reduction } from '../engine'
 import type { CardInstance, GameState, PlayerId } from '../state'
-import { bankToDiscard, createLog, type Log, reject, setHand } from './core'
+import {
+  bankToDiscard,
+  createLog,
+  type Log,
+  reject,
+  setHand,
+  timeFor,
+  UPGRADE_DISCARD_MS,
+  UPGRADE_PICK_MS,
+} from './core'
 
 // System Upgrade — "все остальные игроки сбрасывают по одной карте", each for
 // themselves and simultaneously, so the pending owes a roster rather than a
@@ -15,6 +24,7 @@ export function openSystemUpgrade(
   player: PlayerId,
   card: CardInstance,
   combo: CardInstance | undefined,
+  at: number,
 ): GameState {
   const spent = combo ? [card, combo] : [card]
   for (const c of spent) log.add({ type: 'discarded', player, card: c.id, reason: 'effect' })
@@ -35,6 +45,8 @@ export function openSystemUpgrade(
       sudo: combo !== undefined,
       phase: 'discarding',
       source: card.id,
+      openedAt: at,
+      deadline: at + timeFor(state, UPGRADE_DISCARD_MS),
     },
     eventSeq: log.seq,
   }
@@ -83,7 +95,15 @@ export function onUpgradeDiscard(
     return {
       state: {
         ...withHand,
-        pending: { ...pending, owed: [], thrown, phase: 'picking' },
+        pending: {
+          ...pending,
+          owed: [],
+          thrown,
+          phase: 'picking',
+          awaitingPresentation: undefined,
+          openedAt: action.at,
+          deadline: action.at + timeFor(state, UPGRADE_PICK_MS),
+        },
         eventSeq: log.seq,
       },
       events: log.events,

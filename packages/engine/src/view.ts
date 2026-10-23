@@ -78,6 +78,9 @@ export type PendingView =
       // standing while the answer is chosen. Public, like `pickFromDiscard`'s:
       // the whole table watched it be revealed.
       source?: CardId
+      awaitingPresentation?: true
+      openedAt?: number
+      deadline?: number
     }
   | {
       kind: 'crush'
@@ -88,6 +91,9 @@ export type PendingView =
       // standing while the answer is chosen. Public, like `pickFromDiscard`'s:
       // the whole table watched it be revealed.
       source?: CardId
+      awaitingPresentation?: true
+      openedAt?: number
+      deadline?: number
     }
   // THE THREE PENDINGS OF ONE EXCHANGE, and all three carry the same picture of
   // the centre: `attack`/`sudo` for what was thrown, `cover`/`coverSudo`/`coverBy`
@@ -145,6 +151,9 @@ export type PendingView =
       // standing while the answer is chosen. Public, like `pickFromDiscard`'s:
       // the whole table watched it be revealed.
       source?: CardId
+      awaitingPresentation?: true
+      openedAt?: number
+      deadline?: number
     }
   // Full card identity, but gated behind `mine` in pendingView (attacks.ts)
   // like the other owner-only variants: only discardTop/discardCount are
@@ -157,6 +166,9 @@ export type PendingView =
       source: CardId
       /** which occasion this is — see the same field in `state.ts` */
       raisedAt: number
+      awaitingPresentation?: true
+      openedAt?: number
+      deadline?: number
     }
   // Full card identity, gated behind `mine` in pendingView (attacks.ts) — the
   // whole of what "не показывая другим" needs, since a deck's contents are
@@ -168,6 +180,9 @@ export type PendingView =
       source: CardId
       /** which occasion this is — see the same field in `state.ts` */
       raisedAt: number
+      awaitingPresentation?: true
+      openedAt?: number
+      deadline?: number
     }
   // The one pending with nothing private in it, so it mirrors state.ts's
   // variant field for field with no `mine` gate anywhere: the rules put the
@@ -183,6 +198,9 @@ export type PendingView =
       sudo: boolean
       phase: 'discarding' | 'picking'
       source: CardId
+      awaitingPresentation?: true
+      openedAt?: number
+      deadline?: number
     }
 
 // A card put out at the centre while its play is being made — face up, the
