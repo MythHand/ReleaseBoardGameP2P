@@ -868,3 +868,66 @@ it.each([
   // and the board that is left once the exchange is over marks nobody
   expect(document.querySelector('[data-targeted]')).toBeNull()
 })
+
+// THE KEEPER PASSED FOR US when our time ran out (owner, 22.10): nothing of ours
+// was taken, so whatever we were holding goes home from where it is — a defence
+// on the cursor, a Sudo still waiting for its partner, a defence let go of too
+// late — and no answer of ours is sent after the time is up.
+function passedBoard(actions: TableActions, hand = HAND) {
+  const base = makeBoardProps()
+  return (
+    <Board
+      {...makeBoardProps({
+        state: { ...base.state, you: { ...base.state.you, hand }, playable: [], pending: null },
+        actions,
+      })}
+    />
+  )
+}
+const settle = () =>
+  act(async () => {
+    await new Promise((r) => setTimeout(r, 800))
+  })
+
+it('sends a defence held on the cursor home when the keeper passes for us', async () => {
+  const onResolve = vi.fn()
+  const view = render(defenceBoard({ options: ['defense-hotfix#0'] }, { onResolve }))
+  const slot = document.querySelectorAll<HTMLElement>('[data-hand-slot]')[0]
+  fireEvent.mouseDown(slot, { clientX: 0, clientY: 0 })
+  fireEvent.mouseMove(window, { clientX: 0, clientY: -20 })
+  expect(document.querySelectorAll('[data-hand-slot]')).toHaveLength(HAND.length - 1)
+  view.rerender(passedBoard({ onResolve }))
+  await settle()
+  expect(document.querySelectorAll('[data-hand-slot]')).toHaveLength(HAND.length)
+  fireEvent.mouseUp(window, { clientX: 0, clientY: -200 })
+  await act(async () => {})
+  expect(onResolve).not.toHaveBeenCalled()
+})
+
+it('sends a Sudo still waiting for its partner home when the keeper passes for us', async () => {
+  const onResolve = vi.fn()
+  const view = render(
+    defenceBoard(
+      { options: ['defense-hotfix#0'], combos: { 'support-sudo#0': ['defense-hotfix#0'] } },
+      { onResolve },
+    ),
+  )
+  await pullFromFan('support-sudo#0')
+  expect(document.querySelectorAll('[data-hand-slot]')).toHaveLength(HAND.length - 1)
+  view.rerender(passedBoard({ onResolve }))
+  await settle()
+  expect(document.querySelectorAll('[data-hand-slot]')).toHaveLength(HAND.length)
+  expect(onResolve).not.toHaveBeenCalled()
+})
+
+it('sends a defence let go of too late home when the keeper passed first', async () => {
+  const onResolve = vi.fn()
+  const view = render(defenceBoard({ options: ['defense-hotfix#0'] }, { onResolve }))
+  await pullCardFromFan('defense-hotfix#0')
+  // our answer went, but the keeper's pass got there first
+  expect(onResolve).toHaveBeenCalledTimes(1)
+  view.rerender(passedBoard({ onResolve }))
+  await settle()
+  expect(document.querySelectorAll('[data-hand-slot]')).toHaveLength(HAND.length)
+  expect(onResolve).toHaveBeenCalledTimes(1)
+})

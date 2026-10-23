@@ -5,7 +5,7 @@ import { act, render } from '@testing-library/react'
 import type { RefObject } from 'react'
 import { expect, it, vi } from 'vitest'
 import type { BeatRun, BoardAnchors, BoardState, StagedHandoff } from '~/entities/game/board'
-import { ALARM_POSE, COVER_POSE } from '~/entities/game/board'
+import { ALARM_POSE, COVER_POSE, handCardOf } from '~/entities/game/board'
 import { useDefenseBeat } from './defenseBeat'
 import type { BeatPlan } from './planBeats'
 
@@ -183,6 +183,9 @@ function harness(handSlot: HTMLElement | null = null) {
       player === 'p1' ? null : { left: 0, top: 0, width: 150, height: 210 },
     seatOf: () => node(),
     handSlotAt: () => handSlot,
+    handCardAt(this: { handSlotAt: (i: number) => HTMLElement | null }, i: number) {
+      return handCardOf(this.handSlotAt(i))
+    },
     // …and an opponent's zone reads at a glance, ours in full: `Seat` hands
     // its zone `lod` and the zone says so on every slot (`zoneReading.ts`)
     releaseSlot: (player: string) => {
@@ -191,6 +194,8 @@ function harness(handSlot: HTMLElement | null = null) {
       return slot
     },
     bindPile: () => {},
+    heldCard: () => null,
+    hold: () => {},
     bindSeat: () => {},
     bindReleaseSlot: () => {},
   } as unknown as BoardAnchors
@@ -1434,4 +1439,49 @@ it('lets the victim’s zone go of a stolen release as it takes off, and lands i
   )
   expect(liftedAfter).toEqual([])
   expect(published.at(-1)?.opponents[0].release.frontend?.id).toBe('release-frontend')
+})
+
+// THE KEEPER ANSWERED WITH THE CARD WE WERE HOLDING (owner, 22.10): the release
+// taken up off the zone for a 503 was held when the time ran out, and it is the
+// sacrifice. It goes to the cover from under the cursor — the carrier goes up
+// where the held card is, and the gesture lets go of its own in that commit.
+it('takes the sacrifice to the cover from under the cursor when the keeper answers with it', async () => {
+  played.calls = []
+  const { api, Probe, anchors } = harness()
+  const onCursor = document.createElement('div')
+  onCursor.getBoundingClientRect = () =>
+    ({ left: 640, top: 120, width: 150, height: 210, right: 790, bottom: 330 }) as DOMRect
+  const held = { uid: 'rel#z', el: () => onCursor, take: vi.fn(), release: vi.fn(), home: vi.fn() }
+  vi.spyOn(anchors, 'heldCard').mockImplementation((uid: string) => (uid === 'rel#z' ? held : null))
+  render(<Probe />)
+  const mine: BeatRun = {
+    ...ctx,
+    base: {
+      ...base,
+      you: {
+        ...base.you,
+        release: { frontend: cardById('release-frontend') },
+        releaseUid: { frontend: 'rel#z' },
+      },
+    } as BoardState,
+  }
+  await drive(() =>
+    api.beat?.runNeutralized(
+      {
+        ...debuggerPlan(),
+        player: 'p1',
+        method: 'sacrifice',
+        slot: 'frontend',
+        spent: [{ eventId: 12, card: 'release-frontend' }],
+      },
+      mine,
+    ),
+  )
+  expect(held.take).toHaveBeenCalledOnce()
+  expect(held.release).toHaveBeenCalledOnce()
+  // the flight to the cover starts where the held card is
+  expect(played.calls.find((c) => c.name === 'playToCenter')?.start).toMatchObject({
+    left: 640,
+    top: 120,
+  })
 })

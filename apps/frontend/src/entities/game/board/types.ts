@@ -7,7 +7,7 @@ import type { PresentationId } from '~/network/session/presentationGate'
 // two will drift, and contract.test-d.ts is what makes the drift a compile
 // error instead of a misrender.
 
-import type { Event, GameView } from '@release/engine'
+import type { Draft, Event, GameView } from '@release/engine'
 import type {
   ActionTimeScale,
   CardData,
@@ -41,6 +41,12 @@ import type {
 import type { ReactNode } from 'react'
 
 export type Panel = 'settings' | 'history' | 'participants' | 'rules' | 'modes' | 'voice' | 'chat'
+
+// The kit's intents, plus the answer as it stands on the screen while its
+// decision is still open — the keeper's to use if the time runs out.
+export interface BoardActions extends TableActions {
+  onDraft?: (draft: Draft) => void
+}
 
 export interface BoardOpponent {
   id: string
@@ -361,6 +367,8 @@ export interface HandLimitHandoff {
   cards: { uid: string; card: CardData; slot: number }[]
   cellAt: (slot: number) => HTMLElement | null
   release: () => void
+  /** the keeper answered for us: the grid takes nothing more and sends nothing */
+  close?: () => void
 }
 
 /**
@@ -423,7 +431,7 @@ export interface BoardProps {
   copy: BoardCopyBundle
   slots?: BoardSlots
   over?: BoardOver | null
-  actions?: TableActions
+  actions?: BoardActions
   // override for the dock derived from `state` — the playground's manual
   // selector uses this to force a specific demo state
   dock?: Partial<DockView>

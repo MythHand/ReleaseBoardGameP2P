@@ -108,6 +108,17 @@ export function isWellFormedAction(action: unknown): action is Action {
 export const DEFEND_MS = 15_000
 export const HAND_CHOICE_MS = 25_000
 
+// The decisions a card raises carry a deadline for the same reason.
+export const ERROR_503_MS = 20_000
+export const CRUSH_MS = 20_000
+export const HAND_LIMIT_MS = 40_000
+export const BAD_VIBE_MS = 20_000
+export const CHERRY_PICK_MS = 30_000
+export const INSIDE_MS = 20_000
+export const REBASE_ORDER_MS = 30_000
+export const UPGRADE_DISCARD_MS = 20_000
+export const UPGRADE_PICK_MS = 20_000
+
 // The turn's inactivity clock: 30s per action, app timing rather than a rule
 // (docs/rules/README.md, "Что правилом НЕ является" — the value the docs name).
 export const TURN_ACTION_MS = 30_000
@@ -212,12 +223,22 @@ export function drawObligationMet(state: GameState): boolean {
 // `ai-hallucination` event also ends the turn immediately, and reduce.ts
 // already needs to import triggers.ts for `fireTrigger`/`onNeutralize` —
 // keeping `endTurn` in reduce.ts would make that a cycle.
-export function endTurn(state: GameState, log: Log): GameState {
+export function endTurn(state: GameState, log: Log, at: number): GameState {
   const me = state.turn.player
   const limit = handLimitFor(state.setup)
   const excess = state.players[me].hand.length - limit
   if (excess > 0) {
-    return { ...state, pending: { kind: 'handLimit', player: me, excess }, eventSeq: log.seq }
+    return {
+      ...state,
+      pending: {
+        kind: 'handLimit',
+        player: me,
+        excess,
+        openedAt: at,
+        deadline: at + timeFor(state, HAND_LIMIT_MS),
+      },
+      eventSeq: log.seq,
+    }
   }
   log.add({ type: 'turnEnded', player: me })
   const next = nextSeat(state, me)

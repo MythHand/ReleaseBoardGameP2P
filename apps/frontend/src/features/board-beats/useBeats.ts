@@ -173,6 +173,9 @@ export function useBeats(args: {
   // hand, read once at the start of a `handLimit` beat so the runner flies the
   // cells that are standing instead of a fan the cards left long ago.
   handLimit?: RefObject<HandLimitHandoff | null>
+  // …and the grid as it stood before any answer of ours went out: what that
+  // beat takes when the keeper answered for us, our time having run out.
+  handLimitGrid?: RefObject<HandLimitHandoff | null>
   /**
    * The board's own private hand order. A beat that lands a card IN the fan
    * commits the slot it landed in, or the next projection draws the card
@@ -192,6 +195,7 @@ export function useBeats(args: {
     clearPaidCost,
     takeStagedRelease,
     handLimit,
+    handLimitGrid,
     discardPick,
     requestPick,
     onHandArrival,
@@ -224,7 +228,7 @@ export function useBeats(args: {
   const defense = useDefenseBeat(anchors, staging, onHandArrival)
   const elimination = useEliminateBeat()
   const gameEnd = useGameEndBeat()
-  const handLimits = useHandLimitBeat(anchors, handLimit)
+  const handLimits = useHandLimitBeat(anchors, handLimit, handLimitGrid)
   const transfers = useTransferBeat(anchors, requestPick, onHandArrival)
   const ais = useAiBeat(anchors, onHandArrival)
   const shownCards = useShownBeat(anchors)

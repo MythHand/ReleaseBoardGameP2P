@@ -3,6 +3,7 @@ import { cardById } from '@release/ui'
 import { act, render } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
 import type { BoardAnchors, BoardState } from '~/entities/game/board'
+import { handCardOf } from '~/entities/game/board'
 import { useDeckBeat } from './deckBeat'
 import type { BeatPlan } from './planBeats'
 
@@ -109,8 +110,13 @@ function harness(opts: { base?: BoardState; live?: number[] } = {}) {
     seatBox: () => null,
     seatOf: () => null,
     handSlotAt: () => null,
+    handCardAt(this: { handSlotAt: (i: number) => HTMLElement | null }, i: number) {
+      return handCardOf(this.handSlotAt(i))
+    },
     releaseSlot: () => null,
     bindPile: () => {},
+    heldCard: () => null,
+    hold: () => {},
     bindSeat: () => {},
     bindReleaseSlot: () => {},
   } as unknown as BoardAnchors

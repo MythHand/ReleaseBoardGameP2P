@@ -40,21 +40,35 @@ export function useDiscardBeat(anchors: BoardAnchors, staging?: RefObject<Staged
   const latest = useRef({ anchors, send, staging })
   latest.current = { anchors, send, staging }
 
-  const whereFrom = useCallback((c: DiscardCard): Rect | null => {
+  // where a card leaves from — and, out of our fan, the tilt it stands at
+  // there, which the exit unwinds in flight (`handCardAt`)
+  const whereFrom = useCallback((c: DiscardCard): { from: Rect; rot?: number } | null => {
     const a = latest.current.anchors
-    if (c.source.kind === 'hand') return rectOf(a.handSlotAt(c.source.index))
-    if (c.source.kind === 'release') return rectOf(a.releaseSlot(c.source.player, c.source.slot))
-    return a.seatBox(c.source.player)
+    if (c.source.kind === 'hand') {
+      const fan = a.handCardAt(c.source.index)
+      return fan ? { from: fan.box, rot: fan.rot } : null
+    }
+    const from =
+      c.source.kind === 'release'
+        ? rectOf(a.releaseSlot(c.source.player, c.source.slot))
+        : a.seatBox(c.source.player)
+    return from ? { from } : null
   }, [])
 
   const toLeaving = useCallback(
     (c: DiscardCard, stagedFrom?: Rect): Leaving | null => {
       const card = cardById(c.card)
-      const from = stagedFrom ?? whereFrom(c)
-      if (!card || !from) return null
+      const start = stagedFrom ? { from: stagedFrom } : whereFrom(c)
+      if (!card || !start) return null
       // The SAME Scatter the adapter rests this card on (I7): the flight ends on
       // the pose the heap already holds for it, so nothing moves on handover.
-      return { key: c.key, card, from, scatter: scatterAt(c.eventId) }
+      return {
+        key: c.key,
+        card,
+        from: start.from,
+        ...(start.rot ? { pose: { rot: start.rot, dx: 0, dy: 0 } } : {}),
+        scatter: scatterAt(c.eventId),
+      }
     },
     [whereFrom],
   )

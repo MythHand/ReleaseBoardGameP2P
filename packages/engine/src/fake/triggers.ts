@@ -3,7 +3,20 @@ import type { Reduction } from '../engine'
 import type { DiscardReason } from '../events'
 import { randomAt } from '../rng'
 import type { CardInstance, GameState, NeutralizeMethod, PlayerId, ReleaseSlot } from '../state'
-import { bankToDiscard, checkWin, createLog, endTurn, type Log, reject, setHand } from './core'
+import {
+  BAD_VIBE_MS,
+  bankToDiscard,
+  CRUSH_MS,
+  checkWin,
+  createLog,
+  ERROR_503_MS,
+  endTurn,
+  INSIDE_MS,
+  type Log,
+  reject,
+  setHand,
+  timeFor,
+} from './core'
 import { discardOptions } from './discard'
 import { openWindow } from './window'
 
@@ -28,7 +41,7 @@ export function neutralizeOptions(state: GameState, player: PlayerId): Neutraliz
 // ('effect'), a release (and its Code Review) or a Monitoring as destroyed
 // alongside their owner ('destroyed') — so the causal trail survives an
 // elimination the same way it survives a hand-limit or release-cost discard.
-export function eliminate(state: GameState, log: Log, player: PlayerId): GameState {
+export function eliminate(state: GameState, log: Log, player: PlayerId, at: number): GameState {
   const me = state.players[player]
   const zoneCards = SLOTS.flatMap((slot) => {
     const r = me.release[slot]
@@ -67,7 +80,7 @@ export function eliminate(state: GameState, log: Log, player: PlayerId): GameSta
   // A fatal draw ends this seat's turn. Keeping it as the active player leaves
   // the survivors waiting on someone who can no longer play, including when
   // the connected keeper is eliminated and all remaining seats are bots.
-  return cleared.turn.player === player ? endTurn(cleared, log) : cleared
+  return cleared.turn.player === player ? endTurn(cleared, log, at) : cleared
 }
 
 // A RELEASE DESTROYED IN ITS ZONE — by a Crush, a sacrifice, or an attack that
@@ -146,7 +159,7 @@ export function fireTrigger(
     // and the elimination follows in the same batch — unchanged from before.
     if (methods.length === 0) {
       log.add({ type: 'discarded', player, card: card.id, reason: 'trigger' }, revealedId)
-      return eliminate(discard(state, [card]), log, player)
+      return eliminate(discard(state, [card]), log, player, at)
     }
     // A standing Monitoring makes the 503 "игнорируются" (cards.md, the
     // Monitoring entry): nothing is asked, so nothing stands. It is answered
@@ -172,7 +185,14 @@ export function fireTrigger(
     // a card already in the heap cannot be answered on the table.
     return {
       ...state,
-      pending: { kind: 'neutralize503', player, card, methods },
+      pending: {
+        kind: 'neutralize503',
+        player,
+        card,
+        methods,
+        openedAt: at,
+        deadline: at + timeFor(state, ERROR_503_MS),
+      },
       eventSeq: log.seq,
     }
   }
@@ -253,7 +273,12 @@ export function onDecline503(state: GameState, action: Action & { type: 'PASS' }
     banked = discard(state, [alarm])
   }
   return {
-    state: eliminate({ ...banked, pending: null, eventSeq: log.seq }, log, action.player),
+    state: eliminate(
+      { ...banked, pending: null, eventSeq: log.seq },
+      log,
+      action.player,
+      action.at,
+    ),
     events: log.events,
   }
 }
@@ -366,7 +391,15 @@ export function resolveAiEvent(
       if (methods.length === 0) return destroySlot(state, log, player, slot)
       return {
         ...state,
-        pending: { kind: 'crush', player, slot, methods, source: event.id },
+        pending: {
+          kind: 'crush',
+          player,
+          slot,
+          methods,
+          source: event.id,
+          openedAt: at,
+          deadline: at + timeFor(state, CRUSH_MS),
+        },
         eventSeq: log.seq,
       }
     }
@@ -472,24 +505,40 @@ export function resolveAiEvent(
       // consequence: `endsTurn` false keeps the seat with its owner.
       return {
         ...state,
-        pending: { kind: 'handLimit', player, excess: 1, endsTurn: false, source: event.id },
+        pending: {
+          kind: 'handLimit',
+          player,
+          excess: 1,
+          endsTurn: false,
+          source: event.id,
+          openedAt: at,
+          deadline: at + timeFor(state, BAD_VIBE_MS),
+        },
         eventSeq: log.seq,
       }
 
     case 'ai-hallucination':
-      return endTurn(state, log)
+      return endTurn(state, log, at)
 
     case 'ai-error-503': {
       log.add({ type: 'revealed', player, card: event.id })
       const methods = neutralizeOptions(state, player)
-      if (methods.length === 0) return eliminate(state, log, player)
+      if (methods.length === 0) return eliminate(state, log, player, at)
       // The event card is already back in the events deck by this point (the
       // trigger-ai branch above appends it once resolveAiEvent returns) — it
       // never touches the discard, so there is no card standing here for a
       // neutralize answer to bank alongside it (general.md §6.4).
       return {
         ...state,
-        pending: { kind: 'neutralize503', player, card: null, methods, source: event.id },
+        pending: {
+          kind: 'neutralize503',
+          player,
+          card: null,
+          methods,
+          source: event.id,
+          openedAt: at,
+          deadline: at + timeFor(state, ERROR_503_MS),
+        },
         eventSeq: log.seq,
       }
     }
@@ -510,6 +559,8 @@ export function resolveAiEvent(
           picks: 1,
           source: event.id,
           raisedAt: log.seq,
+          openedAt: at,
+          deadline: at + timeFor(state, INSIDE_MS),
         },
         eventSeq: log.seq,
       }

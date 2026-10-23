@@ -21,7 +21,15 @@ import styles from './CardPreview.module.css'
 // down a tenth — the size that sits right next to the discard without shouting.
 const PREVIEW_H = Math.round(460 * 1.15 * 0.9)
 const CARD_WH = 368 / 515
-const PREVIEW_W = Math.round(PREVIEW_H * CARD_WH)
+/** the preview card's width, px */
+export const CARD_PREVIEW_W = Math.round(PREVIEW_H * CARD_WH)
+/**
+ * Its distance from the right edge of the screen, px: clear of the right rail
+ * (56px) by the same 26px the decks keep from the left. Exported with the width
+ * so a surface laying cards out beside the preview keeps clear of it by the
+ * preview's own numbers rather than copies of them.
+ */
+export const CARD_PREVIEW_INSET = 82
 
 // Slots stand side by side with a few px of table between them. Crossing that
 // gap is two frames, and closing on it would blink the preview off and straight
@@ -166,11 +174,16 @@ export function useCardPreview({ quiet = false }: CardPreviewOptions = {}): Card
   }, [card, close, stop])
 
   const overlay = card ? (
-    <div {...{ [OWN_ATTR]: true }} className={styles.preview} aria-hidden="true">
+    <div
+      {...{ [OWN_ATTR]: true }}
+      className={styles.preview}
+      style={{ insetInlineEnd: CARD_PREVIEW_INSET }}
+      aria-hidden="true"
+    >
       {/* keyed by the card, so every card mounts a fresh face instead of easing
           over from the previous one's values (the hand's zoom does the same) */}
       <Fragment key={card.id}>
-        <Card card={card} interactive={false} width={PREVIEW_W} />
+        <Card card={card} interactive={false} width={CARD_PREVIEW_W} />
       </Fragment>
     </div>
   ) : null

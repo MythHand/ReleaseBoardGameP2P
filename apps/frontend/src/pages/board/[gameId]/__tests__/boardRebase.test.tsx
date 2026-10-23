@@ -3,7 +3,7 @@
 // an empty `piles`, so the row has nothing to hide and simply renders what it
 // was given. What the table sees instead is the card's own flight to the
 // discard, which the ordinary discard run plays.
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { mockReducedMotion } from '~/test/reducedMotion'
 import Board from '../_Board'
@@ -296,4 +296,110 @@ it('does not redeal an answered offer restored by the queue while its return set
   expect(screen.queryByTestId('board-rebase-scrim')).toBeNull()
   await vi.waitFor(() => expect(screen.queryByTestId('board-rebase-row')).toBeNull())
   expect(onResolve).toHaveBeenCalledTimes(1)
+})
+
+// THE KEEPER'S ANSWER, WHEN THE TIME RUNS OUT. Nothing was confirmed: the
+// keeper applied the order on the screen, and the offer closed with no event —
+// a Rebase answer carries none. The row does not vanish: the cards turn their
+// backs and go home in that order, as a confirm sends them, and nothing more is
+// sent to the keeper.
+it('flies the order on the screen home when the keeper answers for the player', async () => {
+  vi.useFakeTimers()
+  mockReducedMotion(false)
+  try {
+    const actions = { onResolve: vi.fn(), onDraft: vi.fn() }
+    const base = makeBoardProps()
+    const state = {
+      ...base.state,
+      pending: rebasePending([
+        { uid: 'r0', id: 'attack-bug' },
+        { uid: 'r1', id: 'release-frontend' },
+        { uid: 'r2', id: 'defense-hotfix' },
+      ]),
+    }
+    const { rerender } = render(<Board {...base} state={state} actions={actions} />)
+    await act(() => vi.advanceTimersByTimeAsync(1200))
+    // move the third card to the front, and confirm nothing
+    const last = screen.getByTestId('rebase-card-r2')
+    last.getBoundingClientRect = () => new DOMRect(760, 200, 150, 210)
+    if (last.parentElement)
+      last.parentElement.getBoundingClientRect = () => new DOMRect(400, 200, 510, 210)
+    fireEvent.pointerDown(last, { button: 0, clientX: 780, clientY: 230 })
+    fireEvent.pointerMove(window, { clientX: 420, clientY: 230 })
+    fireEvent.pointerUp(window, { clientX: 420, clientY: 230 })
+    expect(actions.onDraft).toHaveBeenLastCalledWith({
+      kind: 'reorderTop',
+      order: [{ pile: 0, cards: ['r2', 'r0', 'r1'] }],
+    })
+
+    // the keeper's answer: the offer is simply gone
+    const front = screen.getByTestId('rebase-card-r2').style.transform
+    rerender(<Board {...base} state={{ ...state, pending: null }} actions={actions} />)
+    expect(screen.queryByTestId('board-rebase-row')).not.toBeNull()
+    // the row keeps the order while the cards turn their backs
+    await act(() => vi.advanceTimersByTimeAsync(300))
+    expect(screen.getByTestId('rebase-card-r2').style.transform).toBe(front)
+    await act(() => vi.advanceTimersByTimeAsync(400))
+    // pinned for the flight home, position 1 on top — the order on the screen
+    const layer = (uid: string) => screen.getByTestId(`rebase-card-${uid}`).style.zIndex
+    expect(screen.getByTestId('rebase-card-r2').style.position).toBe('fixed')
+    expect([layer('r2'), layer('r0'), layer('r1')]).toEqual(['53', '52', '51'])
+    await act(() => vi.advanceTimersByTimeAsync(3000))
+    expect(screen.queryByTestId('board-rebase-row')).toBeNull()
+    expect(actions.onResolve).not.toHaveBeenCalled()
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+// …and a card still HELD over the row when the keeper answers goes home from
+// under the cursor, in the order the keeper applied — the last one let go of
+// (owner, 22.10). It does not jump back into its slot first.
+it('flies a card held over the row home from where it is held', async () => {
+  vi.useFakeTimers()
+  mockReducedMotion(false)
+  try {
+    const actions = { onResolve: vi.fn(), onDraft: vi.fn() }
+    const base = makeBoardProps()
+    const state = {
+      ...base.state,
+      pending: rebasePending([
+        { uid: 'r0', id: 'attack-bug' },
+        { uid: 'r1', id: 'release-frontend' },
+        { uid: 'r2', id: 'defense-hotfix' },
+      ]),
+    }
+    const { rerender } = render(<Board {...base} state={state} actions={actions} />)
+    await act(() => vi.advanceTimersByTimeAsync(1200))
+    const last = screen.getByTestId('rebase-card-r2')
+    last.getBoundingClientRect = () => new DOMRect(760, 200, 150, 210)
+    if (last.parentElement)
+      last.parentElement.getBoundingClientRect = () => new DOMRect(400, 200, 510, 210)
+    // picked up and carried towards the front, NOT let go of
+    fireEvent.pointerDown(last, { button: 0, clientX: 780, clientY: 230 })
+    fireEvent.pointerMove(window, { clientX: 420, clientY: 230 })
+    const held = screen.getByTestId('rebase-card-r2').style.transform
+    // nothing let go of, nothing told
+    expect(actions.onDraft).not.toHaveBeenCalledWith({
+      kind: 'reorderTop',
+      order: [{ pile: 0, cards: ['r2', 'r0', 'r1'] }],
+    })
+
+    rerender(<Board {...base} state={{ ...state, pending: null }} actions={actions} />)
+    // still where the cursor held it while the row turns its backs
+    await act(() => vi.advanceTimersByTimeAsync(300))
+    expect(screen.getByTestId('rebase-card-r2').style.transform).toBe(held)
+    // a pointer let go of now changes nothing
+    fireEvent.pointerUp(window, { clientX: 420, clientY: 230 })
+    expect(screen.getByTestId('rebase-card-r2').style.transform).toBe(held)
+    await act(() => vi.advanceTimersByTimeAsync(400))
+    // pinned for the flight home in the order the keeper applied: r2 last
+    const layer = (uid: string) => screen.getByTestId(`rebase-card-${uid}`).style.zIndex
+    expect([layer('r0'), layer('r1'), layer('r2')]).toEqual(['53', '52', '51'])
+    await act(() => vi.advanceTimersByTimeAsync(3000))
+    expect(screen.queryByTestId('board-rebase-row')).toBeNull()
+    expect(actions.onResolve).not.toHaveBeenCalled()
+  } finally {
+    vi.useRealTimers()
+  }
 })

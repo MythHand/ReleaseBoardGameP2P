@@ -266,6 +266,7 @@ export default function BoardPage() {
           onPass: game.pass,
           onUnpass: game.unpass,
           onResolve: game.resolve,
+          onDraft: game.draft,
           onShow: game.show,
           onTakeBack: game.takeBack,
           onOverContinue: () => navigate(`/board/${gameId}/stats`),

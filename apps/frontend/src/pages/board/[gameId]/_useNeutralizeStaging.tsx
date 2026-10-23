@@ -29,12 +29,11 @@ import type {
   HandCardState,
   HandItem,
   HandPlayDrop,
-  TableActions,
   TableChoice,
   TablePending,
 } from '@release/ui'
 import { Card, CardPair } from '@release/ui'
-import { play, type Rect, useFlyer } from '@release/ui/animations'
+import { type HeldCard, play, type Rect, useFlyer } from '@release/ui/animations'
 import {
   Fragment,
   type MouseEvent as ReactMouseEvent,
@@ -46,7 +45,7 @@ import {
   useRef,
   useState,
 } from 'react'
-import type { BoardAnchors, BoardState } from '~/entities/game/board'
+import type { BoardActions, BoardAnchors, BoardState } from '~/entities/game/board'
 import { COVER_POSE } from '~/entities/game/board'
 import { useToHand } from '~/features/board-beats/toHand'
 import { useReducedMotion } from '~/shared/lib/useReducedMotion'
@@ -109,12 +108,14 @@ export interface NeutralizeStaging {
   release: () => void
   /** Resolves once the local answer has landed, before the beat's hold. */
   whenLanded: () => Promise<void>
+  /** the fan's held card, as `Hand` reports it — a Debugger held is the answer */
+  onFanHold: (held: HeldCard | null) => void
 }
 
 export interface Options {
   state: BoardState
   anchors: BoardAnchors
-  actions?: TableActions
+  actions?: BoardActions
   events: Event[] // the feed — watched for `rejected` after dispatch
   enabled: boolean // false while the deal or an exclusive beat owns the table
   /** the match this staging belongs to — same boundary and the same reason as
@@ -300,11 +301,36 @@ export function useNeutralizeStaging({
   // The zone gesture (Task 8's module). It holds the dragged card in its own
   // state and knows nothing about the game: `accepts` is the drop rule and
   // `onDrop` is what the drop MEANS.
+  // THE ANSWER HELD, told to the keeper: a release on the cursor, or a Debugger
+  // pulled out of the fan, IS the answer if the time runs out while it is held,
+  // and nothing else is — put back, it answers nothing (owner, 22.10). Sent only
+  // as it changes, and cleared only if something was sent.
+  const heldSent = useRef(false)
+  const holding = useCallback(
+    (method: 'debugger' | 'sacrifice' | null, card?: string) => {
+      const p = pending
+      if (!p) return
+      if (method === null) {
+        if (!heldSent.current) return
+        heldSent.current = false
+        actions?.onDraft?.({ kind: p.kind })
+        return
+      }
+      heldSent.current = true
+      actions?.onDraft?.(
+        p.kind === 'crush'
+          ? { kind: 'crush', method }
+          : { kind: 'neutralize503', method, ...(card ? { card } : {}) },
+      )
+    },
+    [pending, actions],
+  )
+
   const pull = useZonePull<NeutralizeSlotKey>({
     accepts: onTable,
     // refused — the card simply goes back to its slot, which needs nothing but
-    // the drag ending (`liftedAt` reads `pull.dragging`)
-    onCancel: () => {},
+    // the drag ending (`liftedAt` reads `pull.dragging`), and holds nothing
+    onCancel: () => holding(null),
     onDrop: (key, at) => {
       if (key === 'monitoring' || !pending) return // Monitoring answers on a press
       const uid = state.you?.releaseUid?.[key]
@@ -415,10 +441,64 @@ export function useNeutralizeStaging({
         actions?.onResolve?.({ kind: pending.kind, method: 'monitoring' })
         return
       }
-      pull.render(<Card card={card} interactive={false} width="100%" />)
+      // A release under its Code Review is taken up as it lies — the pair, the
+      // same one the flight to the cover slot then carries (`commit`)
+      const aux = state.you?.support?.[key]
+      pull.render(
+        aux ? (
+          <CardPair main={card} aux={aux} width="100%" />
+        ) : (
+          <Card card={card} interactive={false} width="100%" />
+        ),
+      )
       pull.begin(key, e.currentTarget, e)
+      const uid = state.you?.releaseUid?.[key]
+      if (!uid) return
+      holding('sacrifice', uid)
+      // ON THE CURSOR, it is still ours — and the keeper's answer, if our time
+      // runs out while it is held, carries it on from here (`anchors.heldCard`).
+      // Held, it IS that answer, so nothing ever sends it home.
+      anchors.hold('zone-pull', {
+        uid,
+        el: pull.el,
+        take: pull.take,
+        release: pull.release,
+        home: pull.release,
+      })
     },
-    [pending, grabbable, state.you?.release, actions, flight.mark, pull.render, pull.begin],
+    [
+      pending,
+      grabbable,
+      state.you?.release,
+      state.you?.releaseUid,
+      state.you?.support,
+      actions,
+      anchors,
+      holding,
+      flight.mark,
+      pull.render,
+      pull.begin,
+      pull.el,
+      pull.take,
+      pull.release,
+    ],
+  )
+  // the drag is over, whichever way it ended: the zone holds nothing
+  useEffect(() => {
+    if (pull.dragging === null) anchors.hold('zone-pull', null)
+  }, [pull.dragging, anchors])
+
+  const onFanHold = useCallback(
+    (held: HeldCard | null) => {
+      if (!held) {
+        holding(null)
+        return
+      }
+      const card = (state.you?.hand ?? EMPTY_HAND).find((h) => h.uid === held.uid)
+      if (active && methods.includes('debugger') && card?.card.id === 'protection-debugger')
+        holding('debugger')
+    },
+    [holding, active, methods, state.you?.hand],
   )
 
   // the engine said no: the answer goes home and the offer opens again. Scoped
@@ -505,6 +585,7 @@ export function useNeutralizeStaging({
     onSlotDown,
     release,
     whenLanded,
+    onFanHold,
   }
 }
 

@@ -1,4 +1,4 @@
-export type { Action, ActionType, Choice, Target } from './actions'
+export type { Action, ActionType, Choice, Draft, Target } from './actions'
 export {
   CARD_RULES,
   type CardKind,

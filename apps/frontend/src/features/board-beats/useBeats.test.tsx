@@ -5,6 +5,7 @@ import { scatterAt } from '@release/ui/animations'
 import { act, fireEvent, render, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import type { BoardAnchors, BoardState, IntroBeat, PlayerBoardState } from '~/entities/game/board'
+import { handCardOf } from '~/entities/game/board'
 import { ELIM_DELAY } from './eliminateBeat'
 import { useBeats } from './useBeats'
 
@@ -132,11 +133,16 @@ const stub = {
   seatOf: () => node(),
   seatBox: () => ({ left: 0, top: 0, width: 150, height: 210 }),
   handSlotAt: (i: number) => document.querySelectorAll<HTMLElement>('[data-hand-slot]')[i] ?? null,
+  handCardAt(this: { handSlotAt: (i: number) => HTMLElement | null }, i: number) {
+    return handCardOf(this.handSlotAt(i))
+  },
   releaseSlot: () => node(),
   bindSeat: () => {},
   bindReleaseSlot: () => {},
   pileBox: () => null,
   bindPile: () => {},
+  heldCard: () => null,
+  hold: () => {},
 } as unknown as BoardAnchors
 
 // The opening's own shadow: a table with no hand at all, because the cards have

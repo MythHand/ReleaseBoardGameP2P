@@ -1,6 +1,7 @@
 import { act, render } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
 import type { BoardAnchors, BoardState } from '~/entities/game/board'
+import { handCardOf } from '~/entities/game/board'
 import type { BeatPlan } from './planBeats'
 import { spot } from './testing'
 import { useTransferBeat } from './transferBeat'
@@ -77,8 +78,13 @@ const anchors = {
   seatBox: () => ({ left: 0, top: 0, width: 150, height: 210 }),
   seatOf: () => node(),
   handSlotAt: () => node(),
+  handCardAt(this: { handSlotAt: (i: number) => HTMLElement | null }, i: number) {
+    return handCardOf(this.handSlotAt(i))
+  },
   releaseSlot: () => null,
   bindPile: () => {},
+  heldCard: () => null,
+  hold: () => {},
   bindSeat: () => {},
   bindReleaseSlot: () => {},
 } as unknown as BoardAnchors

@@ -31,6 +31,8 @@ interface DragState<K extends string> {
   fracX: number
   fracY: number
   startW: number // source on-screen width (eases to CARD_W)
+  left: number // where it lay — the carrier mounts here, at that size (I10)
+  top: number
 }
 
 export interface ZonePull<K extends string = string> {
@@ -42,6 +44,15 @@ export interface ZonePull<K extends string = string> {
   overlay: ReactNode
   /** bind the card the carrier should show while `dragging` is set */
   render: (node: ReactNode) => void
+  /** the carrier's node while a card is held */
+  el: () => HTMLElement | null
+  /**
+   * Someone else carries the card on (`HeldCard`): the carrier stops following
+   * the pointer and decides nothing when it lets go. It stays up until `release`.
+   */
+  take: () => void
+  /** the carrier comes down */
+  release: () => void
 }
 
 export function useZonePull<K extends string = string>(opts: {
@@ -59,6 +70,8 @@ export function useZonePull<K extends string = string>(opts: {
   // extra render per `render()` call (pick-up only, not per frame); the rAF
   // loop below still writes style.left/top/width straight onto the node.
   const [content, setContent] = useState<ReactNode>(null)
+  // the running drag's own way to stop listening, for `take`
+  const stop = useRef<() => void>(() => {})
 
   function begin(key: K, el: HTMLElement, e: ReactMouseEvent) {
     // Only a primary press starts a drag — a right- or middle-press on the
@@ -74,6 +87,8 @@ export function useZonePull<K extends string = string>(opts: {
       fracX: (e.clientX - r.left) / r.width,
       fracY: (e.clientY - r.top) / r.height,
       startW: r.width,
+      left: r.left,
+      top: r.top,
     })
   }
 
@@ -81,6 +96,12 @@ export function useZonePull<K extends string = string>(opts: {
   // (same position + size), then eases to the normal card size while the grab
   // point stays under the cursor (no snap-to-centre); on release, hit-test via
   // `accepts` and hand the drop (or cancel) back to the caller.
+  //
+  // THE SIZE IS A SCALE, never the width. The carrier is always the normal card
+  // width and grows by `transform`, the way every flight resizes a card (`move`
+  // in the presets). The card's own layers are sized off its width and ease
+  // their sizes for the LOD reading — a width changing every frame restarts
+  // those eases every frame, and the face lags behind its frame.
   // biome-ignore lint/correctness/useExhaustiveDependencies: drag is the trigger; the handlers use the closures captured when the drag began
   useEffect(() => {
     if (!drag) return
@@ -105,7 +126,7 @@ export function useZonePull<K extends string = string>(opts: {
         const ease = 1 - (1 - t) ** 3
         const w = drag.startW + (CARD_W - drag.startW) * ease
         const h = (w * CARD_H) / CARD_W
-        node.style.width = `${w}px`
+        node.style.transform = `scale(${w / CARD_W})`
         node.style.left = `${cursor.x - drag.fracX * w}px`
         node.style.top = `${cursor.y - drag.fracY * h}px`
       }
@@ -131,12 +152,18 @@ export function useZonePull<K extends string = string>(opts: {
       else onCancel(drag.key)
       setDrag(null)
     }
+    stop.current = () => {
+      cancelAnimationFrame(raf)
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)
     return () => {
       cancelAnimationFrame(raf)
       window.removeEventListener('mousemove', onMove)
       window.removeEventListener('mouseup', onUp)
+      stop.current = () => {}
     }
   }, [drag])
 
@@ -144,10 +171,22 @@ export function useZonePull<K extends string = string>(opts: {
     dragging: drag?.key ?? null,
     begin,
     overlay: drag && (
-      <div className={styles.carrier} ref={dragRef} style={{ width: CARD_W }}>
+      <div
+        className={styles.carrier}
+        ref={dragRef}
+        style={{
+          width: CARD_W,
+          left: drag.left,
+          top: drag.top,
+          transform: `scale(${drag.startW / CARD_W})`,
+        }}
+      >
         {content}
       </div>
     ),
     render: (node: ReactNode) => setContent(node),
+    el: () => dragRef.current,
+    take: () => stop.current(),
+    release: () => setDrag(null),
   }
 }
