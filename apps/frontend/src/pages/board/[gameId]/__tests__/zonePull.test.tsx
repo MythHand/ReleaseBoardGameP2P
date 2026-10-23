@@ -116,3 +116,23 @@ it('takes the card up at its own place and size, and grows it by a scale', () =>
   act(() => fireEvent.mouseUp(window, { clientX: 400, clientY: 300 }))
   raf.mockRestore()
 })
+
+// Taken by whoever carries the card on — the keeper answered with it while it
+// was held (owner, 22.10): the carrier stays up, follows nothing and decides
+// nothing on release, until it is released.
+it('lets a taken card go nowhere on its own, until it is released', () => {
+  const { view, api, onDrop, onCancel } = harness(() => true)
+  fireEvent.mouseDown(view.getByTestId('slot'), { clientX: 10, clientY: 10 })
+  const el = api.pull?.el()
+  expect(el).toBeInstanceOf(HTMLElement)
+  act(() => api.pull?.take())
+  act(() => {
+    fireEvent.mouseMove(window, { clientX: 400, clientY: 300 })
+    fireEvent.mouseUp(window, { clientX: 400, clientY: 300 })
+  })
+  expect(onDrop).not.toHaveBeenCalled()
+  expect(onCancel).not.toHaveBeenCalled()
+  expect(api.pull?.dragging).toBe('frontend')
+  act(() => api.pull?.release())
+  expect(api.pull?.dragging).toBeNull()
+})

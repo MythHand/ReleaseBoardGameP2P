@@ -132,6 +132,8 @@ export { default as Stats } from './screens/Stats'
 export type { CardCatalogProps } from './table/CardCatalog'
 export { default as CardCatalog } from './table/CardCatalog'
 export {
+  CARD_PREVIEW_INSET,
+  CARD_PREVIEW_W,
   type CardPreview,
   type CardPreviewSlotProps,
   useCardPreview,

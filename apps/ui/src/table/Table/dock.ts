@@ -2,6 +2,10 @@ import type { TurnDockState } from '@/table/TurnDock/TurnDock'
 import { pendingOwedBy, pendingOwesSelf } from './intents'
 import type { TableState } from './types'
 
+// The decisions owed to you that a pass answers: declining to defend against an
+// attack, to neutralize a 503, to defend against a Crush.
+const PASS_ANSWERS = new Set(['defend', 'neutralize503', 'crush'])
+
 export interface DockView {
   state: TurnDockState
   danger: boolean
@@ -159,10 +163,14 @@ export function deriveDock(
   // owes every seat on its roster at once while it is discarding, and the
   // actor alone once it is picking — so the actor sits in the `hold` branch
   // below for the first half of their own card and lands here for the second.
+  //
+  // The key is there only where a pass IS an answer: declining a defence, a 503
+  // or a Crush. Every other decision is answered on the table, and a pass on it
+  // is refused — so it reads as the reaction it is, with no key to press.
   if (pending && pending.kind !== 'discardForRelease' && pendingOwesSelf(pending, selfId)) {
     const timed = 'deadline' in pending ? pending : undefined
     return {
-      state: 'reaction',
+      state: PASS_ANSWERS.has(pending.kind) ? 'reaction' : 'decide',
       danger: pending.kind === 'defend' || pending.kind === 'neutralize503',
       ...clock(timed?.openedAt, timed?.deadline, now),
       activePlayer,

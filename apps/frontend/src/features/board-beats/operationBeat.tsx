@@ -182,8 +182,11 @@ export function useOperationBeat(anchors: BoardAnchors, staging?: RefObject<Stag
       // Another player's card they had put out at the centre first is already
       // standing there — it starts where it stands, not at the seat.
       const shown = mine ? null : shownSource(ctx.base, plan.player, ids, a)
-      const slot = inHand[0] ? a.handSlotAt(ctx.base.you?.hand.indexOf(inHand[0]) ?? -1) : null
-      const from = shown?.rect ?? rectOf(slot) ?? a.seatBox(plan.player)
+      // out of our fan: the card's own box and the tilt it stands at
+      // (`handCardAt`), not the slot's bounding rect (I6)
+      const fan =
+        !shown && inHand[0] ? a.handCardAt(ctx.base.you?.hand.indexOf(inHand[0]) ?? -1) : null
+      const from = shown?.rect ?? fan?.box ?? a.seatBox(plan.player)
       if (!to || !main || !from) {
         // nothing to fly it along: it still goes where it stands
         liftOff(ctx, sources)
@@ -231,6 +234,7 @@ export function useOperationBeat(anchors: BoardAnchors, staging?: RefObject<Stag
               {
                 key: KEY,
                 at: from,
+                pose: fan?.pose,
                 content: (
                   <div data-public-operation="">
                     <Card card={main} width="100%" />

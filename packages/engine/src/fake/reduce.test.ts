@@ -123,7 +123,13 @@ it('holds the turn open on a hand-limit overflow instead of advancing', () => {
   // Six cards against a limit of five.
   const r = reduce(drawn.state, { type: 'PUSH', player: 'p1', at: 1001 })
   expect(r.state.turn.player).toBe('p1')
-  expect(r.state.pending).toEqual({ kind: 'handLimit', player: 'p1', excess: 1 })
+  expect(r.state.pending).toEqual({
+    kind: 'handLimit',
+    player: 'p1',
+    excess: 1,
+    openedAt: 1001,
+    deadline: 1001 + 40_000,
+  })
 })
 
 it('advances the turn once the overflow is discarded', () => {

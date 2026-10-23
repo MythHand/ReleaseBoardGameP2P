@@ -451,9 +451,13 @@ export function useTransferBeat(
           const index = beat.base.you.hand.findIndex((h) =>
             uid ? h.uid === uid : h.card.id === plan.card,
           )
-          const slot = rectOf(picked ?? null) ?? (index >= 0 ? rectOf(a.handSlotAt(index)) : null)
+          const shown = rectOf(picked ?? null)
+          // out of our fan: the card's own box and the tilt it stands at
+          // (`handCardAt`), not the slot's bounding rect (I6)
+          const fan = !shown && index >= 0 ? a.handCardAt(index) : null
+          const slot = shown ?? fan?.box ?? null
           if (!slot) return
-          const raised = raise([{ key: KEY, card, at: slot, faceDown: false }])
+          const raised = raise([{ key: KEY, card, at: slot, pose: fan?.pose, faceDown: false }])
           // your fan closes the gap while the card is in the air, and the
           // `giveCard` pending clears in the same publish: our own flyer now
           // holds the card, so `_Board.tsx`'s static centre render has

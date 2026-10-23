@@ -143,10 +143,10 @@ export function useComboBeat(
               : [{ kind: 'seat', player: actor, count: auxId ? 2 : 1 }],
         )
       }
-      const fromRect =
-        shown?.rect ??
-        (mine && handIndex >= 0 ? rectOf(a.handSlotAt(handIndex)) : null) ??
-        a.seatBox(actor)
+      // out of our fan: the card's own box and the tilt it stands at
+      // (`handCardAt`), not the slot's bounding rect (I6)
+      const fan = !shown && mine && handIndex >= 0 ? a.handCardAt(handIndex) : null
+      const fromRect = shown?.rect ?? fan?.box ?? a.seatBox(actor)
       if (!fromRect) return null
       // ALREADY STANDING, ALREADY WHOLE. A play put out at the centre was
       // watched arriving there — a release at the stage slot, a release with
@@ -173,7 +173,12 @@ export function useComboBeat(
       }
       if (aux && main.category === 'attack') {
         const raisedPair = flyer.raise([
-          { key: 'fold', at: fromRect, content: <CardPair main={main} aux={aux} width="100%" /> },
+          {
+            key: 'fold',
+            at: fromRect,
+            pose: fan?.pose,
+            content: <CardPair main={main} aux={aux} width="100%" />,
+          },
         ])
         takeOver()
         const [el] = await raisedPair
@@ -724,6 +729,14 @@ export function useComboBeat(
       if (!toRect) {
         adoptStaged(ctx, handoff)
         return
+      }
+      // A plain play of ours the keeper played for us when the turn ran out may
+      // still be in the air to the centre (owner, 22.10): it lands first, and
+      // the node it stands on is read only then.
+      if (handoff?.whenLanded && plan.player === ctx.base.selfId) {
+        await handoff.whenLanded()
+        await nextFrames()
+        handoff = latest.current.staging?.current ?? handoff
       }
       if (handoff && plan.player === ctx.base.selfId && handoff.el && cRect) {
         // the actor's staged PAIR is at the centre: fly THAT node to the slot.

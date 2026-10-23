@@ -1137,3 +1137,77 @@ it('takes the table’s word again once the keeper has answered the take-back', 
   rerender(boardWith({ targets: BUG_TARGETS, shown: [bugOut()] }, {}, [bugTakenBack]))
   expect(screen.getByTestId('board-centre-shown')).toBeTruthy()
 })
+
+// THE TURN RAN OUT (owner, 22.10). A card with a target still to choose goes
+// home — from the AIR if it is still on its way to the centre, not after it has
+// stood there and the arrow has started aiming on someone else's turn. A card
+// with nothing left to choose is played instead: let go of, it is not taken back.
+it('takes a card on its way to the centre home from the air when the turn runs out', async () => {
+  const held = vi.spyOn(Element.prototype, 'animate').mockImplementation(
+    () =>
+      ({
+        cancel: () => {},
+        finished: new Promise<void>(() => {}), // still in the air
+      }) as unknown as Animation,
+  )
+  try {
+    const onPlay = vi.fn()
+    const base = makeBoardProps()
+    const props = makeBoardProps({
+      state: {
+        ...base.state,
+        you: { ...base.state.you, hand: HAND },
+        turn: base.state.selfId,
+        hasDrawn: true,
+        playable: HAND.map((c) => c.uid),
+        targets: BUG_TARGETS,
+      },
+      actions: { onPlay },
+    })
+    const board = render(<Board {...props} />)
+    await pullCardFromFan('attack-bug#0')
+    expect(document.querySelector('[class*="arriving"]')).toBeNull()
+    board.rerender(<Board {...props} state={{ ...props.state, turn: 'p2', playable: [] }} />)
+    await act(async () => {})
+    // the way home is up, from the node that was flying, and nothing stands
+    expect(document.querySelector('[class*="arriving"]')).not.toBeNull()
+    expect(screen.queryByTestId('board-centre-staged')).toBeNull()
+    expect(onPlay).not.toHaveBeenCalled()
+  } finally {
+    held.mockRestore()
+  }
+})
+
+it('does not take back a card with nothing left to choose when the turn runs out', async () => {
+  const monitoring = cardById('protection-monitoring')
+  if (!monitoring) throw new Error('missing Monitoring card')
+  const hand = [{ uid: 'protection-monitoring#0', card: monitoring }, HAND[0]]
+  const base = makeBoardProps()
+  const props = makeBoardProps({
+    state: {
+      ...base.state,
+      you: { ...base.state.you, hand },
+      turn: base.state.selfId,
+      hasDrawn: true,
+      playable: ['protection-monitoring#0'],
+      targets: {},
+    },
+    actions: { onPlay: vi.fn(), onShow: vi.fn() },
+  })
+  const board = render(<Board {...props} />)
+  const slot = document.querySelectorAll<HTMLElement>('[data-hand-slot]')[0]
+  fireEvent.mouseDown(slot, { clientX: 0, clientY: 0 })
+  fireEvent.mouseMove(window, { clientX: 0, clientY: -20 })
+  fireEvent.mouseUp(window, { clientX: 0, clientY: -200 })
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 600))
+  })
+  expect(screen.getByTestId('board-centre-staged')).toBeTruthy()
+  board.rerender(<Board {...props} state={{ ...props.state, turn: 'p2', playable: [] }} />)
+  await act(async () => {
+    await new Promise((r) => setTimeout(r, 100))
+  })
+  // still standing for the keeper's own play of it; not on its way home
+  expect(screen.getByTestId('board-centre-staged')).toBeTruthy()
+  expect(document.querySelector('[class*="arriving"]')).toBeNull()
+})

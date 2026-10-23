@@ -4,14 +4,18 @@
    `perspective`/`contain`/`will-change` do), so pinning a cell still escapes
    this clip exactly as intended.
 
-   The scene's own band (`GitCards.module.css` `.gridWrap` + `.grid`), 1:1: the
-   rows start at the TOP of it and are centred across, and its bottom 150px are
-   the confirm bar's — reserved, so the bar never travels over the last row.
+   The scene's own band (`GitCards.module.css` `.gridWrap` + `.grid`): the rows
+   start at the TOP of it and are centred across, and it runs to the bottom of
+   the screen.
    Board-only: the padding, which keeps the selection glow and the badges inside
-   the scrollable content box. */
+   the scrollable content box.
+
+   TWO VIEWERS, ONE GRID (`data-viewer`). What both see is written here; what
+   only one of them sees goes under its own selector below, so the actor's grid
+   can change without touching the watcher's (owner, 22.10). */
 .cells {
   position: absolute;
-  inset-block: 27px 150px;
+  inset-block: 27px 0;
   inset-inline: 210px;
   display: flex;
   flex-wrap: wrap;
@@ -24,6 +28,24 @@
   overflow-y: auto;
   pointer-events: auto;
 }
+
+/* THE ACTOR — the seat that chooses. It has the confirm bar, so its bottom
+   150px are kept for it and the bar never travels over the last row. It reads
+   the card it points at in the table's preview, which stands on the right,
+   centred top to bottom: the grid moves left and ends where the preview's place
+   begins, and stands as far from the left edge as the preview does from the
+   right (owner, 23.10). The two numbers are the preview's own, set inline;
+   the grid's own padding is the gap between them. */
+.cells[data-viewer='actor'] {
+  inset-block-end: 150px;
+  inset-inline: var(--preview-inset) calc(var(--preview-inset) + var(--preview-w));
+}
+
+/* THE WATCHER — an opponent or a spectator. No bar, so the band runs to the
+   bottom of the screen: cut short, it cut the cards off along an edge nothing
+   on this screen explains (owner, 22.10). The rows stand where the actor's do;
+   only the bottom edge differs. Nothing else of its own yet: it sees the grid
+   as both viewers share it. */
 
 /* while dealing out of the pile, don't clip — cards fly in from outside the
    grid's own scroll band (GitCards.module.css's own `.dealing`, ported) */

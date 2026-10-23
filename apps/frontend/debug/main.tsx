@@ -100,6 +100,12 @@ function ScenarioRun({
   // board's own lines, rather than a render later.
   const runRef = useRef(run)
   const [viewer, setViewer] = useState<string | null>('you')
+  // A pick a seat is offering but has not confirmed — the session's, not the
+  // game's, exactly as `pages/board/[gameId]/index.tsx` holds it: the seat
+  // choosing sets it, and every other view of this table watches it.
+  const [pickPreview, setPickPreview] = useState<{ player: string; card: string | null } | null>(
+    null,
+  )
   const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>('off')
   const [micOff, setMicOff] = useState(true)
   const [voiceVolume, setVoiceVolume] = useState(100)
@@ -412,6 +418,10 @@ function ScenarioRun({
             chat: <Typography base="body">{t('chat.empty')}</Typography>,
           }}
           rejections={rejections}
+          pickPreview={pickPreview}
+          onPickPreview={(card) => {
+            if (viewer !== null) setPickPreview({ player: viewer, card })
+          }}
           room={{
             role: 'host',
             participants: run.state.seating.map((id) => ({

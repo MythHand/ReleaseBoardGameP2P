@@ -3,6 +3,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { createRef } from 'react'
 import { expect, it, vi } from 'vitest'
 import type { BoardState } from '~/entities/game/board'
+import { handCardOf } from '~/entities/game/board'
 import { useDealIntro } from '../useDealIntro'
 
 // The opening no longer starts itself (#96): it publishes one beat and the
@@ -44,11 +45,16 @@ const refs = () => ({
   seatOf: () => null,
   seatBox: () => null,
   handSlotAt: () => null,
+  handCardAt(this: { handSlotAt: (i: number) => HTMLElement | null }, i: number) {
+    return handCardOf(this.handSlotAt(i))
+  },
   releaseSlot: () => null,
   bindSeat: () => {},
   bindReleaseSlot: () => {},
   pileBox: () => null,
   bindPile: () => {},
+  heldCard: () => null,
+  hold: () => {},
 })
 
 // Minimal but real: the shapes the sequencer reads. No `as unknown as` cast —

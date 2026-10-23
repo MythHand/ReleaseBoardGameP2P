@@ -1,4 +1,4 @@
-import type { GameState } from '../state'
+import type { GameState, Pending } from '../state'
 
 interface Timing {
   openedAt?: number
@@ -19,6 +19,16 @@ function activate<T extends Timing>(clock: T, at: number): T {
     return clock
   const { awaitingPresentation: _, ...rest } = clock
   return { ...rest, openedAt: at, deadline: at + clock.deadline - clock.openedAt } as T
+}
+
+// The same kind owed by the same seat. A System Upgrade names a roster rather
+// than a seat, and each of its phases is a decision of its own.
+function isSameDecision(before: Pending | null, after: Pending): boolean {
+  if (before?.kind !== after.kind) return false
+  if (before.kind === 'systemUpgrade' && after.kind === 'systemUpgrade') {
+    return before.phase === after.phase
+  }
+  return 'player' in before && 'player' in after && before.player === after.player
 }
 
 // Only new or normally renewed allowances wait for presentation. An unrelated
@@ -46,7 +56,7 @@ export function deferNewClocks(before: GameState, after: GameState): GameState {
       ? defer(
           oldPending && 'openedAt' in oldPending ? oldPending : null,
           nextPending,
-          oldPending?.kind === nextPending.kind && oldPending.player === nextPending.player,
+          isSameDecision(oldPending, nextPending),
         )
       : nextPending
   return turn === after.turn && window === after.window && pending === after.pending

@@ -10,7 +10,7 @@ import type {
   PlayerBoardState,
   StagedHandoff,
 } from '~/entities/game/board'
-import { ALARM_POSE } from '~/entities/game/board'
+import { ALARM_POSE, handCardOf } from '~/entities/game/board'
 import { useDiscardBeat } from './discardBeat'
 import type { BeatPlan } from './planBeats'
 
@@ -104,6 +104,9 @@ function harness(staging?: { current: StagedHandoff | null }) {
     hand: { current: node() },
     discardBox: { current: node() },
     handSlotAt: () => node(),
+    handCardAt(this: { handSlotAt: (i: number) => HTMLElement | null }, i: number) {
+      return handCardOf(this.handSlotAt(i))
+    },
     releaseSlot: () => node(),
     seatBox: () => ({ left: 0, top: 0, width: 150, height: 210 }),
   } as unknown as BoardAnchors

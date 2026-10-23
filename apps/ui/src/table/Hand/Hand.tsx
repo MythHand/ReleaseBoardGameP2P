@@ -1,5 +1,6 @@
 import type React from 'react'
 import { Fragment, useLayoutEffect, useRef, useState } from 'react'
+import type { HeldCard } from '@/animations/held'
 import type { Card as CardType } from '@/cards/types'
 import type { Deflection } from '@/cards/useCardTilt'
 import Card from '@/primitives/Card'
@@ -153,6 +154,15 @@ interface HandProps {
    * something: that is about the cursor, this is about the hand.
    */
   readOnly?: boolean
+  /**
+   * The card under the cursor, offered while it is held and `null` once it is
+   * not: whoever has to carry it on when the decision is answered by someone
+   * else takes it from here (`HeldCard`). Taken, the fan stops following the
+   * cursor and keeps the card up until it is released; sent home, it glides
+   * back into its own slot from where it is — the same glide a refused play
+   * takes.
+   */
+  onHold?: (held: HeldCard | null) => void
 }
 
 interface DragState {
@@ -192,6 +202,7 @@ export default function Hand({
   renderFace = defaultFace,
   carrying = false,
   readOnly = false,
+  onHold,
 }: HandProps) {
   // ховер по UID (не по индексу) — при удалении карты индекс «съезжает» на
   // соседа и та вспыхивает фантомом; uid этого не допускает.
@@ -214,6 +225,10 @@ export default function Hand({
   useLayoutEffect(() => {
     playOnDrop.current = onPlay
   }, [onPlay])
+  const holdOut = useRef(onHold)
+  useLayoutEffect(() => {
+    holdOut.current = onHold
+  }, [onHold])
 
   const n = items.length
   // Whether a card carried elsewhere should also close THIS drag mode is the
@@ -373,6 +388,7 @@ export default function Hand({
     const onUp = (e: MouseEvent) => {
       window.removeEventListener('mousemove', onMove)
       window.removeEventListener('mouseup', onUp)
+      if (taken) return
       if (inBand(e.clientY)) {
         // Only with a consumer commit: the settle into a NEW slot is a promise
         // that the order changed, and with no `onReorder` to keep it the next
@@ -402,11 +418,41 @@ export default function Hand({
         settleInto(items.findIndex((it) => it.uid === drag.uid))
       }
     }
+    // OFFERED while held: whoever carries it on when someone else answers takes
+    // it from here. Taken, nothing of the drag runs any more — no cursor, no
+    // drop — and the flyer stays up until that carrier releases it.
+    let taken = false
+    const stop = () => {
+      taken = true
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    const uid = drag.uid
+    holdOut.current?.({
+      uid,
+      el: () => flyerRef.current,
+      take: stop,
+      release: () => {
+        setDrag(null)
+        setPreview(null)
+      },
+      home: () => {
+        stop()
+        const at = items.findIndex((it) => it.uid === uid)
+        if (at < 0) {
+          setDrag(null)
+          setPreview(null)
+          return
+        }
+        settleInto(at)
+      },
+    })
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)
     return () => {
       window.removeEventListener('mousemove', onMove)
       window.removeEventListener('mouseup', onUp)
+      holdOut.current?.(null)
     }
   }, [drag])
 

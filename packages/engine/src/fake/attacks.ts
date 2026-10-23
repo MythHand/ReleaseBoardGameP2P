@@ -493,6 +493,9 @@ export function pendingView(state: GameState, viewerId: PlayerId | null): Pendin
         excess: p.excess,
         options: mine ? state.players[p.player].hand.map((c) => c.uid) : [],
         ...(p.source ? { source: p.source } : {}),
+        awaitingPresentation: p.awaitingPresentation,
+        openedAt: p.openedAt,
+        deadline: p.deadline,
       }
     case 'stealCard':
       return {
@@ -541,6 +544,9 @@ export function pendingView(state: GameState, viewerId: PlayerId | null): Pendin
         card: p.card ? p.card.id : null,
         methods: viewerId === null ? [] : [...p.methods],
         ...(p.source ? { source: p.source } : {}),
+        awaitingPresentation: p.awaitingPresentation,
+        openedAt: p.openedAt,
+        deadline: p.deadline,
       }
     case 'crush':
       return {
@@ -549,6 +555,9 @@ export function pendingView(state: GameState, viewerId: PlayerId | null): Pendin
         slot: p.slot,
         methods: viewerId === null ? [] : [...p.methods],
         ...(p.source ? { source: p.source } : {}),
+        awaitingPresentation: p.awaitingPresentation,
+        openedAt: p.openedAt,
+        deadline: p.deadline,
       }
     case 'pickFromDiscard':
       // Only discardTop/discardCount are ever projected of the discard pile
@@ -563,6 +572,9 @@ export function pendingView(state: GameState, viewerId: PlayerId | null): Pendin
         source: p.source,
         // public: it says WHEN the decision was raised, not what is in it
         raisedAt: p.raisedAt,
+        awaitingPresentation: p.awaitingPresentation,
+        openedAt: p.openedAt,
+        deadline: p.deadline,
       }
     case 'reorderTop':
       // A deck's contents are never public, so this is `mine` or nothing —
@@ -574,6 +586,9 @@ export function pendingView(state: GameState, viewerId: PlayerId | null): Pendin
         source: p.source,
         // public: it says WHEN the decision was raised, not what is in it
         raisedAt: p.raisedAt,
+        awaitingPresentation: p.awaitingPresentation,
+        openedAt: p.openedAt,
+        deadline: p.deadline,
       }
     case 'systemUpgrade':
       // Nothing here is private: the rules put the thrown cards face up at the
@@ -586,6 +601,9 @@ export function pendingView(state: GameState, viewerId: PlayerId | null): Pendin
         sudo: p.sudo,
         phase: p.phase,
         source: p.source,
+        awaitingPresentation: p.awaitingPresentation,
+        openedAt: p.openedAt,
+        deadline: p.deadline,
       }
     default:
       return null
