@@ -8,4 +8,8 @@
   z-index: var(--z-flight);
   aspect-ratio: var(--card-aspect);
   pointer-events: none;
+
+  /* it grows by a scale from its top-left corner — the corner its place is
+     counted from, so the grabbed point stays under the cursor as it grows */
+  transform-origin: 0 0;
 }

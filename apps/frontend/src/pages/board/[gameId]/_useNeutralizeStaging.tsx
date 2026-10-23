@@ -441,7 +441,16 @@ export function useNeutralizeStaging({
         actions?.onResolve?.({ kind: pending.kind, method: 'monitoring' })
         return
       }
-      pull.render(<Card card={card} interactive={false} width="100%" />)
+      // A release under its Code Review is taken up as it lies — the pair, the
+      // same one the flight to the cover slot then carries (`commit`)
+      const aux = state.you?.support?.[key]
+      pull.render(
+        aux ? (
+          <CardPair main={card} aux={aux} width="100%" />
+        ) : (
+          <Card card={card} interactive={false} width="100%" />
+        ),
+      )
       pull.begin(key, e.currentTarget, e)
       const uid = state.you?.releaseUid?.[key]
       if (!uid) return
@@ -462,6 +471,7 @@ export function useNeutralizeStaging({
       grabbable,
       state.you?.release,
       state.you?.releaseUid,
+      state.you?.support,
       actions,
       anchors,
       holding,

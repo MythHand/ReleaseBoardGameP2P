@@ -568,7 +568,7 @@ function createDdosScenario(initial: GameState): GameState {
 // the pile under the trigger. Only what a card would otherwise find missing is
 // changed:
 //   Crush <slot>    — the release it destroys stands in its own slot, and
-//                     Crush Backend's under a Code Review;
+//                     Crush Backend's and Crush Database's under a Code Review;
 //   Release <slot>  — that slot is empty, or the card has nowhere to go;
 //   Inside          — two releases of different types in the discard, so the
 //                     pick is a choice rather than a card handed over.
@@ -584,9 +584,10 @@ function aiTable(aiCard: string): {
   const crushed = slot('ai-crush-')
   const placed = slot('ai-release-')
   const standing: ReleaseSlot = crushed ?? 'frontend'
-  // Crush Backend's release stands under a Code Review, so the stand shows what
-  // a Crush does to a release paid for with one (owner, 04.10)
-  const reviewed = crushed === 'backend'
+  // Crush Backend's and Crush Database's releases stand under a Code Review, so
+  // the stand shows what a Crush does to a release paid for with one (owner,
+  // 04.10, 21.10)
+  const reviewed = crushed === 'backend' || crushed === 'database'
   return {
     release:
       placed === standing
@@ -612,7 +613,8 @@ function aiTable(aiCard: string): {
 //   alarm503 — the alarm STANDS, because there is something to answer it with:
 //     a Debugger in hand and a release in the zone are two of the three methods
 //     (`neutralizeOptions`), so the board asks instead of eliminating on the
-//     spot. The third, a standing Monitoring, would answer inside the draw
+//     spot. A second release stands under a Code Review, so a sacrifice can be
+//     made of a bare release or of one paid for with a review. The third, a standing Monitoring, would answer inside the draw
 //     itself and show nothing — that case belongs to the release preset, where
 //     a Monitoring can actually be put down first.
 //   aiTrigger — the AI card reveals ONE event, the one chosen on the stand. The
@@ -620,11 +622,24 @@ function aiTable(aiCard: string): {
 //     random and a one-card deck is the only way a run repeats itself. The table
 //     is laid for what that card acts on (`aiTable`), and a card with nothing
 //     to act on passes by doing nothing — which is the engine's own rule, not
-//     a scene worth choosing.
+//     a scene worth choosing. Crush Database holds a Monitoring in place of the
+//     Debugger, so the Crush meets a hand that can stand a Monitoring rather
+//     than one that answers with a Debugger.
 function createTriggerScenario(initial: GameState, scenario: Scenario, aiCard: string): GameState {
   const alarm = scenario === 'alarm503'
   const trigger = instance(alarm ? 'trigger-error-503' : 'trigger-ai', 30)
   const table = alarm ? aiTable(DEFAULT_AI_CARD) : aiTable(aiCard)
+  const guard =
+    !alarm && aiCard === 'ai-crush-database' ? 'protection-monitoring' : 'protection-debugger'
+  const release = alarm
+    ? {
+        ...table.release,
+        backend: {
+          card: instance('release-backend', 36),
+          codeReview: instance('support-code-review', 37),
+        },
+      }
+    : table.release
   return {
     ...initial,
     eventSeq: 100,
@@ -643,8 +658,8 @@ function createTriggerScenario(initial: GameState, scenario: Scenario, aiCard: s
       ...initial.players,
       you: {
         ...initial.players.you,
-        hand: [instance('protection-debugger', 0), instance('defense-hotfix', 1)],
-        release: table.release,
+        hand: [instance(guard, 0), instance('defense-hotfix', 1)],
+        release,
         openedAtDeal: [],
       },
       p2: {

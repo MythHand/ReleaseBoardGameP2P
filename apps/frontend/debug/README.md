@@ -201,14 +201,18 @@ new attack animation. Restart resets the same card identities into a new game.
 - **Error 503: the alarm / AI trigger:** nothing has been drawn yet, and the
   trigger sits on top of the pile — both cards fire on the draw and never reach a
   hand. The 503 alarm stands because there are two ways to answer it, a Debugger
-  in hand and a release to sacrifice. The AI preset is every AI card behind one
-  tab: the row beneath the toolbar picks which card the trigger reveals, and
-  picking one restarts the scene. The events deck is seeded with that single
-  card, so every run reveals it, and the table is laid for what it acts on — the
-  matching release for a Crush, an empty slot for an AI release, two releases of
-  different types in the discard for Inside (`aiTable` in `scenarios.ts`). Crush
-  Backend's release stands under a Code Review, so the two leaving together — in
-  the order they lay — can be watched.
+  in hand and a release to sacrifice — a bare Frontend, and a Backend under a
+  Code Review, so the sacrifice can be made of either. The AI preset is every AI
+  card behind one tab: the row beneath the toolbar picks which card the trigger
+  reveals, and picking one restarts the scene. The events deck is seeded with
+  that single card, so every run reveals it, and the table is laid for what it
+  acts on — the matching release for a Crush, an empty slot for an AI release,
+  two releases of different types in the discard for Inside (`aiTable` in
+  `scenarios.ts`). Crush Backend's and Crush Database's releases stand under a
+  Code Review, so the two leaving together — in the order they lay — can be
+  watched. Crush Database holds a Monitoring in place of the Debugger: drawn at
+  once, nothing meets the Crush; with the Monitoring put down first, it stands
+  the Crush off by itself.
 - **Defences in the defender's hand:** every preset that throws an attack gives
   the defender every defence card, one copy each — Hotfix, Rubber ducky, PR
   approved, Rollback, Not a bug, Works on my machine. A stand is where you reach

@@ -34,6 +34,7 @@ describe.each(['neutralize503', 'crush'] as const)('%s card gestures', (kind) =>
     hand?: string[] // card ids — uids come out as `${id}#${i}`
     release?: Partial<Record<SlotKey, string>>
     releaseUid?: Partial<Record<SlotKey, string>>
+    support?: Partial<Record<SlotKey, string>> // the Code Review under a release
   }
 
   // A board whose `state.pending` is a 503 owed to `selfId` — the engine's own
@@ -45,6 +46,8 @@ describe.each(['neutralize503', 'crush'] as const)('%s card gestures', (kind) =>
     const hand = (over.hand ?? []).map((id, i) => ({ uid: `${id}#${i}`, card: card(id) }))
     const release: Record<string, CardData | undefined> = {}
     for (const [key, id] of Object.entries(over.release ?? {})) release[key] = card(id)
+    const support: Record<string, CardData | undefined> = {}
+    for (const [key, id] of Object.entries(over.support ?? {})) support[key] = card(id)
     const props = makeBoardProps({
       state: {
         ...base.state,
@@ -53,6 +56,7 @@ describe.each(['neutralize503', 'crush'] as const)('%s card gestures', (kind) =>
           hand,
           release,
           releaseUid: over.releaseUid,
+          ...(over.support ? { support } : {}),
         },
         // no pending → nothing playable is a real engine invariant
         // (`playableFor`'s own first check); a 503 is no exception.
@@ -286,6 +290,31 @@ describe.each(['neutralize503', 'crush'] as const)('%s card gestures', (kind) =>
       card: 'release-frontend#3',
     })
     expect(screen.getByTestId('board-cover-staged')).toBeTruthy()
+  })
+
+  it('takes a release up with the Code Review under it, as it lies', () => {
+    const { container } = render(
+      withAlarm({
+        methods: ['sacrifice'],
+        release: { frontend: 'release-frontend' },
+        releaseUid: { frontend: 'release-frontend#3' },
+        support: { frontend: 'support-code-review' },
+      }),
+    )
+    layOut(container)
+    const you = container.querySelector('[data-testid="board-you"]') as HTMLElement
+    const away = (id: string) =>
+      [...container.ownerDocument.querySelectorAll(`[data-card="${id}"]`)].filter(
+        (el) => !you.contains(el),
+      )
+    const releasesAway = away('release-frontend').length
+    const reviewsAway = away('support-code-review').length
+    // held, not yet let go: the pair is under the cursor, the slot shows its place
+    fireEvent.mouseDown(slotNode(container, 'frontend'), { clientX: 420, clientY: 620 })
+    expect(away('release-frontend')).toHaveLength(releasesAway + 1)
+    expect(away('support-code-review')).toHaveLength(reviewsAway + 1)
+    expect(you.querySelector('[data-card="support-code-review"]')).toBeNull()
+    fireEvent.mouseUp(window, { clientX: 640, clientY: 660 })
   })
 
   it('answers with Monitoring on a press, and moves nothing', () => {
