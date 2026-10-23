@@ -12,9 +12,9 @@
 // mirror that file's own `pullFromComboFan`/`clickComboFanCard`).
 
 import type { Event } from '@release/engine'
-import type { CardData, TableActions } from '@release/ui'
+import type { CardData, TableActions, TableWindow } from '@release/ui'
 import { cardById } from '@release/ui'
-import { act, fireEvent, render, renderHook, screen } from '@testing-library/react'
+import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
 import pairFoldStyles from '@/animations/usePairFold.module.css'
 import arrowStyles from '@/primitives/Arrow/Arrow.module.css'
@@ -747,6 +747,126 @@ it('reduced motion folds the pair without a flight', () => {
   })
   expect(screen.getByTestId('board-cover-staged').querySelectorAll('[data-card]')).toHaveLength(2)
   mm.mockRestore()
+})
+
+// ===== the mark on the seat an attack at the centre is aimed at =====
+//
+// The table waits on a player for the answer to an attack thrown at THEM — the
+// projection's `defend` with no window open (an attack on a release is thrown
+// only into one, and the window stays while it waits). Their seat carries the
+// mark for as long as that wait is on the board, for everyone at the table.
+
+const WINDOW: TableWindow = {
+  player: 'p2',
+  slot: 'frontend',
+  round: 1,
+  openedAt: 0,
+  deadline: 15_000,
+  passed: [],
+  canAttackWith: [],
+}
+
+function attackedBoard(player: string, window?: TableWindow) {
+  const base = makeBoardProps()
+  return (
+    <Board
+      {...base}
+      state={{
+        ...base.state,
+        ...(window ? { window } : {}),
+        pending: {
+          kind: 'defend',
+          player,
+          attacker: player === 'p3' ? 'p2' : 'p3',
+          attackCard: 'attack-bug',
+          sudo: false,
+          options: [],
+          openedAt: 0,
+          deadline: 15_000,
+          scope: window ? 'release' : 'hand',
+        },
+      }}
+    />
+  )
+}
+
+const marked = () =>
+  Array.from(document.querySelectorAll('[data-targeted]')).map((el) => [
+    el.getAttribute('data-testid'),
+    el.getAttribute('data-targeted'),
+  ])
+
+it('marks the seat of the player an attack at the centre waits on', () => {
+  render(attackedBoard('p3'))
+  expect(marked()).toEqual([['seat-p3', 'below']])
+})
+
+it('marks no seat when the attack waits on us', () => {
+  render(attackedBoard('you'))
+  expect(marked()).toEqual([])
+})
+
+it('marks no seat for an attack thrown into a reaction window', () => {
+  render(attackedBoard('p2', WINDOW))
+  expect(marked()).toEqual([])
+})
+
+it('takes the mark down once the attack is answered', () => {
+  const { rerender } = render(attackedBoard('p3'))
+  expect(marked()).toEqual([['seat-p3', 'below']])
+  const base = makeBoardProps()
+  rerender(<Board {...base} state={{ ...base.state, pending: null }} />)
+  expect(marked()).toEqual([])
+})
+
+// …and while the exchange is still on the board. A peer who is neither
+// attacker nor defender gets the attack and its answer in ONE batch, and then
+// the board itself stands the attack's `defend` for the whole exchange
+// (`comboBeat`'s `standAttack`), naming the attacked player whatever the
+// attack was aimed at. So the mark is up while the answer flies in when the
+// attack was at a player, and never, for even one commit, when it was at a
+// release. Played through the real board queue (`playback`), as
+// presentation.test.tsx does.
+it.each([
+  ['shows the mark through an exchange that arrives in one batch', false, ['seat-p2:below']],
+  ['never marks a seat through such an exchange on a release', true, []],
+])('%s', async (_, onRelease, expected) => {
+  const base = makeBoardProps()
+  const seen: number[] = []
+  const id = { gameId: 'g', incarnation: 'host', revision: 1 }
+  const playback = {
+    events: [] as Event[],
+    restoredThrough: 0,
+    presentation: id,
+    onPresented: (value: { revision: number }) => seen.push(value.revision),
+  }
+  const before = { ...base.state, turn: 'p3', ...(onRelease ? { window: WINDOW } : {}) }
+  const view = render(<Board {...base} state={before} playback={playback} />)
+  await waitFor(() => expect(seen).toEqual([1]))
+  const marks = new Set<string>()
+  const observer = new MutationObserver(() => {
+    for (const el of document.querySelectorAll('[data-targeted]'))
+      marks.add(`${el.getAttribute('data-testid')}:${el.getAttribute('data-targeted')}`)
+  })
+  observer.observe(document.body, { attributes: true, childList: true, subtree: true })
+  const exchange: Event[] = [
+    { id: 1, type: 'attacked', attacker: 'p3', card: 'attack-bug', sudo: false, target: 'p2' },
+    { id: 2, type: 'defended', player: 'p2', card: 'defense-hotfix', effect: 'cancel' },
+    { id: 3, type: 'discarded', player: 'p3', card: 'attack-bug', reason: 'attackSpent' },
+    { id: 4, type: 'discarded', player: 'p2', card: 'defense-hotfix', reason: 'defenceSpent' },
+  ]
+  view.rerender(
+    <Board
+      {...base}
+      state={{ ...before, decks: { ...before.decks, discardCount: before.decks.discardCount + 2 } }}
+      playback={{ ...playback, events: exchange, presentation: { ...id, revision: 2 } }}
+    />,
+  )
+  await waitFor(() => expect(seen).toEqual([1, 2]), { timeout: 5000 })
+  observer.disconnect()
+  expect([...marks]).toEqual(expected)
+  // and the board that is left once the exchange is over marks nobody
+  expect(document.querySelector('[data-targeted]')).toBeNull()
 })
 
 // THE KEEPER PASSED FOR US when our time ran out (owner, 22.10): nothing of ours

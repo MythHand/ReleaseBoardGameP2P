@@ -128,6 +128,13 @@ const EMPTY_RELEASE: ReleaseSlots = {
   database: undefined,
 }
 
+// Whether a seat stands in the spectator's LOWER row — the split
+// `Table.module.css` makes with its `[data-spectator][data-seats=…]
+// .opponents > :nth-child(n + k)` rules: from the 2nd seat of 2, the 3rd of 3
+// or 4, the 4th of 5 or 6. The board needs it for the one mark that faces the
+// table's centre rather than the seat's own bottom edge.
+const inSpectatorLowerRow = (index: number, seats: number) => index >= Math.ceil(seats / 2)
+
 // ===== settings drawer building blocks =====
 // A titled cluster of settings fields. The heading is optional: a non-host
 // player sees a single, self-evident group and needs no heading; the host sees
@@ -780,6 +787,17 @@ function BoardView({
   // and the layout effect below collapsing it, and both readers now resolve
   // that tie the same way because they read the same value.
   const pendingDefend = !staging.staged && state.pending?.kind === 'defend' ? state.pending : null
+  // THE SEAT AN ATTACK AT THE CENTRE IS AIMED AT — the player the table waits on
+  // for an answer to an attack thrown at them, not at a release. The window
+  // tells the two apart: an attack on a release is thrown only INTO an open
+  // window (`onAttack`), one at a player only while none is open
+  // (`playableFor`), and the window stays while its attack waits. Read off the
+  // same shown state as the attack card at the centre, so the mark comes and
+  // goes with it — the attack's own flight included, which stands its `defend`
+  // on that state (`comboBeat`'s `standAttack`). When the attacked player is
+  // us there is no seat of ours to mark.
+  const attackedSeat =
+    state.pending?.kind === 'defend' && !state.window ? state.pending.player : null
   const transferPending =
     state.pending &&
     (state.pending.kind === 'stealCard' ||
@@ -1469,7 +1487,7 @@ function BoardView({
       {/* the seats: each in its own wrapper, so the opening can drop them in one
           after another and the deal can aim a card at the seat it belongs to */}
       <div className={kit.opponents} ref={anchors.seats}>
-        {opponents.map((p) => {
+        {opponents.map((p, index) => {
           const eliminated = Boolean(p.eliminated)
           const disconnected = disconnectedIds.has(p.id)
           // выбыл → карты в сброс: пустая зона релиза, рука = 0
@@ -1492,6 +1510,13 @@ function BoardView({
                 slotRef={(key, el) => anchors.bindReleaseSlot(p.id, key, el)}
                 onPick={(t) => staging.onTargetPick(t)}
                 targets={staging.targets}
+                targeted={
+                  p.id === attackedSeat
+                    ? you === null && inSpectatorLowerRow(index, opponents.length)
+                      ? 'above'
+                      : 'below'
+                    : undefined
+                }
               />
             </div>
           )

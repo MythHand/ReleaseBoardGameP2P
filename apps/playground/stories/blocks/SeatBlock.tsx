@@ -18,6 +18,8 @@ export default function SeatBlock() {
       turn: 'ход (active)',
       out: 'выбыл',
       noConn: 'нет связи',
+      targeted: 'цель атаки',
+      targetedAbove: 'цель атаки, нижний ряд зрителя',
     },
     en: {
       states: 'Seat states',
@@ -25,6 +27,8 @@ export default function SeatBlock() {
       turn: 'turn (active)',
       out: 'eliminated',
       noConn: 'no connection',
+      targeted: 'attack target',
+      targetedAbove: "attack target, spectator's lower row",
     },
   })
 
@@ -42,6 +46,12 @@ export default function SeatBlock() {
         </KitCell>
         <KitCell caption={w.noConn}>
           <Seat player={player} disconnected copy={copy} />
+        </KitCell>
+        <KitCell caption={w.targeted}>
+          <Seat player={player} targeted="below" copy={copy} />
+        </KitCell>
+        <KitCell caption={w.targetedAbove}>
+          <Seat player={player} targeted="above" copy={copy} />
         </KitCell>
       </KitSection>
     </KitPage>

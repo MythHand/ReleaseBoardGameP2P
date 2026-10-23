@@ -76,3 +76,52 @@ it('keeps public Upgrade choices visible without letting the observer answer', (
   if (card) fireEvent.click(card)
   expect(onResolve).not.toHaveBeenCalled()
 })
+
+// The spectator's seats stand in two rows (`Table.module.css`): a seat of the
+// lower row is marked on its upper edge, facing the centre, the rest on their
+// lower edge. The row is the stylesheet's own split — from the 2nd seat of 2,
+// the 3rd of 3 or 4, the 4th of 5 or 6.
+const LOWER_FROM: Record<number, number> = { 2: 1, 3: 2, 4: 2, 5: 3, 6: 3 }
+
+it.each([
+  2, 3, 4, 5, 6,
+])('marks an attacked seat on the side facing the centre, %i seats', (count) => {
+  mockReducedMotion(true)
+  const props = makeBoardProps()
+  const opponents = Array.from({ length: count }, (_, i) => ({
+    id: `seat-${i}`,
+    name: `Player ${i}`,
+    handCount: 5,
+    release: {},
+  }))
+  const board = (player: string) => (
+    <Board
+      {...props}
+      state={{
+        ...props.state,
+        selfId: null,
+        you: null,
+        opponents,
+        turn: 'seat-0',
+        pending: {
+          kind: 'defend',
+          player,
+          attacker: player === 'seat-0' ? 'seat-1' : 'seat-0',
+          attackCard: 'attack-bug',
+          sudo: false,
+          options: [],
+          openedAt: 0,
+          deadline: 15_000,
+          scope: 'hand',
+        },
+      }}
+    />
+  )
+  const { rerender } = render(board(opponents[0].id))
+  opponents.forEach((seat, i) => {
+    rerender(board(seat.id))
+    expect(screen.getByTestId(`seat-${seat.id}`).getAttribute('data-targeted')).toBe(
+      i >= LOWER_FROM[count] ? 'above' : 'below',
+    )
+  })
+})
